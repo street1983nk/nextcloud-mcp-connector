@@ -92,6 +92,14 @@ that is hard to buy: the permission-correct one.
 
 ## BL-02: Findling synergy, content-hit permission fidelity test (after Findling v1.0)
 
+**STATUS 2026-09-07: IMPLEMENTED** (Findling 1.0.1 is in the store since today, the trigger
+holds). tests/integration/test_content_hit_fidelity.py measures all four steps in one test;
+scripts/install_findling.sh builds the state from the real store artifacts; the exapp CI job
+installs Findling and runs the measurement on every push. Proven locally against a full HaRP
+topology with Findling 1.0.1: alice's marker arrives as a content hit (excerpt carries it,
+no title does), bob gets an empty answer from a provider that answered. Once this is merged
+and green, BL-01 and BL-15 lose this blocker.
+
 **Trigger:** same as BL-01.
 
 **What:** Integration test in this repo, guarded by a skip when Findling is not

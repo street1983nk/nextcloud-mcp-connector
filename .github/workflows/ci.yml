@@ -105,6 +105,19 @@ jobs:
         run: |
           set -a && . ./.env.exapp && set +a
           uv run pytest tests/integration/test_permission_fidelity_exapp.py -m integration
+      - name: Findling on the same instance (BL-02 topology)
+        # The content-hit test below skips without the findling provider, so this install
+        # is what turns it from a skip into a measurement. It uses the real store
+        # artifacts of the pinned release: the PHP half from the GitHub release archive,
+        # the backend image over the same HaRP daemon this job registered the connector
+        # with. Nothing is mocked; the chain measured is the chain a selfhoster gets.
+        run: bash scripts/install_findling.sh
+      - name: Content-hit permission fidelity with Findling (BL-02)
+        # The synergy claim as a measured fact: a marker that exists only inside a
+        # document reaches alice over unified_search and never reaches bob.
+        run: |
+          set -a && . ./.env.exapp && set +a
+          uv run pytest tests/integration/test_content_hit_fidelity.py -m integration
       - name: The OAuth connection over the full chain (AUTH-02, AUTH-03, SC 4, SC 5)
         # The five checks that prove phase 3: a token from the flow serves a tool call over
         # the chain, it survives a restart of the container, two accounts stay two, a
