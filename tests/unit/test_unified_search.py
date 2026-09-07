@@ -377,3 +377,66 @@ async def test_the_provider_list_is_read_again_on_the_next_call(clients: NcClien
         await search_tools.unified_search(clients, query="protokoll")
 
     assert providers.call_count == 2, "no cached provider list, not even for one process"
+
+
+FINDLING_ENTRY = {
+    "title": "Kuendigung-Lagerflaeche.docx",
+    "subline": "... die Kuendigungsfrist betraegt drei Monate ...",
+    "resourceUrl": f"{BASE}/index.php/f/9917",
+    "attributes": [],
+}
+
+
+def providers_with_findling() -> dict[str, Any]:
+    """The runtime list of an instance that carries a content provider (BL-15)."""
+    payload = provider_list("files")
+    payload["ocs"]["data"].append({"id": "findling", "name": "Findling", "order": 60})
+    return payload
+
+
+@pytest.mark.anyio
+async def test_the_note_admits_content_hits_when_findling_answered(clients: NcClients) -> None:
+    """BL-15: the note describes the answer in hand, not the installation.
+
+    The day a content provider answers, the blanket sentence "file contents are not
+    indexed" becomes a lie in the direction pitfall 5 guards against: a model that
+    believes it distrusts a correct content hit. So an answer a content provider
+    contributed to has to say so, and the old sentence must not appear in it.
+    """
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(PROVIDERS_URL).mock(
+            return_value=httpx.Response(200, json=providers_with_findling())
+        )
+        mock.get(search_url("files")).mock(
+            return_value=httpx.Response(200, json=fixture("ocs_search_files.json"))
+        )
+        mock.get(search_url("findling")).mock(
+            return_value=httpx.Response(200, json=hits("Findling", [FINDLING_ENTRY]))
+        )
+
+        result = await search_tools.unified_search(clients, query="budget")
+
+    assert result["note"] == (
+        "matched on names, metadata and file contents; findling searched inside documents"
+    )
+    assert "not indexed" not in result["note"]
+
+
+@pytest.mark.anyio
+async def test_the_note_stays_conservative_when_the_content_provider_broke(
+    clients: NcClients,
+) -> None:
+    """A degraded content provider contributed nothing, so the old sentence is the truth."""
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(PROVIDERS_URL).mock(
+            return_value=httpx.Response(200, json=providers_with_findling())
+        )
+        mock.get(search_url("files")).mock(
+            return_value=httpx.Response(200, json=fixture("ocs_search_files.json"))
+        )
+        mock.get(search_url("findling")).mock(return_value=httpx.Response(500))
+
+        result = await search_tools.unified_search(clients, query="budget")
+
+    assert result["note"] == search_tools.SEARCH_NOTE
+    assert result["degraded"][0]["provider"] == "findling"
