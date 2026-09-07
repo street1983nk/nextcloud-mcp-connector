@@ -7,6 +7,16 @@
 Ein kuratierter MCP Server, der Ihr Nextcloud (Dateien, Kalender, Notizen, Deck, Kontakte, Tables, Talk
 und Mail) mit KI-Assistenten wie Claude, Cursor, ChatGPT oder Ihren eigenen Agenten verbindet.
 
+**Findling + Nextcloud MCP Connector = die Retrieval-Schicht für Ihr eigenes RAG.**
+[Findling](https://apps.nextcloud.com/apps/findling) macht den Inhalt Ihrer Dokumente
+durchsuchbar, Scans eingeschlossen, und 1.0.0 bringt die semantische Suche mit. Der
+Connector reicht diese Treffer an jeden MCP-Client weiter, mit genau den Rechten des
+fragenden Nutzers. Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
+Gemessen statt versprochen:
+[tests/integration/test_content_hit_fidelity.py](tests/integration/test_content_hit_fidelity.py)
+belegt, dass ein Inhaltstreffer nie ein fremdes Konto erreicht.
+
+
 **Dieser Server kann niemals etwas löschen, überschreiben oder neu teilen.**
 
 Dieser Satz ist die Design-Einschränkung, kein Versprechen guten Verhaltens. Der Server implementiert

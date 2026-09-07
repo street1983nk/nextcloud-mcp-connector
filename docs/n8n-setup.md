@@ -6,6 +6,13 @@
 the identity of the person who signed in, instead of with one administrator credential
 shared by everybody.
 
+**Content hits included:** with
+[Findling](https://apps.nextcloud.com/apps/findling) installed, `unified_search` returns
+hits from inside documents (scans included) with the rights of the signed in user; the
+answer's `note` says what was matched. Proof:
+[tests/integration/test_content_hit_fidelity.py](../tests/integration/test_content_hit_fidelity.py).
+
+
 Everything below was executed against **n8n 2.37.10**
 (`n8nio/n8n@sha256:307d6065be25619aa24cfc63a7c2f04ca56d084a08c05c8e9f189a89f353b1ec`) and
 **this connector 0.1.11** on **Nextcloud 34.0.3** with **AppAPI 34.0.0** behind

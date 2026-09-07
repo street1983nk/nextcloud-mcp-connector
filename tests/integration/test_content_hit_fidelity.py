@@ -239,6 +239,14 @@ async def test_a_content_hit_reaches_alice_and_never_bob(chain_env: dict[str, st
         assert any(marker in hit.get("subline", "") for hit in hits), (
             f"no excerpt carries the marker, so the hit is not proven to be content: {hits!r}"
         )
+        # BL-15: the answer a content provider contributed to must not claim the
+        # opposite in the same payload; the note names the content search instead.
+        assert "not indexed" not in answer.get("note", ""), (
+            f"the note contradicts the content hit it travels with: {answer.get('note')!r}"
+        )
+        assert FINDLING_PROVIDER in answer.get("note", ""), (
+            f"the note does not name the content provider: {answer.get('note')!r}"
+        )
 
     # 4. Leak test: same marker, same provider, bob's identity. The provider has to have
     #    ANSWERED emptily; a degradation entry would mean "empty because broken" and must

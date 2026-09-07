@@ -20,9 +20,11 @@ notes ``note:<id>``, deck cards the short ``card:<cardId>`` form, and everything
 ``url:<absolute-url>``. The last two are marked ``resolvable: false``, because neither can
 be handed to a read tool as it stands (pitfall 10).
 
-**The expectation is managed in the answer.** ``note`` says out loud that names and
-metadata are matched, not file contents. Without it a model concludes "the document does
-not exist" from a search that never looked inside a single file (pitfall 5).
+**The expectation is managed in the answer.** ``note`` says out loud what this answer
+matched: names and metadata only, or file contents too, when a content provider such as
+findling answered (BL-15). Without it a model concludes "the document does not exist"
+from a search that never looked inside a single file, or distrusts a real content hit
+because the payload claims contents are not indexed (pitfall 5, both directions).
 """
 
 import asyncio
@@ -43,12 +45,25 @@ MAX_LIMIT = 100
 #: parallel in the web UI for the same reason: one slow app is normal, a slow answer is not.
 PER_PROVIDER_TIMEOUT = 15.0
 
-#: One sentence against a whole class of wrong model statements (pitfall 5).
+#: One sentence against a whole class of wrong model statements (pitfall 5). Until
+#: 2026-09-07 it was unconditional and became false the day a content provider was
+#: installed (BL-15): findling answers with real content hits, scanned PDFs included,
+#: and this very sentence taught the model to distrust them. The note now describes
+#: the answer in hand, not the installation: this constant stays the truth for an
+#: answer no content provider contributed to, and :func:`_note` builds the truth for
+#: the other case. Ships with release 0.1.12.
 SEARCH_NOTE = "matched on names and metadata; file contents are not indexed"
+
+#: The providers that search inside file contents. Grown by proof and never by guess:
+#: a name enters this set when the content hit fidelity test of BL-02
+#: (tests/integration/test_content_hit_fidelity.py) has seen it answer with a content
+#: hit behind this connector's impersonation and with bob's empty counter proof.
+CONTENT_PROVIDERS = frozenset({"findling"})
 
 _TERM_HINT = (
     "Give at least one word, for example 'budget'. Nextcloud rejects a search without a "
-    "term, and words that only appear inside a document are not indexed."
+    "term. Whether words inside documents are found depends on the installed providers; "
+    "the note of every answer says what this search actually matched."
 )
 
 _UNKNOWN_PROVIDER_REASON = "This Nextcloud has no search provider with that id."
@@ -109,7 +124,7 @@ async def unified_search(
         "query": term,
         "count": len(results),
         "results": results,
-        "note": SEARCH_NOTE,
+        "note": _note(selected, degraded),
     }
     if degraded:
         result["degraded"] = degraded
@@ -120,6 +135,25 @@ async def unified_search(
         # on, a shorter list without a word about it is not.
         result["skipped"] = skipped
     return result
+
+
+def _note(selected: Sequence[str], degraded: list[dict[str, str]]) -> str:
+    """The sentence a model may trust, about this answer and not about the instance.
+
+    A content provider that was asked and answered makes the answer include content
+    hits, so the old blanket sentence would be a lie in exactly the direction pitfall
+    5 guards against. A content provider that is installed but degraded contributed
+    nothing, so for that answer the conservative sentence stays the honest one.
+    """
+    broken = {item["provider"] for item in degraded}
+    content = sorted(name for name in selected if name in CONTENT_PROVIDERS and name not in broken)
+    if not content:
+        return SEARCH_NOTE
+    return (
+        "matched on names, metadata and file contents; "
+        + " and ".join(content)
+        + " searched inside documents"
+    )
 
 
 def _select(

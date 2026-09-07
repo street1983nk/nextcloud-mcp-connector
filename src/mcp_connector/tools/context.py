@@ -284,7 +284,14 @@ async def prepare_context(clients: NcClients, query: str, detail: str = SHORT) -
     }
     if degraded:
         result["degraded"] = degraded
-    result["note"] = search_tools.SEARCH_NOTE
+    # The note travels from the inner search answer, so it stays true the day a content
+    # provider answers (BL-15). When the search leg itself failed, nothing in this bundle
+    # is a content hit and the conservative sentence is the honest one.
+    result["note"] = (
+        search_out.get("note", search_tools.SEARCH_NOTE)
+        if isinstance(search_out, dict)
+        else search_tools.SEARCH_NOTE
+    )
     return result
 
 
