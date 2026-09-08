@@ -9,9 +9,9 @@ All notable changes to this app are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.12] - 2026-09-08
 
-Nothing here is released. The record of tool calls that 0.1.11 did not carry is usable now: an
+The record of tool calls that 0.1.11 announced is usable now: an
 administrator switches it on in the admin settings and reads it with an occ command, and every
 sentence this app publishes about storage, about the purge and about what is planned says what
 the code does. An installed instance sees none of it before the next release, because the store
@@ -19,6 +19,11 @@ reads the manifest at upload time and an installed app keeps the code it was ins
 
 ### Added
 
+- The content hit permission fidelity test: alice uploads a document whose unique marker exists
+  only in the content, alice finds it over `unified_search` through the full ExApp chain, bob
+  never does, and the file name provably carries no marker. It runs in CI against a real
+  Nextcloud with Findling installed from the store, and it is the measurement the synergy
+  banner of the READMEs points at.
 - An occ command that reads the record: `occ mcp_connector:audit:read` prints the entries of one
   account or of the instance, newest first, one line per entry, and never a parameter value.
   `--user` takes an account name, or the word `instance` for the chain that belongs to no
@@ -38,6 +43,17 @@ reads the manifest at upload time and an installed app keeps the code it was ins
 
 ### Changed
 
+- The store description is a short fact list now, owner directive of 2026-09-07: what the
+  connector does, what it will never do, the audit line, and the requirements, in all three
+  languages. It carries one new paragraph: together with Findling this connector forms the
+  retrieval layer for your own RAG, search hits include document contents with exactly the
+  rights of the asking user. The measurement behind that sentence is
+  tests/integration/test_content_hit_fidelity.py.
+- The note of a `unified_search` answer describes the answer instead of the installation: with a
+  content provider answering it says that file contents were searched and by whom, without one it
+  keeps the old sentence, and the tool description points at the note instead of claiming
+  anything. Before this, an instance with Findling told every client in the same payload that
+  contents are not indexed while handing over content hits.
 - The wording of the audit switch in the admin settings names the three things the short version
   left out: the names of the parameters, never their values, a fixed identifier of the reason
   where a call was refused, and how long a call took. It also says what a later check of the
@@ -587,7 +603,7 @@ First release, submitted to the Nextcloud App Store.
   never sees more than that user sees in the web interface.
 - A privacy and data flow description, see [docs/privacy.md](docs/privacy.md).
 
-[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.1.11...HEAD
+[0.1.12]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.1.8...v0.1.9

@@ -62,167 +62,55 @@
 	  - test_no_description_names_a_blocked_mailbox holds the rule, so it does not have to be
 	  - found a second time.
 	-->
-	<description><![CDATA[
-**MCP Connector** is a self hosted MCP server for your Nextcloud. It connects AI assistants that speak the [Model Context Protocol](https://modelcontextprotocol.io), such as Claude, Claude Code, ChatGPT or your own agent. Every request runs as the signed in user.
+	<description><![CDATA[What MCP Connector does:
 
-### What an assistant can do
+- Connects MCP assistants (Claude, ChatGPT, n8n, your own agent) to Nextcloud; every request runs as the signed-in user (OAuth sign-in; a per-account switch pauses access, one click can disconnect an assistant)
+- Tools: files, calendar, notes, Deck, contacts, Tables, Talk, mail (read only) and one search across all of it
+- Nothing destructive: no delete, no move, no share; nothing in the background, no telemetry
 
-- **Files**: browse, search, read, upload
-- **Calendar**: read the agenda, create an event
-- **Notes**: search, read, write
-- **Deck**: browse boards and cards, add a card
-- **Contacts**: search the address book
-- **Tables**: read tables, columns and rows, add a row
-- **Talk**: read conversations, send a message
-- **Mail**: read the accounts, the mailboxes of one, the messages of one, and the full text of a single message, with filters
-- **Search**: one question across all of it, full text on demand
-- **One call**: prepare_context bundles a search, the coming week, the Talk conversations that are waiting and the unread mail counts into a single answer. Mail arrives as counts only, so the standard bundle carries no subject and no message content at all.
-- **Open a hit in place**: a Talk message and a table found by the search are read where they were found, without switching to the app. A mail hit deliberately stays a link, because resolving it to one single message is untested, and a wrong one would be somebody else's mail.
-
-### What it will not do
-
-- **Nothing destructive**: no delete, no move, no share
-- **No trace when reading**: Talk sets no read marker
-- **Mail is read only**: no way to send, to draft, to move, to flag or to delete a message
-- **One direct messaging channel**: sending a Talk message, and an administrator can switch it off
-
-An assistant also reads text that strangers wrote, right next to your data. The only direct way out is a Talk message, and an administrator can switch it off. New files, cards or rows send nothing to anyone, but they can land somewhere you share with others.
-
-### Under your control
-
-- **Real sign in**: OAuth through Nextcloud, no app password in a configuration file
-- **Your own switch**: pause access or disconnect one assistant, per account
-- **Nothing in the background**: no scheduled job, no indexing, no telemetry
-- **Your data stays yours**: what an assistant reads goes to that assistant, in most cases a hosted provider
-
-### Automation with n8n
-
-Nextcloud data in n8n AI workflows, without a new line of code. n8n speaks MCP since version 1.119.0, so one node reaches every tool of this app, and each person signs in once with their own account instead of a shared administrator credential. That is what turns an n8n workflow into an agent: agentic AI working on real Nextcloud data, with the permissions of the account that signed in. A measured walkthrough, with both registration paths, an unattended workflow that needs no language model, a file trigger built from Nextcloud's own webhook app and the pitfalls that actually happen: [Nextcloud in n8n over MCP](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/n8n-setup.md)
+Together with [Findling](https://apps.nextcloud.com/apps/findling), this connector forms the retrieval layer for your own RAG: search hits include document contents, scans included, with exactly the rights of the asking user.
 
 ### Enterprise
 
-The audit log is part of this app and not of an add-on. With it on, every tool call is written down with the account it ran for, the tool, the time, the calling app and the outcome, and never a parameter value or any part of a result. It is off by default, an administrator switches it on in the admin settings of this app, and the entries are read with the command occ mcp_connector:audit:read. Every entry is hash chained to the one before it, and occ mcp_connector:audit:verify walks the chains and names the first place one of them is broken.
+The hash-chained audit log is built in and off by default; next on this road: group policies and identity provider sign-in.
 
-Two things are planned as a commercial add-on for organisations: group policies, and sign in through the identity provider your organisation already runs. Want to run this app in your organisation? Talk to us: admin@infranode.dev
+Requirements:
 
-### Resources
+- Nextcloud 32 to 34 with the AppAPI app; runs as an External App
+- n8n speaks MCP natively since 1.119.0; guide: docs/n8n-setup.md in the source code]]></description>
+	<description lang="de"><![CDATA[Was der MCP Connector kann:
 
-- [Set up a client](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/client-setup.md)
-- [Nextcloud in n8n over MCP](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/n8n-setup.md)
-- [Privacy and data flow](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/privacy.md)
-- [Questions and answers](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/faq.md)
-- [Source code and issues](https://github.com/street1983nk/nextcloud-mcp-connector)
-- [Rate this app in the app store](https://apps.nextcloud.com/apps/mcp_connector)
-	]]></description>
-	<description lang="de"><![CDATA[
-**MCP Connector** ist ein selbst gehosteter MCP Server für Ihre Nextcloud. Er verbindet KI-Assistenten, die das [Model Context Protocol](https://modelcontextprotocol.io) sprechen, etwa Claude, Claude Code, ChatGPT oder Ihren eigenen Agenten. Jede Anfrage läuft unter der Identität des angemeldeten Nutzers.
+- Verbindet MCP-Assistenten (Claude, ChatGPT, n8n, eigene Agenten) mit Nextcloud; jede Anfrage läuft als der angemeldete Nutzer (OAuth-Anmeldung; ein Schalter je Konto pausiert den Zugriff, ein Klick kann einen Assistenten trennen)
+- Werkzeuge: Dateien, Kalender, Notizen, Deck, Kontakte, Tables, Talk, Mail (nur lesen) und eine Suche über alles
+- Nichts Destruktives: kein Löschen, kein Verschieben, kein Teilen; nichts im Hintergrund, keine Telemetrie
 
-### Was ein Assistent kann
-
-- **Dateien**: durchsehen, suchen, lesen, hochladen
-- **Kalender**: Termine lesen, einen Termin anlegen
-- **Notizen**: suchen, lesen, schreiben
-- **Deck**: Boards und Karten durchsehen, eine Karte anlegen
-- **Kontakte**: das Adressbuch durchsuchen
-- **Tables**: Tabellen, Spalten und Zeilen lesen, eine Zeile anlegen
-- **Talk**: Konversationen lesen, eine Nachricht senden
-- **Mail**: die Konten, die Postfächer eines Kontos, die Nachrichten eines Postfachs und den Volltext einer einzelnen Nachricht lesen, mit Filtern
-- **Suche**: eine Frage über alles davon, Volltext auf Abruf
-- **Ein Aufruf**: prepare_context bündelt eine Suche, die kommende Woche, die wartenden Talk-Konversationen und die Ungelesen-Zähler der Mailkonten in einer einzigen Antwort. Mail kommt nur als Zahl, das Standardbündel enthält also weder einen Betreff noch einen Nachrichteninhalt.
-- **Einen Treffer direkt lesen**: eine Talk-Nachricht und eine Tabelle aus der Suche werden dort gelesen, wo sie gefunden wurden, ohne Wechsel in die App. Ein Mail-Treffer bleibt bewusst ein Link, weil seine Auflösung auf genau eine Nachricht ungeprüft ist und eine falsche die Mail eines anderen Menschen wäre.
-
-### Was er nicht kann
-
-- **Nichts Zerstörendes**: kein Löschen, kein Verschieben, kein Teilen
-- **Keine Spur beim Lesen**: Talk setzt keinen Lesemarker
-- **Mail nur lesen**: kein Weg, eine Nachricht zu senden, als Entwurf anzulegen, zu verschieben, zu markieren oder zu löschen
-- **Nur ein direkter Nachrichtenkanal**: eine Talk-Nachricht senden, und die Administration kann das abschalten
-
-Eine Assistenz liest auch fremde Texte neben Ihren Daten. Der einzige direkte Weg nach außen ist die Talk-Nachricht, und die Administration kann ihn abschalten. Neu angelegte Dateien, Karten oder Zeilen verschicken nichts, können aber dort landen, wo Sie mit anderen teilen.
-
-### In Ihrer Hand
-
-- **Echte Anmeldung**: OAuth über Nextcloud, kein App-Passwort in einer Konfigurationsdatei
-- **Ihr eigener Schalter**: Zugang pausieren oder eine einzelne Assistenz trennen, pro Konto
-- **Nichts im Hintergrund**: keine geplante Aufgabe, keine Indizierung, keine Telemetrie
-- **Ihre Daten bleiben Ihre**: was eine Assistenz liest, geht an genau diese Assistenz, meist an einen gehosteten Anbieter
-
-### Automatisierung mit n8n
-
-Nextcloud-Daten in n8n-KI-Workflows, ohne eine neue Zeile Code. n8n spricht MCP seit Version 1.119.0, ein einziger Knoten erreicht damit jedes Werkzeug dieser App, und jede Person meldet sich einmal mit dem eigenen Konto an, statt ein geteiltes Administrationskonto zu benutzen. Genau das macht aus einem n8n-Workflow einen Agenten: agentic AI auf echten Nextcloud-Daten, mit den Rechten des Kontos, das sich angemeldet hat. Eine durchgemessene Anleitung mit beiden Registrierungswegen, einem unbeaufsichtigten Workflow ohne Sprachmodell, einem Datei-Auslöser aus Nextclouds eigener Webhook-App und den Stolpersteinen, die wirklich auftreten: [Nextcloud in n8n über MCP](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/n8n-setup.md)
+Zusammen mit [Findling](https://apps.nextcloud.com/apps/findling) ergibt dieser Connector die Retrieval-Schicht für Ihr eigenes RAG: Suchtreffer enthalten Dokumentinhalte, auch aus Scans, mit genau den Rechten des fragenden Nutzers.
 
 ### Enterprise
 
-Das Audit-Log gehört zu dieser App und nicht zu einem Add-on. Eingeschaltet hält es jeden Werkzeugaufruf fest: das Konto, für das er lief, das Werkzeug, die Zeit, die aufrufende App und das Ergebnis, nie einen Parameterwert und nie einen Teil eines Ergebnisses. Es ist ab Werk aus, die Administration schaltet es in den Admin-Einstellungen dieser App ein, und gelesen wird es mit dem Kommando occ mcp_connector:audit:read. Jeder Eintrag ist mit dem vorigen hash-verkettet, und occ mcp_connector:audit:verify prüft die Ketten und nennt die erste Stelle, an der eine gebrochen ist.
+Das hash-verkettete Audit-Log ist eingebaut und ab Werk aus; als Nächstes auf dieser Schiene: Gruppen-Policies und Anmeldung über den Identity-Provider.
 
-Zwei Dinge sind als kommerzielles Add-on für Organisationen geplant: Gruppen-Policies und die Anmeldung über den Identitätsanbieter Ihrer Organisation. Sie möchten die App in Ihrer Organisation einsetzen? Sprechen Sie uns an: admin@infranode.dev
+Anforderungen:
 
-### Weiterführendes
+- Nextcloud 32 bis 34 mit der App AppAPI; läuft als External App
+- n8n spricht MCP ab 1.119.0 direkt; Anleitung: docs/n8n-setup.md im Quellcode]]></description>
+	<description lang="fr"><![CDATA[Ce que sait faire le MCP Connector :
 
-- [Einen Client einrichten](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/client-setup.md)
-- [Nextcloud in n8n über MCP](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/n8n-setup.md)
-- [Datenschutz und Datenfluss](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/privacy.md)
-- [Fragen und Antworten](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/faq.md)
-- [Quellcode und Fehlermeldungen](https://github.com/street1983nk/nextcloud-mcp-connector)
-- [Diese App im App Store bewerten](https://apps.nextcloud.com/apps/mcp_connector)
+- Connecte les assistants MCP (Claude, ChatGPT, n8n, vos propres agents) à Nextcloud ; chaque requête s'exécute comme l'utilisateur connecté (connexion OAuth ; un interrupteur par compte suspend l'accès, un clic peut déconnecter un assistant)
+- Outils : fichiers, calendrier, notes, Deck, contacts, Tables, Talk, mail (lecture seule) et une recherche sur tout
+- Rien de destructif : pas de suppression, pas de déplacement, pas de partage ; rien en arrière-plan, pas de télémétrie
 
-Die verlinkten Seiten sind auf Englisch.
-	]]></description>
-	<description lang="fr"><![CDATA[
-**MCP Connector** est un serveur MCP auto-hébergé pour votre Nextcloud. Il relie les assistants IA qui parlent le [Model Context Protocol](https://modelcontextprotocol.io), comme Claude, Claude Code, ChatGPT ou votre propre agent. Chaque requête s'exécute sous l'identité de l'utilisateur connecté.
-
-### Ce qu'un assistant peut faire
-
-- **Fichiers** : parcourir, rechercher, lire, téléverser
-- **Agenda** : lire les événements, en créer un
-- **Notes** : rechercher, lire, écrire
-- **Deck** : parcourir les tableaux et les cartes, ajouter une carte
-- **Contacts** : rechercher dans le carnet d'adresses
-- **Tables** : lire les tables, les colonnes et les lignes, ajouter une ligne
-- **Talk** : lire les conversations, envoyer un message
-- **Mail** : lire les comptes, les boîtes aux lettres de l'un d'eux, les messages de l'une d'elles et le texte complet d'un seul message, avec des filtres
-- **Recherche** : une seule question sur tout cela, texte complet à la demande
-- **Un seul appel** : prepare_context regroupe une recherche, la semaine à venir, les conversations Talk en attente et le nombre de messages non lus des comptes Mail dans une seule réponse. Mail n'arrive que sous forme de nombres, le paquet standard ne contient donc ni objet ni contenu de message.
-- **Lire un résultat sur place** : un message Talk et une table issus de la recherche se lisent là où ils ont été trouvés, sans passer dans l'application. Un résultat Mail reste volontairement un lien, car sa résolution vers un seul message n'est pas testée et un mauvais serait le courrier de quelqu'un d'autre.
-
-### Ce qu'il ne fera pas
-
-- **Rien de destructeur** : aucune suppression, aucun déplacement, aucun partage
-- **Aucune trace à la lecture** : Talk ne pose pas de marqueur de lecture
-- **Mail en lecture seule** : aucun moyen d'envoyer, de rédiger un brouillon, de déplacer, de marquer ou de supprimer un message
-- **Un seul canal de message direct** : envoyer un message Talk, et un administrateur peut le désactiver
-
-Un assistant lit aussi des textes écrits par des inconnus, à côté de vos données. La seule sortie directe est le message Talk, et un administrateur peut la désactiver. Les fichiers, cartes ou lignes créés n'envoient rien à personne, mais ils peuvent atterrir là où vous partagez avec d'autres.
-
-### Sous votre contrôle
-
-- **Une vraie authentification** : OAuth via Nextcloud, aucun mot de passe d'application dans un fichier de configuration
-- **Votre propre interrupteur** : suspendre l'accès ou déconnecter un seul assistant, par compte
-- **Rien en arrière-plan** : ni tâche planifiée, ni indexation, ni télémétrie
-- **Vos données restent les vôtres** : ce qu'un assistant lit va à cet assistant, dans la plupart des cas un fournisseur hébergé
-
-### Automatisation avec n8n
-
-Les données Nextcloud dans les workflows IA de n8n, sans une nouvelle ligne de code. n8n parle MCP depuis la version 1.119.0 : un seul nœud atteint tous les outils de cette application, et chaque personne se connecte une fois avec son propre compte au lieu de partager un identifiant d'administration. C'est ce qui transforme un workflow n8n en agent : de l'agentic AI sur de vraies données Nextcloud, avec les droits du compte connecté. Un guide mesuré, avec les deux voies d'enregistrement, un workflow autonome qui n'a besoin d'aucun modèle de langage, un déclencheur de fichier construit avec l'application webhook de Nextcloud et les pièges qui surviennent vraiment : [Nextcloud dans n8n via MCP](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/n8n-setup.md)
+Avec [Findling](https://apps.nextcloud.com/apps/findling), ce connecteur forme la couche de récupération de votre propre RAG : les résultats de recherche incluent le contenu des documents, numérisations comprises, avec exactement les droits de l'utilisateur qui demande.
 
 ### Enterprise
 
-Le journal d'audit fait partie de cette application et non d'un module complémentaire. Activé, il consigne chaque appel d'outil : le compte pour lequel il s'est exécuté, l'outil, l'heure, l'application appelante et le résultat, jamais une valeur de paramètre ni une partie d'un résultat. Il est désactivé par défaut, un administrateur l'active dans les paramètres d'administration de cette application, et il se lit avec la commande occ mcp_connector:audit:read. Chaque entrée est chaînée par empreinte à la précédente, et occ mcp_connector:audit:verify parcourt les chaînes et indique le premier endroit où l'une d'elles est rompue.
+Le journal d'audit chaîné par hachage est intégré et désactivé par défaut ; ensuite sur cette route : politiques de groupe et connexion via le fournisseur d'identité.
 
-Deux choses sont prévues comme module commercial pour les organisations : les politiques de groupe et l'authentification via le fournisseur d'identité de votre organisation. Vous souhaitez déployer l'application dans votre organisation ? Contactez-nous : admin@infranode.dev
+Prérequis :
 
-### Pour aller plus loin
-
-- [Configurer un client](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/client-setup.md)
-- [Nextcloud dans n8n via MCP](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/n8n-setup.md)
-- [Confidentialité et flux de données](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/privacy.md)
-- [Questions et réponses](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/docs/faq.md)
-- [Code source et signalements](https://github.com/street1983nk/nextcloud-mcp-connector)
-- [Noter cette application dans l'App Store](https://apps.nextcloud.com/apps/mcp_connector)
-
-Les pages liées sont en anglais.
-	]]></description>
-	<version>0.1.11</version>
+- Nextcloud 32 à 34 avec l'application AppAPI ; fonctionne comme External App
+- n8n parle MCP nativement depuis la 1.119.0 ; guide : docs/n8n-setup.md dans le code source]]></description>
+	<version>0.1.12</version>
 	<licence>agpl</licence>
 	<author mail="admin@infranode.dev">street1983nk</author>
 	<namespace>McpConnector</namespace>
@@ -297,7 +185,7 @@ Les pages liées sont en anglais.
 			-->
 			<registry>ghcr.io</registry>
 			<image>street1983nk/mcp_connector</image>
-			<image-tag>0.1.11</image-tag>
+			<image-tag>0.1.12</image-tag>
 		</docker-install>
 		<!--
 		  - Exactly thirteen routes, and they are the whole external attack surface of this app.
