@@ -69,9 +69,12 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
     """Build the MCP application of this deployment and attach the lifecycle routes.
 
     The MCP half is built exactly like ``entry_http.build_app``. Behind HaRP the ``Host``
-    header is the one of the reverse proxy, so the container image sets
-    ``NC_MCP_DISABLE_DNS_REBINDING_PROTECTION``; the allowlist stays configurable for
-    deployments that terminate closer to the client (the 421 of pitfall 6 in phase 1).
+    header is the one of the reverse proxy, so the entrypoint of the container sets
+    ``NC_MCP_DISABLE_DNS_REBINDING_PROTECTION`` on that path alone. Everywhere else the
+    check stays armed, and since issue #4 it is armed over an allowlist that carries the
+    public address of this deployment (``config.deployment_hosts``) instead of localhost
+    alone: the proxy of an AIO installation forwards the custom domain, and a one click
+    installation has no deploy variable to add it with (the 421 of pitfall 6 in phase 1).
 
     The three lifecycle routes are appended here and nowhere else. Registering them on the
     shared server object would add them to the standalone HTTP mode as well, and D-23 says
@@ -249,27 +252,38 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
 def _warn_when_the_host_check_is_a_trap(env: Mapping[str, str] | None = None) -> None:
     """Name the 421 trap of a docker-install daemon without HaRP at startup (IN-04).
 
-    Behind the PHP proxy the ``Host`` header is the container name, the rebinding
-    protection stays armed without ``HP_SHARED_KEY``, and the default allowlist is
-    localhost. The lifecycle routes sit before the transport check, so the installation
-    turns green and every ``/mcp`` request afterwards dies as a 421 that surfaces as one
-    log line. The warning is skipped when the operator already made a decision: an
-    allowlist is set, the shared key selects the HaRP path, or the check is disabled.
+    Without ``HP_SHARED_KEY`` the rebinding protection stays armed, and until issue #4 the
+    allowlist behind it was localhost and nothing else: the ``Host`` header a proxy
+    forwards is either the container name or, as measured in AIO, the public custom
+    domain, and neither was in it. The lifecycle routes sit before the transport check, so
+    the installation turns green and every ``/mcp`` request afterwards dies as a 421 that
+    surfaces as one log line.
+
+    Since :func:`~mcp_connector.config.deployment_hosts` the allowlist carries the public
+    address of this deployment, so the trap is only still open when there is no such
+    address to derive from. The warning is skipped whenever the question is already
+    answered: a derived host, an allowlist of her own, the shared key that selects the
+    HaRP path, or a disabled check.
     """
     source = os.environ if env is None else env
     if (source.get(config.ENV_HP_SHARED_KEY) or "").strip():
         return
     if (source.get(config.ENV_ALLOWED_HOSTS) or "").strip():
         return
+    if config.deployment_hosts(source):
+        return
     if not config.dns_rebinding_protection(env):
         return
     logger.warning(
-        "%s is not set and %s is empty. Without HaRP the Host header of every proxied "
-        "request is the container name, the Host check stays armed with the localhost "
-        "default, and every /mcp request will answer 421. Set %s to the host name the "
-        "proxy uses for this container (docs/exapp-install.md, pitfall 5).",
+        "%s is not set, %s is empty and no address of this deployment could be read from "
+        "%s or %s. The Host check stays armed with the localhost default, so every /mcp "
+        "request will answer 421. Set the public address of this app, which the allowlist "
+        "is derived from, or set %s to the host name the proxy uses for this container "
+        "(docs/exapp-install.md, pitfall 5).",
         config.ENV_HP_SHARED_KEY,
         config.ENV_ALLOWED_HOSTS,
+        config.ENV_PUBLIC_URL,
+        config.ENV_NEXTCLOUD_URL,
         config.ENV_ALLOWED_HOSTS,
     )
 

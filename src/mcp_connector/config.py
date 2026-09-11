@@ -332,8 +332,57 @@ def _probe_writable(path: Path) -> bool:
     return True
 
 
+def deployment_hosts(env: Mapping[str, str] | None = None) -> list[str]:
+    """The host names this deployment answers to, read out of its own two addresses.
+
+    The answer to issue #4: in Nextcloud AIO the proxy in front of an ExApp forwards the
+    ``Host`` header of the public custom domain, the allowlist knew localhost and nothing
+    else, and every ``/mcp`` request died as a 421 that an administrator of a one click
+    installation had no variable to fix, because ``NC_MCP_ALLOWED_HOSTS`` is a deploy
+    variable and a store installation gets none.
+
+    Two variables are read and no third one:
+
+    * ``NC_MCP_PUBLIC_URL`` is the address clients are told to call this server at. It is
+      the one value such an installation *does* have, because it is the one field the
+      administration form of this app asks for, so deriving from it is what makes the
+      allowlist reachable without a deploy variable at all.
+    * ``NEXTCLOUD_URL`` is the address of the Nextcloud this container belongs to, set by
+      the AppAPI deploy daemon, and in AIO it *is* the public custom domain: that
+      deployment passes ``'nextcloud_url' => 'https://' . getenv('NC_DOMAIN')``
+      (``AIODockerActions::registerAIOHarpDaemonConfig``). So this is the variable that
+      carries the answer before an administrator has filled in any form at all. Only its
+      host is read, so the ``https`` to ``http`` rewrite AppAPI does to that value on
+      other daemons is irrelevant here.
+
+    ``NC_MCP_URL`` is deliberately not among them: that is the Nextcloud a standalone
+    process talks *to*, never an address this server is reached at, and an allowlist entry
+    for it would widen the check for nothing.
+
+    This is not a hole in the DNS rebinding protection, it is what the protection is for.
+    Both values come from the deploy environment or from the administration form of this
+    app, neither is settable from a request, and the check stays armed against every other
+    name. The alternative, and the one this replaces, is disabling the protection.
+    """
+    source = os.environ if env is None else env
+    names: list[str] = []
+    for variable in (ENV_PUBLIC_URL, ENV_NEXTCLOUD_URL):
+        host = _host_of(source.get(variable) or "")
+        if host and host not in names:
+            names.append(host)
+    return names
+
+
 def allowed_hosts(env: Mapping[str, str] | None = None) -> list[str]:
-    """Parse ``NC_MCP_ALLOWED_HOSTS`` into an allowlist for the transport layer.
+    """Build the Host allowlist of the transport layer for this deployment.
+
+    Two sources, in this order: the host names of :func:`deployment_hosts`, which this
+    server answers to by definition and which are therefore always present, and then
+    ``NC_MCP_ALLOWED_HOSTS`` if an operator set one, or the localhost default if she did
+    not. The explicit variable still replaces that default rather than extending it, which
+    is what it always did: an operator who narrows the list meant to narrow it, and the
+    derived names are not a widening she did not ask for but the address of her own
+    deployment.
 
     Two entries per bare hostname (``example.com`` and ``example.com:*``), because the
     Host header carries the port whenever the client was given one, and an allowlist that
@@ -342,7 +391,8 @@ def allowed_hosts(env: Mapping[str, str] | None = None) -> list[str]:
     """
     source = os.environ if env is None else env
     raw = (source.get(ENV_ALLOWED_HOSTS) or "").strip()
-    names = [item.strip() for item in raw.split(",") if item.strip()] or list(LOCALHOST_NAMES)
+    configured = [item.strip() for item in raw.split(",") if item.strip()]
+    names = [*deployment_hosts(source), *(configured or list(LOCALHOST_NAMES))]
 
     hosts: list[str] = []
     for name in names:
@@ -479,6 +529,39 @@ def _bounded_number(env: Mapping[str, str] | None, name: str, default: int, floo
 def _has_port(name: str) -> bool:
     """True for ``example.com:8765`` and ``[::1]:*``, false for ``[::1]``."""
     return ":" in name.rsplit("]", 1)[-1]
+
+
+def _host_of(raw: str) -> str:
+    """The bare host name of an absolute http(s) URL, in the spelling a Host header uses.
+
+    Empty for everything this function cannot read with certainty: a blank value, a value
+    without a scheme it knows, a value without an authority, and a value ``urlsplit`` or
+    its own port parser refuses. Empty means "contributes no allowlist entry", which is the
+    fail closed answer: a name guessed out of a string nobody could parse would be an
+    allowlist entry nobody wrote.
+
+    The port is dropped on purpose. :func:`allowed_hosts` expands a bare name into ``name``
+    and ``name:*``, so the wildcard covers the port the deployment actually publishes,
+    which is not always the one that happens to stand in the configured address.
+
+    IPv6 comes back in brackets, because ``urlsplit`` strips them and a Host header carries
+    them (RFC 3986 §3.2.2).
+    """
+    candidate = raw.strip()
+    if not candidate:
+        return ""
+    try:
+        parts = urlsplit(candidate)
+        if parts.scheme not in ("http", "https") or not parts.netloc:
+            return ""
+        hostname = parts.hostname
+    except ValueError:
+        # A bracket that never closes, a port that is not a number: both raise here rather
+        # than answering, and neither is a host name this function may invent one for.
+        return ""
+    if not hostname:
+        return ""
+    return f"[{hostname}]" if ":" in hostname else hostname
 
 
 def _required_exapp(source: Mapping[str, str], name: str) -> str:

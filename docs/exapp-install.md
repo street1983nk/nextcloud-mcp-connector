@@ -348,14 +348,28 @@ docker compose -f compose.exapp.yml up -d --no-deps --force-recreate appapi-harp
 request was actually routed, which is the fastest way to tell a cache problem from a
 configuration problem.
 
-**5. A docker-install daemon without HaRP runs `/mcp` into a 421 trap** (IN-04). Behind
-the PHP proxy the `Host` header of every proxied request is the container name, the DNS
-rebinding protection stays armed (the entrypoint only disarms it when `HP_SHARED_KEY` is
-set), and the default allowlist is localhost. The lifecycle routes sit before that check,
-so the installation turns green and every `/mcp` request afterwards answers 421 with a
-single log line. In that mode, set `NC_MCP_ALLOWED_HOSTS` to the host name the proxy uses
-for the container. The process also logs a warning at startup when it is started without
-`HP_SHARED_KEY` and without `NC_MCP_ALLOWED_HOSTS`.
+**5. A deployment without `HP_SHARED_KEY` runs `/mcp` into a 421 trap** (IN-04, issue #4).
+The DNS rebinding protection of the MCP transport stays armed whenever that variable is
+absent, because the entrypoint only disarms it for the HaRP tunnel, and until issue #4 the
+allowlist behind it was localhost and nothing else. The `Host` header that arrives is
+neither: behind the PHP proxy it is the container name, and in Nextcloud AIO it is the
+public custom domain. The lifecycle routes sit before that check, so the installation turns
+green and every `/mcp` request afterwards answers 421 with the body `Invalid Host header`
+and a single log line.
+
+Since issue #4 the allowlist carries the addresses this deployment answers to without any
+variable: the host of `NEXTCLOUD_URL` and the host of the public address of this app when
+one is set. That is what makes AIO work out of the box, because AIO passes
+`NEXTCLOUD_URL=https://<custom domain>` and its HaRP backend forwards the `Host` header
+unchanged. `NC_MCP_ALLOWED_HOSTS` stays the way to name a host that is neither of the two,
+for example a second proxy in front of the instance, and the process still logs a warning
+at startup when it has no shared key, no allowlist and no address it could derive one from.
+
+**Why AIO never takes the HaRP branch of the entrypoint.** AIO registers its HaRP daemon
+with `exapp_direct => true`, and `DockerActions::buildDeployEnvs` skips `HP_SHARED_KEY`,
+`HP_FRP_ADDRESS` and `HP_FRP_PORT` for a direct connect daemon. The container therefore
+runs the plain TCP path with the host check armed, which is correct: it is reachable on a
+port, so the check is the defence that belongs there.
 
 ## Security notes for production
 

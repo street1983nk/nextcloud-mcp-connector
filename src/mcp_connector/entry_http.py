@@ -17,7 +17,9 @@ Two decisions worth the comment they cost:
   Misdirected Request** to every Host header that is not localhost, the check runs before
   any MCP code, and the reason appears only as one line in the server log while the
   client sees a generic transport error. ``--host 0.0.0.0`` allowlists nothing: bind
-  address and Host allowlist are unrelated. Hence ``NC_MCP_ALLOWED_HOSTS`` from day one.
+  address and Host allowlist are unrelated. Hence ``NC_MCP_ALLOWED_HOSTS`` from day one,
+  and since issue #4 the public address of the deployment is in the allowlist without it:
+  ``config.allowed_hosts`` derives the host of ``NC_MCP_PUBLIC_URL`` as well.
 * ``/health`` is a custom route, and custom routes are never authenticated, even when the
   rest of the server is. That is exactly right for a health probe and forbidden for
   anything else, so this module still registers exactly one. The AppAPI lifecycle routes

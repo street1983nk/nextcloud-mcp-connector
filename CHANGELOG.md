@@ -9,6 +9,22 @@ All notable changes to this app are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Nextcloud AIO with a custom domain answered every `/mcp` request with `421 Misdirected
+  Request` and the body `Invalid Host header`, reported as
+  [#4](https://github.com/street1983nk/nextcloud-mcp-connector/issues/4). The host allow
+  list of the transport layer knew localhost and nothing else unless an operator set
+  `NC_MCP_ALLOWED_HOSTS`, and an installation from the app store gets no environment
+  variable to set it with. It now always carries the addresses this deployment answers to:
+  the host of `NEXTCLOUD_URL`, which AIO sets to the public custom domain, and the host of
+  the public address of this app when one is configured. The installation looked green
+  while this happened, because the lifecycle routes sit in front of the check.
+  The protection itself stays armed and every other host name is still refused with the
+  same 421; nothing about this widens the check beyond the deployment's own names.
+
 ## [0.1.12] - 2026-09-08
 
 The record of tool calls that 0.1.11 announced is usable now: an

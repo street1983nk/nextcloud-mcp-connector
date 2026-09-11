@@ -169,7 +169,15 @@ Each bare name is expanded into two entries, `example.com` and `example.com:*`, 
 client that was given a port puts the port into the `Host` header. A name that already
 carries a port or a wildcard is taken exactly as written.
 
-Without the variable, only `127.0.0.1`, `localhost` and `[::1]` are accepted.
+Two entries are always in the list, with or without the variable, because they are the
+addresses this deployment answers to rather than a permission somebody granted: the host of
+`NC_MCP_PUBLIC_URL` and, in the ExApp mode, the host of the `NEXTCLOUD_URL` the deploy
+daemon sets. That is what makes a Nextcloud AIO installation with a custom domain work
+without any configuration (issue #4); before it, every `/mcp` request there answered 421.
+
+Apart from those two, only `127.0.0.1`, `localhost` and `[::1]` are accepted without the
+variable, and an explicit `NC_MCP_ALLOWED_HOSTS` replaces those three rather than extending
+them.
 
 Behind a reverse proxy that rewrites `Host` itself, and only there, the check can be turned
 off with `NC_MCP_DISABLE_DNS_REBINDING_PROTECTION=true`.
@@ -775,8 +783,10 @@ Cause: the `Host` header of the request is not in the allow list. This check run
 transport layer, before any code of this server, so there is no friendly error message.
 
 Fix: set `NC_MCP_ALLOWED_HOSTS` to the name the client actually uses, including the port if
-the client was given one. Reproduce and verify against the MCP endpoint, never against
-`/health`:
+the client was given one. In the ExApp mode this is rarely needed any more: the host of
+`NEXTCLOUD_URL` and the host of the public address of this app are in the list already
+(issue #4), so a 421 there means the proxy sends a third name. Reproduce and verify against
+the MCP endpoint, never against `/health`:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \

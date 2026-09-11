@@ -334,6 +334,81 @@ def test_initialize_with_a_valid_handshake_is_served(
     assert "protocolVersion" in response.text
 
 
+# --- the 421 of issue #4: AIO forwards the public custom domain as the Host ---------
+
+#: The deploy environment of a Nextcloud AIO installation, and every value of it was read
+#: out of the source of the two components rather than assumed:
+#:
+#: * No ``HP_SHARED_KEY``. AIO registers its HaRP daemon with ``exapp_direct => true``
+#:   (``AIODockerActions::registerAIOHarpDaemonConfig``), and ``DockerActions::
+#:   buildDeployEnvs`` skips all three ``HP_*`` variables for a direct connect daemon. So
+#:   the entrypoint of our container never exports the rebinding switch, and the Host check
+#:   is armed in exactly the deployment that gets a foreign Host header.
+#: * ``NEXTCLOUD_URL`` is the public custom domain, not an internal name: AIO passes
+#:   ``'nextcloud_url' => 'https://' . getenv('NC_DOMAIN')``.
+#: * That same domain arrives in the ``Host`` header, because nothing on the way rewrites
+#:   it: the AIO Caddyfile reverse proxies ``/exapps/*`` without ``header_up Host``, and the
+#:   HaRP ``ex_apps_backend`` sets EX-APP-ID, EX-APP-VERSION, AUTHORIZATION-APP-API and
+#:   AA-VERSION, changes the destination with ``set-dst``, and touches no Host.
+#:
+#: Deliberately no ``NC_MCP_PUBLIC_URL``: this is the first minute of a one click
+#: installation from the app store, which has no deploy variable and no filled in form yet.
+AIO_ENV = {
+    config.ENV_APP_ID: APP_ID,
+    config.ENV_APP_SECRET: APP_SECRET,
+    config.ENV_APP_VERSION: APP_VERSION,
+    config.ENV_NEXTCLOUD_URL: "https://cloud.example.com",
+}
+
+
+def test_the_aio_custom_domain_is_served_instead_of_answering_421(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Issue #4, reproduced against the real application object and then fixed.
+
+    Measured before the fix, over a real socket and with a valid AppAPI handshake:
+    ``HTTP/1.1 421 Misdirected Request`` with the body ``Invalid Host header`` and one
+    WARNING per request in the container log, for every ``/mcp`` request of an AIO
+    installation with a custom domain. The installation looks green, because the lifecycle
+    routes sit before the transport check.
+
+    Nothing about the environment below is unusual, and that is the whole point: it is what
+    the deploy daemon sets and nothing else. An installation from the app store gets no
+    deploy variable, so ``NC_MCP_ALLOWED_HOSTS`` was not a way out for the administrator
+    who reported this.
+    """
+    env, _ = with_a_local_store(AIO_ENV, tmp_path, monkeypatch)
+
+    with TestClient(
+        entry_exapp.build_exapp_app(env), base_url="http://cloud.example.com"
+    ) as client:
+        response = client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, **appapi_headers(user="alice")}
+        )
+
+    assert response.status_code == 200, response.text
+    assert "protocolVersion" in response.text
+
+
+def test_a_foreign_host_is_still_refused_in_the_same_deployment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The negative half: the allowlist was narrowed to this deployment, not opened.
+
+    Same environment, same valid AppAPI handshake, a host name that is not this
+    deployment's: the transport check answers 421 exactly as it did before.
+    """
+    env, _ = with_a_local_store(AIO_ENV, tmp_path, monkeypatch)
+
+    with TestClient(entry_exapp.build_exapp_app(env), base_url="http://evil.example") as client:
+        response = client.post(
+            "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, **appapi_headers(user="alice")}
+        )
+
+    assert response.status_code == 421
+    assert response.text == "Invalid Host header"
+
+
 # --- the second identity source of the same boundary (T-03-01, T-03-06) -----------
 
 
@@ -844,6 +919,8 @@ def test_a_missing_deploy_variable_stops_the_start(monkeypatch: pytest.MonkeyPat
         ({config.ENV_ALLOWED_HOSTS: "harp.example"}, False),
         ({config.ENV_DISABLE_DNS_REBINDING: "1"}, False),
         ({config.ENV_HP_SHARED_KEY: "   ", config.ENV_ALLOWED_HOSTS: ""}, True),
+        ({config.ENV_PUBLIC_URL: "https://cloud.example.com/exapps/mcp_connector"}, False),
+        ({config.ENV_PUBLIC_URL: "not-an-address"}, True),
     ],
     ids=[
         "neither key nor allowlist",
@@ -851,6 +928,8 @@ def test_a_missing_deploy_variable_stops_the_start(monkeypatch: pytest.MonkeyPat
         "allowlist set",
         "host check disabled",
         "blank values do not count as a decision",
+        "a public address answers the question",
+        "an unreadable address answers nothing",
     ],
 )
 def test_the_421_trap_of_a_daemon_without_harp_is_named_at_startup(
