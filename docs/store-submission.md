@@ -275,7 +275,7 @@ on, and step 4 is irreversible in public.
    The store downloads the archive, checks the signature against the certificate, checks
    the folder structure (exactly one top level folder, lowercase and underscores,
    contains `appinfo/info.xml`) and validates the metadata (after `pre-info.xslt`)
-   against `info.xsd`. 201 means accepted.
+   against `info.xsd`. 201 means accepted (a new release); updating an EXISTING release of the same version answers 200, also success.
 
    **This step needs the store session, not necessarily a person at the keyboard.** The
    token belongs to the store account, it is not a repository secret and it is
@@ -511,4 +511,7 @@ Cache note, measured twice on 2026-08-22: an upload answers 201 immediately, but
 serves the app detail page, the catalogue endpoint and the search index from caches that
 refresh minutes apart. A change is not lost when it is not visible one minute after the
 upload, and it must not be chased with another release. Version 0.1.5 and 0.1.6 were both
-spent on that mistake.
+spent on that mistake. Measured again on 2026-09-11: appapi_apps.json is served with
+Cache-Control max-age=14400, so up to FOUR HOURS after an upload that endpoint still lists
+the previous signature; a signature mismatch measured there inside that window is expected
+cache, not a failed upload. The app detail page carries no cache header and is the faster check.

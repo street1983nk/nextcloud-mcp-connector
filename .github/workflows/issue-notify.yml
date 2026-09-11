@@ -1,0 +1,46 @@
+# Meldet neue und wiederoeffnete Issues sofort per ntfy an den Owner.
+# Das Topic liegt als Secret NTFY_TOPIC, weil das Repo oeffentlich ist und der
+# Topic-Name seine Vertraulichkeit allein aus der Zufallsendung bezieht.
+# workflow_dispatch dient nur dem einmaligen Zustellungstest.
+name: issue-notify
+
+on:
+  issues:
+    types: [opened, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: push to ntfy
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_USER: ${{ github.event.issue.user.login }}
+          ISSUE_ACTION: ${{ github.event.action }}
+        run: |
+          if [ -z "${NTFY_TOPIC}" ]; then
+            echo "NTFY_TOPIC secret fehlt" >&2
+            exit 1
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TITLE="Zustellungstest issue-notify (${{ github.repository }})"
+            BODY="Wenn diese Nachricht ankommt, melden neue Issues dieses Repos sofort."
+            URL="https://github.com/${{ github.repository }}/issues"
+          else
+            TITLE="Issue ${ISSUE_ACTION}: ${{ github.repository }}"
+            BODY="${ISSUE_TITLE} (von ${ISSUE_USER})"
+            URL="${ISSUE_URL}"
+          fi
+          curl -sf --max-time 30 \
+            -H "Title: ${TITLE}" \
+            -H "Click: ${URL}" \
+            -H "Tags: speech_balloon" \
+            -d "${BODY}" \
+            "https://ntfy.sh/${NTFY_TOPIC}"
