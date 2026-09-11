@@ -9,13 +9,10 @@ All notable changes to this app are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.12] - 2026-09-11
+## [0.1.13] - 2026-09-11
 
-The record of tool calls that 0.1.11 announced is usable now: an
-administrator switches it on in the admin settings and reads it with an occ command, and every
-sentence this app publishes about storage, about the purge and about what is planned says what
-the code does. An installed instance sees none of it before the next release, because the store
-reads the manifest at upload time and an installed app keeps the code it was installed with.
+One fix, and it is the reason this release exists so soon after 0.1.12: on Nextcloud AIO with
+a custom domain, this app could not answer a single request.
 
 ### Fixed
 
@@ -30,6 +27,17 @@ reads the manifest at upload time and an installed app keeps the code it was ins
   while this happened, because the lifecycle routes sit in front of the check.
   The protection itself stays armed and every other host name is still refused with the
   same 421; nothing about this widens the check beyond the deployment's own names.
+- The download of 0.1.12 carries the same fix from 2026-09-11 on, because its release asset
+  was rebuilt that day. Whoever installed 0.1.12 before is not served by that and gets the
+  fix with this release, which is why 0.1.13 exists.
+
+## [0.1.12] - 2026-09-08
+
+The record of tool calls that 0.1.11 announced is usable now: an
+administrator switches it on in the admin settings and reads it with an occ command, and every
+sentence this app publishes about storage, about the purge and about what is planned says what
+the code does. An installed instance sees none of it before the next release, because the store
+reads the manifest at upload time and an installed app keeps the code it was installed with.
 
 ### Added
 
@@ -617,6 +625,7 @@ First release, submitted to the Nextcloud App Store.
   never sees more than that user sees in the web interface.
 - A privacy and data flow description, see [docs/privacy.md](docs/privacy.md).
 
+[0.1.13]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.1.9...v0.1.10

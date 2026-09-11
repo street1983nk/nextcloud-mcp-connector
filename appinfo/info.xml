@@ -110,7 +110,7 @@ Prérequis :
 
 - Nextcloud 32 à 34 avec l'application AppAPI ; fonctionne comme External App
 - n8n parle MCP nativement depuis la 1.119.0 ; guide : docs/n8n-setup.md dans le code source]]></description>
-	<version>0.1.12</version>
+	<version>0.1.13</version>
 	<licence>agpl</licence>
 	<author mail="admin@infranode.dev">street1983nk</author>
 	<namespace>McpConnector</namespace>
@@ -185,7 +185,7 @@ Prérequis :
 			-->
 			<registry>ghcr.io</registry>
 			<image>street1983nk/mcp_connector</image>
-			<image-tag>0.1.12</image-tag>
+			<image-tag>0.1.13</image-tag>
 		</docker-install>
 		<!--
 		  - Exactly thirteen routes, and they are the whole external attack surface of this app.

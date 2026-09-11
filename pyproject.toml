@@ -1,6 +1,6 @@
 [project]
 name = "nextcloud-mcp-connector"
-version = "0.1.12"
+version = "0.1.13"
 description = "Curated MCP server for Nextcloud: files, calendar, notes, deck and contacts as read-first tools"
 requires-python = ">=3.13"
 license = "AGPL-3.0-or-later"
