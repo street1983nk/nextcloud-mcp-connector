@@ -9,7 +9,13 @@ All notable changes to this app are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.12] - 2026-09-11
+
+The record of tool calls that 0.1.11 announced is usable now: an
+administrator switches it on in the admin settings and reads it with an occ command, and every
+sentence this app publishes about storage, about the purge and about what is planned says what
+the code does. An installed instance sees none of it before the next release, because the store
+reads the manifest at upload time and an installed app keeps the code it was installed with.
 
 ### Fixed
 
@@ -24,14 +30,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   while this happened, because the lifecycle routes sit in front of the check.
   The protection itself stays armed and every other host name is still refused with the
   same 421; nothing about this widens the check beyond the deployment's own names.
-
-## [0.1.12] - 2026-09-08
-
-The record of tool calls that 0.1.11 announced is usable now: an
-administrator switches it on in the admin settings and reads it with an occ command, and every
-sentence this app publishes about storage, about the purge and about what is planned says what
-the code does. An installed instance sees none of it before the next release, because the store
-reads the manifest at upload time and an installed app keeps the code it was installed with.
 
 ### Added
 
