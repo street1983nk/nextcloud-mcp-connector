@@ -756,3 +756,12 @@ def test_a_tool_call_without_a_live_connection_is_refused(
 
     with pytest.raises(deps.MCPError):
         deps.resolve_credentials(_Context(identity))
+
+
+def test_the_health_probe_answers_without_authentication(tmp_path: Path) -> None:
+    app, _ = make_app(tmp_path)
+    with TestClient(app, base_url=PUBLIC_URL) as client:
+        response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert set(response.json()) == {"status", "version"}

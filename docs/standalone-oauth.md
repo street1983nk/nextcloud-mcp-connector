@@ -112,10 +112,45 @@ message on stderr; nothing partially starts.
 
 It binds to `NC_MCP_BIND_HOST` (default `127.0.0.1`) and `NC_MCP_BIND_PORT` (default
 `8765`), and is meant to run behind a TLS-terminating reverse proxy, never exposed directly.
-The process runs with uvicorn's `proxy_headers` support, so it trusts `X-Forwarded-*`
-headers from whatever sends them. **The reverse proxy must be the only way to reach this
-process**. Anything else that can connect directly can forge the client address these
-headers carry, which the throttle and the DNS-rebinding check both rely on.
+Addresses, links and cookies are built from `NC_MCP_PUBLIC_URL`, never from forwarded
+headers. The rate limiter, however, reads the client address from `X-Forwarded-For` as sent
+(see the operations notes), so **the reverse proxy must be the only way to reach this
+process** and must set that header itself.
+
+`GET /health` answers `{"status": "ok", "version": ...}` without authentication and is the
+probe to use.
+
+### In a container
+
+The published image starts the ExApp by default. For this mode, override the entry point and
+the health check, and mount the two secrets and the store directory:
+
+```yaml
+services:
+  mcp-connector:
+    image: ghcr.io/<owner>/<image>:<tag>
+    entrypoint: ["nc-mcp-oauth"]
+    environment:
+      NC_MCP_AUTH_MODE: oauth
+      NC_MCP_BIND_HOST: 0.0.0.0
+      NC_MCP_URL: https://cloud.example.com
+      NC_MCP_PUBLIC_URL: https://mcp.example.com
+      NC_MCP_OAUTH_STORAGE_DIR: /data
+      NC_MCP_OAUTH_DATA_KEY_FILE: /run/secrets/data_key
+      NC_MCP_OIDC_ISSUER: https://sso.example.com
+      NC_MCP_OIDC_CLIENT_ID: "<client id>"
+      NC_MCP_OIDC_CLIENT_SECRET_FILE: /run/secrets/oidc_client_secret
+      NC_MCP_OIDC_PROVIDER_ID: "<user_oidc provider id>"
+      NC_MCP_OIDC_MAPPING: user_oidc_unique_uid_sub_v1
+    volumes:
+      - mcp-data:/data
+    secrets: [data_key, oidc_client_secret]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8765/health"]
+```
+
+The image runs as uid 10001: the store directory must belong to that user with mode `0700`,
+and the secret files must be readable by it without granting anything to others.
 
 ## Operations and security notes
 

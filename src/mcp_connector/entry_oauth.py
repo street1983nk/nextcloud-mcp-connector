@@ -31,11 +31,12 @@ from pathlib import Path
 import uvicorn
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
-from starlette.responses import Response
+from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from . import config
+from . import __version__, config
 from .errors import ToolError
 from .exapp.middleware import RequireOAuthBearer
 from .exapp.responses import NO_STORE
@@ -227,6 +228,7 @@ def build_oauth_app(
             f"the standalone application has {guarded} guarded {MCP_PATH} routes instead of one"
         )
 
+    app.router.routes.append(Route("/health", _health, methods=["GET"]))
     for route in (
         *metadata_routes(env, dcr_enabled=policy.dcr_enabled, cimd_enabled=policy.cimd_enabled),
         *auth_routes(env, provider=provider, throttle=counters),
@@ -243,6 +245,11 @@ def build_oauth_app(
             route.app = BodyLimit(route.app, MAX_BROWSER_BODY_BYTES)
         app.router.routes.append(route)
     return app
+
+
+async def _health(request: Request) -> JSONResponse:
+    """Liveness probe, the same dull answer ``entry_http`` gives: status and version only."""
+    return JSONResponse({"status": "ok", "version": __version__}, headers=NO_STORE)
 
 
 class BodyLimit:
