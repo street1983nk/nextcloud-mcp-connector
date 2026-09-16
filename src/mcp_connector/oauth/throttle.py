@@ -87,6 +87,8 @@ __all__ = [
     "CLASS_CONNECT",
     "CLASS_CONNECTIONS",
     "CLASS_CONNECT_START",
+    "CLASS_OIDC_CALLBACK",
+    "CLASS_OIDC_START",
     "CLASS_REGISTER",
     "CLASS_REVOKE",
     "CLASS_TOKEN",
@@ -100,7 +102,7 @@ __all__ = [
     "source_of",
 ]
 
-#: The eight path classes of this application. Separate counters, because a person fighting
+#: The path classes of this application. Separate counters, because a person fighting
 #: with the consent screen must not close the endpoint a working connector refreshes at.
 CLASS_TOKEN = "token"  # noqa: S105 - the name of a path class, not a credential
 CLASS_REGISTER = "register"
@@ -122,6 +124,12 @@ CLASS_CONNECTIONS = "connections"
 #: screens behind them would close a waiting page that is doing nothing wrong.
 CLASS_CONNECT_START = "connect-start"
 CLASS_AUTHORIZE_START = "authorize-start"
+
+#: The standalone OIDC browser routes (``oauth/oidc_routes``). The start counts every
+#: request, because each one writes a sign in row; the callback counts refusals, like the
+#: consent screen it leads back to.
+CLASS_OIDC_START = "oidc-start"
+CLASS_OIDC_CALLBACK = "oidc-callback"
 
 #: How many failed attempts one source may make per path class before it has to wait. Ten
 #: is generous for every legitimate shape of failure (a mistyped link, a stale tab, a

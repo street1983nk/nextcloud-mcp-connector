@@ -100,6 +100,8 @@ FORM_TOKEN_WINDOW = 3600
 PURPOSE_CONSENT = "consent"
 PURPOSE_DISCONNECT = "disconnect"
 PURPOSE_SWITCH = "switch"
+#: The POST that sends a browser to the standalone identity provider (``oauth/oidc_routes``).
+PURPOSE_OIDC_START = "oidc-start"
 
 #: The AppAPI route that stores ExApp configuration. ``sensitive`` marks the value as one
 #: Nextcloud must not show in any administrative interface.
