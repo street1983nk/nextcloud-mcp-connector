@@ -34,7 +34,9 @@ import asyncio
 import contextlib
 import hashlib
 import hmac
+import os
 import sqlite3
+import stat
 import time
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
@@ -81,6 +83,7 @@ __all__ = [
     "OAuthStore",
     "RefreshRedemption",
     "RefreshTokenRow",
+    "StoreFileRefused",
     "StoreKeyMismatch",
     "StoreProvider",
     "explicit_store_opener",
@@ -115,6 +118,20 @@ _KEY_MISMATCH_HINT = (
     "connector never replaces it on its own. If the key is lost, the stored connections "
     "cannot be read by anyone: remove the store file and let every user connect again."
 )
+
+
+_STORE_FILE_HINT = (
+    "The OAuth store file has to be a regular file that only the connector's own user can "
+    "read or write (mode 0600). Fix the mode with 'chmod 600', or remove a link that stands "
+    "in its place."
+)
+
+
+class StoreFileRefused(ToolError):
+    """The store path is a link, not a regular file, or readable beyond its owner."""
+
+    def __init__(self) -> None:
+        super().__init__(message="The OAuth store file is not private.", hint=_STORE_FILE_HINT)
 
 
 class StoreKeyMismatch(ToolError):
@@ -1586,11 +1603,11 @@ def store_opener(env: Mapping[str, str] | None = None) -> StoreProvider:
     # a reinstallation that keeps the volume. Today that makes the old rows unreadable one by
     # one while new connections work; a check would refuse the whole store instead. Changing
     # that is a decision for the ExApp, not a side effect of the standalone preparation.
-    return explicit_store_opener(directory=exapp_directory, key=exapp_key, verify_key=False)
+    return explicit_store_opener(directory=exapp_directory, key=exapp_key, strict=False)
 
 
 def explicit_store_opener(
-    *, directory: DirectoryProvider, key: KeyProvider, verify_key: bool = True
+    *, directory: DirectoryProvider, key: KeyProvider, strict: bool = True
 ) -> StoreProvider:
     """One store per application, opened at its first use and swept when it opens.
 
@@ -1607,6 +1624,13 @@ def explicit_store_opener(
     a dictionary that outlives a request is one refactor away from being a session store.
     Two applications in one process, which is what every test builds, get one store each
     unless the caller passes the same opener to both.
+
+    ``strict`` is the default for every deployment except the ExApp, and it adds two rules
+    before anything else touches the file. The store file is created with mode 0600 and
+    must be a regular, owner-only file (:class:`StoreFileRefused`); SQLite gives its
+    ``-wal`` and ``-shm`` files the mode of the database. And the data key is checked
+    (:meth:`OAuthStore.verify_data_key`, :class:`StoreKeyMismatch`). Both rules assume a
+    directory nobody else can write into, which :func:`config.storage_directory` enforces.
     """
     opened: dict[str, OAuthStore] = {}
     lock = asyncio.Lock()
@@ -1621,10 +1645,15 @@ def explicit_store_opener(
                 # The key first: it is the one step that can fail with a named error, and
                 # it fails before anything creates a directory.
                 data_key = await key()
-                candidate = OAuthStore(directory() / STORE_FILENAME, data_key)
-                if verify_key:
-                    # Before the sweep and before anything is cached: a wrong key must not
-                    # touch a protected row, and the next request asks again.
+                path = directory() / STORE_FILENAME
+                if strict:
+                    _prepare_private_file(path)
+                candidate = OAuthStore(path, data_key)
+                if strict:
+                    # Before the sweep and before anything is cached, so the next request
+                    # asks again. A recorded check value is compared before any protected
+                    # row is read; an older store without one is tested against a bounded
+                    # sample of its encrypted rows (see verify_data_key).
                     await candidate.verify_data_key()
                 await candidate.purge_expired()
                 ready = candidate
@@ -1632,6 +1661,31 @@ def explicit_store_opener(
             return ready
 
     return open_once
+
+
+def _prepare_private_file(path: Path) -> None:
+    """Create the store file owner-only if it is missing, then refuse anything else.
+
+    ``O_EXCL`` never opens an existing entry, a link included, so a file this call creates
+    is new and has mode 0600 (or stricter under the umask). An existing entry is checked
+    with ``lstat``: a link, a directory or a file with any group or other bits is refused.
+    """
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except FileExistsError:
+        pass
+    else:
+        os.close(descriptor)
+    try:
+        status = path.lstat()
+    except OSError:
+        raise StoreFileRefused from None
+    if not stat.S_ISREG(status.st_mode):
+        raise StoreFileRefused
+    # POSIX only, for the reason config.storage_directory gives.
+    if os.name != "nt" and status.st_mode & (stat.S_IRWXG | stat.S_IRWXO):
+        raise StoreFileRefused
 
 
 def _connect(path: Path, *, schema: bool = True) -> sqlite3.Connection:

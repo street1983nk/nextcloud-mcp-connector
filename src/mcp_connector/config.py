@@ -25,6 +25,8 @@ hardening of ``entry_http`` (allowed hosts, DNS rebinding protection).
 
 import logging
 import os
+import secrets
+import stat
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -165,7 +167,13 @@ def normalize_base_url(raw: str) -> str:
     if not candidate:
         raise ToolError(message=f"{ENV_URL} is empty.", hint=_URL_HINT)
 
-    parts = urlsplit(candidate)
+    try:
+        parts = urlsplit(candidate)
+        # Read once so an out of range or non numeric port is refused here and not on the
+        # first request that builds a URL from this value.
+        _ = parts.port
+    except ValueError:
+        raise ToolError(message=f"{ENV_URL} is not a valid URL.", hint=_URL_HINT) from None
     if parts.scheme not in ("http", "https"):
         raise ToolError(
             message=f"{ENV_URL} must start with http:// or https:// (got {candidate!r}).",
@@ -299,7 +307,7 @@ def persistent_storage(env: Mapping[str, str] | None = None) -> Path:
         )
         return fallback
 
-    return storage_directory(raw, variable=ENV_APP_PERSISTENT_STORAGE, hint=_STORAGE_HINT)
+    return _writable_directory(raw, variable=ENV_APP_PERSISTENT_STORAGE, hint=_STORAGE_HINT)
 
 
 def storage_directory(raw: str, *, variable: str, hint: str) -> Path:
@@ -311,7 +319,25 @@ def storage_directory(raw: str, *, variable: str, hint: str) -> Path:
     is ever chosen instead, because a store that lands in the wrong place answers correctly
     until the next restart and then has lost every authorization (pitfall 12, T-03-15).
     ``variable`` and ``hint`` name the setting in the deployment's own words.
+
+    On top of that the directory must not be writable by its group or by others. Whoever can
+    write there can replace the store file between a check and the next open, or plant a
+    link in its place, so the file rules of the store only hold in a directory that belongs
+    to the connector. The ExApp volume keeps its current rules (:func:`persistent_storage`).
     """
+    path = _writable_directory(raw, variable=variable, hint=hint)
+    # POSIX only: Windows models a read-only flag in these bits and nothing else, so there
+    # the ACL of the directory is the boundary and the documentation says so.
+    if os.name != "nt" and path.stat().st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        raise ToolError(
+            message=f"The directory in {variable} is writable by its group or by others.",
+            hint=hint,
+        )
+    return path
+
+
+def _writable_directory(raw: str, *, variable: str, hint: str) -> Path:
+    """An existing directory this process can write into, or a named error."""
     candidate = (raw or "").strip()
     if not candidate:
         raise ToolError(message=f"{variable} is not set.", hint=hint)
@@ -330,10 +356,21 @@ def _probe_writable(path: Path) -> bool:
     ``os.access`` reports the permission bits, which say nothing about a read only bind
     mount, a full filesystem or a Windows ACL. The store has to write, so the check
     writes.
+
+    The probe is created exclusively under a random name and never follows a link. The
+    name used to be predictable (``.write-probe-<pid>``) and was opened with an ordinary
+    write, so a link planted there beforehand made the check truncate whatever file it
+    pointed at. ``O_EXCL`` refuses any existing entry, a link included, and ``O_NOFOLLOW``
+    says the same where the platform offers it. Only the entry this call created is removed.
     """
-    probe = path / f".write-probe-{os.getpid()}"
+    probe = path / f".write-probe-{os.getpid()}-{secrets.token_hex(8)}"
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
     try:
-        probe.write_bytes(b"")
+        descriptor = os.open(probe, flags, 0o600)
+    except OSError:
+        return False
+    os.close(descriptor)
+    try:
         probe.unlink()
     except OSError:
         return False

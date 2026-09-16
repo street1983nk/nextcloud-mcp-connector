@@ -5,6 +5,7 @@ The ExApp opener does not ask, so an ExApp store keeps its documented tables and
 """
 
 import asyncio
+import os
 import sqlite3
 from pathlib import Path
 
@@ -16,6 +17,8 @@ KEY = bytes(range(32))
 OTHER_KEY = bytes(range(32, 64))
 CLIENT_ID = "client-4711"
 UNUSED_CLIENT = "client-never-used"
+
+posix_only = pytest.mark.skipif(os.name == "nt", reason="POSIX permissions and links")
 
 
 def file_of(tmp_path: Path) -> Path:
@@ -55,6 +58,7 @@ async def legacy_store(tmp_path: Path, key: bytes, *, connections: int = 1) -> N
             scopes="nextcloud",
             resource="https://mcp.example.com/mcp",
         )
+    file_of(tmp_path).chmod(0o600)
 
 
 def opener(tmp_path: Path, key: bytes) -> store.StoreProvider:
@@ -143,6 +147,7 @@ async def test_an_empty_older_store_adopts_the_first_key(tmp_path: Path) -> None
     """Nothing to protect yet, so nothing to compare against: the documented first use."""
     subject = store.OAuthStore(file_of(tmp_path), KEY)
     await subject.save_client(CLIENT_ID, metadata_json="{}")
+    file_of(tmp_path).chmod(0o600)
 
     await opener(tmp_path, OTHER_KEY)()
 
@@ -190,3 +195,78 @@ async def test_the_wipe_takes_the_check_with_it(tmp_path: Path) -> None:
     assert recorded_check(tmp_path) is None
     await opener(tmp_path, OTHER_KEY)()
     assert recorded_check(tmp_path) == crypto.key_check(OTHER_KEY)
+
+
+@pytest.mark.anyio
+async def test_two_workers_on_an_older_store_only_admit_the_key_that_reads_it(
+    tmp_path: Path,
+) -> None:
+    await legacy_store(tmp_path, KEY, connections=2)
+
+    results = await asyncio.gather(
+        opener(tmp_path, OTHER_KEY)(), opener(tmp_path, KEY)(), return_exceptions=True
+    )
+
+    assert isinstance(results[0], store.StoreKeyMismatch)
+    assert isinstance(results[1], store.OAuthStore)
+    assert recorded_check(tmp_path) == crypto.key_check(KEY)
+
+
+# --- the store file itself -----------------------------------------------------------------
+
+
+@posix_only
+@pytest.mark.anyio
+async def test_a_new_store_file_is_private(tmp_path: Path) -> None:
+    await opener(tmp_path, KEY)()
+
+    mode = file_of(tmp_path).stat().st_mode
+    assert mode & 0o077 == 0, oct(mode)
+
+
+@posix_only
+@pytest.mark.anyio
+async def test_an_existing_store_file_readable_by_others_is_refused(tmp_path: Path) -> None:
+    await legacy_store(tmp_path, KEY)
+    file_of(tmp_path).chmod(0o644)
+
+    with pytest.raises(store.StoreFileRefused):
+        await opener(tmp_path, KEY)()
+
+    assert "store_meta" not in tables(tmp_path), "nothing was written before the refusal"
+
+
+@posix_only
+@pytest.mark.anyio
+async def test_a_link_in_place_of_the_store_file_is_refused(tmp_path: Path) -> None:
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    target = elsewhere / "victim.sqlite3"
+    target.write_bytes(b"")
+    target.chmod(0o600)
+    file_of(tmp_path).symlink_to(target)
+
+    with pytest.raises(store.StoreFileRefused):
+        await opener(tmp_path, KEY)()
+
+    assert target.read_bytes() == b"", "the link target was not turned into a store"
+
+
+@posix_only
+@pytest.mark.anyio
+async def test_the_exapp_opener_keeps_its_file_rules(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Unchanged ExApp behaviour: an existing store readable by others still opens."""
+    await legacy_store(tmp_path, KEY)
+    file_of(tmp_path).chmod(0o644)
+
+    async def data_key(env: object = None) -> bytes:
+        return KEY
+
+    monkeypatch.setattr(store.crypto, "data_key", data_key)
+    monkeypatch.setattr(store.config, "persistent_storage", lambda env=None: tmp_path)
+
+    await store.store_opener({})()
+
+    assert file_of(tmp_path).stat().st_mode & 0o777 == 0o644

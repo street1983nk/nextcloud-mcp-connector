@@ -46,11 +46,41 @@ def test_an_unusable_address_is_refused_with_a_named_error(raw: str) -> None:
         NextcloudTarget.from_url(raw)
 
 
-@pytest.mark.parametrize("raw", ["http://nc.test/", " http://nc.test", "https://u:p@nc.test"])
-def test_the_direct_constructor_accepts_only_a_normalized_value(raw: str) -> None:
+@pytest.mark.parametrize(
+    "raw", ["http://nc.test/", " http://nc.test", "https://u:p@nc.test", "ftp://nc.test", ""]
+)
+def test_the_direct_constructor_refuses_with_one_exception_type(raw: str) -> None:
     """No object of this type carries a value the normalization would have changed."""
-    with pytest.raises((ValueError, ToolError)):
+    with pytest.raises(ValueError, match="Nextcloud target"):
         NextcloudTarget(base_url=raw)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "https://cloud.test/nextcloud?x=1",
+        "https://cloud.test/nextcloud?",
+        "https://cloud.test/nextcloud#frag",
+        "https://cloud.test#",
+    ],
+    ids=["query", "empty query", "fragment", "empty fragment"],
+)
+def test_a_query_or_fragment_is_refused(raw: str) -> None:
+    """Consumers append paths as text, so a ``?`` or ``#`` would swallow them."""
+    with pytest.raises(ToolError):
+        NextcloudTarget.from_url(raw)
+    with pytest.raises(ValueError, match="Nextcloud target"):
+        NextcloudTarget(base_url=raw)
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["http://[::1", "http://cloud.test:99999", "http://cloud.test:port"],
+    ids=["broken ipv6", "port out of range", "port not numeric"],
+)
+def test_a_malformed_url_is_a_named_error_and_not_a_parser_crash(raw: str) -> None:
+    with pytest.raises(ToolError):
+        NextcloudTarget.from_url(raw)
 
 
 def test_the_netloc_is_host_and_port() -> None:
