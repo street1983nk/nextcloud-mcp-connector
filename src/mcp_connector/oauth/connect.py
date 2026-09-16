@@ -41,7 +41,6 @@ from starlette.responses import RedirectResponse, Response
 from starlette.routing import Route
 
 from ..errors import ToolError
-from ..exapp.auth import appapi_user, is_user
 from ..exapp.responses import NO_STORE, form_or_none
 from ..exapp.ui import errors
 from ..exapp.ui.connect import (
@@ -58,6 +57,7 @@ from ..exapp.ui.connect import (
 )
 from ..nextcloud.target import NextcloudTarget
 from . import loginflow
+from .browser_identity import BrowserIdentitySource
 from .store import OAuthStore
 from .throttle import CLASS_CONNECT, CLASS_CONNECT_START, FLOW_LIMIT, Throttle, Throttled
 
@@ -104,12 +104,17 @@ def connect_routes(
     *,
     nextcloud: NextcloudTarget,
     store_provider: StoreProvider,
+    browser_identity: BrowserIdentitySource,
     throttle: Throttle | None = None,
 ) -> list[Route]:
     """Build the three onboarding routes against one environment and one Nextcloud.
 
     ``nextcloud`` is the Nextcloud every login flow of these routes starts at, is polled at and
     hands its app password back to. The deployment resolves it once; no route reads it.
+
+    ``browser_identity`` decides whether the browser that loads the result is the account
+    that signed in (CR-01), the same source the consent decision asks. The ExApp passes its
+    AppAPI adapter, so the comparison there is the one this route made before.
 
     Throttled as browser paths, and in two classes rather than one: this is the surface on
     which an anonymous caller can make this server open a Nextcloud login flow, which is
@@ -155,7 +160,7 @@ def connect_routes(
 
     async def wait(request: Request) -> Response:
         """One poll per load, and one of the four ends: waiting, result, expired, failed."""
-        return await _wait(request, store, nextcloud, env)
+        return await _wait(request, store, nextcloud, browser_identity, env)
 
     counters = throttle if throttle is not None else Throttle()
     invitation_route = Route(CONNECT_PATH, invitation, methods=["GET"])
@@ -245,6 +250,7 @@ async def _wait(
     request: Request,
     store: StoreProvider,
     nextcloud: NextcloudTarget,
+    browser_identity: BrowserIdentitySource,
     env: Mapping[str, str] | None,
 ) -> Response:
     """The waiting screen: one poll, then one of the four ends of this flow.
@@ -288,7 +294,13 @@ async def _wait(
         return _generic("the login flow poll failed", env)
 
     credentials = result.credentials
-    if not is_user(appapi_user(request, env=env), credentials.login_name):
+    try:
+        identified = await browser_identity.identifies(request, credentials.login_name)
+    except Exception:
+        # A source is a security boundary: its failure is a refusal, never a fallback.
+        logger.error("the browser identity source could not decide the onboarding identity")
+        identified = False
+    if not identified:
         # Not the browser of the account that signed in, so the credential is not shown to
         # it. It exists at Nextcloud from the moment of the poll, and nobody will ever use
         # it now, so it goes back the same way a failed write hands it back (pitfall 13).

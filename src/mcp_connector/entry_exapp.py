@@ -104,6 +104,9 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
     # environment and handed to every consumer. `main` has already refused a start without
     # it, so this read names the same problem for a caller that builds the app directly.
     nextcloud = exapp_target(env)
+    # One browser identity source for both places that hand something to a browser only if
+    # it is the account that signed in: the consent decision and the onboarding result.
+    browser_identity = AppApiBrowserIdentitySource(env)
     provider = NextcloudOAuthProvider(
         nextcloud=nextcloud, env=env, policy=policy, store_provider=store
     )
@@ -240,7 +243,13 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
     for route in (
         *lifecycle_routes(env),
         *metadata_routes(env, dcr_enabled=policy.dcr_enabled, cimd_enabled=policy.cimd_enabled),
-        *connect_routes(env, nextcloud=nextcloud, store_provider=store, throttle=counters),
+        *connect_routes(
+            env,
+            nextcloud=nextcloud,
+            store_provider=store,
+            browser_identity=browser_identity,
+            throttle=counters,
+        ),
         *connections_routes(
             env,
             store_provider=store,
@@ -251,7 +260,7 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
         *consent_routes(
             env,
             provider=provider,
-            browser_identity=AppApiBrowserIdentitySource(env),
+            browser_identity=browser_identity,
             nextcloud=nextcloud,
             throttle=counters,
         ),

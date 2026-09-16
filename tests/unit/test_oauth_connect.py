@@ -31,6 +31,7 @@ from starlette.testclient import TestClient
 
 from mcp_connector import config, entry_http
 from mcp_connector.entry_exapp import build_exapp_app
+from mcp_connector.exapp.browser_identity import AppApiBrowserIdentitySource
 from mcp_connector.exapp.target import exapp_target
 from mcp_connector.exapp.ui import strings
 from mcp_connector.nextcloud.target import NextcloudTarget
@@ -110,7 +111,14 @@ def app_with(store: OAuthStore) -> Starlette:
     async def provider() -> OAuthStore:
         return store
 
-    return Starlette(routes=connect.connect_routes(ENV, nextcloud=TARGET, store_provider=provider))
+    return Starlette(
+        routes=connect.connect_routes(
+            ENV,
+            browser_identity=AppApiBrowserIdentitySource(ENV),
+            nextcloud=TARGET,
+            store_provider=provider,
+        )
+    )
 
 
 def start_a_flow(client: TestClient) -> str:
@@ -523,7 +531,10 @@ def test_a_deployment_without_a_provider_opens_one_store_and_sweeps_it_once(
     client = TestClient(
         Starlette(
             routes=connect.connect_routes(
-                env, nextcloud=TARGET, store_provider=store_module.store_opener(env)
+                env,
+                browser_identity=AppApiBrowserIdentitySource(env),
+                nextcloud=TARGET,
+                store_provider=store_module.store_opener(env),
             )
         )
     )
@@ -594,7 +605,11 @@ def test_a_flood_of_successful_starts_ends_in_429(store: OAuthStore) -> None:
     client = TestClient(
         Starlette(
             routes=connect.connect_routes(
-                ENV, nextcloud=TARGET, store_provider=provide, throttle=counters
+                ENV,
+                browser_identity=AppApiBrowserIdentitySource(ENV),
+                nextcloud=TARGET,
+                store_provider=provide,
+                throttle=counters,
             )
         )
     )
@@ -626,7 +641,11 @@ def test_the_throttled_start_does_not_close_the_waiting_screen(store: OAuthStore
     client = TestClient(
         Starlette(
             routes=connect.connect_routes(
-                ENV, nextcloud=TARGET, store_provider=provide, throttle=counters
+                ENV,
+                browser_identity=AppApiBrowserIdentitySource(ENV),
+                nextcloud=TARGET,
+                store_provider=provide,
+                throttle=counters,
             )
         )
     )
@@ -896,7 +915,10 @@ def test_the_default_store_is_opened_once_and_purged_at_the_first_use(
     client = TestClient(
         Starlette(
             routes=connect.connect_routes(
-                env, nextcloud=TARGET, store_provider=store_module.store_opener(env)
+                env,
+                browser_identity=AppApiBrowserIdentitySource(env),
+                nextcloud=TARGET,
+                store_provider=store_module.store_opener(env),
             )
         )
     )
@@ -916,6 +938,7 @@ def test_a_store_that_cannot_be_opened_is_the_generic_page() -> None:
         Starlette(
             routes=connect.connect_routes(
                 {config.ENV_PUBLIC_URL: PUBLIC_URL},
+                browser_identity=AppApiBrowserIdentitySource({config.ENV_PUBLIC_URL: PUBLIC_URL}),
                 nextcloud=TARGET,
                 store_provider=store_module.store_opener({config.ENV_PUBLIC_URL: PUBLIC_URL}),
             )
@@ -945,7 +968,10 @@ def test_the_onboarding_stores_no_credential_anywhere_in_its_source() -> None:
 
 def test_the_factory_returns_the_three_declared_routes() -> None:
     routes = connect.connect_routes(
-        ENV, nextcloud=TARGET, store_provider=store_module.store_opener(ENV)
+        ENV,
+        browser_identity=AppApiBrowserIdentitySource(ENV),
+        nextcloud=TARGET,
+        store_provider=store_module.store_opener(ENV),
     )
 
     assert [getattr(route, "path", "") for route in routes] == [
@@ -966,7 +992,10 @@ def test_the_onboarding_opens_its_flow_at_the_injected_target(store: OAuthStore)
     client = TestClient(
         Starlette(
             routes=connect.connect_routes(
-                ENV, nextcloud=NextcloudTarget.from_url(injected), store_provider=provider
+                ENV,
+                browser_identity=AppApiBrowserIdentitySource(ENV),
+                nextcloud=NextcloudTarget.from_url(injected),
+                store_provider=provider,
             )
         )
     )
@@ -981,3 +1010,40 @@ def test_the_onboarding_opens_its_flow_at_the_injected_target(store: OAuthStore)
 
     assert response.status_code == 200, response.text
     assert (injected_init.call_count, environment_init.call_count) == (1, 0)
+
+
+@respx.mock
+def test_a_failing_identity_source_hands_nothing_over_and_takes_the_password_back(
+    store: OAuthStore,
+) -> None:
+    """The onboarding asks the injected source like the consent decision does (CR-01)."""
+
+    class Broken:
+        async def identifies(self, request: object, expected_account_id: str) -> bool:
+            raise RuntimeError("identity backend down")
+
+    async def provider() -> OAuthStore:
+        return store
+
+    client = TestClient(
+        Starlette(
+            routes=connect.connect_routes(
+                ENV, nextcloud=TARGET, store_provider=provider, browser_identity=Broken()
+            )
+        )
+    )
+    flow_id = start_a_flow(client)
+    respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    revoke = respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
+
+    response = result_of(client, flow_id)
+
+    assert APP_PASSWORD not in response.text
+    assert revoke.call_count == 1
+    assert flow_ids(store) == []
+
+
+def test_the_onboarding_no_longer_compares_appapi_headers_itself() -> None:
+    source = Path(connect.__file__).read_text(encoding="utf-8")
+    assert "appapi_user" not in source
+    assert "is_user(" not in source
