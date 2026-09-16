@@ -36,15 +36,30 @@ from starlette.datastructures import QueryParams
 from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 from starlette.routing import Route
+from starlette.types import ASGIApp, Receive, Scope, Send
 
-from ..exapp.responses import NO_STORE, form_or_none
+from ..exapp.responses import (
+    NO_STORE,
+    BodyTooLarge,
+    BodyUnreadable,
+    bounded_body,
+    form_or_none,
+    with_body,
+)
 from ..exapp.ui import errors, layout
 from ..exapp.ui.consent import CONFIRM_PARAM, CONSENT_PATH, FLOW_PARAM
 from . import crypto, oidc
 from .principal import same_principal
 from .provider import NextcloudOAuthProvider
 from .store import OIDC_TTL, OAuthStore
-from .throttle import CLASS_OIDC_CALLBACK, CLASS_OIDC_START, FLOW_LIMIT, Throttle, Throttled
+from .throttle import (
+    CLASS_OIDC_CALLBACK,
+    CLASS_OIDC_START,
+    FLOW_LIMIT,
+    Throttle,
+    Throttled,
+    source_of,
+)
 
 __all__ = [
     "OIDC_CALLBACK_PATH",
@@ -67,6 +82,10 @@ PROOF_COOKIE = "__Host-mcp-oidc-proof"
 #: Entropy of every handle and of state and nonce: 32 bytes, 43 URL-safe characters.
 HANDLE_BYTES = 32
 _HANDLE = re.compile(r"[A-Za-z0-9_-]{43}")
+
+#: The start form carries two short values. Anything larger is refused before it is parsed,
+#: because a standalone deployment has no proxy in front that would limit it.
+MAX_START_BODY_BYTES = 4096
 
 #: An authorization code longer than this is not one the provider issued.
 MAX_CODE_LENGTH = 2048
@@ -107,8 +126,20 @@ def oidc_routes(
         count_all=True,
         limit=FLOW_LIMIT,
     )
-    callback_route.app = Throttled(
-        callback_route.app, counters, CLASS_OIDC_CALLBACK, machine=False, env=env
+    # Refusals of the callback are counted per source only. The class wide ceiling would let
+    # anybody who varies a forwarded address close every sign in for everybody, and a sign in
+    # lives no longer than that lock. Requests that cannot do any work (not a GET, no usable
+    # state) are answered before the counter, so they cannot fill it either.
+    callback_route.app = _cheap_refusals(
+        Throttled(
+            callback_route.app,
+            counters,
+            CLASS_OIDC_CALLBACK,
+            machine=False,
+            env=env,
+            identity=_source,
+        ),
+        env,
     )
     return [start_route, callback_route]
 
@@ -120,7 +151,11 @@ async def _start(
     env: Mapping[str, str] | None,
 ) -> Response:
     """Remember one sign in for this flow and send the browser to the provider."""
-    form = await form_or_none(request)
+    try:
+        raw = await bounded_body(request, MAX_START_BODY_BYTES)
+    except (BodyTooLarge, BodyUnreadable):
+        return _refused(env)
+    form = await form_or_none(with_body(request, raw))
     if form is None:
         return _refused(env)
     flow_id = str(form.get(FLOW_PARAM) or "")
@@ -184,8 +219,8 @@ async def _callback(
         # consume a sign in.
         return Response(status_code=405, headers={"Allow": "GET", **NO_STORE})
     params = request.query_params
-    state = _single(params, "state")
-    if state is None or not _HANDLE.fullmatch(state):
+    state = _usable_state(params)
+    if state is None:
         return _refused(env)
 
     store = await _store_or_none(provider)
@@ -252,6 +287,37 @@ async def _callback(
     _set_cookie(response, PROOF_COOKIE, proof)
     response.delete_cookie(SIGN_IN_COOKIE, path="/", secure=True, httponly=True, samesite="lax")
     return response
+
+
+def _cheap_refusals(app: ASGIApp, env: Mapping[str, str] | None) -> ASGIApp:
+    """Answer callbacks that cannot consume anything before they reach the counter."""
+
+    async def guard(scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            request = Request(scope)
+            if request.method != "GET":
+                response: Response = Response(status_code=405, headers={"Allow": "GET", **NO_STORE})
+                await response(scope, receive, send)
+                return
+            if _usable_state(request.query_params) is None:
+                await _refused(env)(scope, receive, send)
+                return
+        await app(scope, receive, send)
+
+    return guard
+
+
+def _source(request: Request) -> str:
+    """The per source key of the callback counter; never empty, so nothing is unthrottled."""
+    return source_of(request) or "unknown"
+
+
+def _usable_state(params: QueryParams) -> str | None:
+    """The one state value of a callback, if it has the shape this app issues."""
+    state = _single(params, "state")
+    if state is None or not _HANDLE.fullmatch(state):
+        return None
+    return state
 
 
 def _issuer_matches(params: QueryParams, issuer: str) -> bool:

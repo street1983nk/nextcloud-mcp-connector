@@ -450,6 +450,47 @@ def test_every_start_is_counted(store: OAuthStore, idp: Idp) -> None:
     assert statuses[-1] == 429
 
 
+@pytest.mark.parametrize(
+    "shape",
+    ["urlencoded", "multipart", "chunked"],
+)
+def test_an_oversized_start_is_refused_before_it_is_parsed(
+    store: OAuthStore, idp: Idp, shape: str
+) -> None:
+    with_flow(store)
+    client = browser(application(store))
+    padding = "x" * (oidc_routes.MAX_START_BODY_BYTES + 1)
+    fields = {"flow": FLOW_ID, "confirm": confirm(store), "padding": padding}
+    if shape == "urlencoded":
+        response = client.post(START, data=fields)
+    elif shape == "multipart":
+        response = client.post(START, data=fields, files={"file": ("a.txt", padding.encode())})
+    else:
+        body = f"flow={FLOW_ID}&confirm={confirm(store)}&padding={padding}".encode()
+
+        def chunks() -> Iterator[bytes]:
+            for index in range(0, len(body), 512):
+                yield body[index : index + 512]
+
+        response = client.post(
+            START,
+            content=chunks(),
+            headers={"content-type": "application/x-www-form-urlencoded"},
+        )
+    assert response.status_code == 400
+    assert open_sign_ins(store) == 0
+
+
+def test_a_start_just_under_the_limit_still_works(store: OAuthStore, idp: Idp) -> None:
+    with_flow(store)
+    client = browser(application(store))
+    fields = {"flow": FLOW_ID, "confirm": confirm(store)}
+    used = len(f"flow={FLOW_ID}&confirm={confirm(store)}&padding=")
+    fields["padding"] = "x" * (oidc_routes.MAX_START_BODY_BYTES - used - 64)
+    response = client.post(START, data=fields)
+    assert response.status_code == 303
+
+
 def test_an_exapp_store_cannot_start_a_sign_in(tmp_path: Path, idp: Idp) -> None:
     subject = OAuthStore(tmp_path / "exapp.sqlite3", KEY)
     with_flow(subject)
@@ -737,6 +778,32 @@ def test_refused_callbacks_are_counted(store: OAuthStore, idp: Idp) -> None:
         for _ in range(throttle_module.FAILURE_LIMIT + 1)
     ]
     assert statuses[-1] == 429
+
+
+def test_callbacks_that_cannot_do_work_are_not_counted(store: OAuthStore, idp: Idp) -> None:
+    client = browser(application(store))
+    for _ in range(throttle_module.FAILURE_LIMIT + 5):
+        assert callback(client, "state=short&code=abc").status_code == 400
+        assert callback(client, "code=abc").status_code == 400
+        assert callback(client, f"state={'x' * 43}", method="HEAD").status_code == 405
+    assert callback(client, f"state={'x' * 43}&code=abc").status_code == 400
+
+
+def test_other_sources_cannot_lock_out_a_sign_in(store: OAuthStore, idp: Idp) -> None:
+    with_flow(store)
+    client = browser(application(store))
+    for index in range(throttle_module.PATH_CEILING + 10):
+        client.cookies.clear()
+        client.get(
+            f"{CALLBACK}?state={'x' * 43}&code=abc",
+            headers={"x-forwarded-for": f"198.51.100.{index % 250}, 203.0.113.{index % 7}"},
+        )
+    start(client, store, idp)
+    answer_with(idp)
+
+    response = callback(client, good_query(idp), cookie=own_cookie(idp))
+
+    assert response.status_code == 303
 
 
 def test_an_exapp_store_refuses_a_callback_without_an_error(tmp_path: Path, idp: Idp) -> None:
