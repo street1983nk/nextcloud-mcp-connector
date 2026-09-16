@@ -1,9 +1,6 @@
-"""The central principal rule: one place decides who a connection belongs to.
+"""The central principal rule: one place decides who a connection belongs to."""
 
-Commit scope: the rule exists and every consent, onboarding, connection page, provider and
-purge path uses it. The canonical account id and the verifier, pause and audit paths follow.
-"""
-
+import dataclasses
 import re
 from pathlib import Path
 
@@ -43,9 +40,17 @@ def test_same_principal(received: str, expected: str, same: bool) -> None:
 
 
 def test_the_legacy_branch_uses_the_login_name_for_both_names() -> None:
+    """An ExApp row written before nc_account_id existed: nothing invented, nothing filled."""
+    assert ROW.nc_account_id is None
     assert principal.principal_of(ROW) == "alice"
     assert principal.login_name_of(ROW) == "alice"
-    assert principal.sign_in_principal("alice") == "alice"
+
+
+def test_a_row_with_an_account_id_is_owned_by_that_id() -> None:
+    """LDAP or alternative login names: the login name signs in, the account id owns."""
+    row = dataclasses.replace(ROW, nc_user="alice@example.com", nc_account_id="a1b2c3")
+    assert principal.principal_of(row) == "a1b2c3"
+    assert principal.login_name_of(row) == "alice@example.com"
 
 
 def test_the_comparison_is_constant_time() -> None:

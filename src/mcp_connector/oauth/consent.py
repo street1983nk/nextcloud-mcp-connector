@@ -98,7 +98,7 @@ from ..exapp.ui.consent import (
 from ..nextcloud.target import NextcloudTarget
 from . import cimd, crypto, loginflow, registry
 from .browser_identity import BrowserIdentitySource
-from .principal import login_name_of, principal_of, sign_in_principal
+from .principal import login_name_of, principal_of
 from .provider import NextcloudOAuthProvider
 from .registry import redirect_uri_allowed
 from .store import FlowRow, OAuthStore
@@ -396,7 +396,23 @@ async def _screen(
     # the poll, and this refusal is the reason nobody will ever use it. So it goes back, word
     # for word like the write failure branch below and the identity branch of
     # ``connect._wait`` (pitfall 13, D-34).
-    disabled = await _access_disabled(store, sign_in_principal(credentials.login_name))
+    # The canonical account id, resolved with the fresh app password before anything is
+    # stored: the principal of this connection. Without it there is no authorization, and
+    # the credential goes back like on every other refusal of this branch (pitfall 13).
+    account = await loginflow.account_id(
+        credentials.login_name, credentials.app_password, target=nextcloud
+    )
+    if account is None:
+        await loginflow.revoke_app_password(
+            credentials.login_name, credentials.app_password, target=nextcloud
+        )
+        try:
+            await store.delete_flow(flow_id)
+        except Exception:
+            logger.exception("the flow record of an unresolved sign in could not be removed")
+        return _generic("the account of the finished sign in could not be resolved", env)
+
+    disabled = await _access_disabled(store, account)
     if disabled is not False:
         # ``None`` is the store that could not answer, and that is never a "no" (fail closed,
         # D-37, the same choice the transport boundary of phase 4 makes).
@@ -411,6 +427,7 @@ async def _screen(
             flow_id,
             client_id=row.client_id,
             nc_user=credentials.login_name,
+            nc_account_id=account,
             app_password=credentials.app_password,
             scopes=row.scopes,
             resource=row.resource,

@@ -156,6 +156,7 @@ async def seed(
         AUTH_ID,
         client_id=CLIENT_ID,
         nc_user=NC_USER,
+        nc_account_id=NC_USER,
         app_password=APP_PASSWORD,
         scopes=TOOL_SCOPE,
         resource=resource,

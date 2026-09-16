@@ -8,17 +8,21 @@ Two names describe a Nextcloud account in this project, and they are not interch
   consent or receives an onboarding result, the ownership of a connection, the per account
   pause switch and the audit subject.
 
-The store records only the login name today (``nc_user``). For every existing row the
-principal therefore *is* the login name, and that is the single legacy branch of this rule.
-A later step adds the canonical Nextcloud account id and switches the principal to it for new
-rows, here and nowhere else. No call site picks a name or compares identities on its own; it
-asks :func:`principal_of`, :func:`login_name_of` and :func:`same_principal`.
+Every new connection stores both: ``nc_user`` is the login name, ``nc_account_id`` the
+canonical Nextcloud account id that OCS (``cloud/user``) returns for the app password right
+after the sign in. The principal is that account id. Rows written by an ExApp before the
+column existed have no account id; for them, and only for them, the principal stays the login
+name. That is the single legacy branch of this rule, and it invents or backfills nothing.
+
+No call site picks a name or compares identities on its own; it asks :func:`principal_of`,
+:func:`login_name_of` and :func:`same_principal`. Before a row exists, the principal of a
+finished sign in is the resolved account id itself.
 """
 
 import secrets
 from typing import Protocol
 
-__all__ = ["login_name_of", "principal_of", "same_principal", "sign_in_principal"]
+__all__ = ["login_name_of", "principal_of", "same_principal"]
 
 
 class Authorized(Protocol):
@@ -27,20 +31,16 @@ class Authorized(Protocol):
     @property
     def nc_user(self) -> str: ...
 
+    @property
+    def nc_account_id(self) -> str | None: ...
+
 
 def principal_of(authorization: Authorized) -> str:
-    """The value identity comparisons, ownership, pause and audit use for this connection."""
-    return authorization.nc_user
+    """The value identity comparisons, ownership, pause and audit use for this connection.
 
-
-def sign_in_principal(login_name: str) -> str:
-    """The principal of a finished sign in, before any connection row exists for it.
-
-    Login Flow v2 returns only the login name, so today it is the principal as well (the
-    legacy branch). Once the canonical account id is resolved right after the poll, this is
-    where it takes over.
+    The canonical account id, or the login name for a legacy ExApp row that has none.
     """
-    return login_name
+    return authorization.nc_account_id or authorization.nc_user
 
 
 def login_name_of(authorization: Authorized) -> str:

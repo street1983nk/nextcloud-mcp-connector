@@ -496,3 +496,69 @@ def test_the_module_no_longer_reads_the_deploy_environment() -> None:
     source = SOURCE.read_text(encoding="utf-8")
     assert "exapp_settings" not in source
     assert "os.environ" not in source
+
+
+# --- the canonical account id -------------------------------------------------------------
+
+ACCOUNT_URL = f"{BASE_URL}{loginflow.ACCOUNT_PATH}"
+
+
+def ocs_user(value: object) -> dict[str, object]:
+    return {"ocs": {"meta": {"status": "ok", "statuscode": 200}, "data": {"id": value}}}
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_the_account_id_is_read_with_the_fresh_app_password() -> None:
+    route = respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=ocs_user("a1b2c3")))
+
+    assert await loginflow.account_id(LOGIN_NAME, APP_PASSWORD, target=TARGET) == "a1b2c3"
+
+    assert route.call_count == 1
+    sent = route.calls.last.request
+    expected = base64.b64encode(f"{LOGIN_NAME}:{APP_PASSWORD}".encode()).decode()
+    assert sent.headers["Authorization"] == f"Basic {expected}"
+    assert sent.headers["OCS-APIRequest"] == "true"
+
+
+@respx.mock
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "response",
+    [
+        httpx.Response(401, json={}),
+        httpx.Response(500, json={}),
+        httpx.Response(200, text="<html>login</html>"),
+        httpx.Response(200, json={"ocs": {"data": {}}}),
+        httpx.Response(200, json=ocs_user("")),
+        httpx.Response(200, json=ocs_user(42)),
+        httpx.Response(200, json=ocs_user(" alice")),
+        httpx.Response(200, json=ocs_user("ali\nce")),
+        httpx.Response(200, json=[]),
+    ],
+    ids=[
+        "401",
+        "500",
+        "html",
+        "no id",
+        "empty id",
+        "number",
+        "padded",
+        "control character",
+        "list",
+    ],
+)
+async def test_an_unusable_answer_is_no_account(response: httpx.Response) -> None:
+    respx.get(ACCOUNT_URL).mock(return_value=response)
+    assert await loginflow.account_id(LOGIN_NAME, APP_PASSWORD, target=TARGET) is None
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_an_unreachable_nextcloud_is_no_account_and_logs_no_secret(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    respx.get(ACCOUNT_URL).mock(side_effect=httpx.ConnectError("down"))
+    with caplog.at_level(logging.DEBUG, logger="mcp_connector"):
+        assert await loginflow.account_id(LOGIN_NAME, APP_PASSWORD, target=TARGET) is None
+    assert APP_PASSWORD not in caplog.text

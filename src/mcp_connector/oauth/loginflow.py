@@ -42,6 +42,7 @@ from ..nextcloud.http import shared_client
 from ..nextcloud.target import NextcloudTarget
 
 __all__ = [
+    "ACCOUNT_PATH",
     "AGENT_FALLBACK",
     "AGENT_NAME_LIMIT",
     "AGENT_PREFIX",
@@ -55,6 +56,7 @@ __all__ = [
     "AppCredentials",
     "FlowStart",
     "PollResult",
+    "account_id",
     "poll_once",
     "revoke_app_password",
     "safe_user_agent",
@@ -67,6 +69,11 @@ INIT_PATH = "/index.php/login/v2"
 
 #: The one poll address this project uses. Fixed on purpose, see the module docstring.
 POLL_PATH = "/login/v2/poll"
+
+#: The OCS route that names the account a request authenticates as. Its ``id`` is the
+#: canonical Nextcloud account id, which can differ from the login name (LDAP, alternative
+#: login names).
+ACCOUNT_PATH = "/ocs/v2.php/cloud/user"
 
 #: The OCS route that deletes the app password a request authenticates with.
 APP_PASSWORD_PATH = "/ocs/v2.php/core/apppassword"  # noqa: S105 - a route, not a password
@@ -269,6 +276,41 @@ async def revoke_app_password(
 
     logger.error("the app password deletion at %s answered %s", url, response.status_code)
     return False
+
+
+async def account_id(login_name: str, app_password: str, *, target: NextcloudTarget) -> str | None:
+    """The canonical account id behind a fresh app password, or ``None``.
+
+    One authenticated OCS request right after the poll. The answer decides who the
+    connection belongs to (the principal rule), so anything but a clean 200 with a
+    non-empty, printable ``id`` is ``None`` and the caller refuses the sign in. One attempt,
+    no retry, and nothing of the exchange is logged (the rules of this module).
+    """
+    url = f"{target.base_url}{ACCOUNT_PATH}"
+    client = shared_client()
+
+    try:
+        response = await client.get(
+            url,
+            headers=dict(OCS_HEADERS),
+            auth=httpx.BasicAuth(login_name, app_password),
+        )
+    except httpx.HTTPError:
+        logger.error("the account lookup at %s did not reach Nextcloud", url)
+        return None
+
+    if response.status_code != 200:
+        logger.error("the account lookup at %s answered %s", url, response.status_code)
+        return None
+
+    payload = _payload(response, url)
+    ocs = payload.get("ocs") if isinstance(payload, dict) else None
+    data = ocs.get("data") if isinstance(ocs, dict) else None
+    found = _text(data.get("id") if isinstance(data, dict) else None)
+    if found is None or not found.isprintable() or found != found.strip():
+        logger.error("the account lookup at %s answered without a usable account id", url)
+        return None
+    return found
 
 
 def _payload(response: httpx.Response, url: str) -> Any:

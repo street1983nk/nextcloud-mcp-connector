@@ -79,6 +79,14 @@ def poll_body() -> dict[str, str]:
     return {"server": BASE_URL, "loginName": LOGIN_NAME, "appPassword": APP_PASSWORD}
 
 
+ACCOUNT_URL = f"{BASE_URL}{loginflow.ACCOUNT_PATH}"
+
+
+def account_body(account: str = LOGIN_NAME) -> dict[str, object]:
+    """The answer of OCS ``cloud/user`` for the fresh app password: the canonical id."""
+    return {"ocs": {"meta": {"status": "ok", "statuscode": 200}, "data": {"id": account}}}
+
+
 class Inputs(HTMLParser):
     """Collect every form control of a page, which is what a phishing page would need."""
 
@@ -342,6 +350,7 @@ def test_the_poll_carries_the_token_of_that_flow(client: TestClient) -> None:
 def test_the_credential_is_shown_once_and_never_again(client: TestClient) -> None:
     flow_id = start_a_flow(client)
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
 
     first = result_of(client, flow_id)
     second = result_of(client, flow_id)
@@ -358,6 +367,7 @@ def test_the_credential_is_shown_once_and_never_again(client: TestClient) -> Non
 def test_the_flow_record_is_gone_after_the_result(client: TestClient, store: OAuthStore) -> None:
     flow_id = start_a_flow(client)
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
 
     result_of(client, flow_id)
 
@@ -369,6 +379,7 @@ def test_the_credential_reaches_no_file_of_this_server(client: TestClient, tmp_p
     """T-03-33: the app password belongs to the user, not to this server."""
     flow_id = start_a_flow(client)
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
 
     assert APP_PASSWORD in result_of(client, flow_id).text
     assert APP_PASSWORD.encode() not in store_bytes(tmp_path)
@@ -378,6 +389,7 @@ def test_the_credential_reaches_no_file_of_this_server(client: TestClient, tmp_p
 def test_the_result_page_says_how_to_use_it_and_how_to_revoke_it(client: TestClient) -> None:
     flow_id = start_a_flow(client)
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
 
     text = result_of(client, flow_id).text
 
@@ -422,6 +434,7 @@ def test_a_paused_account_is_never_shown_its_app_password(
     flow_id = start_a_flow(client)
     pause(store)
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
     revoke = respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
 
     response = result_of(client, flow_id)
@@ -442,6 +455,7 @@ def test_an_account_that_is_not_paused_still_reads_its_credential(
     """The positive control of point 2: the check refuses one case and not the route."""
     flow_id = start_a_flow(client)
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
     revoke = respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
 
     response = result_of(client, flow_id)
@@ -459,6 +473,7 @@ def test_a_switch_that_cannot_be_read_shows_no_credential(
     """Fail closed (D-37): an unreadable switch is a page, never a rendered credential."""
     flow_id = start_a_flow(client)
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
     revoke = respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
     break_switch(store)
 
@@ -478,6 +493,7 @@ def test_no_refusal_of_a_paused_account_writes_a_value_into_the_log(
     flow_id = start_a_flow(client)
     pause(store)
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
     respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
 
     with caplog.at_level(logging.DEBUG, logger="mcp_connector"):
@@ -682,6 +698,7 @@ def test_the_relay_attack_reads_no_app_password(
     """
     flow_id = start_a_flow(client)
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
     revoke = respx.delete(f"{BASE_URL}{loginflow.APP_PASSWORD_PATH}").mock(
         return_value=httpx.Response(200, json={})
     )
@@ -699,6 +716,7 @@ def test_a_forged_identity_header_reads_no_app_password(client: TestClient) -> N
     """The header is signed with APP_SECRET, which the caller does not have (T-02-02)."""
     flow_id = start_a_flow(client)
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
     respx.delete(f"{BASE_URL}{loginflow.APP_PASSWORD_PATH}").mock(
         return_value=httpx.Response(200, json={})
     )
@@ -725,6 +743,7 @@ def test_a_refused_result_ends_the_flow_so_the_poll_is_not_repeated(
     leave a flow behind that can never finish, and one more page to try it on."""
     flow_id = start_a_flow(client)
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
     respx.delete(f"{BASE_URL}{loginflow.APP_PASSWORD_PATH}").mock(
         return_value=httpx.Response(200, json={})
     )
@@ -741,6 +760,7 @@ def test_no_secret_of_the_result_reaches_the_log(
     """T-03-36: the one page that carries a credential must not repeat it in a record."""
     flow_id = start_a_flow(client)
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
 
     with caplog.at_level(logging.DEBUG, logger="mcp_connector"):
         result_of(client, flow_id)
@@ -1034,6 +1054,7 @@ def test_a_failing_identity_source_hands_nothing_over_and_takes_the_password_bac
     )
     flow_id = start_a_flow(client)
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
     revoke = respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
 
     response = result_of(client, flow_id)
@@ -1047,3 +1068,47 @@ def test_the_onboarding_no_longer_compares_appapi_headers_itself() -> None:
     source = Path(connect.__file__).read_text(encoding="utf-8")
     assert "appapi_user" not in source
     assert "is_user(" not in source
+
+
+# --- the canonical account id (principal rule) -------------------------------------------
+
+
+@respx.mock
+def test_the_result_is_handed_to_the_account_id_and_not_the_login_name(
+    client: TestClient, store: OAuthStore
+) -> None:
+    flow_id = start_a_flow(client)
+    respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body("a1b2c3")))
+    revoke = respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
+
+    refused = result_of(client, flow_id, user=LOGIN_NAME)
+
+    assert APP_PASSWORD not in refused.text
+    assert revoke.call_count == 1
+
+
+@respx.mock
+def test_the_account_id_is_what_the_result_page_trusts(
+    client: TestClient, store: OAuthStore
+) -> None:
+    flow_id = start_a_flow(client)
+    respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body("a1b2c3")))
+
+    assert APP_PASSWORD in result_of(client, flow_id, user="a1b2c3").text
+
+
+@respx.mock
+def test_an_unresolved_account_hands_nothing_over(client: TestClient, store: OAuthStore) -> None:
+    flow_id = start_a_flow(client)
+    respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(401, json={}))
+    revoke = respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
+
+    response = result_of(client, flow_id)
+
+    assert APP_PASSWORD not in response.text
+    assert strings.ERROR_GENERIC_TITLE in response.text
+    assert revoke.call_count == 1
+    assert flow_ids(store) == []

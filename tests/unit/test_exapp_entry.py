@@ -1881,6 +1881,7 @@ def a_connected_account(
             f"authorization-of-{nc_user}",
             client_id=CONNECTED_CLIENT_ID,
             nc_user=nc_user,
+            nc_account_id=nc_user,
             app_password="aaaaa-bbbbb-ccccc-ddddd-eeeee",
             scopes=TOOL_SCOPE,
             resource=f"{PUBLIC_URL}{RESOURCE_SUFFIX}",

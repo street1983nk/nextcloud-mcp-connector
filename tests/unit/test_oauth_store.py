@@ -54,6 +54,7 @@ async def with_authorization(subject: store.OAuthStore, *, now: int | None = Non
         AUTH_ID,
         client_id=CLIENT_ID,
         nc_user=NC_USER,
+        nc_account_id=NC_USER,
         app_password=APP_PASSWORD,
         scopes=SCOPES,
         resource=RESOURCE,
@@ -73,6 +74,7 @@ async def with_three_connections(subject: store.OAuthStore) -> None:
             auth_id,
             client_id=CLIENT_ID,
             nc_user=nc_user,
+            nc_account_id=nc_user,
             app_password=APP_PASSWORD,
             scopes=SCOPES,
             resource=RESOURCE,
@@ -252,6 +254,7 @@ async def test_every_connection_still_sets_the_three_pragmas(
             AUTH_ID,
             client_id="no-such-client",
             nc_user=NC_USER,
+            nc_account_id=NC_USER,
             app_password=APP_PASSWORD,
             scopes=SCOPES,
             resource=RESOURCE,
@@ -417,6 +420,7 @@ async def test_the_app_password_is_bound_to_its_own_row(tmp_path: Path) -> None:
         "auth-0002",
         client_id=CLIENT_ID,
         nc_user="bob",
+        nc_account_id="bob",
         app_password="app-password-of-bob",
         scopes=SCOPES,
         resource=RESOURCE,
@@ -866,6 +870,7 @@ async def with_a_running_flow(
         flow_id,
         client_id=CLIENT_ID,
         nc_user=NC_USER,
+        nc_account_id=NC_USER,
         app_password=APP_PASSWORD,
         scopes=SCOPES,
         resource=RESOURCE,
@@ -1656,3 +1661,104 @@ def test_every_lifetime_is_a_named_constant() -> None:
     assert store.ROTATION_GRACE == 10
     assert store.UNUSED_CLIENT_TTL == 24 * 3600
     assert store.IDLE_CLIENT_TTL == 90 * 24 * 3600
+
+
+# --- the canonical account id (principal rule) -------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_a_new_connection_needs_its_account_id(tmp_path: Path) -> None:
+    subject = open_store(tmp_path)
+    await with_client(subject)
+    with pytest.raises(ValueError, match="account id"):
+        await subject.create_authorization(
+            AUTH_ID,
+            client_id=CLIENT_ID,
+            nc_user=NC_USER,
+            nc_account_id="  ",
+            app_password=APP_PASSWORD,
+            scopes=SCOPES,
+            resource=RESOURCE,
+        )
+
+
+@pytest.mark.anyio
+async def test_the_connections_of_an_account_are_found_by_its_principal(tmp_path: Path) -> None:
+    subject = open_store(tmp_path)
+    await with_client(subject)
+    await subject.create_authorization(
+        "auth-ldap",
+        client_id=CLIENT_ID,
+        nc_user="alice@example.com",
+        nc_account_id="a1b2c3",
+        app_password=APP_PASSWORD,
+        scopes=SCOPES,
+        resource=RESOURCE,
+    )
+
+    assert [row.auth_id for row in await subject.authorizations_of_user("a1b2c3")] == ["auth-ldap"]
+    assert await subject.authorizations_of_user("alice@example.com") == []
+
+
+@pytest.mark.anyio
+async def test_an_older_file_grows_the_column_and_keeps_its_rows_legacy(tmp_path: Path) -> None:
+    """A store written before nc_account_id: the row survives, principal = login name."""
+    path = tmp_path / store.STORE_FILENAME
+    conn = sqlite3.connect(path)
+    try:
+        conn.executescript(store.SCHEMA.replace("  nc_account_id TEXT,\n", ""))
+        conn.execute(
+            "INSERT INTO clients (client_id, metadata_json, registered_at) VALUES (?, ?, ?)",
+            (CLIENT_ID, "{}", 1),
+        )
+        conn.execute(
+            "INSERT INTO authorizations (auth_id, client_id, nc_user, app_password_enc, "
+            "scopes, resource, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                AUTH_ID,
+                CLIENT_ID,
+                NC_USER,
+                crypto.encrypt(KEY, b"pw", aad=AUTH_ID),
+                SCOPES,
+                RESOURCE,
+                1,
+            ),
+        )
+        conn.commit()
+        assert "nc_account_id" not in {
+            row[1] for row in conn.execute("PRAGMA table_info(authorizations)")
+        }
+    finally:
+        conn.close()
+
+    row = await open_store(tmp_path).load_authorization(AUTH_ID)
+
+    assert row is not None
+    assert row.nc_account_id is None
+    assert [r.auth_id for r in await open_store(tmp_path).authorizations_of_user(NC_USER)] == [
+        AUTH_ID
+    ]
+
+
+@pytest.mark.anyio
+async def test_the_pause_sweep_keeps_a_pause_whose_account_still_has_a_connection(
+    tmp_path: Path,
+) -> None:
+    subject = open_store(tmp_path)
+    await with_client(subject)
+    await subject.create_authorization(
+        "auth-ldap",
+        client_id=CLIENT_ID,
+        nc_user="alice@example.com",
+        nc_account_id="a1b2c3",
+        app_password=APP_PASSWORD,
+        scopes=SCOPES,
+        resource=RESOURCE,
+    )
+    await subject.set_access("a1b2c3", disabled=True, now=1)
+    await subject.set_access("stranger", disabled=True, now=1)
+
+    await subject.purge_expired(now=1 + store.STALE_ACCESS_TTL + 1)
+
+    assert await subject.access_disabled("a1b2c3") is True
+    assert await subject.access_disabled("stranger") is False

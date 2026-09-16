@@ -58,7 +58,6 @@ from ..exapp.ui.connect import (
 from ..nextcloud.target import NextcloudTarget
 from . import loginflow
 from .browser_identity import BrowserIdentitySource
-from .principal import sign_in_principal
 from .store import OAuthStore
 from .throttle import CLASS_CONNECT, CLASS_CONNECT_START, FLOW_LIMIT, Throttle, Throttled
 
@@ -295,10 +294,20 @@ async def _wait(
         return _generic("the login flow poll failed", env)
 
     credentials = result.credentials
-    try:
-        identified = await browser_identity.identifies(
-            request, sign_in_principal(credentials.login_name)
+    # The principal of this sign in: the canonical account id behind the fresh app password.
+    # Without it nothing is handed over, and the credential goes back (pitfall 13).
+    account = await loginflow.account_id(
+        credentials.login_name, credentials.app_password, target=nextcloud
+    )
+    if account is None:
+        await loginflow.revoke_app_password(
+            credentials.login_name, credentials.app_password, target=nextcloud
         )
+        await _forget_flow(opened, flow_id)
+        return _generic("the account of the finished sign in could not be resolved", env)
+
+    try:
+        identified = await browser_identity.identifies(request, account)
     except Exception:
         # A source is a security boundary: its failure is a refusal, never a fallback.
         logger.error("the browser identity source could not decide the onboarding identity")
@@ -322,7 +331,7 @@ async def _wait(
     # the credential of a paused account may not be rendered, and because both refusals owe
     # the same thing: the app password exists at Nextcloud from the 200 of the poll, and this
     # refusal is the reason nobody will ever use it (pitfall 13, D-34).
-    disabled = await _access_disabled(opened, sign_in_principal(credentials.login_name))
+    disabled = await _access_disabled(opened, account)
     if disabled is not False:
         # ``None`` is the store that could not answer, and that is never a "no" (fail closed,
         # D-37, the same choice the transport boundary of phase 4 makes).

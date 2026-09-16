@@ -54,6 +54,7 @@ async def legacy_store(tmp_path: Path, key: bytes, *, connections: int = 1) -> N
             f"auth-{index}",
             client_id=CLIENT_ID,
             nc_user="alice",
+            nc_account_id="alice",
             app_password=f"app-password-{index}",
             scopes="nextcloud",
             resource="https://mcp.example.com/mcp",

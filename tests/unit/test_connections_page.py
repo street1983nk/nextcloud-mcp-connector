@@ -731,6 +731,7 @@ def seed(
             auth_id,
             client_id=client_id,
             nc_user=nc_user,
+            nc_account_id=nc_user,
             app_password=APP_PASSWORD,
             scopes=TOOL_SCOPE,
             resource=RESOURCE,

@@ -261,6 +261,10 @@ CREATE TABLE IF NOT EXISTS authorizations (
   auth_id TEXT PRIMARY KEY,
   client_id TEXT NOT NULL REFERENCES clients(client_id) ON DELETE CASCADE,
   nc_user TEXT NOT NULL,
+  -- The canonical Nextcloud account id (OCS cloud/user) and with it the principal of the
+  -- connection. NULL only in rows an ExApp wrote before the column existed; for those the
+  -- principal stays nc_user (oauth/principal.py).
+  nc_account_id TEXT,
   app_password_enc BLOB NOT NULL,
   scopes TEXT NOT NULL,
   resource TEXT NOT NULL,
@@ -393,6 +397,7 @@ class AuthorizationRow:
     created_at: int
     revoked_at: int | None
     cleanup_at: int | None = None
+    nc_account_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -702,20 +707,29 @@ class OAuthStore:
         *,
         client_id: str,
         nc_user: str,
+        nc_account_id: str,
         app_password: str,
         scopes: str,
         resource: str,
         now: int | None = None,
     ) -> None:
-        """Store one connection: one user, one dedicated Nextcloud app password."""
+        """Store one connection: one user, one dedicated Nextcloud app password.
+
+        ``nc_account_id`` is required and may not be blank: no new connection exists without
+        its canonical account id (the principal rule). Only rows written before the column
+        existed lack it.
+        """
+        if not nc_account_id.strip():
+            raise ValueError("a new connection needs its canonical account id")
         moment = _moment(now)
         blob = encrypt(self._key, app_password.encode("utf-8"), aad=auth_id)
 
         def work(conn: sqlite3.Connection) -> None:
             conn.execute(
-                "INSERT INTO authorizations (auth_id, client_id, nc_user, app_password_enc, "
-                "scopes, resource, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (auth_id, client_id, nc_user, blob, scopes, resource, moment),
+                "INSERT INTO authorizations (auth_id, client_id, nc_user, nc_account_id, "
+                "app_password_enc, scopes, resource, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (auth_id, client_id, nc_user, nc_account_id, blob, scopes, resource, moment),
             )
 
         await self._write(work)
@@ -724,7 +738,7 @@ class OAuthStore:
         def work(conn: sqlite3.Connection) -> AuthorizationRow | None:
             row = conn.execute(
                 "SELECT auth_id, client_id, nc_user, scopes, resource, created_at, revoked_at, "
-                "cleanup_at FROM authorizations WHERE auth_id = ?",
+                "cleanup_at, nc_account_id FROM authorizations WHERE auth_id = ?",
                 (auth_id,),
             ).fetchone()
             return None if row is None else _authorization_row(row)
@@ -832,7 +846,7 @@ class OAuthStore:
         def work(conn: sqlite3.Connection) -> list[AuthorizationRow]:
             rows = conn.execute(
                 "SELECT auth_id, client_id, nc_user, scopes, resource, created_at, "
-                "revoked_at, cleanup_at FROM authorizations WHERE client_id = ? "
+                "revoked_at, cleanup_at, nc_account_id FROM authorizations WHERE client_id = ? "
                 "ORDER BY created_at LIMIT ?",
                 (client_id, capped),
             ).fetchall()
@@ -842,6 +856,9 @@ class OAuthStore:
 
     async def authorizations_of_user(self, nc_user: str) -> list[AuthorizationRow]:
         """The live connections of one account, newest first (S5 of the connections page).
+
+        ``nc_user`` here is the principal (oauth/principal.py): the canonical account id, or
+        the login name of a legacy row without one. The same value keys ``user_access``.
 
         Only what still exists: a revoked connection ended, and the page that lists it is
         the page a user opens to see who can reach their Nextcloud right now. No ``limit``
@@ -858,7 +875,8 @@ class OAuthStore:
         def work(conn: sqlite3.Connection) -> list[AuthorizationRow]:
             rows = conn.execute(
                 "SELECT auth_id, client_id, nc_user, scopes, resource, created_at, "
-                "revoked_at, cleanup_at FROM authorizations WHERE nc_user = ? "
+                "revoked_at, cleanup_at, nc_account_id FROM authorizations "
+                "WHERE COALESCE(nc_account_id, nc_user) = ? "
                 "AND revoked_at IS NULL ORDER BY created_at DESC",
                 (nc_user,),
             ).fetchall()
@@ -892,7 +910,8 @@ class OAuthStore:
         def work(conn: sqlite3.Connection) -> list[AuthorizationRow]:
             rows = conn.execute(
                 "SELECT auth_id, client_id, nc_user, scopes, resource, created_at, "
-                "revoked_at, cleanup_at FROM authorizations ORDER BY created_at LIMIT ?",
+                "revoked_at, cleanup_at, nc_account_id FROM authorizations "
+                "ORDER BY created_at LIMIT ?",
                 (_NO_LIMIT,),
             ).fetchall()
             return [_authorization_row(row) for row in rows]
@@ -1022,7 +1041,7 @@ class OAuthStore:
         def work(conn: sqlite3.Connection) -> list[AuthorizationRow]:
             rows = conn.execute(
                 "SELECT a.auth_id, a.client_id, a.nc_user, a.scopes, a.resource, a.created_at, "
-                "a.revoked_at, a.cleanup_at FROM authorizations AS a "
+                "a.revoked_at, a.cleanup_at, a.nc_account_id FROM authorizations AS a "
                 "LEFT JOIN flows AS f ON f.flow_id = a.auth_id "
                 "WHERE a.revoked_at IS NULL AND f.flow_id IS NULL AND a.created_at < ? "
                 "AND NOT EXISTS (SELECT 1 FROM auth_codes AS c WHERE c.auth_id = a.auth_id) "
@@ -1031,19 +1050,7 @@ class OAuthStore:
                 "ORDER BY a.created_at LIMIT ?",
                 (moment - FLOW_TTL, limit),
             ).fetchall()
-            return [
-                AuthorizationRow(
-                    auth_id=row[0],
-                    client_id=row[1],
-                    nc_user=row[2],
-                    scopes=row[3],
-                    resource=row[4],
-                    created_at=row[5],
-                    revoked_at=row[6],
-                    cleanup_at=row[7],
-                )
-                for row in rows
-            ]
+            return [_authorization_row(row) for row in rows]
 
         return await self._read(work)
 
@@ -1414,7 +1421,7 @@ class OAuthStore:
             conn.execute(
                 "DELETE FROM user_access WHERE disabled_at < ? "
                 "AND NOT EXISTS (SELECT 1 FROM authorizations AS a "
-                "WHERE a.nc_user = user_access.nc_user)",
+                "WHERE COALESCE(a.nc_account_id, a.nc_user) = user_access.nc_user)",
                 (moment - STALE_ACCESS_TTL,),
             )
             conn.execute(
@@ -1736,6 +1743,10 @@ def _add_missing_columns(conn: sqlite3.Connection) -> None:
     columns = {row[1] for row in conn.execute("PRAGMA table_info(authorizations)")}
     if "cleanup_at" not in columns:
         conn.execute("ALTER TABLE authorizations ADD COLUMN cleanup_at INTEGER")
+    if "nc_account_id" not in columns:
+        # Nullable, no default and no backfill: an older row keeps meaning what it meant, a
+        # connection whose principal is its login name (oauth/principal.py).
+        conn.execute("ALTER TABLE authorizations ADD COLUMN nc_account_id TEXT")
     columns = {row[1] for row in conn.execute("PRAGMA table_info(clients)")}
     if "cimd_fetched_at" not in columns:
         conn.execute("ALTER TABLE clients ADD COLUMN cimd_fetched_at INTEGER")
@@ -1756,6 +1767,7 @@ def _authorization_row(row: tuple[Any, ...]) -> AuthorizationRow:
         created_at=row[5],
         revoked_at=row[6],
         cleanup_at=row[7],
+        nc_account_id=row[8],
     )
 
 

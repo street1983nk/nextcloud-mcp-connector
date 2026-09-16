@@ -146,6 +146,7 @@ class Deployment:
                 auth_id,
                 client_id=CLIENT_ID,
                 nc_user=nc_user,
+                nc_account_id=nc_user,
                 app_password=password,
                 scopes="nextcloud",
                 resource=f"{PUBLIC_URL}/mcp",

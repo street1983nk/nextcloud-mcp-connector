@@ -97,6 +97,14 @@ def poll_body() -> dict[str, str]:
     return {"server": BASE_URL, "loginName": LOGIN_NAME, "appPassword": APP_PASSWORD}
 
 
+ACCOUNT_URL = f"{BASE_URL}{loginflow.ACCOUNT_PATH}"
+
+
+def account_body(account: str = LOGIN_NAME) -> dict[str, object]:
+    """The answer of OCS ``cloud/user`` for the fresh app password: the canonical id."""
+    return {"ocs": {"meta": {"status": "ok", "statuscode": 200}, "data": {"id": account}}}
+
+
 @pytest.fixture
 def store(tmp_path: Path) -> OAuthStore:
     return OAuthStore(tmp_path / "oauth.sqlite3", KEY)
@@ -524,6 +532,7 @@ def test_a_finished_sign_in_turns_into_the_consent_screen(store: OAuthStore) -> 
 
     with respx.mock:
         respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
         response = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
 
     assert response.status_code == 200
@@ -544,6 +553,7 @@ def test_the_credential_of_the_sign_in_is_stored_and_never_rendered(
 
     with respx.mock:
         respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
         response = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
 
     assert APP_PASSWORD not in response.text
@@ -567,6 +577,7 @@ def test_a_second_load_after_the_sign_in_does_not_poll_again(store: OAuthStore) 
 
     with respx.mock:
         poll = respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
         client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
         second = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
 
@@ -585,6 +596,7 @@ def test_the_unverified_callout_is_there_for_a_self_registered_client(
 
     with respx.mock:
         respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
         response = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
 
     assert strings.CONSENT_WARNING_TITLE in response.text
@@ -600,6 +612,7 @@ def test_the_unverified_callout_is_absent_for_a_listed_client(store: OAuthStore)
         respx.post(INIT_URL).mock(return_value=httpx.Response(200, json=start_body()))
         flow_id = flow_of(start(client))
         respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
         response = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
 
     assert strings.CONSENT_WARNING_TITLE not in response.text
@@ -705,6 +718,7 @@ def signed_in_screen(provider: provider_module.NextcloudOAuthProvider, **overrid
         respx.post(INIT_URL).mock(return_value=httpx.Response(200, json=start_body()))
         flow_id = flow_of(start(client, **overrides))
         respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
         response = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
     assert response.status_code == 200, response.text
     return response.text
@@ -849,6 +863,7 @@ def test_the_authorize_chain_reads_a_document_again_once_its_window_has_passed(
         respx.post(INIT_URL).mock(return_value=httpx.Response(200, json=start_body()))
         flow_id = flow_of(start(client, client_id=CIMD_CLIENT_ID, redirect_uri=LOOPBACK_REQUESTED))
         respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
         page = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
 
     assert route.call_count >= 1
@@ -949,6 +964,7 @@ def test_a_client_blocked_after_the_sign_in_does_not_reach_the_decision(
 
     with respx.mock:
         respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
         response = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
 
     assert response.status_code in (400, 403)
@@ -963,6 +979,7 @@ def signed_in(provider: provider_module.NextcloudOAuthProvider) -> tuple[TestCli
     client, flow_id, _target = opened(provider)
     with respx.mock:
         respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
         page = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
     return client, flow_id, page.text
 
@@ -2004,6 +2021,7 @@ def out_of_band(store: OAuthStore, flow_id: str) -> None:
             flow_id,
             client_id=CLIENT_ID,
             nc_user=LOGIN_NAME,
+            nc_account_id=LOGIN_NAME,
             app_password=APP_PASSWORD,
             scopes="nextcloud",
             resource=RESOURCE,
@@ -2114,6 +2132,7 @@ def test_a_paused_account_never_reaches_the_consent_screen(store: OAuthStore) ->
 
     with respx.mock:
         respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
         revoke = respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
         response = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
 
@@ -2136,6 +2155,7 @@ def test_an_account_that_is_not_paused_reaches_the_consent_screen(store: OAuthSt
 
     with respx.mock:
         respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
         revoke = respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
         response = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
 
@@ -2154,6 +2174,7 @@ def test_a_switch_that_cannot_be_read_creates_no_authorization(store: OAuthStore
 
     with respx.mock:
         respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
         revoke = respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
         response = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
 
@@ -2319,6 +2340,7 @@ def test_no_refusal_of_a_paused_account_writes_a_value_into_the_log(
 
     with respx.mock, caplog.at_level(logging.DEBUG, logger="mcp_connector"):
         respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body()))
         respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
         client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
 
@@ -2520,3 +2542,84 @@ def test_the_routes_are_declared_in_the_manifest_and_served_by_the_application()
     assert paths.count("/authorize") == 1
     assert paths.count(ui_consent.CONSENT_PATH) == 1
     assert paths.count(ui_consent.DECIDE_PATH) == 1
+
+
+# --- the canonical account id (principal rule) -------------------------------------------
+
+ACCOUNT_ID = "a1b2c3d4"
+
+
+def signed_in_as_account(
+    provider: provider_module.NextcloudOAuthProvider, account: str
+) -> tuple[TestClient, str]:
+    """A sign in whose login name differs from its canonical account id (LDAP-like)."""
+    client, flow_id, _target = opened(provider)
+    with respx.mock:
+        respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body(account)))
+        page = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
+    assert page.status_code == 200, page.text
+    return client, flow_id
+
+
+def test_the_connection_stores_the_login_name_and_the_account_id(store: OAuthStore) -> None:
+    provider = make(store)
+    register(provider)
+    _client, flow_id = signed_in_as_account(provider, ACCOUNT_ID)
+
+    row = asyncio.run(store.load_authorization(flow_id))
+
+    assert row is not None
+    assert row.nc_user == LOGIN_NAME
+    assert row.nc_account_id == ACCOUNT_ID
+
+
+def test_the_decision_belongs_to_the_account_id_and_not_the_login_name(store: OAuthStore) -> None:
+    """AppAPI names the browser by its account id; that is what the decision compares."""
+    provider = make(store)
+    register(provider)
+    client, flow_id = signed_in_as_account(provider, ACCOUNT_ID)
+
+    refused = decide(client, flow_id, ui_consent.DECISION_APPROVE, store=store, user=LOGIN_NAME)
+    assert asyncio.run(store.load_flow(flow_id)) is not None, "nothing was decided"
+    granted = decide(client, flow_id, ui_consent.DECISION_APPROVE, store=store, user=ACCOUNT_ID)
+
+    assert refused.headers.get("location") is None
+    assert granted.status_code == 200, granted.text
+    assert asyncio.run(store.load_flow(flow_id)) is None, "the approval spent the flow"
+
+
+def test_a_pause_of_the_account_id_refuses_the_sign_in(store: OAuthStore) -> None:
+    provider = make(store)
+    register(provider)
+    asyncio.run(store.set_access(ACCOUNT_ID, disabled=True))
+    client, flow_id, _target = opened(provider)
+
+    with respx.mock:
+        respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=account_body(ACCOUNT_ID)))
+        revoke = respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
+        client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
+
+    assert revoke.call_count == 1
+    assert asyncio.run(store.load_authorization(flow_id)) is None
+
+
+def test_an_unresolved_account_stores_nothing_and_hands_the_password_back(
+    store: OAuthStore,
+) -> None:
+    provider = make(store)
+    register(provider)
+    client, flow_id, _target = opened(provider)
+
+    with respx.mock:
+        respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(500, json={}))
+        revoke = respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
+        response = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
+
+    assert response.status_code == 500
+    assert strings.ERROR_GENERIC_TITLE in response.text
+    assert revoke.call_count == 1
+    assert asyncio.run(store.load_authorization(flow_id)) is None
+    assert asyncio.run(store.load_flow(flow_id)) is None, "the spent poll leaves no waiting page"

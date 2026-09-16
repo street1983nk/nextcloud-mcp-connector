@@ -739,6 +739,7 @@ async def test_the_oauth_store_still_rotates_and_connects_after_the_bound_bit(
         AUTH_ID,
         client_id=CLIENT_ID,
         nc_user="alice",
+        nc_account_id="alice",
         app_password=APP_PASSWORD,
         scopes="nextcloud",
         resource=RESOURCE,
