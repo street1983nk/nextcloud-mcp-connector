@@ -228,6 +228,28 @@ async def test_one_browser_gets_a_small_number_of_open_sign_ins(tmp_path: Path) 
 
 
 @pytest.mark.anyio
+async def test_parallel_starts_respect_the_browser_cap(tmp_path: Path) -> None:
+    subject = oidc_store(tmp_path)
+    await with_flow(subject)
+
+    results = await asyncio.gather(
+        *(
+            oidc_store(tmp_path).create_oidc_transaction(
+                state=f"{STATE}-{index}",
+                flow_id=FLOW_ID,
+                browser_handle=BROWSER,
+                nonce=NONCE,
+                code_verifier=VERIFIER,
+                now=NOW,
+            )
+            for index in range(store.OIDC_TRANSACTIONS_PER_BROWSER + 3)
+        )
+    )
+
+    assert results.count(True) == store.OIDC_TRANSACTIONS_PER_BROWSER
+
+
+@pytest.mark.anyio
 async def test_parallel_redemptions_have_exactly_one_winner(tmp_path: Path) -> None:
     subject = oidc_store(tmp_path)
     await with_flow(subject)
@@ -292,6 +314,21 @@ async def test_a_manipulated_ciphertext_is_refused(
 
     found = await subject.redeem_oidc_transaction(state=STATE, browser_handle=BROWSER, now=NOW)
     assert found is None
+
+
+@pytest.mark.anyio
+async def test_a_ciphertext_whose_plaintext_is_not_utf8_is_refused(tmp_path: Path) -> None:
+    subject = oidc_store(tmp_path)
+    await with_flow(subject)
+    assert await begin(subject)
+    state_hash = store.token_hash(STATE)
+    bad = store.encrypt(KEY, b"\xff\xfe", aad=store._oidc_aad("transactions", "nonce", state_hash))
+    execute(tmp_path, "UPDATE oidc_transactions SET nonce_enc = ?", (bad,))
+
+    found = await subject.redeem_oidc_transaction(state=STATE, browser_handle=BROWSER, now=NOW)
+
+    assert found is None
+    assert query(tmp_path, "SELECT 1 FROM oidc_transactions") == []
 
 
 @pytest.mark.anyio

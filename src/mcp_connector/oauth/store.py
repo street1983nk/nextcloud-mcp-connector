@@ -1696,17 +1696,20 @@ class OAuthStore:
         if not hmac.compare_digest(str(row[1]), token_hash(browser_handle)):
             return None
         try:
-            nonce = decrypt(self._key, row[2], aad=_oidc_aad("transactions", "nonce", state_hash))
+            nonce = decrypt(
+                self._key, row[2], aad=_oidc_aad("transactions", "nonce", state_hash)
+            ).decode("utf-8")
             verifier = decrypt(
                 self._key, row[3], aad=_oidc_aad("transactions", "verifier", state_hash)
-            )
-        except (DecryptionRejected, TypeError):
+            ).decode("utf-8")
+        except (DecryptionRejected, TypeError, UnicodeDecodeError):
             # TypeError: a value that is not a ciphertext at all, e.g. rewritten as text.
+            # UnicodeDecodeError: a genuine ciphertext whose plaintext is not valid UTF-8.
             return None
         return OidcTransaction(
             flow_id=row[0],
-            nonce=nonce.decode("utf-8"),
-            code_verifier=verifier.decode("utf-8"),
+            nonce=nonce,
+            code_verifier=verifier,
             expires_at=row[4],
         )
 

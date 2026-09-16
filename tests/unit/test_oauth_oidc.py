@@ -38,7 +38,7 @@ PRIVATE = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 OTHER_PRIVATE = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
 
-def jwk_of(private: rsa.RSAPrivateKey, kid: str = KID, **extra: str) -> dict[str, Any]:
+def jwk_of(private: rsa.RSAPrivateKey, kid: str = KID, **extra: Any) -> dict[str, Any]:
     entry = json.loads(RSAAlgorithm.to_jwk(private.public_key()))
     entry.update({"kid": kid, "use": "sig", "alg": "RS256"}, **extra)
     return entry
@@ -186,6 +186,22 @@ async def test_the_authorization_url_carries_every_required_parameter() -> None:
 
 @respx.mock
 @pytest.mark.anyio
+async def test_the_authorization_url_keeps_an_existing_query() -> None:
+    provider(discovery(authorization_endpoint=f"{AUTHORIZE_URL}?foo=bar"))
+    url = await oidc.OidcClient(settings()).authorization_url(
+        state="s", nonce=NONCE, code_verifier="v" * 43
+    )
+
+    parts = urlsplit(url)
+    assert f"{parts.scheme}://{parts.netloc}{parts.path}" == AUTHORIZE_URL
+    query = {key: values[0] for key, values in parse_qs(parts.query).items()}
+    assert query["foo"] == "bar"
+    assert query["client_id"] == CLIENT_ID
+    assert query["state"] == "s"
+
+
+@respx.mock
+@pytest.mark.anyio
 @pytest.mark.parametrize(
     "document",
     [
@@ -194,6 +210,9 @@ async def test_the_authorization_url_carries_every_required_parameter() -> None:
         discovery(token_endpoint="https://evil.example.com/token"),
         discovery(jwks_uri="http://auth.example.com/keys"),
         discovery(authorization_endpoint="https://auth.example.com:8443/authorize"),
+        discovery(authorization_endpoint=f"{AUTHORIZE_URL}#"),
+        discovery(token_endpoint=f"{TOKEN_URL}#"),
+        discovery(jwks_uri=f"{JWKS_URL}#"),
         discovery(code_challenge_methods_supported=["plain"]),
         discovery(code_challenge_methods_supported=None),
         discovery(response_modes_supported=["form_post"]),
@@ -206,6 +225,9 @@ async def test_the_authorization_url_carries_every_required_parameter() -> None:
         "foreign token endpoint",
         "plain http jwks",
         "other port",
+        "fragment in authorization endpoint",
+        "fragment in token endpoint",
+        "fragment in jwks uri",
         "no S256",
         "no PKCE methods",
         "no query mode",
@@ -326,6 +348,8 @@ async def test_a_valid_token_passes() -> None:
         lambda: token(sub=""),
         lambda: token(sub=" padded"),
         lambda: token(iat=None),
+        lambda: token(nbf=int(time.time()) + 3600),
+        lambda: token(iat="not-a-number"),
         lambda: token(OTHER_PRIVATE),
         lambda: token(kid="unknown-key"),
         lambda: token(kid=None),
@@ -348,6 +372,8 @@ async def test_a_valid_token_passes() -> None:
         "empty sub",
         "padded sub",
         "no iat",
+        "nbf in the future",
+        "iat not a number",
         "foreign signature",
         "unknown kid",
         "no kid",
@@ -382,11 +408,45 @@ async def test_several_audiences_with_the_right_azp_pass() -> None:
         {"kty": "oct", "k": base64.urlsafe_b64encode(SHARED_SECRET.encode()).decode(), "kid": KID},
         jwk_of(PRIVATE, use="enc"),
         jwk_of(PRIVATE, alg="RS512"),
+        jwk_of(PRIVATE, key_ops=["sign"]),
+        jwk_of(PRIVATE, key_ops="verify"),
     ],
-    ids=["symmetric key", "encryption key", "key for another algorithm"],
+    ids=[
+        "symmetric key",
+        "encryption key",
+        "key for another algorithm",
+        "key_ops without verify",
+        "key_ops not a list",
+    ],
 )
 async def test_a_key_that_may_not_sign_is_ignored(entry: dict[str, Any]) -> None:
     provider(keys=[entry])
+    with pytest.raises(oidc.OidcRefused):
+        await oidc.OidcClient(settings()).validate_id_token(token(), nonce=NONCE)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_key_with_key_ops_verify_is_accepted() -> None:
+    provider(keys=[jwk_of(PRIVATE, key_ops=["verify"])])
+    found = await oidc.OidcClient(settings()).validate_id_token(token(), nonce=NONCE)
+    assert found["sub"] == SUB
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_key_declared_for_another_algorithm_than_the_token_is_refused() -> None:
+    provider(keys=[jwk_of(PRIVATE, alg="RS384")])
+    with pytest.raises(oidc.OidcRefused):
+        await oidc.OidcClient(settings(algorithms=("RS256", "RS384"))).validate_id_token(
+            token(algorithm="RS256"), nonce=NONCE
+        )
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_duplicate_kid_in_the_jwks_is_refused() -> None:
+    provider(keys=[jwk_of(PRIVATE), jwk_of(OTHER_PRIVATE)])
     with pytest.raises(oidc.OidcRefused):
         await oidc.OidcClient(settings()).validate_id_token(token(), nonce=NONCE)
 

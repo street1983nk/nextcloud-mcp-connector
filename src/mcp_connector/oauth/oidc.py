@@ -36,7 +36,7 @@ import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
 import jwt
@@ -167,9 +167,15 @@ def user_oidc_unique_uid_sub_v1(provider_id: int, sub: str) -> str:
     return hashlib.sha256(f"{provider_id}_0_{sub}".encode()).hexdigest()
 
 
+#: A usable JWKS entry: its key material and its declared ``alg`` (``None`` if it named
+#: none). ``None`` in the cache marks a ``kid`` that named more than one usable key, which
+#: makes that ``kid`` unusable rather than picking one of them.
+_KeyEntry = tuple[Any, str | None]
+
+
 @dataclass(slots=True)
 class _KeyCache:
-    keys: dict[str, Any] = field(default_factory=dict)
+    keys: dict[str, _KeyEntry | None] = field(default_factory=dict)
     fetched_at: float = 0.0
 
 
@@ -224,21 +230,22 @@ class OidcClient:
     async def authorization_url(self, *, state: str, nonce: str, code_verifier: str) -> str:
         """Where the browser goes: code flow, PKCE S256, response_mode=query, scope openid."""
         metadata = await self.metadata()
-        query = urlencode(
-            {
-                "response_type": "code",
-                "response_mode": "query",
-                "client_id": self._settings.client_id,
-                "redirect_uri": self._settings.redirect_uri,
-                "scope": "openid",
-                "state": state,
-                "nonce": nonce,
-                "code_challenge": code_challenge(code_verifier),
-                "code_challenge_method": "S256",
-            }
+        parts = urlsplit(metadata.authorization_endpoint)
+        params = parse_qsl(parts.query, keep_blank_values=True)
+        params.extend(
+            [
+                ("response_type", "code"),
+                ("response_mode", "query"),
+                ("client_id", self._settings.client_id),
+                ("redirect_uri", self._settings.redirect_uri),
+                ("scope", "openid"),
+                ("state", state),
+                ("nonce", nonce),
+                ("code_challenge", code_challenge(code_verifier)),
+                ("code_challenge_method", "S256"),
+            ]
         )
-        separator = "&" if urlsplit(metadata.authorization_endpoint).query else "?"
-        return f"{metadata.authorization_endpoint}{separator}{query}"
+        return urlunsplit(parts._replace(query=urlencode(params)))
 
     async def exchange(self, *, code: str, code_verifier: str, nonce: str) -> dict[str, Any]:
         """Redeem the code and return the claims of a fully validated ID token."""
@@ -273,7 +280,7 @@ class OidcClient:
         kid = header.get("kid")
         if not isinstance(kid, str) or not kid:
             raise _refused("the ID token names no key")
-        key = await self._key(kid)
+        key = await self._key(kid, algorithm)
         try:
             claims = jwt.decode(
                 token,
@@ -306,16 +313,21 @@ class OidcClient:
 
     # --- transport -------------------------------------------------------------------
 
-    async def _key(self, kid: str) -> Any:
+    async def _key(self, kid: str, algorithm: str) -> Any:
         now = self._clock()
         fresh = now - self._keys.fetched_at < JWKS_CACHE_SECONDS
         if not fresh or kid not in self._keys.keys:
             # At most one fetch per call: a fresh cache without the kid refetches once, a
             # stale cache refetches anyway, and either way the answer below is final.
             await self._refresh_keys(now)
-        key = self._keys.keys.get(kid)
-        if key is None:
-            raise _refused("the ID token names an unknown key")
+        entry = self._keys.keys.get(kid)
+        if entry is None:
+            # Either no key at all, or a kid claimed by more than one usable key: both are
+            # refused the same way, so a caller cannot tell a collision from an unknown kid.
+            raise _refused("the ID token names an unknown or unusable key")
+        key, alg = entry
+        if alg is not None and alg != algorithm:
+            raise _refused("the key is declared for another algorithm")
         return key
 
     async def _refresh_keys(self, now: float) -> None:
@@ -324,24 +336,14 @@ class OidcClient:
         entries = document.get("keys") if isinstance(document, dict) else None
         if not isinstance(entries, list) or len(entries) > _MAX_KEYS:
             raise _refused("the JWKS is not a usable key list")
-        keys: dict[str, Any] = {}
+        keys: dict[str, _KeyEntry | None] = {}
         for entry in entries:
-            if not isinstance(entry, dict):
+            usable = _usable_key(entry, self._settings.algorithms)
+            if usable is None:
                 continue
-            if entry.get("kty") not in _ALLOWED_KEY_TYPES:
-                continue
-            if entry.get("use") not in (None, "sig"):
-                continue
-            kid = entry.get("kid")
-            alg = entry.get("alg")
-            if not isinstance(kid, str) or (
-                alg is not None and alg not in self._settings.algorithms
-            ):
-                continue
-            try:
-                keys[kid] = jwt.PyJWK(entry).key
-            except jwt.PyJWTError:
-                continue
+            kid, parsed = usable
+            # A kid already seen becomes unusable rather than resolving to either key.
+            keys[kid] = None if kid in keys else parsed
         self._keys = _KeyCache(keys=keys, fetched_at=now)
 
     async def _get_json(self, url: str) -> Any:
@@ -383,6 +385,37 @@ class OidcClient:
             raise _refused("the provider answer is not JSON") from None
 
 
+def _usable_key(entry: object, algorithms: tuple[str, ...]) -> tuple[str, _KeyEntry] | None:
+    """The ``(kid, (key, alg))`` of ``entry`` if it may verify a signature, else ``None``.
+
+    ``use`` and ``key_ops``, when present, must each allow verification, and when both are
+    present they must agree: ``use`` must be ``"sig"`` and ``key_ops`` must contain
+    ``"verify"``. A declared ``alg`` outside the configured algorithms is unusable too, so
+    the cache never carries a key for an algorithm the operator did not allow.
+    """
+    if not isinstance(entry, dict):
+        return None
+    if entry.get("kty") not in _ALLOWED_KEY_TYPES:
+        return None
+    if entry.get("use") not in (None, "sig"):
+        return None
+    key_ops = entry.get("key_ops")
+    if key_ops is not None:
+        if not isinstance(key_ops, list) or not all(isinstance(op, str) for op in key_ops):
+            return None
+        if "verify" not in key_ops:
+            return None
+    kid = entry.get("kid")
+    alg = entry.get("alg")
+    if not isinstance(kid, str) or (alg is not None and alg not in algorithms):
+        return None
+    try:
+        key = jwt.PyJWK(entry).key
+    except jwt.PyJWTError:
+        return None
+    return kid, (key, alg)
+
+
 def _refused(reason: str) -> OidcRefused:
     logger.warning("OIDC refused: %s", reason)
     return OidcRefused()
@@ -398,6 +431,17 @@ def _origin(url: str) -> tuple[str, str]:
 
 
 def _same_origin(url: str, issuer: str) -> bool:
+    # ``urlsplit`` alone cannot tell "no fragment" from "an empty fragment" (both report
+    # ``fragment == ""``), so the raw text is checked directly; an endpoint the operator
+    # never intended to carry one is refused either way.
+    if "#" in url:
+        return False
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return False
+    if parts.username is not None or parts.password is not None:
+        return False
     try:
         return _origin(url) == _origin(issuer) and _origin(url)[0] == "https"
     except ValueError:
