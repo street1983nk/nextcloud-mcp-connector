@@ -1119,3 +1119,4 @@ shows a credential is the onboarding result page, once, with `no-store`.
 - Where the discovery paths were measured first: [spike-discovery.md](./spike-discovery.md)
 - Requirements `AUTH-02` (browser onboarding), `AUTH-03` (OAuth 2.1 to the MCP
   authorization specification) and `AUTH-07` (the three administrator switches)
+- Running without AppAPI at all: [standalone-oauth.md](./standalone-oauth.md)
