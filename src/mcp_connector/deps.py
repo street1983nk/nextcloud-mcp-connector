@@ -90,6 +90,11 @@ def resolve_credentials(ctx: Any) -> Credentials:
         # headers is not None in this mode either, for the same reason.
         return _credentials_from_appapi(ctx, headers or {})
 
+    if mode == "oauth":
+        # The standalone OAuth deployment: only a verified bearer reaches a tool, and the
+        # Nextcloud is the configured one, never a value from the request.
+        return _credentials_from_oauth(ctx, config.load_base_url())
+
     if mode == "http_passthrough":
         # headers is not None in this mode, select_mode guarantees it.
         return _credentials_from_basic(headers or {})
@@ -248,7 +253,7 @@ def _credentials_from_appapi(ctx: Any, headers: Mapping[str, str]) -> Credential
         ) from None
 
     if not user:
-        return _credentials_from_oauth(ctx, settings)
+        return _credentials_from_oauth(ctx, settings.base_url)
 
     # The base URL is the one AppAPI deployed us against, never a value from the request.
     return Credentials(
@@ -262,7 +267,7 @@ def _credentials_from_appapi(ctx: Any, headers: Mapping[str, str]) -> Credential
     )
 
 
-def _credentials_from_oauth(ctx: Any, settings: config.ExAppSettings) -> Credentials:
+def _credentials_from_oauth(ctx: Any, base_url: str) -> Credentials:
     """The fifth credential mode: one OAuth token, one authorization, one app password.
 
     The identity is read and not resolved here. ``exapp/middleware.py`` verified the bearer
@@ -296,7 +301,7 @@ def _credentials_from_oauth(ctx: Any, settings: config.ExAppSettings) -> Credent
 
     # The base URL is the one this app was deployed against, never a value from the request.
     return Credentials(
-        base_url=settings.base_url,
+        base_url=base_url,
         user=identity.nc_user,
         secret=identity.app_password,
         mode=MODE_BASIC,

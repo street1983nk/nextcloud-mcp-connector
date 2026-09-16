@@ -67,7 +67,23 @@ ENV_HP_SHARED_KEY = "HP_SHARED_KEY"  # the env var name, not a secret
 ENV_HP_EXAPP_SOCK = "HP_EXAPP_SOCK"
 ENV_NEXTCLOUD_URL = "NEXTCLOUD_URL"
 
-Mode = Literal["stdio", "exapp", "http_passthrough", "http_static_bearer"]
+# Standalone OAuth deployment (``nc-mcp-oauth``): the MCP authorization server of this app
+# without AppAPI, with the browser identity of an OIDC single sign-on. Nextcloud is
+# ``NC_MCP_URL`` and the public address is ``NC_MCP_PUBLIC_URL``, as in the other modes.
+ENV_AUTH_MODE = "NC_MCP_AUTH_MODE"
+AUTH_MODE_OAUTH = "oauth"
+ENV_OAUTH_STORAGE_DIR = "NC_MCP_OAUTH_STORAGE_DIR"
+ENV_OAUTH_DATA_KEY_FILE = "NC_MCP_OAUTH_DATA_KEY_FILE"
+ENV_OIDC_ISSUER = "NC_MCP_OIDC_ISSUER"
+ENV_OIDC_CLIENT_ID = "NC_MCP_OIDC_CLIENT_ID"
+ENV_OIDC_CLIENT_SECRET_FILE = "NC_MCP_OIDC_CLIENT_SECRET_FILE"  # noqa: S105 - a variable name
+ENV_OIDC_PROVIDER_ID = "NC_MCP_OIDC_PROVIDER_ID"
+ENV_OIDC_MAPPING = "NC_MCP_OIDC_MAPPING"
+ENV_OIDC_ALGORITHMS = "NC_MCP_OIDC_ALGORITHMS"
+ENV_BIND_HOST = "NC_MCP_BIND_HOST"
+ENV_BIND_PORT = "NC_MCP_BIND_PORT"
+
+Mode = Literal["stdio", "exapp", "oauth", "http_passthrough", "http_static_bearer"]
 
 #: Used as issuer and resource server URL in the static bearer mode. It is only ever a
 #: self-reference for the RFC 9728 discovery document, never a place we send secrets to.
@@ -230,9 +246,23 @@ def select_mode(
     # instead of resolving it silently per request (D-27, no silent fallbacks).
     if exapp_configured(source):
         return "exapp"
+    # The standalone OAuth entry point refuses to start next to a static bearer or an
+    # ExApp environment, so this branch never has to choose between them at runtime.
+    if oauth_configured(source):
+        return "oauth"
     if static_bearer(source):
         return "http_static_bearer"
     return "http_passthrough"
+
+
+def oauth_configured(env: Mapping[str, str] | None = None) -> bool:
+    """Whether this process is the standalone OAuth deployment (``NC_MCP_AUTH_MODE=oauth``).
+
+    An explicit switch and not a guess from the OIDC variables: the credential source of
+    every tool call depends on it, so a half-configured environment must not select it.
+    """
+    source = os.environ if env is None else env
+    return (source.get(ENV_AUTH_MODE) or "").strip().lower() == AUTH_MODE_OAUTH
 
 
 def static_bearer(env: Mapping[str, str] | None = None) -> str | None:

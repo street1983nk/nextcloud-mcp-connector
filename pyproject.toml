@@ -27,6 +27,7 @@ dependencies = [
 [project.scripts]
 nc-mcp = "mcp_connector.entry_stdio:main"
 nc-mcp-exapp = "mcp_connector.entry_exapp:main"
+nc-mcp-oauth = "mcp_connector.entry_oauth:main"
 
 [build-system]
 requires = ["hatchling"]

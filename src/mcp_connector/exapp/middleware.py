@@ -69,7 +69,7 @@ from .auth import AppApiRejected, require_appapi
 from .responses import NO_STORE
 from .ui import strings
 
-__all__ = ["RequireAppApi"]
+__all__ = ["RequireAppApi", "RequireOAuthBearer"]
 
 #: How the switch of one Nextcloud account reaches this boundary: one call, one account, one
 #: answer. It is handed in like the verifier and for the same reason, so the standalone HTTP
@@ -271,3 +271,30 @@ class RequireAppApi:
         """
         metadata_url = f"{config.public_url(self._env)}{PRM_SUFFIX}"
         return {**NO_STORE, "WWW-Authenticate": _CHALLENGE.format(metadata_url=metadata_url)}
+
+
+class RequireOAuthBearer(RequireAppApi):
+    """The same boundary without AppAPI: the standalone OAuth deployment (``nc-mcp-oauth``).
+
+    There is no handshake to verify and no Nextcloud user header to trust, so the only way
+    past this boundary is a bearer the verifier accepts and resolves to a connection. The
+    switch and the recorder follow exactly as in the ExApp. A Basic header, a cookie or any
+    other credential is never read: a browser session can not reach ``/mcp`` (design note,
+    "bearer guard").
+    """
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self._app(scope, receive, send)
+            return
+        request = Request(scope)
+        if not await self._bearer_is_valid(request):
+            response = Response(status_code=401, headers=self._unauthorized_headers())
+            await response(scope, receive, send)
+            return
+        refusal = await self._switch_refusal(request, "")
+        if refusal is not None:
+            await refusal(scope, receive, send)
+            return
+        self._deposit_recorder(request)
+        await self._app(scope, receive, send)
