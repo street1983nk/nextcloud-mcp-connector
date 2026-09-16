@@ -478,6 +478,7 @@ dependencies = [
     { name = "lxml" },
     { name = "mcp", extra = ["cli"] },
     { name = "pydantic" },
+    { name = "pyjwt", extra = ["crypto"] },
     { name = "tzdata" },
     { name = "vobject" },
 ]
@@ -500,6 +501,7 @@ requires-dist = [
     { name = "lxml", specifier = ">=6.1,<7" },
     { name = "mcp", extras = ["cli"], specifier = ">=2.0,<3" },
     { name = "pydantic", specifier = ">=2.12,<3" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.13,<3" },
     { name = "tzdata", specifier = ">=2025.2" },
     { name = "vobject", specifier = ">=0.9.9,<1" },
 ]

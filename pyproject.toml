@@ -14,6 +14,8 @@ keywords = ["mcp", "nextcloud", "webdav", "caldav", "carddav"]
 dependencies = [
     "mcp[cli]>=2.0,<3",
     "cryptography>=50,<51",
+    # oauth/oidc.py validates ID tokens with PyJWT directly; already locked through mcp.
+    "pyjwt[crypto]>=2.13,<3",
     "httpx>=0.28,<0.29",
     "lxml>=6.1,<7",
     "icalendar>=7.2,<8",
