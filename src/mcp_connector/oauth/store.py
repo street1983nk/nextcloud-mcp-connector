@@ -59,6 +59,9 @@ __all__ = [
     "IDLE_CLIENT_TTL",
     "KEY_CHECK_NAME",
     "KEY_CHECK_SAMPLES",
+    "OIDC_SCHEMA",
+    "OIDC_TRANSACTIONS_PER_BROWSER",
+    "OIDC_TTL",
     "REDEEM_EXPIRED",
     "REDEEM_OK",
     "REDEEM_REUSED",
@@ -81,6 +84,7 @@ __all__ = [
     "FlowRow",
     "KeyProvider",
     "OAuthStore",
+    "OidcTransaction",
     "RefreshRedemption",
     "RefreshTokenRow",
     "StoreFileRefused",
@@ -163,6 +167,15 @@ REFRESH_TOKEN_TTL = 30 * 24 * 3600
 #: Twenty minutes, the pace Nextcloud sets for its own login flow.
 FLOW_TTL = 1200
 
+#: Five minutes for an OIDC sign in and for the browser proof it leaves behind, and never
+#: longer than the flow they belong to. Short on purpose: both are bearer-like values in a
+#: browser, and a person who needs longer starts the confirmation again.
+OIDC_TTL = 300
+
+#: Open OIDC sign ins per browser handle. The start is an anonymous browser surface that
+#: writes a row and makes the IdP busy, so one browser gets a small, fixed number of them.
+OIDC_TRANSACTIONS_PER_BROWSER = 3
+
 #: How long a validated access token may be answered from a process cache (03-06 uses it).
 VALIDATION_CACHE_TTL = 5
 
@@ -185,6 +198,37 @@ IDLE_CLIENT_TTL = 90 * 24 * 3600
 #: table does not carry a deleted account forever. The price is named in ``docs/faq.md``:
 #: an account that pauses without ever connecting is switched on again after 90 days.
 STALE_ACCESS_TTL = 90 * 24 * 3600
+
+#: The two tables of the standalone OIDC browser identity. Created only for a store that
+#: asks for them (``OAuthStore(..., oidc=True)``), so an ExApp store keeps exactly its seven
+#: documented tables. Both hang on the flow they belong to: every path that ends a flow
+#: (completion, denial, expiry, binding failure, paused withdrawal, sweeps, client removal,
+#: purge) takes them along through the cascade.
+#:
+#: No handle, state, nonce or verifier is stored in the clear. State, browser handle and
+#: proof handle are SHA-256 digests (lookup keys); nonce and PKCE verifier come back out and
+#: are AES-GCM encrypted with an AAD of table, field and row key, so a ciphertext moved to
+#: another row, field or table is refused.
+OIDC_SCHEMA = """
+CREATE TABLE IF NOT EXISTS oidc_transactions (
+  state_hash TEXT PRIMARY KEY,
+  flow_id TEXT NOT NULL REFERENCES flows(flow_id) ON DELETE CASCADE,
+  browser_hash TEXT NOT NULL,
+  nonce_enc BLOB NOT NULL,
+  verifier_enc BLOB NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS oidc_transactions_browser ON oidc_transactions(browser_hash);
+
+CREATE TABLE IF NOT EXISTS oidc_proofs (
+  proof_hash TEXT PRIMARY KEY,
+  flow_id TEXT NOT NULL UNIQUE REFERENCES flows(flow_id) ON DELETE CASCADE,
+  principal TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+"""
 
 #: SQLite's own spelling of "no upper bound": a negative ``LIMIT`` expression returns every
 #: row. It lets a read that must not be capped keep one constant statement with one
@@ -461,6 +505,22 @@ class RefreshRedemption:
     successor: str | None = None
 
 
+@dataclass(frozen=True, slots=True, repr=False)
+class OidcTransaction:
+    """One consumed OIDC sign in: what the callback needs to finish it."""
+
+    flow_id: str
+    nonce: str
+    code_verifier: str
+    expires_at: int
+
+    def __repr__(self) -> str:
+        return (
+            f"OidcTransaction(flow_id={self.flow_id!r}, expires_at={self.expires_at!r}, "
+            "nonce='***', code_verifier='***')"
+        )
+
+
 class OAuthStore:
     """The persistence of the phase, bound to one file and one data key.
 
@@ -470,9 +530,11 @@ class OAuthStore:
     two workers on the same volume behave exactly like two threads in one worker.
     """
 
-    def __init__(self, path: Path, key: bytes) -> None:
+    def __init__(self, path: Path, key: bytes, *, oidc: bool = False) -> None:
         self._path = path
         self._key = key
+        # Whether this store carries the two OIDC tables (standalone only).
+        self._oidc = oidc
         # False until this object has opened the file once (LO-02). See :meth:`_call` for
         # what it is worth and what it deliberately does not promise.
         self._schema_ready = False
@@ -1421,6 +1483,9 @@ class OAuthStore:
 
         def work(conn: sqlite3.Connection) -> None:
             _purge_expired_rows(conn, moment)
+            if self._oidc:
+                conn.execute("DELETE FROM oidc_transactions WHERE expires_at <= ?", (moment,))
+                conn.execute("DELETE FROM oidc_proofs WHERE expires_at <= ?", (moment,))
             conn.execute(
                 "DELETE FROM user_access WHERE disabled_at < ? "
                 "AND NOT EXISTS (SELECT 1 FROM authorizations AS a "
@@ -1524,8 +1589,199 @@ class OAuthStore:
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'store_meta'"
             ).fetchone():
                 conn.execute("DELETE FROM store_meta")
+            # The two OIDC tables hang on flows and are already empty through the cascade;
+            # the statements make that independent of the foreign keys, like above.
+            if conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'oidc_proofs'"
+            ).fetchone():
+                conn.execute("DELETE FROM oidc_proofs")
+                conn.execute("DELETE FROM oidc_transactions")
 
         await self._write(work)
+
+    # --- standalone OIDC browser identity -------------------------------------------
+
+    async def create_oidc_transaction(
+        self,
+        *,
+        state: str,
+        flow_id: str,
+        browser_handle: str,
+        nonce: str,
+        code_verifier: str,
+        now: int | None = None,
+    ) -> bool:
+        """Remember one OIDC sign in for a flow whose authorization already exists.
+
+        ``False`` when the flow is gone or expired, when its authorization is missing,
+        revoked or has no canonical account id, or when this browser already has
+        :data:`OIDC_TRANSACTIONS_PER_BROWSER` open sign ins. The row lives
+        :data:`OIDC_TTL` seconds and never longer than its flow.
+        """
+        self._require_oidc()
+        moment = _moment(now)
+        state_hash = token_hash(state)
+        nonce_enc = encrypt(
+            self._key, nonce.encode("utf-8"), aad=_oidc_aad("transactions", "nonce", state_hash)
+        )
+        verifier_enc = encrypt(
+            self._key,
+            code_verifier.encode("utf-8"),
+            aad=_oidc_aad("transactions", "verifier", state_hash),
+        )
+        browser_hash = token_hash(browser_handle)
+
+        def work(conn: sqlite3.Connection) -> bool:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute("DELETE FROM oidc_transactions WHERE expires_at <= ?", (moment,))
+            (open_count,) = conn.execute(
+                "SELECT COUNT(*) FROM oidc_transactions WHERE browser_hash = ?",
+                (browser_hash,),
+            ).fetchone()
+            if open_count >= OIDC_TRANSACTIONS_PER_BROWSER:
+                conn.execute("COMMIT")
+                return False
+            cursor = conn.execute(
+                "INSERT INTO oidc_transactions (state_hash, flow_id, browser_hash, nonce_enc, "
+                "verifier_enc, created_at, expires_at) "
+                "SELECT ?, f.flow_id, ?, ?, ?, ?, MIN(f.expires_at, ?) "
+                "FROM flows AS f JOIN authorizations AS a ON a.auth_id = f.flow_id "
+                "WHERE f.flow_id = ? AND f.expires_at > ? AND a.revoked_at IS NULL "
+                "AND a.nc_account_id IS NOT NULL AND a.nc_account_id != ''",
+                (
+                    state_hash,
+                    browser_hash,
+                    nonce_enc,
+                    verifier_enc,
+                    moment,
+                    moment + OIDC_TTL,
+                    flow_id,
+                    moment,
+                ),
+            )
+            conn.execute("COMMIT")
+            return cursor.rowcount == 1
+
+        return await self._transaction(work)
+
+    async def redeem_oidc_transaction(
+        self, *, state: str, browser_handle: str, now: int | None = None
+    ) -> OidcTransaction | None:
+        """Consume the sign in behind ``state``, or return ``None``. Exactly once.
+
+        The row is deleted as soon as its state is known, whatever follows: a known state
+        with a wrong or missing browser binding ends that sign in for good (H2), and so do
+        an expired row and a ciphertext that does not belong to it. Every refusal is the
+        same ``None``, so a caller cannot answer differently for them (oracle-free).
+        """
+        self._require_oidc()
+        moment = _moment(now)
+        state_hash = token_hash(state)
+
+        def work(conn: sqlite3.Connection) -> tuple[Any, ...] | None:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT flow_id, browser_hash, nonce_enc, verifier_enc, expires_at "
+                "FROM oidc_transactions WHERE state_hash = ?",
+                (state_hash,),
+            ).fetchone()
+            if row is not None:
+                conn.execute("DELETE FROM oidc_transactions WHERE state_hash = ?", (state_hash,))
+            conn.execute("COMMIT")
+            return row
+
+        row = await self._transaction(work)
+        if row is None or row[4] <= moment:
+            return None
+        if not hmac.compare_digest(str(row[1]), token_hash(browser_handle)):
+            return None
+        try:
+            nonce = decrypt(self._key, row[2], aad=_oidc_aad("transactions", "nonce", state_hash))
+            verifier = decrypt(
+                self._key, row[3], aad=_oidc_aad("transactions", "verifier", state_hash)
+            )
+        except (DecryptionRejected, TypeError):
+            # TypeError: a value that is not a ciphertext at all, e.g. rewritten as text.
+            return None
+        return OidcTransaction(
+            flow_id=row[0],
+            nonce=nonce.decode("utf-8"),
+            code_verifier=verifier.decode("utf-8"),
+            expires_at=row[4],
+        )
+
+    async def create_browser_proof(
+        self, *, proof_handle: str, flow_id: str, principal: str, now: int | None = None
+    ) -> bool:
+        """Record that this browser proved ``principal`` for this flow; one proof per flow.
+
+        An earlier proof of the same flow is replaced, so an older handle stops working the
+        moment a new one is issued (rotation after the callback, H1). ``False`` when the
+        flow is gone or expired. The proof lives :data:`OIDC_TTL` seconds and never longer
+        than its flow.
+        """
+        self._require_oidc()
+        if not principal.strip():
+            raise ValueError("a browser proof needs a principal")
+        moment = _moment(now)
+        proof_hash = token_hash(proof_handle)
+
+        def work(conn: sqlite3.Connection) -> bool:
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute("DELETE FROM oidc_proofs WHERE flow_id = ?", (flow_id,))
+            cursor = conn.execute(
+                "INSERT INTO oidc_proofs (proof_hash, flow_id, principal, created_at, expires_at) "
+                "SELECT ?, f.flow_id, ?, ?, MIN(f.expires_at, ?) FROM flows AS f "
+                "WHERE f.flow_id = ? AND f.expires_at > ?",
+                (proof_hash, principal, moment, moment + OIDC_TTL, flow_id, moment),
+            )
+            conn.execute("COMMIT")
+            return cursor.rowcount == 1
+
+        return await self._transaction(work)
+
+    async def browser_proof_principal(
+        self, *, proof_handle: str, flow_id: str, now: int | None = None
+    ) -> str | None:
+        """The principal a live proof of this browser names for this flow. Consumes nothing."""
+        self._require_oidc()
+        moment = _moment(now)
+
+        def work(conn: sqlite3.Connection) -> str | None:
+            row = conn.execute(
+                "SELECT principal FROM oidc_proofs "
+                "WHERE proof_hash = ? AND flow_id = ? AND expires_at > ?",
+                (token_hash(proof_handle), flow_id, moment),
+            ).fetchone()
+            return None if row is None else str(row[0])
+
+        return await self._read(work)
+
+    async def redeem_browser_proof(
+        self, *, proof_handle: str, flow_id: str, now: int | None = None
+    ) -> str | None:
+        """Consume the proof of this browser for this flow and return its principal, once."""
+        self._require_oidc()
+        moment = _moment(now)
+        proof_hash = token_hash(proof_handle)
+
+        def work(conn: sqlite3.Connection) -> str | None:
+            conn.execute("BEGIN IMMEDIATE")
+            row = conn.execute(
+                "SELECT principal FROM oidc_proofs "
+                "WHERE proof_hash = ? AND flow_id = ? AND expires_at > ?",
+                (proof_hash, flow_id, moment),
+            ).fetchone()
+            if row is not None:
+                conn.execute("DELETE FROM oidc_proofs WHERE proof_hash = ?", (proof_hash,))
+            conn.execute("COMMIT")
+            return None if row is None else str(row[0])
+
+        return await self._transaction(work)
+
+    def _require_oidc(self) -> None:
+        if not self._oidc:
+            raise RuntimeError("this store was opened without the OIDC tables")
 
     # --- the plumbing ---------------------------------------------------------------
 
@@ -1574,7 +1830,10 @@ class OAuthStore:
         costs one extra script and nothing else: every statement of it is
         ``IF NOT EXISTS``.
         """
-        conn = _connect(self._path, schema=not self._schema_ready or not self._path.exists())
+        needs_schema = not self._schema_ready or not self._path.exists()
+        conn = _connect(self._path, schema=needs_schema)
+        if needs_schema and self._oidc:
+            conn.executescript(OIDC_SCHEMA)
         self._schema_ready = True
         try:
             if commit:
@@ -1635,8 +1894,9 @@ def explicit_store_opener(
     Two applications in one process, which is what every test builds, get one store each
     unless the caller passes the same opener to both.
 
-    ``strict`` is the default for every deployment except the ExApp, and it adds two rules
-    before anything else touches the file. The store file is created with mode 0600 and
+    ``strict`` is the default for every deployment except the ExApp. It opens the store with
+    the two OIDC tables (:data:`OIDC_SCHEMA`) and adds two rules before anything else
+    touches the file. The store file is created with mode 0600 and
     must be a regular, owner-only file (:class:`StoreFileRefused`); SQLite gives its
     ``-wal`` and ``-shm`` files the mode of the database. And the data key is checked
     (:meth:`OAuthStore.verify_data_key`, :class:`StoreKeyMismatch`). Both rules assume a
@@ -1658,7 +1918,7 @@ def explicit_store_opener(
                 path = directory() / STORE_FILENAME
                 if strict:
                     _prepare_private_file(path)
-                candidate = OAuthStore(path, data_key)
+                candidate = OAuthStore(path, data_key, oidc=strict)
                 if strict:
                     # Before the sweep and before anything is cached, so the next request
                     # asks again. A recorded check value is compared before any protected
@@ -1833,6 +2093,11 @@ def _checked_state(value: str) -> str:
     if value not in STATES:
         raise ValueError(f"unknown refresh token state {value!r}, expected one of {STATES}")
     return value
+
+
+def _oidc_aad(table: str, field: str, row_key: str) -> str:
+    """The AAD of an encrypted OIDC value: purpose (table and field) plus row key."""
+    return f"oidc_{table}:{field}:{row_key}"
 
 
 def _moment(now: int | None) -> int:
