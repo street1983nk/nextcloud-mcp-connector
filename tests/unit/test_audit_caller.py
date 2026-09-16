@@ -133,6 +133,7 @@ def guarded_app(recorder: object | None) -> tuple[Starlette, list[object | None]
 def identity(**fields: Any) -> OAuthIdentity:
     values: dict[str, Any] = {
         "nc_user": NC_USER,
+        "principal": NC_USER,
         "app_password": APP_PASSWORD,
         "auth_id": AUTH_ID,
         "client_id": CLIENT_ID,
@@ -237,3 +238,16 @@ def test_without_a_recorder_nothing_is_deposited_at_all() -> None:
 
     assert response.status_code == 200
     assert seen == [None]
+
+
+def test_an_oauth_call_is_recorded_under_the_principal(exapp_env: None) -> None:
+    """The audit chain of an account is keyed by the value AppAPI callers use as well."""
+    caller = resolve_caller(
+        FakeContext(
+            headers=appapi_headers(user=""),
+            identity=identity(nc_user="alice@example.com", principal="a1b2c3"),
+        )
+    )
+
+    assert caller is not None
+    assert caller.nc_user == "a1b2c3"

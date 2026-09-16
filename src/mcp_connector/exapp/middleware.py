@@ -199,7 +199,7 @@ class RequireAppApi:
         if self._access_check is None:
             return None
         identity = getattr(request.state, OAUTH_STATE_ATTR, None)
-        nc_user = user or (identity.nc_user if identity is not None else "")
+        nc_user = user or (identity.principal if identity is not None else "")
         if not nc_user:
             return None
         try:

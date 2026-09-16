@@ -120,6 +120,7 @@ def identity(nc_user: str = CALLER) -> OAuthIdentity:
     """The identity the transport boundary resolves once per request."""
     return OAuthIdentity(
         nc_user=nc_user,
+        principal=nc_user,
         app_password="aaaaa-bbbbb-ccccc-ddddd-eeeee",
         auth_id="the-flow-this-authorization-was-born-in",
         client_id="9d0f8f1a-0b3c-4a0e-9f4c-000000000001",

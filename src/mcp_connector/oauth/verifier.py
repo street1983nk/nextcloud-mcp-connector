@@ -49,6 +49,7 @@ from mcp.shared.auth_utils import check_resource_allowed
 
 from .. import config
 from .metadata import RESOURCE_SUFFIX
+from .principal import login_name_of, principal_of
 from .store import VALIDATION_CACHE_TTL, OAuthStore, token_hash
 
 __all__ = [
@@ -115,6 +116,10 @@ class OAuthIdentity:
     every other credential carrier of this project (``nextcloud/credentials.py``). It is
     built per request and never cached.
 
+    ``nc_user`` is the login name, the value Nextcloud Basic authentication needs.
+    ``principal`` is the value every identity decision uses: the pause switch on ``/mcp``
+    and the audit subject (oauth/principal.py). Both come from the connection row.
+
     ``revoked`` is carried rather than turned into a refusal here, because the two sides
     answer differently: the transport boundary refuses a token whose connection is gone,
     while the credential layer turns a connection that was ended into a sentence the user
@@ -130,12 +135,14 @@ class OAuthIdentity:
     app_password: str
     auth_id: str
     client_id: str
+    principal: str
     revoked: bool = False
     client_name: str = ""
 
     def __repr__(self) -> str:
         return (
-            f"OAuthIdentity(nc_user={self.nc_user!r}, auth_id={self.auth_id!r}, "
+            f"OAuthIdentity(nc_user={self.nc_user!r}, principal={self.principal!r}, "
+            f"auth_id={self.auth_id!r}, "
             f"client_id={self.client_id!r}, client_name={self.client_name!r}, "
             f"revoked={self.revoked!r}, app_password='***')"
         )
@@ -256,7 +263,7 @@ class StoreTokenVerifier:
             scopes=row.scopes.split(),
             expires_at=row.expires_at,
             resource=row.resource,
-            subject=row.nc_user,
+            subject=principal_of(row),
             # The name comes from the client this check has just loaded anyway: zero
             # additional reads, no second lookup and no new ``await``. The price is that a
             # rename is visible up to the cache window of five seconds later, which is
@@ -292,10 +299,11 @@ class StoreTokenVerifier:
         if not password:
             return None
         return OAuthIdentity(
-            nc_user=row.nc_user,
+            nc_user=login_name_of(row),
             app_password=password,
             auth_id=auth_id,
             client_id=row.client_id,
+            principal=principal_of(row),
             revoked=row.revoked_at is not None,
             # Copied from the claim rather than read from the store: the name rode along
             # with the token, so a missing claim is an empty name and never a lookup.

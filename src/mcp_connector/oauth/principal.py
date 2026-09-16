@@ -14,6 +14,12 @@ after the sign in. The principal is that account id. Rows written by an ExApp be
 column existed have no account id; for them, and only for them, the principal stays the login
 name. That is the single legacy branch of this rule, and it invents or backfills nothing.
 
+Audit chains are keyed by the principal (``u:<principal>``). A legacy row keeps writing to
+the chain of its login name, exactly as before, so no existing chain forks. A connection
+with an account id writes to the chain of that id, which is the chain AppAPI callers of the
+same account already use; where login name and account id differ (LDAP), the older OAuth
+entries stay readable under the login name chain and new ones follow the account id.
+
 No call site picks a name or compares identities on its own; it asks :func:`principal_of`,
 :func:`login_name_of` and :func:`same_principal`. Before a row exists, the principal of a
 finished sign in is the resolved account id itself.

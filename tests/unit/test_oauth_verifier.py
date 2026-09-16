@@ -498,3 +498,37 @@ async def test_the_verifier_answers_the_sdk_protocol(tmp_path: Path) -> None:
 
     assert await check(TOKEN) is not None
     assert isinstance(subject, verifier_module.IdentitySource)
+
+
+# --- the principal rule ------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_the_token_subject_and_identity_carry_both_names(tmp_path: Path) -> None:
+    """Login name for Basic auth, account id for every identity decision."""
+    subject, store = build(tmp_path)
+    await store.save_client(CLIENT_ID, metadata_json=REGISTRATION, allowed=True)
+    await store.touch_client(CLIENT_ID)
+    await store.create_authorization(
+        AUTH_ID,
+        client_id=CLIENT_ID,
+        nc_user="alice@example.com",
+        nc_account_id="a1b2c3",
+        app_password=APP_PASSWORD,
+        scopes=TOOL_SCOPE,
+        resource=RESOURCE,
+    )
+    await store.create_access_token(
+        TOKEN, auth_id=AUTH_ID, family_id=FAMILY_ID, scopes=TOOL_SCOPE, resource=RESOURCE
+    )
+
+    access = await subject.verify_token(TOKEN)
+    assert access is not None
+    assert access.subject == "a1b2c3"
+
+    found = await subject.resolve_identity(access)
+    assert found is not None
+    assert found.nc_user == "alice@example.com"
+    assert found.principal == "a1b2c3"
+    assert "a1b2c3" in repr(found)
+    assert APP_PASSWORD not in repr(found)

@@ -67,6 +67,7 @@ RULED = (
     "oauth/provider.py",
     "exapp/purge.py",
     "exapp/browser_identity.py",
+    "exapp/middleware.py",
 )
 
 

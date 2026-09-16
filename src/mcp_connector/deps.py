@@ -154,7 +154,9 @@ def resolve_caller(ctx: Any) -> Caller | None:
     identity = _oauth_identity(ctx)
     if identity is not None:
         return Caller(
-            nc_user=identity.nc_user,
+            # The principal and not the login name: the audit chain of an account is keyed by
+            # the value AppAPI callers use as well (oauth/principal.py).
+            nc_user=identity.principal,
             client_id=identity.client_id,
             auth_id=identity.auth_id,
             client_name=identity.client_name,

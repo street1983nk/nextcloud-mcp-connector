@@ -55,6 +55,7 @@ def identity(client_name: str = CLIENT_NAME) -> OAuthIdentity:
     """The identity the transport boundary resolves once per request."""
     return OAuthIdentity(
         nc_user=NC_USER,
+        principal=NC_USER,
         app_password="aaaaa-bbbbb-ccccc-ddddd-eeeee",
         auth_id=AUTH_ID,
         client_id=CLIENT_ID,

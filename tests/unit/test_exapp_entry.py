@@ -502,7 +502,11 @@ def test_a_rejected_bearer_stops_at_the_boundary() -> None:
 def test_a_verified_bearer_leaves_its_identity_for_the_credential_layer() -> None:
     """The hand over of plan 03-06: the boundary resolves, the tool call reads (D-26)."""
     identity = OAuthIdentity(
-        nc_user="alice", app_password="app-password", auth_id="auth-1", client_id="client-1"
+        nc_user="alice",
+        principal="alice",
+        app_password="app-password",
+        auth_id="auth-1",
+        client_id="client-1",
     )
     source = StubSource(accepted="a-good-token", identity=identity)
 
@@ -587,7 +591,11 @@ def test_a_paused_account_is_refused_on_the_appapi_branch() -> None:
 def test_a_paused_account_is_refused_on_the_oauth_branch_as_well() -> None:
     """The other way in, same account, same answer: one decision for both (D-49)."""
     identity = OAuthIdentity(
-        nc_user="alice", app_password="app-password", auth_id="auth-1", client_id="client-1"
+        nc_user="alice",
+        principal="alice",
+        app_password="app-password",
+        auth_id="auth-1",
+        client_id="client-1",
     )
     source = StubSource(accepted="a-good-token", identity=identity)
     switch = StubSwitch(paused={"alice"})
@@ -2202,3 +2210,24 @@ def test_a_switched_off_store_still_loses_its_expired_rows_on_a_start(
     assert [row["nc_user"] for row in rows] == [None], "the expired call is gone"
     assert rows[0]["kind"] == audit_store_module.KIND_TOMBSTONE
     assert rows[0]["chain"] == audit_store_module.CHAIN_INSTANCE
+
+
+def test_the_pause_switch_of_a_token_is_asked_about_its_principal() -> None:
+    """The easiest place to miss: the /mcp pause check reads the principal, not the login."""
+    identity = OAuthIdentity(
+        nc_user="alice@example.com",
+        principal="a1b2c3",
+        app_password="app-password",
+        auth_id="auth-1",
+        client_id="client-1",
+    )
+    source = StubSource(accepted="a-good-token", identity=identity)
+    switch = StubSwitch(paused={"a1b2c3"})
+
+    with TestClient(guarded_app(source, switch)) as client:
+        response = client.get(
+            "/mcp", headers={**appapi_headers(user=""), "Authorization": "Bearer a-good-token"}
+        )
+
+    assert response.status_code == 403
+    assert switch.asked == ["a1b2c3"]

@@ -429,6 +429,7 @@ class AccessTokenRow:
     scopes: str
     resource: str
     expires_at: int
+    nc_account_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1230,7 +1231,8 @@ class OAuthStore:
 
         def work(conn: sqlite3.Connection) -> AccessTokenRow | None:
             row = conn.execute(
-                "SELECT t.auth_id, t.family_id, a.nc_user, t.scopes, t.resource, t.expires_at "
+                "SELECT t.auth_id, t.family_id, a.nc_user, t.scopes, t.resource, t.expires_at, "
+                "a.nc_account_id "
                 "FROM access_tokens AS t JOIN authorizations AS a ON a.auth_id = t.auth_id "
                 "WHERE t.token_hash = ? AND t.revoked_at IS NULL AND t.expires_at > ? "
                 "AND a.revoked_at IS NULL",
@@ -1245,6 +1247,7 @@ class OAuthStore:
                 scopes=row[3],
                 resource=row[4],
                 expires_at=row[5],
+                nc_account_id=row[6],
             )
 
         return await self._read(work)
