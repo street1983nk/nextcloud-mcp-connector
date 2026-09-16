@@ -34,9 +34,11 @@ from .errors import IssuerRefused, ToolError
 from .exapp import config_values
 from .exapp.audit_read import audit_read_routes
 from .exapp.audit_verify import audit_verify_routes
+from .exapp.browser_identity import AppApiBrowserIdentitySource
 from .exapp.lifecycle import lifecycle_routes
 from .exapp.middleware import RequireAppApi
 from .exapp.purge import purge_routes
+from .exapp.target import exapp_target
 from .exapp.ui import strings
 from .nextcloud.http import USER_AGENT, NoCookieJar, configure_logging
 from .oauth import throttle
@@ -98,7 +100,13 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
     # question.
     policy = client_policy(env)
     store = store_opener(env)
-    provider = NextcloudOAuthProvider(env=env, policy=policy, store_provider=store)
+    # One Nextcloud for the whole browser half, resolved once from the AppAPI deploy
+    # environment and handed to every consumer. `main` has already refused a start without
+    # it, so this read names the same problem for a caller that builds the app directly.
+    nextcloud = exapp_target(env)
+    provider = NextcloudOAuthProvider(
+        nextcloud=nextcloud, env=env, policy=policy, store_provider=store
+    )
     verifier = StoreTokenVerifier(store_provider=store, get_client=provider.get_client, env=env)
     # The last wire of the pair, and the one that makes "revoked" mean "now": the verifier
     # answers from a five second process cache, and a revocation, whether it comes from the
@@ -232,7 +240,7 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
     for route in (
         *lifecycle_routes(env),
         *metadata_routes(env, dcr_enabled=policy.dcr_enabled, cimd_enabled=policy.cimd_enabled),
-        *connect_routes(env, store_provider=store, throttle=counters),
+        *connect_routes(env, nextcloud=nextcloud, store_provider=store, throttle=counters),
         *connections_routes(
             env,
             store_provider=store,
@@ -240,8 +248,14 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
             throttle=counters,
         ),
         *auth_routes(env, provider=provider, throttle=counters),
-        *consent_routes(env, provider=provider, throttle=counters),
-        *purge_routes(env, store_provider=store),
+        *consent_routes(
+            env,
+            provider=provider,
+            browser_identity=AppApiBrowserIdentitySource(env),
+            nextcloud=nextcloud,
+            throttle=counters,
+        ),
+        *purge_routes(env, nextcloud=nextcloud, store_provider=store),
         *audit_verify_routes(env, store_provider=audit_store),
         *audit_read_routes(env, store_provider=audit_store),
     ):

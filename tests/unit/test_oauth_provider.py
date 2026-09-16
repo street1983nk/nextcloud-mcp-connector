@@ -45,6 +45,7 @@ from starlette.testclient import TestClient
 from mcp_connector import config, entry_http
 from mcp_connector.entry_exapp import MCP_PATH, build_exapp_app
 from mcp_connector.exapp.middleware import RequireAppApi
+from mcp_connector.exapp.target import exapp_target
 from mcp_connector.oauth import cimd, loginflow, metadata, registry
 from mcp_connector.oauth import provider as provider_module
 from mcp_connector.oauth import throttle as throttle_module
@@ -132,6 +133,7 @@ def build(tmp_path: Path, **env: str) -> tuple[provider_module.NextcloudOAuthPro
     policy = registry.client_policy(ENV | env)
     return (
         provider_module.NextcloudOAuthProvider(
+            nextcloud=exapp_target(ENV | env),
             env=ENV | env,
             policy=policy,
             store_provider=opener(subject),
@@ -1576,7 +1578,9 @@ async def test_every_token_path_refuses_what_this_server_never_issued(tmp_path: 
 
 def routes(**env: str) -> list[str]:
     policy = registry.client_policy(ENV | env)
-    subject = provider_module.NextcloudOAuthProvider(env=ENV | env, policy=policy)
+    subject = provider_module.NextcloudOAuthProvider(
+        nextcloud=exapp_target(ENV | env), env=ENV | env, policy=policy
+    )
     return [route.path for route in provider_module.auth_routes(ENV | env, provider=subject)]
 
 
@@ -1687,7 +1691,10 @@ def client(tmp_path: Path, **env: str) -> TestClient:
     subject = OAuthStore(tmp_path / "oauth.sqlite3", KEY)
     policy = registry.client_policy(ENV | env)
     instance = provider_module.NextcloudOAuthProvider(
-        env=ENV | env, policy=policy, store_provider=opener(subject)
+        nextcloud=exapp_target(ENV | env),
+        env=ENV | env,
+        policy=policy,
+        store_provider=opener(subject),
     )
     return TestClient(Starlette(routes=provider_module.auth_routes(ENV | env, provider=instance)))
 

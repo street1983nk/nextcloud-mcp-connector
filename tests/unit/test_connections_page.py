@@ -35,6 +35,8 @@ from starlette.responses import Response
 from starlette.testclient import TestClient
 
 from mcp_connector import config
+from mcp_connector.exapp.browser_identity import AppApiBrowserIdentitySource
+from mcp_connector.exapp.target import exapp_target
 from mcp_connector.exapp.ui import connections as ui
 from mcp_connector.exapp.ui import consent as ui_consent
 from mcp_connector.exapp.ui import errors, icons, layout, strings
@@ -620,6 +622,7 @@ class Deployment:
     def __init__(self, tmp_path: Path, *, throttle: throttle_module.Throttle | None = None) -> None:
         self.store = OAuthStore(tmp_path / "oauth.sqlite3", KEY)
         self.provider = provider_module.NextcloudOAuthProvider(
+            nextcloud=exapp_target(SERVED_ENV),
             env=SERVED_ENV,
             policy=registry.client_policy(SERVED_ENV),
             store_provider=self._open,
@@ -646,7 +649,13 @@ class Deployment:
                         end_connection=self.provider.end_connection,
                         throttle=counters,
                     ),
-                    *consent.consent_routes(SERVED_ENV, provider=self.provider, throttle=counters),
+                    *consent.consent_routes(
+                        SERVED_ENV,
+                        provider=self.provider,
+                        browser_identity=AppApiBrowserIdentitySource(SERVED_ENV),
+                        nextcloud=exapp_target(SERVED_ENV),
+                        throttle=counters,
+                    ),
                 ]
             )
         )
@@ -764,8 +773,9 @@ class Nextcloud:
         self.deleted: list[tuple[str, str]] = []
         self.answer = True
 
-    async def revoke(self, login_name: str, app_password: str, *, env: Any = None) -> bool:
-        del env
+    async def revoke(self, login_name: str, app_password: str, *, target: object) -> bool:
+        # Required like the real signature, so a caller without a target fails here too.
+        del target
         self.deleted.append((login_name, app_password))
         return self.answer
 

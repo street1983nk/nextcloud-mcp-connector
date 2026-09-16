@@ -47,6 +47,7 @@ from starlette.responses import Response
 from starlette.routing import Route
 
 from ..errors import ToolError
+from ..nextcloud.target import NextcloudTarget
 from ..oauth import crypto, loginflow
 from ..oauth.store import AuthorizationRow, OAuthStore
 from .auth import AppApiRejected, require_appapi
@@ -131,7 +132,10 @@ type StoreProvider = Callable[[], Awaitable[OAuthStore]]
 
 
 def purge_routes(
-    env: Mapping[str, str] | None = None, *, store_provider: StoreProvider
+    env: Mapping[str, str] | None = None,
+    *,
+    nextcloud: NextcloudTarget,
+    store_provider: StoreProvider,
 ) -> list[Route]:
     """The one route of the purge, handed out rather than registered on the server object.
 
@@ -159,7 +163,7 @@ def purge_routes(
             logger.error("the purge found no readable store: %s", type(exc).__name__)
             return json_response({"purged": False, "hint": STORE_HINT})
 
-        revoked, failures = await _hand_back_every(store, rows, env)
+        revoked, failures = await _hand_back_every(store, rows, nextcloud)
         if rows and revoked == 0:
             # WR-01 of 05-REVIEW.md, and the line is drawn at zero on purpose. A run that
             # handed back nothing at all signals a fault of the connection to Nextcloud and
@@ -213,7 +217,7 @@ def purge_routes(
 
 
 async def _hand_back_every(
-    store: OAuthStore, rows: list[AuthorizationRow], env: Mapping[str, str] | None
+    store: OAuthStore, rows: list[AuthorizationRow], nextcloud: NextcloudTarget
 ) -> tuple[int, int]:
     """Give every Nextcloud app password back, one attempt each. Returns (done, failed).
 
@@ -233,7 +237,9 @@ async def _hand_back_every(
             logger.error("the app password of a connection could not be read back")
             password = None
 
-        if password and await loginflow.revoke_app_password(row.nc_user, password, env=env):
+        if password and await loginflow.revoke_app_password(
+            row.nc_user, password, target=nextcloud
+        ):
             revoked += 1
         else:
             # loginflow already logged what happened, without a value of the exchange.

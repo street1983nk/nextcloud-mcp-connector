@@ -20,17 +20,13 @@ import pytest
 import respx
 
 from mcp_connector import config
+from mcp_connector.nextcloud.target import NextcloudTarget
 from mcp_connector.oauth import loginflow
 
 BASE_URL = "http://nc.test"
 
-ENV = {
-    config.ENV_APP_ID: "mcp_connector",
-    config.ENV_APP_SECRET: "app-secret-test",
-    config.ENV_APP_VERSION: "0.1.0",
-    config.ENV_AA_VERSION: "34.0.3",
-    config.ENV_NEXTCLOUD_URL: BASE_URL,
-}
+#: The injected Nextcloud. No login flow call reads the deploy environment any more.
+TARGET = NextcloudTarget.from_url(BASE_URL)
 
 INIT_URL = f"{BASE_URL}{loginflow.INIT_PATH}"
 POLL_URL = f"{BASE_URL}{loginflow.POLL_PATH}"
@@ -124,7 +120,7 @@ def test_the_user_agent_is_never_empty_and_always_a_valid_header_value() -> None
 async def test_the_start_sends_one_request_and_returns_the_token_and_the_login_url() -> None:
     route = respx.post(INIT_URL).mock(return_value=httpx.Response(200, json=start_body()))
 
-    started = await loginflow.start_flow("Claude", env=ENV)
+    started = await loginflow.start_flow("Claude", target=TARGET)
 
     assert route.call_count == 1
     assert started is not None
@@ -137,7 +133,7 @@ async def test_the_start_sends_one_request_and_returns_the_token_and_the_login_u
 async def test_the_start_sends_the_cleaned_client_name_as_the_user_agent() -> None:
     route = respx.post(INIT_URL).mock(return_value=httpx.Response(200, json=start_body()))
 
-    await loginflow.start_flow("Claude\r\nX-Evil: yes", env=ENV)
+    await loginflow.start_flow("Claude\r\nX-Evil: yes", target=TARGET)
 
     sent = route.calls[0].request.headers["user-agent"]
     assert sent == f"{loginflow.AGENT_PREFIX}ClaudeX-Evil: yes"
@@ -150,7 +146,7 @@ async def test_the_start_sends_the_cleaned_client_name_as_the_user_agent() -> No
 async def test_a_start_that_is_not_a_200_is_a_named_failure(status: int) -> None:
     route = respx.post(INIT_URL).mock(return_value=httpx.Response(status, json={}))
 
-    assert await loginflow.start_flow("Claude", env=ENV) is None
+    assert await loginflow.start_flow("Claude", target=TARGET) is None
     assert route.call_count == 1, "a failed start must not be retried"
 
 
@@ -159,7 +155,7 @@ async def test_a_start_that_is_not_a_200_is_a_named_failure(status: int) -> None
 async def test_a_start_that_does_not_reach_nextcloud_is_a_named_failure() -> None:
     route = respx.post(INIT_URL).mock(side_effect=httpx.ConnectError("no route to host"))
 
-    assert await loginflow.start_flow("Claude", env=ENV) is None
+    assert await loginflow.start_flow("Claude", target=TARGET) is None
     assert route.call_count == 1
 
 
@@ -189,7 +185,7 @@ async def test_a_start_that_does_not_reach_nextcloud_is_a_named_failure() -> Non
 async def test_a_start_answer_this_code_cannot_read_is_a_named_failure(body: object) -> None:
     respx.post(INIT_URL).mock(return_value=httpx.Response(200, json=body))
 
-    assert await loginflow.start_flow("Claude", env=ENV) is None
+    assert await loginflow.start_flow("Claude", target=TARGET) is None
 
 
 @respx.mock
@@ -197,7 +193,7 @@ async def test_a_start_answer_this_code_cannot_read_is_a_named_failure(body: obj
 async def test_a_start_answer_that_is_not_json_is_a_named_failure() -> None:
     respx.post(INIT_URL).mock(return_value=httpx.Response(200, html="<html>login</html>"))
 
-    assert await loginflow.start_flow("Claude", env=ENV) is None
+    assert await loginflow.start_flow("Claude", target=TARGET) is None
 
 
 @respx.mock
@@ -213,7 +209,7 @@ async def test_a_login_url_that_is_not_http_is_refused(login: str) -> None:
     body["login"] = login
     respx.post(INIT_URL).mock(return_value=httpx.Response(200, json=body))
 
-    assert await loginflow.start_flow("Claude", env=ENV) is None
+    assert await loginflow.start_flow("Claude", target=TARGET) is None
 
 
 # --- polling (T-03-34, pitfall 7) ------------------------------------------------------
@@ -225,7 +221,7 @@ async def test_one_poll_is_exactly_one_request_against_the_configured_base_url()
     poll = respx.post(POLL_URL).mock(return_value=httpx.Response(404))
     foreign = respx.post(FOREIGN_POLL_ENDPOINT).mock(return_value=httpx.Response(200))
 
-    result = await loginflow.poll_once(POLL_TOKEN, env=ENV)
+    result = await loginflow.poll_once(POLL_TOKEN, target=TARGET)
 
     assert poll.call_count == 1
     assert foreign.call_count == 0, "the absolute endpoint of the answer must never be called"
@@ -239,7 +235,7 @@ async def test_three_polls_are_three_requests_and_nothing_else() -> None:
     poll = respx.post(POLL_URL).mock(return_value=httpx.Response(404))
 
     for _ in range(3):
-        await loginflow.poll_once(POLL_TOKEN, env=ENV)
+        await loginflow.poll_once(POLL_TOKEN, target=TARGET)
 
     assert poll.call_count == 3
 
@@ -249,7 +245,7 @@ async def test_three_polls_are_three_requests_and_nothing_else() -> None:
 async def test_the_poll_sends_the_token_as_a_form_field() -> None:
     poll = respx.post(POLL_URL).mock(return_value=httpx.Response(404))
 
-    await loginflow.poll_once(POLL_TOKEN, env=ENV)
+    await loginflow.poll_once(POLL_TOKEN, target=TARGET)
 
     request = poll.calls[0].request
     assert request.content == f"token={POLL_TOKEN}".encode()
@@ -261,7 +257,7 @@ async def test_the_poll_sends_the_token_as_a_form_field() -> None:
 async def test_a_poll_that_answers_200_carries_the_credentials() -> None:
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
 
-    result = await loginflow.poll_once(POLL_TOKEN, env=ENV)
+    result = await loginflow.poll_once(POLL_TOKEN, target=TARGET)
 
     assert result.outcome == loginflow.POLL_DONE
     assert result.credentials is not None
@@ -277,7 +273,7 @@ async def test_any_other_poll_status_is_a_named_failure_without_a_second_attempt
 ) -> None:
     poll = respx.post(POLL_URL).mock(return_value=httpx.Response(status, json={}))
 
-    result = await loginflow.poll_once(POLL_TOKEN, env=ENV)
+    result = await loginflow.poll_once(POLL_TOKEN, target=TARGET)
 
     assert result.outcome == loginflow.POLL_FAILED
     assert result.credentials is None
@@ -289,7 +285,7 @@ async def test_any_other_poll_status_is_a_named_failure_without_a_second_attempt
 async def test_a_poll_that_does_not_reach_nextcloud_is_a_named_failure() -> None:
     poll = respx.post(POLL_URL).mock(side_effect=httpx.ReadTimeout("too slow"))
 
-    result = await loginflow.poll_once(POLL_TOKEN, env=ENV)
+    result = await loginflow.poll_once(POLL_TOKEN, target=TARGET)
 
     assert result.outcome == loginflow.POLL_FAILED
     assert poll.call_count == 1
@@ -310,7 +306,7 @@ async def test_a_poll_that_does_not_reach_nextcloud_is_a_named_failure() -> None
 async def test_a_poll_answer_without_credentials_is_a_named_failure(body: object) -> None:
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=body))
 
-    result = await loginflow.poll_once(POLL_TOKEN, env=ENV)
+    result = await loginflow.poll_once(POLL_TOKEN, target=TARGET)
 
     assert result.outcome == loginflow.POLL_FAILED
     assert result.credentials is None
@@ -324,7 +320,7 @@ async def test_a_poll_answer_without_credentials_is_a_named_failure(body: object
 async def test_the_revocation_sends_one_delete_with_the_credentials_of_that_password() -> None:
     route = respx.delete(APP_PASSWORD_URL).mock(return_value=httpx.Response(200, json={}))
 
-    assert await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, env=ENV) is True
+    assert await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, target=TARGET) is True
 
     request = route.calls[0].request
     expected = base64.b64encode(f"{LOGIN_NAME}:{APP_PASSWORD}".encode()).decode()
@@ -341,7 +337,7 @@ async def test_the_revocation_counts_deleted_and_already_gone_as_success(status:
     """401 means the user was faster than we were, and that is the wanted end state."""
     respx.delete(APP_PASSWORD_URL).mock(return_value=httpx.Response(status, json={}))
 
-    assert await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, env=ENV) is True
+    assert await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, target=TARGET) is True
 
 
 @respx.mock
@@ -352,7 +348,7 @@ async def test_any_other_revocation_status_is_a_failure_without_a_second_attempt
 ) -> None:
     route = respx.delete(APP_PASSWORD_URL).mock(return_value=httpx.Response(status, json={}))
 
-    assert await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, env=ENV) is False
+    assert await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, target=TARGET) is False
     assert route.call_count == 1
 
 
@@ -362,7 +358,7 @@ async def test_a_revocation_that_does_not_reach_nextcloud_is_a_failure_not_an_ex
     """Pitfall 13: a failed deletion may never block the revocation path that called it."""
     route = respx.delete(APP_PASSWORD_URL).mock(side_effect=httpx.ConnectError("gone"))
 
-    assert await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, env=ENV) is False
+    assert await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, target=TARGET) is False
     assert route.call_count == 1
 
 
@@ -391,9 +387,9 @@ async def test_no_secret_reaches_the_log_at_debug_level(
     respx.delete(APP_PASSWORD_URL).mock(return_value=httpx.Response(500, json={}))
 
     with caplog.at_level(logging.DEBUG, logger="mcp_connector"):
-        await loginflow.start_flow("Claude", env=ENV)
-        await loginflow.poll_once(POLL_TOKEN, env=ENV)
-        await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, env=ENV)
+        await loginflow.start_flow("Claude", target=TARGET)
+        await loginflow.poll_once(POLL_TOKEN, target=TARGET)
+        await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, target=TARGET)
 
     text = caplog.text
     assert text, "the failures were not logged at all"
@@ -409,9 +405,9 @@ async def test_a_successful_flow_logs_no_secret_either(caplog: pytest.LogCapture
     respx.delete(APP_PASSWORD_URL).mock(return_value=httpx.Response(200, json={}))
 
     with caplog.at_level(logging.DEBUG, logger="mcp_connector"):
-        await loginflow.start_flow("Claude", env=ENV)
-        await loginflow.poll_once(POLL_TOKEN, env=ENV)
-        await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, env=ENV)
+        await loginflow.start_flow("Claude", target=TARGET)
+        await loginflow.poll_once(POLL_TOKEN, target=TARGET)
+        await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, target=TARGET)
 
     for secret in (POLL_TOKEN, APP_PASSWORD):
         assert secret not in caplog.text
@@ -450,3 +446,53 @@ def test_the_three_paths_are_the_ones_of_the_research() -> None:
     assert loginflow.POLL_PATH == "/login/v2/poll"
     assert loginflow.APP_PASSWORD_PATH == "/ocs/v2.php/core/apppassword"
     assert re.fullmatch(r"MCP Connector: ", loginflow.AGENT_PREFIX)
+
+
+# --- the injected target (standalone OAuth, slice 2) ---------------------------------------
+
+INJECTED_BASE = "https://cloud.injected.example/nextcloud"
+INJECTED = NextcloudTarget.from_url(INJECTED_BASE)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_all_three_calls_go_to_the_injected_target_and_ignore_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The deploy environment names another Nextcloud; none of the three calls follows it."""
+    monkeypatch.setenv(config.ENV_NEXTCLOUD_URL, "http://environment.example")
+    monkeypatch.setenv(config.ENV_URL, "http://environment.example")
+    init = respx.post(f"{INJECTED_BASE}{loginflow.INIT_PATH}").mock(
+        return_value=httpx.Response(200, json=start_body())
+    )
+    poll = respx.post(f"{INJECTED_BASE}{loginflow.POLL_PATH}").mock(
+        return_value=httpx.Response(404)
+    )
+    revoke = respx.delete(f"{INJECTED_BASE}{loginflow.APP_PASSWORD_PATH}").mock(
+        return_value=httpx.Response(200, json={})
+    )
+
+    assert await loginflow.start_flow("Claude", target=INJECTED) is not None
+    assert (await loginflow.poll_once(POLL_TOKEN, target=INJECTED)).outcome == (
+        loginflow.POLL_PENDING
+    )
+    assert await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, target=INJECTED)
+
+    assert (init.call_count, poll.call_count, revoke.call_count) == (1, 1, 1)
+
+
+@pytest.mark.parametrize("function", ["start_flow", "poll_once", "revoke_app_password"])
+def test_the_target_is_a_required_keyword_without_a_default(function: str) -> None:
+    """No hidden fallback to the ExApp environment: a caller has to name the target."""
+    import inspect
+
+    parameter = inspect.signature(getattr(loginflow, function)).parameters["target"]
+    assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameter.default is inspect.Parameter.empty
+    assert "env" not in inspect.signature(getattr(loginflow, function)).parameters
+
+
+def test_the_module_no_longer_reads_the_deploy_environment() -> None:
+    source = SOURCE.read_text(encoding="utf-8")
+    assert "exapp_settings" not in source
+    assert "os.environ" not in source

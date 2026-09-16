@@ -62,7 +62,9 @@ from starlette.routing import Route
 from starlette.testclient import TestClient
 
 from mcp_connector import config
+from mcp_connector.exapp.browser_identity import AppApiBrowserIdentitySource
 from mcp_connector.exapp.middleware import RequireAppApi
+from mcp_connector.exapp.target import exapp_target
 from mcp_connector.exapp.ui import consent as ui_consent
 from mcp_connector.exapp.ui import strings
 from mcp_connector.oauth import consent, crypto, loginflow, registry
@@ -143,7 +145,11 @@ class Deployment:
         self.store = OAuthStore(tmp_path / "oauth.sqlite3", KEY)
         self.policy = registry.client_policy(self.env)
         self.provider = provider_module.NextcloudOAuthProvider(
-            env=self.env, policy=self.policy, store_provider=self._open, clock=clock
+            nextcloud=exapp_target(self.env),
+            env=self.env,
+            policy=self.policy,
+            store_provider=self._open,
+            clock=clock,
         )
         self.verifier = verifier_module.StoreTokenVerifier(
             store_provider=self._open, get_client=self.provider.get_client, env=self.env
@@ -160,7 +166,13 @@ class Deployment:
                     *provider_module.auth_routes(
                         self.env, provider=self.provider, throttle=counters
                     ),
-                    *consent.consent_routes(self.env, provider=self.provider, throttle=counters),
+                    *consent.consent_routes(
+                        self.env,
+                        provider=self.provider,
+                        browser_identity=AppApiBrowserIdentitySource(self.env),
+                        nextcloud=exapp_target(self.env),
+                        throttle=counters,
+                    ),
                     tool,
                 ]
             )

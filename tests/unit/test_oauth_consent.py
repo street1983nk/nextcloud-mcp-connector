@@ -34,15 +34,20 @@ import pytest
 import respx
 from mcp.shared.auth import OAuthClientInformationFull
 from starlette.applications import Starlette
+from starlette.requests import Request
 from starlette.testclient import TestClient
 
 from mcp_connector import config
 from mcp_connector.entry_exapp import build_exapp_app
+from mcp_connector.exapp.browser_identity import AppApiBrowserIdentitySource
+from mcp_connector.exapp.target import exapp_target
 from mcp_connector.exapp.ui import consent as ui_consent
 from mcp_connector.exapp.ui import strings
+from mcp_connector.nextcloud.target import NextcloudTarget
 from mcp_connector.oauth import consent, crypto, loginflow, registry
 from mcp_connector.oauth import provider as provider_module
 from mcp_connector.oauth import throttle as throttle_module
+from mcp_connector.oauth.browser_identity import BrowserIdentitySource
 from mcp_connector.oauth.store import AUTH_CODE_TTL, FLOW_TTL, OAuthStore, token_hash
 
 BASE_URL = "http://nc.test"
@@ -102,15 +107,37 @@ def make(store: OAuthStore, **env: str) -> provider_module.NextcloudOAuthProvide
         return store
 
     return provider_module.NextcloudOAuthProvider(
-        env=ENV | env, policy=registry.client_policy(ENV | env), store_provider=provide
+        nextcloud=exapp_target(ENV | env),
+        env=ENV | env,
+        policy=registry.client_policy(ENV | env),
+        store_provider=provide,
     )
 
 
 def application(provider: provider_module.NextcloudOAuthProvider, **env: str) -> Starlette:
+    deployed_env = ENV | env
+    return application_with_identity(
+        provider,
+        AppApiBrowserIdentitySource(deployed_env),
+        **env,
+    )
+
+
+def application_with_identity(
+    provider: provider_module.NextcloudOAuthProvider,
+    browser_identity: BrowserIdentitySource,
+    **env: str,
+) -> Starlette:
+    deployed_env = ENV | env
     return Starlette(
         routes=[
             *provider_module.auth_routes(ENV | env, provider=provider),
-            *consent.consent_routes(ENV | env, provider=provider),
+            *consent.consent_routes(
+                deployed_env,
+                provider=provider,
+                browser_identity=browser_identity,
+                nextcloud=exapp_target(deployed_env),
+            ),
         ]
     )
 
@@ -658,6 +685,7 @@ def fetching(store: OAuthStore, **env: str) -> provider_module.NextcloudOAuthPro
         return store
 
     return provider_module.NextcloudOAuthProvider(
+        nextcloud=exapp_target(ENV | env),
         env=ENV | env,
         policy=registry.client_policy(ENV | env),
         store_provider=provide,
@@ -985,6 +1013,23 @@ def decide(
         headers=appapi_headers(user) if user is not None else {},
         follow_redirects=False,
     )
+
+
+class StubBrowserIdentitySource:
+    """A deployment-selected authority without AppAPI headers."""
+
+    def __init__(self, answer: bool = True, *, fail: bool = False) -> None:
+        self.answer = answer
+        self.fail = fail
+        self.expected: str | None = None
+        self.path: str | None = None
+
+    async def identifies(self, request: Request, expected_account_id: str) -> bool:
+        self.expected = expected_account_id
+        self.path = request.url.path
+        if self.fail:
+            raise RuntimeError("synthetic identity-source failure")
+        return self.answer
 
 
 def rows(store: OAuthStore, table: str) -> list[tuple[Any, ...]]:
@@ -1605,7 +1650,13 @@ def test_a_flood_of_accepted_authorization_requests_ends_in_429(store: OAuthStor
         Starlette(
             routes=[
                 *provider_module.auth_routes(ENV, provider=provider),
-                *consent.consent_routes(ENV, provider=provider, throttle=counters),
+                *consent.consent_routes(
+                    ENV,
+                    provider=provider,
+                    browser_identity=AppApiBrowserIdentitySource(ENV),
+                    nextcloud=exapp_target(ENV),
+                    throttle=counters,
+                ),
             ]
         )
     )
@@ -1631,7 +1682,13 @@ def test_the_flood_does_not_close_the_consent_screen_behind_it(store: OAuthStore
         Starlette(
             routes=[
                 *provider_module.auth_routes(ENV, provider=provider),
-                *consent.consent_routes(ENV, provider=provider, throttle=counters),
+                *consent.consent_routes(
+                    ENV,
+                    provider=provider,
+                    browser_identity=AppApiBrowserIdentitySource(ENV),
+                    nextcloud=exapp_target(ENV),
+                    throttle=counters,
+                ),
             ]
         )
     )
@@ -1695,6 +1752,48 @@ def test_the_return_page_shows_the_address_it_continues_to(store: OAuthStore) ->
 
 
 # --- CR-01: the decision belongs to the account that signed in ----------------------------
+
+
+def test_the_decision_consults_the_injected_browser_identity_source(store: OAuthStore) -> None:
+    provider = make(store)
+    register(provider)
+    _client, flow_id, _page = signed_in(provider)
+    source = StubBrowserIdentitySource()
+    deciding = TestClient(application_with_identity(provider, source))
+
+    response = decide(
+        deciding,
+        flow_id,
+        ui_consent.DECISION_APPROVE,
+        store=store,
+        user=None,
+    )
+
+    assert response.status_code == 200
+    assert source.expected == LOGIN_NAME
+    assert source.path == ui_consent.DECIDE_PATH
+    assert len(rows(store, "auth_codes")) == 1
+
+
+def test_a_browser_identity_source_failure_fails_closed(store: OAuthStore) -> None:
+    provider = make(store)
+    register(provider)
+    _client, flow_id, _page = signed_in(provider)
+    source = StubBrowserIdentitySource(fail=True)
+    deciding = TestClient(application_with_identity(provider, source))
+    before = snapshot(store)
+
+    response = decide(
+        deciding,
+        flow_id,
+        ui_consent.DECISION_APPROVE,
+        store=store,
+        user=None,
+    )
+
+    assert response.status_code == 400
+    assert "location" not in response.headers
+    assert snapshot(store) == before
 
 
 @pytest.mark.parametrize(
@@ -1790,7 +1889,16 @@ def test_an_authorize_body_that_cannot_be_parsed_is_a_page_and_never_a_traceback
     """The same on the front door, which reads a form when it is asked with a POST."""
     provider = make(store)
     register(provider)
-    client = TestClient(Starlette(routes=consent.consent_routes(ENV, provider=provider)))
+    client = TestClient(
+        Starlette(
+            routes=consent.consent_routes(
+                ENV,
+                provider=provider,
+                browser_identity=AppApiBrowserIdentitySource(ENV),
+                nextcloud=exapp_target(ENV),
+            )
+        )
+    )
 
     response = client.post(
         consent.AUTHORIZATION_PATH,
@@ -2319,6 +2427,91 @@ def test_the_login_flow_page_of_this_instance_is_rendered(store: OAuthStore) -> 
         response = client.get(f"{consent_url(flow_id)}&{ui_consent.LOGIN_PARAM}={LOGIN_URL}")
 
     assert f'href="{LOGIN_URL}"' in response.text
+
+
+INJECTED_BASE = "https://nc.injected.example"
+
+
+def test_the_consent_surface_uses_the_injected_target_and_not_the_environment(
+    store: OAuthStore,
+) -> None:
+    """Standalone OAuth, slice 2: sign in link check and poll follow the injected target.
+
+    The deploy environment still names ``BASE_URL``. A link on that host is refused once the
+    application was assembled with another target, a link on the injected host is rendered,
+    and the waiting screen polls the injected Nextcloud and nothing else.
+    """
+    provider = make(store)
+    register(provider)
+    client = TestClient(
+        Starlette(
+            routes=[
+                *provider_module.auth_routes(ENV, provider=provider),
+                *consent.consent_routes(
+                    ENV,
+                    provider=provider,
+                    browser_identity=AppApiBrowserIdentitySource(ENV),
+                    nextcloud=NextcloudTarget.from_url(INJECTED_BASE),
+                ),
+            ]
+        )
+    )
+    with respx.mock:
+        respx.post(INIT_URL).mock(return_value=httpx.Response(200, json=start_body()))
+        flow_id = flow_of(start(client))
+
+    injected_link = f"{INJECTED_BASE}/index.php/login/v2/flow/abc123"
+    environment_link = f"{BASE_URL}/index.php/login/v2/flow/abc123"
+    with respx.mock:
+        environment_poll = respx.post(POLL_URL).mock(return_value=httpx.Response(404))
+        injected_poll = respx.post(f"{INJECTED_BASE}{loginflow.POLL_PATH}").mock(
+            return_value=httpx.Response(404)
+        )
+        accepted = client.get(f"{consent_url(flow_id)}&{ui_consent.LOGIN_PARAM}={injected_link}")
+        refused = client.get(f"{consent_url(flow_id)}&{ui_consent.LOGIN_PARAM}={environment_link}")
+        waiting = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
+
+    assert f'href="{injected_link}"' in accepted.text
+    assert environment_link not in refused.text
+    assert waiting.status_code == 200
+    assert injected_poll.call_count == 1
+    assert environment_poll.call_count == 0
+
+
+def test_the_provider_opens_its_login_flow_at_its_injected_target(store: OAuthStore) -> None:
+    """The authorization endpoint starts the flow through the provider, so the provider's
+    target decides where, whatever the deploy environment names."""
+
+    async def provide() -> OAuthStore:
+        return store
+
+    provider = provider_module.NextcloudOAuthProvider(
+        nextcloud=NextcloudTarget.from_url(INJECTED_BASE),
+        env=ENV,
+        policy=registry.client_policy(ENV),
+        store_provider=provide,
+    )
+    register(provider)
+    client = TestClient(application(provider))
+    with respx.mock:
+        environment_init = respx.post(INIT_URL).mock(
+            return_value=httpx.Response(200, json=start_body())
+        )
+        injected_init = respx.post(f"{INJECTED_BASE}{loginflow.INIT_PATH}").mock(
+            return_value=httpx.Response(200, json=start_body())
+        )
+        response = start(client)
+
+    assert response.status_code == 302
+    assert (injected_init.call_count, environment_init.call_count) == (1, 0)
+
+
+def test_the_consent_factory_requires_an_explicit_target() -> None:
+    """No hidden fallback to ``exapp_settings``: the parameter has no default."""
+    parameter = inspect.signature(consent.consent_routes).parameters["nextcloud"]
+    assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
+    assert parameter.default is inspect.Parameter.empty
+    assert "exapp_settings" not in inspect.getsource(consent)
 
 
 def test_the_routes_are_declared_in_the_manifest_and_served_by_the_application() -> None:

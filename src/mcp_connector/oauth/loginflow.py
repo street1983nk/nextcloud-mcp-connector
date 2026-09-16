@@ -8,8 +8,9 @@ which the user can see and revoke in Nextcloud under "Devices and sessions".
 The module is built like :mod:`mcp_connector.exapp.status`, the one outgoing call of the
 ExApp package, and follows the same four rules (03-PATTERNS.md):
 
-1. The target is built from the configured base URL of
-   :func:`mcp_connector.config.exapp_settings`, never from a value in an answer.
+1. The target is the :class:`~mcp_connector.nextcloud.target.NextcloudTarget` the
+   deployment injected when it built the application, never a value from an answer and
+   never a second read of the environment.
 2. The client comes from :func:`mcp_connector.nextcloud.http.shared_client`, which already
    refuses redirects and carries the timeouts of this project.
 3. One attempt per call and no retry (D-37). A failure is a return value, so a caller can
@@ -30,16 +31,15 @@ wrong exactly once (pitfall 7 of 03-RESEARCH.md):
 """
 
 import logging
-from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
 
-from .. import config
 from ..nextcloud.clients.ocs import OCS_HEADERS
 from ..nextcloud.http import shared_client
+from ..nextcloud.target import NextcloudTarget
 
 __all__ = [
     "AGENT_FALLBACK",
@@ -155,15 +155,14 @@ def safe_user_agent(raw: str) -> str:
     return f"{AGENT_PREFIX}{collapsed[:AGENT_NAME_LIMIT]}"
 
 
-async def start_flow(client_name: str, *, env: Mapping[str, str] | None = None) -> FlowStart | None:
+async def start_flow(client_name: str, *, target: NextcloudTarget) -> FlowStart | None:
     """Open a sign in at Nextcloud, or say that it could not be opened.
 
     ``None`` instead of an exception, for the reason ``status.py`` gives: the caller of this
     function renders a page for a person, and a page that names the next step is a better
     answer than a stack trace turned into a 500 (D-37).
     """
-    settings = config.exapp_settings(env)
-    url = f"{settings.base_url}{INIT_PATH}"
+    url = f"{target.base_url}{INIT_PATH}"
     client = shared_client()
 
     try:
@@ -193,7 +192,7 @@ async def start_flow(client_name: str, *, env: Mapping[str, str] | None = None) 
     return FlowStart(poll_token=token, login_url=login)
 
 
-async def poll_once(poll_token: str, *, env: Mapping[str, str] | None = None) -> PollResult:
+async def poll_once(poll_token: str, *, target: NextcloudTarget) -> PollResult:
     """Ask Nextcloud once whether the sign in is finished. Exactly one request, ever.
 
     One request per call is the whole throttling of the waiting page: it refreshes every few
@@ -204,8 +203,7 @@ async def poll_once(poll_token: str, *, env: Mapping[str, str] | None = None) ->
     the difference cannot come from this answer. It comes from the deadline the caller keeps
     in its own flow record.
     """
-    settings = config.exapp_settings(env)
-    url = f"{settings.base_url}{POLL_PATH}"
+    url = f"{target.base_url}{POLL_PATH}"
     client = shared_client()
 
     try:
@@ -237,7 +235,7 @@ async def poll_once(poll_token: str, *, env: Mapping[str, str] | None = None) ->
 
 
 async def revoke_app_password(
-    login_name: str, app_password: str, *, env: Mapping[str, str] | None = None
+    login_name: str, app_password: str, *, target: NextcloudTarget
 ) -> bool:
     """Remove one app password again, authenticated with exactly that app password.
 
@@ -251,8 +249,7 @@ async def revoke_app_password(
     depend on: a revocation that hangs on a failed deletion would keep a user connected
     because a cleanup step did not work (pitfall 13, D-37).
     """
-    settings = config.exapp_settings(env)
-    url = f"{settings.base_url}{APP_PASSWORD_PATH}"
+    url = f"{target.base_url}{APP_PASSWORD_PATH}"
     client = shared_client()
 
     try:

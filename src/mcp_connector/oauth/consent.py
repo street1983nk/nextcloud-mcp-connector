@@ -75,7 +75,6 @@ from starlette.routing import Route
 
 from .. import config
 from ..errors import ToolError
-from ..exapp.auth import appapi_user, is_user
 from ..exapp.responses import form_or_none
 from ..exapp.ui import errors
 from ..exapp.ui.consent import (
@@ -96,7 +95,9 @@ from ..exapp.ui.consent import (
     handoff_page,
     waiting_page,
 )
+from ..nextcloud.target import NextcloudTarget
 from . import cimd, crypto, loginflow, registry
+from .browser_identity import BrowserIdentitySource
 from .provider import NextcloudOAuthProvider
 from .registry import redirect_uri_allowed
 from .store import FlowRow, OAuthStore
@@ -130,6 +131,8 @@ def consent_routes(
     env: Mapping[str, str] | None = None,
     *,
     provider: NextcloudOAuthProvider,
+    browser_identity: BrowserIdentitySource,
+    nextcloud: NextcloudTarget,
     throttle: Throttle | None = None,
 ) -> list[Route]:
     """The authorization endpoint of this app and the consent surface behind it.
@@ -186,7 +189,7 @@ def consent_routes(
         because that is where the sign in is offered in the first place, which is why the
         route stays PUBLIC in ``appinfo/info.xml``.
         """
-        return await _screen(request.query_params, provider, env)
+        return await _screen(request.query_params, provider, nextcloud, env)
 
     async def decide(request: Request) -> Response:
         """The other half: the decision, on a path of its own because it grants something.
@@ -197,7 +200,7 @@ def consent_routes(
         from the account whose sign in produced the authorization. The route is PUBLIC and
         the refusal is this application's own, for the reason the module docstring gives.
         """
-        return await _decide(request, provider, env)
+        return await _decide(request, provider, browser_identity, nextcloud, env)
 
     counters = throttle if throttle is not None else Throttle()
     authorize_route = Route(AUTHORIZATION_PATH, authorize, methods=["GET", "POST"])
@@ -314,6 +317,7 @@ def _no_client_page(
 async def _screen(
     params: QueryParams,
     provider: NextcloudOAuthProvider,
+    nextcloud: NextcloudTarget,
     env: Mapping[str, str] | None,
 ) -> Response:
     """One of the four states of the consent surface, in the order they can happen."""
@@ -367,14 +371,14 @@ async def _screen(
         return _decision(client, signed_in.nc_user, row, store, provider, env)
 
     if params.get(STEP_PARAM) != STEP_WAIT:
-        link = _sign_in_link(params.get(LOGIN_PARAM) or "", env)
+        link = _sign_in_link(params.get(LOGIN_PARAM) or "", nextcloud, env)
         if link:
             return handoff_page(_name(client), link, flow_id, env=env)
         # No usable link, so the honest page is the one that keeps asking: the sign in may
         # already be running in another window.
         return waiting_page(flow_id, env=env)
 
-    result = await loginflow.poll_once(row.poll_token, env=env)
+    result = await loginflow.poll_once(row.poll_token, target=nextcloud)
     if result.outcome == loginflow.POLL_PENDING:
         return waiting_page(flow_id, env=env)
     if result.outcome != loginflow.POLL_DONE or result.credentials is None:
@@ -395,7 +399,9 @@ async def _screen(
     if disabled is not False:
         # ``None`` is the store that could not answer, and that is never a "no" (fail closed,
         # D-37, the same choice the transport boundary of phase 4 makes).
-        return await _refuse_paused(store, flow_id, credentials, env, readable=disabled is True)
+        return await _refuse_paused(
+            store, flow_id, credentials, nextcloud, env, readable=disabled is True
+        )
 
     try:
         # Written under the id of its own flow, which is what connects the two without a
@@ -413,7 +419,7 @@ async def _screen(
         # The app password exists at Nextcloud from now on and nobody will ever use it, so
         # it is handed back instead of left behind (pitfall 13, D-34).
         await loginflow.revoke_app_password(
-            credentials.login_name, credentials.app_password, env=env
+            credentials.login_name, credentials.app_password, target=nextcloud
         )
         return _generic("the finished sign in could not be written to the store", env)
 
@@ -509,6 +515,8 @@ def _is_loopback(address: str) -> bool:
 async def _decide(
     request: Request,
     provider: NextcloudOAuthProvider,
+    browser_identity: BrowserIdentitySource,
+    nextcloud: NextcloudTarget,
     env: Mapping[str, str] | None,
 ) -> Response:
     """The one request of this whole surface that grants or refuses something.
@@ -533,8 +541,9 @@ async def _decide(
     value could not answer that, because it is derived from the same flow id. The account
     that signed in can: it is the one fact of this request the party that started the flow
     cannot produce, and HaRP puts it into the AppAPI header of every request it forwards.
-    A caller without a Nextcloud credential arrives with an empty id, which :func:`is_user`
-    never accepts, so the anonymous case is refused here and needs no help from the proxy.
+    A source must fail closed for a missing or ambiguous identity, so an anonymous request
+    is refused here as well.  The deployment chooses the trust anchor when it assembles the
+    application; no request parameter can select or replace it.
     """
     form = await form_or_none(request)
     if form is None:
@@ -579,7 +588,15 @@ async def _decide(
         # and the honest next step is to start the connection again.
         return _page(errors.error_page("E4", env=env))
 
-    if not is_user(appapi_user(request, env=env), authorization.nc_user):
+    try:
+        identified = await browser_identity.identifies(request, authorization.nc_user)
+    except Exception:
+        # A source is a security boundary.  Its outage or malformed state is one refusal,
+        # never a 500 that might tempt a caller to add a weaker fallback.
+        logger.error("the browser identity source could not decide the consent identity")
+        identified = False
+
+    if not identified:
         # The browser that decides is not the account whose sign in this is (CR-01).
         # Answered with the page an expired link gets, for the reason the anti forgery
         # refusal above is: a refusal that named the reason would tell whoever tried which
@@ -608,14 +625,14 @@ async def _decide(
             # granted, so it is the second press of the button like any other late decision.
             logger.info("a paused refusal arrived for a flow another decision had already spent")
             return _page(errors.error_page("E3", env=env))
-        await _withdraw(store, row, authorization.nc_user, env)
+        await _withdraw(store, row, authorization.nc_user, nextcloud)
         return _page(errors.error_page(errors.PAUSED, env=env))
 
     decision = str(form.get(DECISION_PARAM) or "")
     if decision == DECISION_APPROVE:
         return await _approve(store, row, client, authorization.nc_user, env)
     if decision == DECISION_DENY:
-        return await _deny(store, row, client, authorization.nc_user, env)
+        return await _deny(store, row, client, authorization.nc_user, nextcloud, env)
     # Neither button. Nothing is granted and nothing is refused, so nothing changes.
     return _page(errors.error_page("E3", env=env))
 
@@ -683,6 +700,7 @@ async def _deny(
     row: FlowRow,
     client: OAuthClientInformationFull,
     user: str,
+    nextcloud: NextcloudTarget,
     env: Mapping[str, str] | None,
 ) -> Response:
     """Refuse the connection, and take back what the sign in already handed out.
@@ -702,7 +720,7 @@ async def _deny(
         logger.info("a denial arrived for a flow another decision had already spent")
         return _page(errors.error_page("E3", env=env))
 
-    await _withdraw(store, row, user, env)
+    await _withdraw(store, row, user, nextcloud)
 
     if not row.redirect_uri:
         return denied_page(_name(client), env=env)
@@ -717,7 +735,10 @@ async def _deny(
 
 
 async def _withdraw(
-    store: OAuthStore, row: FlowRow, user: str, env: Mapping[str, str] | None
+    store: OAuthStore,
+    row: FlowRow,
+    user: str,
+    nextcloud: NextcloudTarget,
 ) -> None:
     """Take back what the sign in already handed out, and forget the flow that produced it.
 
@@ -728,7 +749,7 @@ async def _withdraw(
     """
     password = await _app_password(store, row.flow_id)
     if password:
-        await loginflow.revoke_app_password(user, password, env=env)
+        await loginflow.revoke_app_password(user, password, target=nextcloud)
     await store.delete_authorization(row.flow_id)
     await store.delete_flow(row.flow_id)
 
@@ -737,6 +758,7 @@ async def _refuse_paused(
     store: OAuthStore,
     flow_id: str,
     credentials: loginflow.AppCredentials,
+    nextcloud: NextcloudTarget,
     env: Mapping[str, str] | None,
     *,
     readable: bool,
@@ -755,7 +777,9 @@ async def _refuse_paused(
     """
     if readable:
         logger.info("a finished sign in was refused because the account has paused MCP access")
-    await loginflow.revoke_app_password(credentials.login_name, credentials.app_password, env=env)
+    await loginflow.revoke_app_password(
+        credentials.login_name, credentials.app_password, target=nextcloud
+    )
     try:
         await store.delete_flow(flow_id)
     except Exception:
@@ -809,7 +833,7 @@ def _confirmed(store: OAuthStore, flow_id: str, presented: str) -> bool:
     return store.form_token_valid(flow_id, presented, purpose=crypto.PURPOSE_CONSENT)
 
 
-def _sign_in_link(candidate: str, env: Mapping[str, str] | None) -> str:
+def _sign_in_link(candidate: str, nextcloud: NextcloudTarget, env: Mapping[str, str] | None) -> str:
     """The Nextcloud sign in address, or an empty string when it is not one.
 
     Three checks, and all of them are about the same question: is this the address of the
@@ -821,7 +845,7 @@ def _sign_in_link(candidate: str, env: Mapping[str, str] | None) -> str:
     have stood behind the primary button of a page whose whole purpose is to be
     trustworthy.
 
-    The two accepted hosts are the configured Nextcloud and the configured public address
+    The two accepted hosts are the injected Nextcloud target and the configured public address
     of this app, which in every supported topology are the same domain: the ExApp lives
     under it, and Nextcloud builds its sign in address from ``overwrite.cli.url``. The path
     of a Login Flow v2 grant page has one shape, and :data:`_LOGIN_PATH_MARKER` is it.
@@ -833,7 +857,7 @@ def _sign_in_link(candidate: str, env: Mapping[str, str] | None) -> str:
         return ""
     known = {
         urlsplit(config.public_url(env)).netloc,
-        urlsplit(_nextcloud_base(env)).netloc,
+        nextcloud.netloc,
     }
     if parts.netloc not in known - {""}:
         logger.warning("a sign in link of a foreign host was not rendered")
@@ -842,14 +866,6 @@ def _sign_in_link(candidate: str, env: Mapping[str, str] | None) -> str:
         logger.warning("a sign in link with a foreign path was not rendered")
         return ""
     return candidate
-
-
-def _nextcloud_base(env: Mapping[str, str] | None) -> str:
-    """The configured Nextcloud, or an empty string when this process has none."""
-    try:
-        return config.exapp_settings(env).base_url
-    except ToolError:
-        return ""
 
 
 async def _flow_or_page(

@@ -92,6 +92,7 @@ from ..errors import IssuerRefused
 from ..exapp.auth import is_user
 from ..exapp.responses import NO_STORE, form_or_none, json_response
 from ..exapp.ui.consent import consent_url
+from ..nextcloud.target import NextcloudTarget
 from . import cimd, loginflow
 from .metadata import (
     AS_METADATA_SUFFIX,
@@ -244,6 +245,7 @@ class NextcloudOAuthProvider(
     def __init__(
         self,
         *,
+        nextcloud: NextcloudTarget,
         env: Mapping[str, str] | None = None,
         policy: ClientPolicy | None = None,
         store_provider: StoreProvider | None = None,
@@ -251,6 +253,9 @@ class NextcloudOAuthProvider(
         resolver: cimd.AddressLookup | None = None,
     ) -> None:
         self._env = env
+        #: The Nextcloud every login flow of this provider starts at and every app password
+        #: it hands back belongs to. Injected, never read from the environment here.
+        self._nextcloud = nextcloud
         self._policy = policy if policy is not None else client_policy(env)
         self._store = store_provider if store_provider is not None else store_opener(env)
         #: The canonical audience of every token this server issues (RFC 8707). Built from
@@ -670,7 +675,7 @@ class NextcloudOAuthProvider(
         if not check_resource_allowed(resource, self._resource):
             raise AuthorizeError("invalid_target", "the resource does not match this server")
 
-        started = await loginflow.start_flow(client.client_name or "", env=self._env)
+        started = await loginflow.start_flow(client.client_name or "", target=self._nextcloud)
         if started is None:
             # loginflow logged what happened; nothing of the request is repeated here.
             raise AuthorizeError("temporarily_unavailable", "the sign in could not be started")
@@ -1189,7 +1194,7 @@ class NextcloudOAuthProvider(
 
         if row is None or not password:
             return False
-        if not await loginflow.revoke_app_password(row.nc_user, password, env=self._env):
+        if not await loginflow.revoke_app_password(row.nc_user, password, target=self._nextcloud):
             # loginflow logged what happened, without any value of the exchange.
             return False
 
@@ -1227,7 +1232,7 @@ class NextcloudOAuthProvider(
                 logger.error("the app password of an abandoned sign in could not be read back")
                 password = None
             if password and await loginflow.revoke_app_password(
-                row.nc_user, password, env=self._env
+                row.nc_user, password, target=self._nextcloud
             ):
                 swept += 1
             else:
@@ -1301,7 +1306,7 @@ class NextcloudOAuthProvider(
                 logger.error("the app password of an expired client could not be read back")
                 password = None
             if not password or not await loginflow.revoke_app_password(
-                row.nc_user, password, env=self._env
+                row.nc_user, password, target=self._nextcloud
             ):
                 logger.warning("an expired client was removed without handing its password back")
             await store.delete_authorization(row.auth_id)

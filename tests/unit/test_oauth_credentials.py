@@ -28,6 +28,7 @@ import pytest
 from starlette.requests import Request
 
 from mcp_connector import config, deps
+from mcp_connector.exapp.target import exapp_target
 from mcp_connector.nextcloud.credentials import MODE_BASIC, MODES
 from mcp_connector.oauth import provider as provider_module
 from mcp_connector.oauth import registry
@@ -222,7 +223,10 @@ async def test_the_durchstich_from_a_stored_token_to_the_credentials(
         return store
 
     provider = provider_module.NextcloudOAuthProvider(
-        env=ENV, policy=registry.client_policy(ENV), store_provider=opener
+        nextcloud=exapp_target(ENV),
+        env=ENV,
+        policy=registry.client_policy(ENV),
+        store_provider=opener,
     )
     verifier = StoreTokenVerifier(store_provider=opener, get_client=provider.get_client, env=ENV)
     await store.save_client(CLIENT_ID, metadata_json=REGISTRATION)

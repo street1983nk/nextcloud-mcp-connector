@@ -31,7 +31,9 @@ from starlette.testclient import TestClient
 
 from mcp_connector import config, entry_http
 from mcp_connector.entry_exapp import build_exapp_app
+from mcp_connector.exapp.target import exapp_target
 from mcp_connector.exapp.ui import strings
+from mcp_connector.nextcloud.target import NextcloudTarget
 from mcp_connector.oauth import connect, loginflow
 from mcp_connector.oauth import store as store_module
 from mcp_connector.oauth import throttle as throttle_module
@@ -49,6 +51,9 @@ ENV = {
     config.ENV_AA_VERSION: "34.0.3",
     config.ENV_NEXTCLOUD_URL: BASE_URL,
 }
+
+#: The Nextcloud the onboarding routes are built against, resolved like the ExApp does.
+TARGET = exapp_target(ENV)
 
 INIT_URL = f"{BASE_URL}{loginflow.INIT_PATH}"
 POLL_URL = f"{BASE_URL}{loginflow.POLL_PATH}"
@@ -105,7 +110,7 @@ def app_with(store: OAuthStore) -> Starlette:
     async def provider() -> OAuthStore:
         return store
 
-    return Starlette(routes=connect.connect_routes(ENV, store_provider=provider))
+    return Starlette(routes=connect.connect_routes(ENV, nextcloud=TARGET, store_provider=provider))
 
 
 def start_a_flow(client: TestClient) -> str:
@@ -515,7 +520,7 @@ def test_a_deployment_without_a_provider_opens_one_store_and_sweeps_it_once(
     monkeypatch.setattr(OAuthStore, "purge_expired", counted)
     monkeypatch.setattr(store_module.crypto, "data_key", key)
     env = {**ENV, config.ENV_APP_PERSISTENT_STORAGE: str(tmp_path)}
-    client = TestClient(Starlette(routes=connect.connect_routes(env)))
+    client = TestClient(Starlette(routes=connect.connect_routes(env, nextcloud=TARGET)))
 
     first = start_a_flow(client)
     second = start_a_flow(client)
@@ -578,7 +583,11 @@ def test_a_flood_of_successful_starts_ends_in_429(store: OAuthStore) -> None:
         return store
 
     client = TestClient(
-        Starlette(routes=connect.connect_routes(ENV, store_provider=provide, throttle=counters))
+        Starlette(
+            routes=connect.connect_routes(
+                ENV, nextcloud=TARGET, store_provider=provide, throttle=counters
+            )
+        )
     )
     init = respx.post(INIT_URL).mock(return_value=httpx.Response(200, json=start_body()))
 
@@ -606,7 +615,11 @@ def test_the_throttled_start_does_not_close_the_waiting_screen(store: OAuthStore
         return store
 
     client = TestClient(
-        Starlette(routes=connect.connect_routes(ENV, store_provider=provide, throttle=counters))
+        Starlette(
+            routes=connect.connect_routes(
+                ENV, nextcloud=TARGET, store_provider=provide, throttle=counters
+            )
+        )
     )
     respx.post(INIT_URL).mock(return_value=httpx.Response(200, json=start_body()))
     respx.post(POLL_URL).mock(return_value=httpx.Response(404))
@@ -871,7 +884,7 @@ def test_the_default_store_is_opened_once_and_purged_at_the_first_use(
 
     monkeypatch.setattr(store_module.crypto, "data_key", fake_key)
     env = ENV | {config.ENV_APP_PERSISTENT_STORAGE: str(tmp_path)}
-    client = TestClient(Starlette(routes=connect.connect_routes(env)))
+    client = TestClient(Starlette(routes=connect.connect_routes(env, nextcloud=TARGET)))
 
     first = client.get(wait_url("unknown"))
     second = client.get(wait_url("unknown"))
@@ -885,7 +898,9 @@ def test_the_default_store_is_opened_once_and_purged_at_the_first_use(
 def test_a_store_that_cannot_be_opened_is_the_generic_page() -> None:
     """Fail closed (D-37): no deploy environment, no store, and a named page, not a 500."""
     client = TestClient(
-        Starlette(routes=connect.connect_routes({config.ENV_PUBLIC_URL: PUBLIC_URL}))
+        Starlette(
+            routes=connect.connect_routes({config.ENV_PUBLIC_URL: PUBLIC_URL}, nextcloud=TARGET)
+        )
     )
 
     response = client.get(wait_url("anything"))
@@ -910,10 +925,38 @@ def test_the_onboarding_stores_no_credential_anywhere_in_its_source() -> None:
 
 
 def test_the_factory_returns_the_three_declared_routes() -> None:
-    routes = connect.connect_routes(ENV)
+    routes = connect.connect_routes(ENV, nextcloud=TARGET)
 
     assert [getattr(route, "path", "") for route in routes] == [
         connect.CONNECT_PATH,
         connect.CONNECT_PATH,
         connect.WAIT_PATH,
     ]
+
+
+@respx.mock
+def test_the_onboarding_opens_its_flow_at_the_injected_target(store: OAuthStore) -> None:
+    """Standalone OAuth, slice 2: the environment still names BASE_URL, the routes do not."""
+    injected = "https://nc.injected.example"
+
+    async def provider() -> OAuthStore:
+        return store
+
+    client = TestClient(
+        Starlette(
+            routes=connect.connect_routes(
+                ENV, nextcloud=NextcloudTarget.from_url(injected), store_provider=provider
+            )
+        )
+    )
+    environment_init = respx.post(INIT_URL).mock(
+        return_value=httpx.Response(200, json=start_body())
+    )
+    injected_init = respx.post(f"{injected}{loginflow.INIT_PATH}").mock(
+        return_value=httpx.Response(200, json=start_body())
+    )
+
+    response = client.post(connect.CONNECT_PATH, data={connect.ACTION_FIELD: connect.ACTION_START})
+
+    assert response.status_code == 200, response.text
+    assert (injected_init.call_count, environment_init.call_count) == (1, 0)

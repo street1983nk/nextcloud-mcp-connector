@@ -24,6 +24,7 @@ from mcp.server.auth.provider import AccessToken
 from mcp.shared.auth import OAuthClientInformationFull
 
 from mcp_connector import config
+from mcp_connector.exapp.target import exapp_target
 from mcp_connector.oauth import provider as provider_module
 from mcp_connector.oauth import registry
 from mcp_connector.oauth import verifier as verifier_module
@@ -126,7 +127,10 @@ def build(
         return subject
 
     provider = provider_module.NextcloudOAuthProvider(
-        env=environment, policy=registry.client_policy(environment), store_provider=opener
+        nextcloud=exapp_target(environment),
+        env=environment,
+        policy=registry.client_policy(environment),
+        store_provider=opener,
     )
     built = verifier_module.StoreTokenVerifier(
         env=environment,
