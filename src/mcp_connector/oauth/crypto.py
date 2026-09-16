@@ -61,6 +61,7 @@ __all__ = [
     "file_key",
     "form_token",
     "form_token_valid",
+    "key_check",
 ]
 
 #: AES-256. The size is fixed here instead of being inferred from the stored value, so a
@@ -160,6 +161,22 @@ def decrypt(key: bytes, blob: bytes, *, aad: str) -> bytes:
         return AESGCM(key).decrypt(blob[:NONCE_BYTES], blob[NONCE_BYTES:], aad.encode("utf-8"))
     except InvalidTag:
         raise DecryptionRejected from None
+
+
+#: What :func:`key_check` derives. Versioned like the form label, and distinct from it, so a
+#: check value can never double as a form token or the other way round.
+_KEY_CHECK_LABEL = b"store-key-check-v1"
+
+
+def key_check(key: bytes) -> str:
+    """A value that identifies ``key`` to a store without revealing anything about it.
+
+    An HMAC over a fixed label: equal for the same key, unrelated for any other, and useless
+    for recovering the key. A store keeps it so that a wrong key is refused when the store is
+    opened, before any protected row is read (standalone OAuth, plan section 4).
+    """
+    _check_key(key)
+    return hmac.new(key, _KEY_CHECK_LABEL, hashlib.sha256).hexdigest()
 
 
 def form_token(key: bytes, handle: str, *, purpose: str, now: float | None = None) -> str:

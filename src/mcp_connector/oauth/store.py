@@ -33,6 +33,7 @@ file are a supported case, not an accident (SRV-05).
 import asyncio
 import contextlib
 import hashlib
+import hmac
 import sqlite3
 import time
 from collections.abc import Awaitable, Callable, Mapping
@@ -41,8 +42,9 @@ from pathlib import Path
 from typing import Any
 
 from .. import config
+from ..errors import ToolError
 from . import crypto
-from .crypto import decrypt, encrypt
+from .crypto import DecryptionRejected, decrypt, encrypt
 
 #: What every method below hands to the worker thread: one function, one connection, one
 #: result. Naming it keeps the three wrappers at the bottom readable and typed.
@@ -53,6 +55,8 @@ __all__ = [
     "AUTH_CODE_TTL",
     "FLOW_TTL",
     "IDLE_CLIENT_TTL",
+    "KEY_CHECK_NAME",
+    "KEY_CHECK_SAMPLES",
     "REDEEM_EXPIRED",
     "REDEEM_OK",
     "REDEEM_REUSED",
@@ -77,6 +81,7 @@ __all__ = [
     "OAuthStore",
     "RefreshRedemption",
     "RefreshTokenRow",
+    "StoreKeyMismatch",
     "StoreProvider",
     "explicit_store_opener",
     "store_opener",
@@ -93,6 +98,33 @@ type DirectoryProvider = Callable[[], Path]
 #: The data key of a deployment. Asynchronous because the ExApp reads it from Nextcloud.
 #: A provider never invents a key: a fresh key silently invalidates every stored row.
 type KeyProvider = Callable[[], Awaitable[bytes]]
+
+#: The one row of ``store_meta`` today: the :func:`crypto.key_check` of the data key.
+KEY_CHECK_NAME = "data_key_check_v1"
+
+#: How many encrypted rows a store without a check value tries before it adopts the key.
+#: One readable row proves the key; a single damaged row must not refuse a whole store.
+KEY_CHECK_SAMPLES = 20
+
+#: The table of the key check. Not part of :data:`SCHEMA` on purpose: only a deployment that
+#: asks for the check creates it, so an ExApp store keeps exactly its documented tables.
+_META_SCHEMA = "CREATE TABLE IF NOT EXISTS store_meta (name TEXT PRIMARY KEY, value TEXT NOT NULL)"
+
+_KEY_MISMATCH_HINT = (
+    "The OAuth store was written with a different data key. Restore the original key; the "
+    "connector never replaces it on its own. If the key is lost, the stored connections "
+    "cannot be read by anyone: remove the store file and let every user connect again."
+)
+
+
+class StoreKeyMismatch(ToolError):
+    """The data key of this process cannot read the store it was pointed at."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            message="The data key does not match the OAuth store.", hint=_KEY_MISMATCH_HINT
+        )
+
 
 #: What every consumer of the store receives: one opener per application.
 type StoreProvider = Callable[[], Awaitable["OAuthStore"]]
@@ -1383,6 +1415,48 @@ class OAuthStore:
 
         await self._write(work)
 
+    async def verify_data_key(self) -> None:
+        """Refuse a data key that is not the key this store was written with.
+
+        One immediate transaction, so two workers that start together cannot both record a
+        check value. A store with a recorded value compares against it. A store without one
+        (an older file, or a new one) tries up to :data:`KEY_CHECK_SAMPLES` encrypted rows:
+        if there are rows and none of them decrypts, the key is wrong; otherwise the key is
+        adopted and its check value recorded. Nothing is ever overwritten, so a wrong key
+        cannot replace the right one. Raises :class:`StoreKeyMismatch`.
+        """
+        expected = crypto.key_check(self._key)
+
+        def work(conn: sqlite3.Connection) -> bool:
+            conn.execute(_META_SCHEMA)
+            row = conn.execute(
+                "SELECT value FROM store_meta WHERE name = ?", (KEY_CHECK_NAME,)
+            ).fetchone()
+            if row is None:
+                samples = conn.execute(
+                    "SELECT auth_id, app_password_enc FROM authorizations "
+                    "UNION ALL SELECT flow_id, poll_token_enc FROM flows LIMIT ?",
+                    (KEY_CHECK_SAMPLES,),
+                ).fetchall()
+                if samples and not any(self._decrypts(blob, aad) for aad, blob in samples):
+                    return False
+                conn.execute(
+                    "INSERT INTO store_meta (name, value) VALUES (?, ?)",
+                    (KEY_CHECK_NAME, expected),
+                )
+                return True
+            return hmac.compare_digest(str(row[0]), expected)
+
+        if not await self._write(work):
+            raise StoreKeyMismatch
+
+    def _decrypts(self, blob: bytes, aad: str) -> bool:
+        try:
+            decrypt(self._key, blob, aad=aad)
+        except DecryptionRejected:
+            return False
+        return True
+
     async def wipe_all(self) -> None:
         """Empty every table of the schema in one transaction. The file stays (05-06).
 
@@ -1416,6 +1490,13 @@ class OAuthStore:
             # EXAPP-02 has no foreign key, so emptying every authorization leaves every
             # paused account paused (D-50).
             conn.execute("DELETE FROM user_access")
+            # The key check goes with the data it vouched for: the purge deletes the key
+            # next, and a check value that outlived it would refuse the fresh key of the
+            # next start. The table exists only where a deployment asked for the check.
+            if conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'store_meta'"
+            ).fetchone():
+                conn.execute("DELETE FROM store_meta")
 
         await self._write(work)
 
@@ -1501,10 +1582,16 @@ def store_opener(env: Mapping[str, str] | None = None) -> StoreProvider:
     def exapp_directory() -> Path:
         return config.persistent_storage(env)
 
-    return explicit_store_opener(directory=exapp_directory, key=exapp_key)
+    # No key check for the ExApp, deliberately: its key lives in Nextcloud and is replaced by
+    # a reinstallation that keeps the volume. Today that makes the old rows unreadable one by
+    # one while new connections work; a check would refuse the whole store instead. Changing
+    # that is a decision for the ExApp, not a side effect of the standalone preparation.
+    return explicit_store_opener(directory=exapp_directory, key=exapp_key, verify_key=False)
 
 
-def explicit_store_opener(*, directory: DirectoryProvider, key: KeyProvider) -> StoreProvider:
+def explicit_store_opener(
+    *, directory: DirectoryProvider, key: KeyProvider, verify_key: bool = True
+) -> StoreProvider:
     """One store per application, opened at its first use and swept when it opens.
 
     The store cannot be built when the routes are: the data key comes from Nextcloud over
@@ -1534,8 +1621,13 @@ def explicit_store_opener(*, directory: DirectoryProvider, key: KeyProvider) -> 
                 # The key first: it is the one step that can fail with a named error, and
                 # it fails before anything creates a directory.
                 data_key = await key()
-                ready = OAuthStore(directory() / STORE_FILENAME, data_key)
-                await ready.purge_expired()
+                candidate = OAuthStore(directory() / STORE_FILENAME, data_key)
+                if verify_key:
+                    # Before the sweep and before anything is cached: a wrong key must not
+                    # touch a protected row, and the next request asks again.
+                    await candidate.verify_data_key()
+                await candidate.purge_expired()
+                ready = candidate
                 opened["store"] = ready
             return ready
 
