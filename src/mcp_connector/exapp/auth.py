@@ -29,7 +29,6 @@ from ..errors import ToolError
 __all__ = [
     "AppApiRejected",
     "appapi_user",
-    "is_user",
     "require_appapi",
     "verify_appapi_headers",
 ]
@@ -111,17 +110,6 @@ def appapi_user(request: Request, *, env: Mapping[str, str] | None = None) -> st
         return require_appapi(request, env=env)
     except (AppApiRejected, ToolError):
         return ""
-
-
-def is_user(received: str, expected: str) -> bool:
-    """Whether these two Nextcloud user ids are the same account. Empty is never a match.
-
-    ``compare_digest`` and not ``==`` for the reason the whole module uses it: one of the
-    two values is decided by a request. An empty id fails before the comparison, so a
-    request without an identity can never pass as the account of a row that has none
-    either (fail closed, D-37).
-    """
-    return bool(received) and bool(expected) and _same(received, expected)
 
 
 def _single(headers: Mapping[str, str], name: str) -> str:

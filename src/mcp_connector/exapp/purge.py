@@ -49,6 +49,7 @@ from starlette.routing import Route
 from ..errors import ToolError
 from ..nextcloud.target import NextcloudTarget
 from ..oauth import crypto, loginflow
+from ..oauth.principal import login_name_of
 from ..oauth.store import AuthorizationRow, OAuthStore
 from .auth import AppApiRejected, require_appapi
 from .responses import NO_STORE, BodyTooLarge, BodyUnreadable, bounded_body, json_response
@@ -238,7 +239,7 @@ async def _hand_back_every(
             password = None
 
         if password and await loginflow.revoke_app_password(
-            row.nc_user, password, target=nextcloud
+            login_name_of(row), password, target=nextcloud
         ):
             revoked += 1
         else:

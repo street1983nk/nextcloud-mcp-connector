@@ -7,7 +7,8 @@ from dataclasses import dataclass
 
 from starlette.requests import Request
 
-from .auth import appapi_user, is_user
+from ..oauth.principal import same_principal
+from .auth import appapi_user
 
 __all__ = ["AppApiBrowserIdentitySource"]
 
@@ -20,4 +21,4 @@ class AppApiBrowserIdentitySource:
 
     async def identifies(self, request: Request, expected_account_id: str) -> bool:
         """Preserve the current CR-01 comparison without adding another identity path."""
-        return is_user(appapi_user(request, env=self.env), expected_account_id)
+        return same_principal(appapi_user(request, env=self.env), expected_account_id)

@@ -12,8 +12,9 @@ mechanics:
 
 * **The identity comes from HaRP and from nowhere else.** ``appapi_user`` reads the account
   out of the header AppAPI signs with ``APP_SECRET``, and a request without one arrives as
-  the empty string, which :func:`is_user` never accepts. An empty identity is E8 on both
-  verbs, before anything is read and long before anything is written (T-04-31).
+  the empty string, which the principal rule (``same_principal``) never accepts. An empty
+  identity is E8 on both verbs, before anything is read and long before anything is written
+  (T-04-31).
 * **Every state change is a POST with an anti forgery value.** The value is an HMAC under
   the data key of this installation, derived from the purpose of the form and the handle it
   is about, and it is compared in constant time. A row value is derived from the connection
@@ -49,7 +50,7 @@ from starlette.responses import Response
 from starlette.routing import Route
 
 from ..errors import ToolError
-from ..exapp.auth import appapi_user, is_user
+from ..exapp.auth import appapi_user
 from ..exapp.responses import BodyTooLarge, BodyUnreadable, bounded_body, form_or_none, with_body
 from ..exapp.ui import errors
 from ..exapp.ui.connections import (
@@ -69,6 +70,7 @@ from ..exapp.ui.connections import (
     connections_page,
 )
 from .crypto import PURPOSE_DISCONNECT, PURPOSE_SWITCH
+from .principal import principal_of, same_principal
 from .store import AuthorizationRow, OAuthStore
 from .throttle import CLASS_CONNECTIONS, Throttle, Throttled
 
@@ -365,7 +367,7 @@ async def _owned(
     except Exception:
         logger.exception("a connection could not be read back")
         return _generic("the connection could not be read", env)
-    if row is None or row.revoked_at is not None or not is_user(user, row.nc_user):
+    if row is None or row.revoked_at is not None or not same_principal(user, principal_of(row)):
         return None
     return row
 

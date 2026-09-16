@@ -98,6 +98,7 @@ from ..exapp.ui.consent import (
 from ..nextcloud.target import NextcloudTarget
 from . import cimd, crypto, loginflow, registry
 from .browser_identity import BrowserIdentitySource
+from .principal import login_name_of, principal_of, sign_in_principal
 from .provider import NextcloudOAuthProvider
 from .registry import redirect_uri_allowed
 from .store import FlowRow, OAuthStore
@@ -362,13 +363,13 @@ async def _screen(
         # decision: this is a GET, a reload is not a decision, and a request that changes
         # state because a browser repeated it is its own defect. The row and the app
         # password behind it end where they always did, at the decision or with the flow.
-        disabled = await _access_disabled(store, signed_in.nc_user)
+        disabled = await _access_disabled(store, principal_of(signed_in))
         if disabled is None:
             return _generic("the access switch could not be read", env)
         if disabled:
             logger.info("a consent screen was refused because the account has paused access")
             return _page(errors.error_page(errors.PAUSED, env=env))
-        return _decision(client, signed_in.nc_user, row, store, provider, env)
+        return _decision(client, login_name_of(signed_in), row, store, provider, env)
 
     if params.get(STEP_PARAM) != STEP_WAIT:
         link = _sign_in_link(params.get(LOGIN_PARAM) or "", nextcloud, env)
@@ -393,9 +394,9 @@ async def _screen(
     #
     # The price of the placement is the app password: it exists at Nextcloud from the 200 of
     # the poll, and this refusal is the reason nobody will ever use it. So it goes back, word
-    # for word like the write failure branch below and the ``is_user`` branch of
+    # for word like the write failure branch below and the identity branch of
     # ``connect._wait`` (pitfall 13, D-34).
-    disabled = await _access_disabled(store, credentials.login_name)
+    disabled = await _access_disabled(store, sign_in_principal(credentials.login_name))
     if disabled is not False:
         # ``None`` is the store that could not answer, and that is never a "no" (fail closed,
         # D-37, the same choice the transport boundary of phase 4 makes).
@@ -589,7 +590,7 @@ async def _decide(
         return _page(errors.error_page("E4", env=env))
 
     try:
-        identified = await browser_identity.identifies(request, authorization.nc_user)
+        identified = await browser_identity.identifies(request, principal_of(authorization))
     except Exception:
         # A source is a security boundary.  Its outage or malformed state is one refusal,
         # never a 500 that might tempt a caller to add a weaker fallback.
@@ -608,7 +609,7 @@ async def _decide(
     # this screen stands open, and the press of a button on a page that was rendered before
     # that must not become a grant. Read here rather than only in :func:`_screen`, because
     # between the two lies however long the person took to read.
-    disabled = await _access_disabled(store, authorization.nc_user)
+    disabled = await _access_disabled(store, principal_of(authorization))
     if disabled is None:
         return _generic("the access switch could not be read", env)
     if disabled:
@@ -625,14 +626,14 @@ async def _decide(
             # granted, so it is the second press of the button like any other late decision.
             logger.info("a paused refusal arrived for a flow another decision had already spent")
             return _page(errors.error_page("E3", env=env))
-        await _withdraw(store, row, authorization.nc_user, nextcloud)
+        await _withdraw(store, row, login_name_of(authorization), nextcloud)
         return _page(errors.error_page(errors.PAUSED, env=env))
 
     decision = str(form.get(DECISION_PARAM) or "")
     if decision == DECISION_APPROVE:
-        return await _approve(store, row, client, authorization.nc_user, env)
+        return await _approve(store, row, client, login_name_of(authorization), env)
     if decision == DECISION_DENY:
-        return await _deny(store, row, client, authorization.nc_user, nextcloud, env)
+        return await _deny(store, row, client, login_name_of(authorization), nextcloud, env)
     # Neither button. Nothing is granted and nothing is refused, so nothing changes.
     return _page(errors.error_page("E3", env=env))
 
