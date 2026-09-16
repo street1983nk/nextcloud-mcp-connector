@@ -71,16 +71,31 @@ __all__ = [
     "AuthCodeRow",
     "AuthorizationRow",
     "ClientRow",
+    "DirectoryProvider",
     "FlowRow",
+    "KeyProvider",
     "OAuthStore",
     "RefreshRedemption",
     "RefreshTokenRow",
+    "StoreProvider",
+    "explicit_store_opener",
     "store_opener",
     "token_hash",
 ]
 
 #: The one file in the persistent volume of this app.
 STORE_FILENAME = "oauth.sqlite3"
+
+#: Where a deployment keeps the store file. Called when the store is opened, not when the
+#: application is assembled, so an ExApp whose volume is mounted late still starts.
+type DirectoryProvider = Callable[[], Path]
+
+#: The data key of a deployment. Asynchronous because the ExApp reads it from Nextcloud.
+#: A provider never invents a key: a fresh key silently invalidates every stored row.
+type KeyProvider = Callable[[], Awaitable[bytes]]
+
+#: What every consumer of the store receives: one opener per application.
+type StoreProvider = Callable[[], Awaitable["OAuthStore"]]
 
 # --- lifetimes ---------------------------------------------------------------------
 # Every number of seconds this phase uses is one of the names below. A literal at a call
@@ -1471,7 +1486,25 @@ class OAuthStore:
             conn.close()
 
 
-def store_opener(env: Mapping[str, str] | None = None) -> Callable[[], Awaitable["OAuthStore"]]:
+def store_opener(env: Mapping[str, str] | None = None) -> StoreProvider:
+    """The store of an ExApp deployment: AppAPI volume and the key kept in Nextcloud.
+
+    The composition of :func:`explicit_store_opener` for this one deployment mode. The key
+    comes from :func:`crypto.data_key`, the directory from :func:`config.persistent_storage`.
+    Any other deployment passes its own two inputs to :func:`explicit_store_opener` and never
+    reaches the development fallback of :func:`config.persistent_storage`.
+    """
+
+    async def exapp_key() -> bytes:
+        return await crypto.data_key(env)
+
+    def exapp_directory() -> Path:
+        return config.persistent_storage(env)
+
+    return explicit_store_opener(directory=exapp_directory, key=exapp_key)
+
+
+def explicit_store_opener(*, directory: DirectoryProvider, key: KeyProvider) -> StoreProvider:
     """One store per application, opened at its first use and swept when it opens.
 
     The store cannot be built when the routes are: the data key comes from Nextcloud over
@@ -1500,8 +1533,8 @@ def store_opener(env: Mapping[str, str] | None = None) -> Callable[[], Awaitable
             if ready is None:
                 # The key first: it is the one step that can fail with a named error, and
                 # it fails before anything creates a directory.
-                key = await crypto.data_key(env)
-                ready = OAuthStore(config.persistent_storage(env) / STORE_FILENAME, key)
+                data_key = await key()
+                ready = OAuthStore(directory() / STORE_FILENAME, data_key)
                 await ready.purge_expired()
                 opened["store"] = ready
             return ready

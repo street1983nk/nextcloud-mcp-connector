@@ -117,7 +117,6 @@ from .store import (
     STATE_REVOKED,
     ClientRow,
     OAuthStore,
-    store_opener,
     token_hash,
 )
 from .throttle import CLASS_REGISTER, CLASS_REVOKE, CLASS_TOKEN, Throttle, Throttled
@@ -248,7 +247,7 @@ class NextcloudOAuthProvider(
         nextcloud: NextcloudTarget,
         env: Mapping[str, str] | None = None,
         policy: ClientPolicy | None = None,
-        store_provider: StoreProvider | None = None,
+        store_provider: StoreProvider,
         clock: Callable[[], float] | None = None,
         resolver: cimd.AddressLookup | None = None,
     ) -> None:
@@ -257,7 +256,7 @@ class NextcloudOAuthProvider(
         #: it hands back belongs to. Injected, never read from the environment here.
         self._nextcloud = nextcloud
         self._policy = policy if policy is not None else client_policy(env)
-        self._store = store_provider if store_provider is not None else store_opener(env)
+        self._store = store_provider
         #: The canonical audience of every token this server issues (RFC 8707). Built from
         #: the configured public URL and never from a request, like every other identity
         #: statement of this app (T-03-02).

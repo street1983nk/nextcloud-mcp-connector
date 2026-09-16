@@ -58,7 +58,7 @@ from ..exapp.ui.connect import (
 )
 from ..nextcloud.target import NextcloudTarget
 from . import loginflow
-from .store import OAuthStore, store_opener
+from .store import OAuthStore
 from .throttle import CLASS_CONNECT, CLASS_CONNECT_START, FLOW_LIMIT, Throttle, Throttled
 
 __all__ = [
@@ -103,7 +103,7 @@ def connect_routes(
     env: Mapping[str, str] | None = None,
     *,
     nextcloud: NextcloudTarget,
-    store_provider: StoreProvider | None = None,
+    store_provider: StoreProvider,
     throttle: Throttle | None = None,
 ) -> list[Route]:
     """Build the three onboarding routes against one environment and one Nextcloud.
@@ -124,12 +124,13 @@ def connect_routes(
     The store is opened once per application and not once per request, and the first open is
     also where :meth:`OAuthStore.purge_expired` runs: this project has no cron and no
     scheduler, so the sweep that removes what ran out hangs on the first use of the store
-    (T-03-17). :func:`~mcp_connector.oauth.store.store_opener` is what does that, and it is
-    called and not copied: this factory carried its own word for word twin of the double
-    checked locking until IN-02 of 05-REVIEW.md, in the one branch no test of this route
-    walked, so a change to one side would silently have missed the other.
+    (T-03-17). The deployment passes the opener in, built by
+    :func:`~mcp_connector.oauth.store.explicit_store_opener`, and this factory never builds
+    one of its own: it carried a word for word twin of the double checked locking until
+    IN-02 of 05-REVIEW.md, and a default opener here would decide the store directory and
+    the data key for a deployment that never chose them.
     """
-    store = store_provider or store_opener(env)
+    store = store_provider
 
     async def invitation(request: Request) -> Response:
         """The page that explains the way and offers the one button that starts it."""

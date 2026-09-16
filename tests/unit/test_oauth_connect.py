@@ -520,7 +520,13 @@ def test_a_deployment_without_a_provider_opens_one_store_and_sweeps_it_once(
     monkeypatch.setattr(OAuthStore, "purge_expired", counted)
     monkeypatch.setattr(store_module.crypto, "data_key", key)
     env = {**ENV, config.ENV_APP_PERSISTENT_STORAGE: str(tmp_path)}
-    client = TestClient(Starlette(routes=connect.connect_routes(env, nextcloud=TARGET)))
+    client = TestClient(
+        Starlette(
+            routes=connect.connect_routes(
+                env, nextcloud=TARGET, store_provider=store_module.store_opener(env)
+            )
+        )
+    )
 
     first = start_a_flow(client)
     second = start_a_flow(client)
@@ -530,15 +536,18 @@ def test_a_deployment_without_a_provider_opens_one_store_and_sweeps_it_once(
     assert swept[0] == str(tmp_path / store_module.STORE_FILENAME)
 
 
-def test_the_store_of_this_route_is_the_shared_opener() -> None:
+def test_the_store_of_this_route_is_the_opener_it_was_given() -> None:
     """The other half of IN-02: one implementation, not two that look alike.
 
     A second copy of the double checked locking, the key first rule and the sweep on first
     open is not a small duplication: it is a second place to fix whenever the first one
-    changes, in a branch no test of this file walks.
+    changes, in a branch no test of this file walks. Since the standalone OAuth preparation
+    the route does not even choose the opener: the deployment passes it in, so no default
+    can pick the ExApp directory and key for a deployment that never chose them.
     """
     source = Path(connect.__file__).read_text(encoding="utf-8")
-    assert "store_opener(" in source, "the opener is called here"
+    assert "store_opener(" not in source, "the deployment builds the opener, not this route"
+    assert "OAuthStore(" not in source, "and no store is constructed here either"
     # The calls, not the prose: the docstring names all three, which is the point of it.
     assert "purge_expired()" not in source, "the sweep is the opener's business"
     assert "crypto.data_key(" not in source, "and so is the key"
@@ -884,7 +893,13 @@ def test_the_default_store_is_opened_once_and_purged_at_the_first_use(
 
     monkeypatch.setattr(store_module.crypto, "data_key", fake_key)
     env = ENV | {config.ENV_APP_PERSISTENT_STORAGE: str(tmp_path)}
-    client = TestClient(Starlette(routes=connect.connect_routes(env, nextcloud=TARGET)))
+    client = TestClient(
+        Starlette(
+            routes=connect.connect_routes(
+                env, nextcloud=TARGET, store_provider=store_module.store_opener(env)
+            )
+        )
+    )
 
     first = client.get(wait_url("unknown"))
     second = client.get(wait_url("unknown"))
@@ -899,7 +914,11 @@ def test_a_store_that_cannot_be_opened_is_the_generic_page() -> None:
     """Fail closed (D-37): no deploy environment, no store, and a named page, not a 500."""
     client = TestClient(
         Starlette(
-            routes=connect.connect_routes({config.ENV_PUBLIC_URL: PUBLIC_URL}, nextcloud=TARGET)
+            routes=connect.connect_routes(
+                {config.ENV_PUBLIC_URL: PUBLIC_URL},
+                nextcloud=TARGET,
+                store_provider=store_module.store_opener({config.ENV_PUBLIC_URL: PUBLIC_URL}),
+            )
         )
     )
 
@@ -925,7 +944,9 @@ def test_the_onboarding_stores_no_credential_anywhere_in_its_source() -> None:
 
 
 def test_the_factory_returns_the_three_declared_routes() -> None:
-    routes = connect.connect_routes(ENV, nextcloud=TARGET)
+    routes = connect.connect_routes(
+        ENV, nextcloud=TARGET, store_provider=store_module.store_opener(ENV)
+    )
 
     assert [getattr(route, "path", "") for route in routes] == [
         connect.CONNECT_PATH,

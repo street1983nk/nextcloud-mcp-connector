@@ -1578,8 +1578,15 @@ async def test_every_token_path_refuses_what_this_server_never_issued(tmp_path: 
 
 def routes(**env: str) -> list[str]:
     policy = registry.client_policy(ENV | env)
+
+    async def never_opened() -> OAuthStore:
+        raise AssertionError("building the routes opens no store")
+
     subject = provider_module.NextcloudOAuthProvider(
-        nextcloud=exapp_target(ENV | env), env=ENV | env, policy=policy
+        nextcloud=exapp_target(ENV | env),
+        env=ENV | env,
+        policy=policy,
+        store_provider=never_opened,
     )
     return [route.path for route in provider_module.auth_routes(ENV | env, provider=subject)]
 

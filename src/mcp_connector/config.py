@@ -299,20 +299,28 @@ def persistent_storage(env: Mapping[str, str] | None = None) -> Path:
         )
         return fallback
 
-    if not raw:
-        raise ToolError(message=f"{ENV_APP_PERSISTENT_STORAGE} is not set.", hint=_STORAGE_HINT)
+    return storage_directory(raw, variable=ENV_APP_PERSISTENT_STORAGE, hint=_STORAGE_HINT)
 
-    path = Path(raw)
+
+def storage_directory(raw: str, *, variable: str, hint: str) -> Path:
+    """Validate a configured store directory without any fallback.
+
+    The strict half of :func:`persistent_storage`, usable by a deployment that is not an
+    ExApp: an empty value, a path that is not a directory and a directory this process
+    cannot write into are named errors. Nothing is created, and no development directory
+    is ever chosen instead, because a store that lands in the wrong place answers correctly
+    until the next restart and then has lost every authorization (pitfall 12, T-03-15).
+    ``variable`` and ``hint`` name the setting in the deployment's own words.
+    """
+    candidate = (raw or "").strip()
+    if not candidate:
+        raise ToolError(message=f"{variable} is not set.", hint=hint)
+
+    path = Path(candidate)
     if not path.is_dir():
-        raise ToolError(
-            message=f"{ENV_APP_PERSISTENT_STORAGE} does not point at a directory.",
-            hint=_STORAGE_HINT,
-        )
+        raise ToolError(message=f"{variable} does not point at a directory.", hint=hint)
     if not _probe_writable(path):
-        raise ToolError(
-            message=f"The directory in {ENV_APP_PERSISTENT_STORAGE} is not writable.",
-            hint=_STORAGE_HINT,
-        )
+        raise ToolError(message=f"The directory in {variable} is not writable.", hint=hint)
     return path
 
 
