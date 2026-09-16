@@ -190,7 +190,7 @@ def consent_routes(
         because that is where the sign in is offered in the first place, which is why the
         route stays PUBLIC in ``appinfo/info.xml``.
         """
-        return await _screen(request.query_params, provider, nextcloud, env)
+        return await _screen(request, provider, browser_identity, nextcloud, env)
 
     async def decide(request: Request) -> Response:
         """The other half: the decision, on a path of its own because it grants something.
@@ -316,12 +316,14 @@ def _no_client_page(
 
 
 async def _screen(
-    params: QueryParams,
+    request: Request,
     provider: NextcloudOAuthProvider,
+    browser_identity: BrowserIdentitySource,
     nextcloud: NextcloudTarget,
     env: Mapping[str, str] | None,
 ) -> Response:
     """One of the four states of the consent surface, in the order they can happen."""
+    params = request.query_params
     flow_id = params.get(FLOW_PARAM) or ""
     if not flow_id:
         return _page(errors.error_page("E3", env=env))
@@ -369,7 +371,17 @@ async def _screen(
         if disabled:
             logger.info("a consent screen was refused because the account has paused access")
             return _page(errors.error_page(errors.PAUSED, env=env))
-        return _decision(client, login_name_of(signed_in), row, store, provider, env)
+        return await _decision_or_step(
+            request,
+            browser_identity,
+            principal_of(signed_in),
+            client,
+            login_name_of(signed_in),
+            row,
+            store,
+            provider,
+            env,
+        )
 
     if params.get(STEP_PARAM) != STEP_WAIT:
         link = _sign_in_link(params.get(LOGIN_PARAM) or "", nextcloud, env)
@@ -441,7 +453,43 @@ async def _screen(
         )
         return _generic("the finished sign in could not be written to the store", env)
 
-    return _decision(client, credentials.login_name, row, store, provider, env)
+    return await _decision_or_step(
+        request,
+        browser_identity,
+        account,
+        client,
+        credentials.login_name,
+        row,
+        store,
+        provider,
+        env,
+    )
+
+
+async def _decision_or_step(
+    request: Request,
+    browser_identity: BrowserIdentitySource,
+    principal: str,
+    client: OAuthClientInformationFull,
+    user: str,
+    row: FlowRow,
+    store: OAuthStore,
+    provider: NextcloudOAuthProvider,
+    env: Mapping[str, str] | None,
+) -> Response:
+    """The decision screen, or the identity step the deployment asks for first.
+
+    A display decision only: :func:`_decide` asks the source again and refuses without its
+    proof. A source that fails here shows the generic page rather than the buttons.
+    """
+    try:
+        step = await browser_identity.pending_step(
+            request, flow_id=row.flow_id, expected_account_id=principal
+        )
+    except Exception:
+        return _generic("the browser identity source could not prepare the consent screen", env)
+    confirm = None if step is None else (step.action_path, dict(step.fields))
+    return _decision(client, user, row, store, provider, env, confirm_identity=confirm)
 
 
 def _decision(
@@ -451,6 +499,8 @@ def _decision(
     store: OAuthStore,
     provider: NextcloudOAuthProvider,
     env: Mapping[str, str] | None,
+    *,
+    confirm_identity: tuple[str, Mapping[str, str]] | None = None,
 ) -> Response:
     """The consent screen, with the three things about this client the reader has to know.
 
@@ -485,6 +535,7 @@ def _decision(
         unverified=not provider.policy.listed(client.client_id, addresses),
         client_host=_identifier_host(client.client_id),
         loopback_only=_loopback_only(addresses),
+        confirm_identity=confirm_identity,
         env=env,
     )
 
@@ -607,7 +658,9 @@ async def _decide(
         return _page(errors.error_page("E4", env=env))
 
     try:
-        identified = await browser_identity.identifies(request, principal_of(authorization))
+        identified = await browser_identity.identifies(
+            request, principal_of(authorization), flow_id=row.flow_id
+        )
     except Exception:
         # A source is a security boundary.  Its outage or malformed state is one refusal,
         # never a 500 that might tempt a caller to add a weaker fallback.

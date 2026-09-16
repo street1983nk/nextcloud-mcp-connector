@@ -76,6 +76,8 @@ __all__ = [
     "CONNECT_WAIT_BODY",
     "CONNECT_WAIT_TITLE",
     "CONSENT_APPROVE",
+    "CONSENT_CONFIRM_ACTION",
+    "CONSENT_CONFIRM_BODY",
     "CONSENT_DENY",
     "CONSENT_DETAIL_APP_NAME",
     "CONSENT_DETAIL_CLIENT_HOST",
@@ -122,6 +124,9 @@ __all__ = [
     "ERROR_TIMEOUT_BODY",
     "ERROR_TIMEOUT_TITLE",
     "FOOTER_PASSWORD_PROMPT",
+    "IDENTITY_HANDOFF_ACTION",
+    "IDENTITY_HANDOFF_BODY",
+    "IDENTITY_HANDOFF_TITLE",
     "RESULT_CONNECTED_BODY",
     "RESULT_CONNECTED_TITLE",
     "RESULT_DENIED_BODY",
@@ -313,6 +318,14 @@ CONSENT_GRANT_REVOKE = "Access ends when you revoke it in Nextcloud settings."
 
 CONSENT_APPROVE = "Approve access"
 
+#: A standalone deployment asks the browser to confirm its account at the organization's
+#: single sign-on before it offers the decision (CR-01 without AppAPI).
+CONSENT_CONFIRM_BODY = (
+    "Before you decide, confirm with your organization's single sign-on that this is you."
+)
+
+CONSENT_CONFIRM_ACTION = "Continue with single sign-on"
+
 CONSENT_DENY = "Deny access"
 
 CONSENT_FOOTER = (
@@ -339,6 +352,16 @@ RESULT_DENIED_BODY = "{client} did not get access. Nothing was shared. You can c
 RESULT_RETURN_BODY = "Taking you back to {client}. If nothing happens, use the button below."
 
 RESULT_RETURN_ACTION = "Continue to {client}"
+
+#: The page that hands a browser to the single sign-on. A navigation and not a redirect, for
+#: the reason :data:`RESULT_RETURN_BODY` gives: the start is a form submission.
+IDENTITY_HANDOFF_TITLE = "Continue to single sign-on"
+
+IDENTITY_HANDOFF_BODY = (
+    "Taking you to your organization's sign-in. If nothing happens, use the button below."
+)
+
+IDENTITY_HANDOFF_ACTION = "Continue to sign-in"
 
 # --- Empty state -------------------------------------------------------------------------
 

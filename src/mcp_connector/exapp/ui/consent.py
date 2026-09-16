@@ -191,9 +191,15 @@ def consent_page(
     unverified: bool,
     client_host: str | None = None,
     loopback_only: bool = False,
+    confirm_identity: tuple[str, Mapping[str, str]] | None = None,
     env: Mapping[str, str] | None = None,
 ) -> Response:
     """S3: everything a person needs to decide, and the two buttons that decide it.
+
+    ``confirm_identity`` is the step a standalone deployment asks for first: the path and
+    hidden fields of the form that starts the single sign-on. While it is set, the page shows
+    that one button instead of the two decision buttons; the decision route refuses without
+    the proof either way.
 
     The details are a definition list and the return address is never shortened: a redirect
     target cut off in the middle hides exactly the part an attacker would have changed
@@ -265,6 +271,34 @@ def consent_page(
                     strings.CONSENT_GRANT_REVOKE,
                 ]
             ),
+        ]
+    )
+    if confirm_identity is not None:
+        action_path, fields = confirm_identity
+        blocks.extend(
+            [
+                layout.paragraph(strings.CONSENT_CONFIRM_BODY),
+                layout.form(
+                    action_path,
+                    [
+                        layout.button_primary(
+                            strings.CONSENT_CONFIRM_ACTION, name="step", value="confirm"
+                        )
+                    ],
+                    hidden=fields,
+                    env=env,
+                ),
+            ]
+        )
+        return layout.page(
+            strings.CONSENT_TITLE.format(client=name),
+            blocks,
+            env=env,
+            footer=strings.CONSENT_FOOTER.format(host=_host(env)),
+            focus_heading=True,
+        )
+    blocks.extend(
+        [
             layout.form(
                 DECIDE_PATH,
                 [

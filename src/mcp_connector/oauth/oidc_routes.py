@@ -46,7 +46,7 @@ from ..exapp.responses import (
     form_or_none,
     with_body,
 )
-from ..exapp.ui import errors, layout
+from ..exapp.ui import errors, layout, strings
 from ..exapp.ui.consent import CONFIRM_PARAM, CONSENT_PATH, FLOW_PARAM
 from . import crypto, oidc
 from .principal import same_principal
@@ -66,6 +66,7 @@ __all__ = [
     "OIDC_START_PATH",
     "PROOF_COOKIE",
     "SIGN_IN_COOKIE",
+    "browser_cookie",
     "oidc_routes",
 ]
 
@@ -150,7 +151,7 @@ async def _start(
     client: oidc.OidcClient,
     env: Mapping[str, str] | None,
 ) -> Response:
-    """Remember one sign in for this flow and send the browser to the provider."""
+    """Remember one sign in for this flow and hand the browser to the provider."""
     try:
         raw = await bounded_body(request, MAX_START_BODY_BYTES)
     except (BodyTooLarge, BodyUnreadable):
@@ -178,7 +179,7 @@ async def _start(
 
     # A browser that already holds a sign in handle keeps it, so the per browser cap of the
     # store counts its open sign ins. A missing or malformed one is replaced.
-    handle = _cookie(request, SIGN_IN_COOKIE) or _new_handle()
+    handle = browser_cookie(request, SIGN_IN_COOKIE) or _new_handle()
     state = _new_handle()
     nonce = _new_handle()
     verifier = oidc.new_code_verifier()
@@ -202,7 +203,17 @@ async def _start(
         target = await client.authorization_url(state=state, nonce=nonce, code_verifier=verifier)
     except Exception:
         return _generic("the identity provider address could not be built", env)
-    response = RedirectResponse(target, status_code=303, headers=_REDIRECT_HEADERS)
+    # A page that navigates, not a redirect: the start is a form submission, and browsers
+    # check ``form-action 'self'`` against the target of a redirect that follows one (CR-03).
+    response = layout.page(
+        strings.IDENTITY_HANDOFF_TITLE,
+        [
+            layout.paragraph(strings.IDENTITY_HANDOFF_BODY),
+            layout.return_action(strings.IDENTITY_HANDOFF_ACTION, target),
+        ],
+        env=env,
+        refresh_to=target,
+    )
     _set_cookie(response, SIGN_IN_COOKIE, handle)
     return response
 
@@ -229,7 +240,7 @@ async def _callback(
     try:
         # Consumed first, whatever follows: from here on this state is spent.
         transaction = await store.redeem_oidc_transaction(
-            state=state, browser_handle=_cookie(request, SIGN_IN_COOKIE) or ""
+            state=state, browser_handle=browser_cookie(request, SIGN_IN_COOKIE) or ""
         )
     except Exception:
         logger.error("an OIDC sign in could not be read back")
@@ -338,7 +349,7 @@ def _single(params: QueryParams, name: str) -> str | None:
     return values[0]
 
 
-def _cookie(request: Request, name: str) -> str | None:
+def browser_cookie(request: Request, name: str) -> str | None:
     """The one well-formed value of a cookie, or ``None``.
 
     Read from the raw headers, because the parsed mapping silently keeps one of several

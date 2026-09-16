@@ -10,11 +10,25 @@ their trust anchor: AppAPI in :mod:`mcp_connector.exapp.browser_identity`, and t
 standalone OIDC implementation in its own adapter.
 """
 
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from starlette.requests import Request
 
-__all__ = ["BrowserIdentitySource"]
+__all__ = ["BrowserIdentitySource", "IdentityStep"]
+
+
+@dataclass(frozen=True, slots=True)
+class IdentityStep:
+    """A step this browser has to take before the consent screen offers a decision.
+
+    ``action_path`` is a route of this application the step posts to, ``fields`` are the
+    hidden values of that form. A source that needs no step (AppAPI) never returns one.
+    """
+
+    action_path: str
+    fields: Mapping[str, str] = field(default_factory=dict)
 
 
 class BrowserIdentitySource(Protocol):
@@ -26,6 +40,21 @@ class BrowserIdentitySource(Protocol):
     a local header verification.
     """
 
-    async def identifies(self, request: Request, expected_account_id: str) -> bool:
-        """Return whether the trusted source identifies the browser as the account."""
+    async def identifies(
+        self, request: Request, expected_account_id: str, *, flow_id: str | None = None
+    ) -> bool:
+        """Return whether the trusted source identifies the browser as the account.
+
+        ``flow_id`` names the authorization request the decision belongs to. A source that
+        binds its proof to one request refuses when it is missing.
+        """
+        ...
+
+    async def pending_step(
+        self, request: Request, *, flow_id: str, expected_account_id: str
+    ) -> IdentityStep | None:
+        """The step the consent screen offers instead of the decision, or ``None``.
+
+        Display only: the decision itself still asks :meth:`identifies`.
+        """
         ...

@@ -1041,12 +1041,19 @@ class StubBrowserIdentitySource:
         self.expected: str | None = None
         self.path: str | None = None
 
-    async def identifies(self, request: Request, expected_account_id: str) -> bool:
+    async def identifies(
+        self, request: Request, expected_account_id: str, *, flow_id: str | None = None
+    ) -> bool:
         self.expected = expected_account_id
         self.path = request.url.path
         if self.fail:
             raise RuntimeError("synthetic identity-source failure")
         return self.answer
+
+    async def pending_step(
+        self, request: Request, *, flow_id: str, expected_account_id: str
+    ) -> None:
+        return None
 
 
 def rows(store: OAuthStore, table: str) -> list[tuple[Any, ...]]:

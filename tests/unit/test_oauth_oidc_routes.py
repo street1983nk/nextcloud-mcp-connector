@@ -10,8 +10,10 @@ handle after success.
 import asyncio
 import base64
 import hashlib
+import html
 import json
 import logging
+import re
 import sqlite3
 import time
 from collections.abc import Coroutine, Iterator
@@ -222,6 +224,16 @@ def cookie_value(response: Any, name: str) -> str:
     return set_cookies(response)[name].split(";", 1)[0].split("=", 1)[1]
 
 
+def handoff_target(response: Any) -> str:
+    """The provider address of the handoff page: its refresh target, equal to its link."""
+    refresh = re.search(r'http-equiv="refresh" content="0; url=([^"]+)"', response.text)
+    link = re.search(r'<a class="btn-link" href="([^"]+)" rel="noreferrer">', response.text)
+    assert refresh is not None
+    assert link is not None
+    assert refresh.group(1) == link.group(1)
+    return html.unescape(refresh.group(1))
+
+
 def start(
     client: TestClient,
     subject: OAuthStore,
@@ -238,8 +250,8 @@ def start(
         headers=headers,
     )
     client.cookies.clear()
-    if idp is not None and response.status_code == 303:
-        query = parse_qs(urlsplit(response.headers["location"]).query)
+    if idp is not None and response.status_code == 200:
+        query = parse_qs(urlsplit(handoff_target(response)).query)
         idp.state = {
             "state": query["state"][0],
             "nonce": query["nonce"][0],
@@ -288,12 +300,14 @@ def proofs(subject: OAuthStore) -> list[tuple[str, str, str]]:
 # --- start ------------------------------------------------------------------------------
 
 
-def test_a_start_sends_the_browser_to_the_provider(store: OAuthStore, idp: Idp) -> None:
+def test_a_start_hands_the_browser_to_the_provider(store: OAuthStore, idp: Idp) -> None:
     with_flow(store)
     response = start(browser(application(store)), store, idp)
 
-    assert response.status_code == 303
-    target = urlsplit(response.headers["location"])
+    assert response.status_code == 200
+    assert "location" not in response.headers
+    assert "form-action 'self';" in response.headers["content-security-policy"]
+    target = urlsplit(handoff_target(response))
     assert f"{target.scheme}://{target.netloc}{target.path}" == AUTHORIZE_URL
     query = parse_qs(target.query)
     assert query["response_type"] == ["code"]
@@ -420,7 +434,7 @@ def test_a_browser_keeps_its_handle_and_its_cap(store: OAuthStore, idp: Idp) -> 
     handle = cookie_value(first, SIGN_IN)
     for _ in range(2):
         again = start(client, store, cookie=f"{SIGN_IN}={handle}")
-        assert again.status_code == 303
+        assert again.status_code == 200
         assert cookie_value(again, SIGN_IN) == handle
     capped = start(client, store, cookie=f"{SIGN_IN}={handle}")
     assert capped.status_code == 400
@@ -435,7 +449,7 @@ def test_a_browser_keeps_its_handle_and_its_cap(store: OAuthStore, idp: Idp) -> 
 def test_an_unusable_handle_is_replaced(store: OAuthStore, idp: Idp, cookie: str) -> None:
     with_flow(store)
     response = start(browser(application(store)), store, cookie=cookie)
-    assert response.status_code == 303
+    assert response.status_code == 200
     handle = cookie_value(response, SIGN_IN)
     assert handle not in (("a" * 43), ("b" * 43), "short")
     assert len(handle) == 43
@@ -488,7 +502,8 @@ def test_a_start_just_under_the_limit_still_works(store: OAuthStore, idp: Idp) -
     used = len(f"flow={FLOW_ID}&confirm={confirm(store)}&padding=")
     fields["padding"] = "x" * (oidc_routes.MAX_START_BODY_BYTES - used - 64)
     response = client.post(START, data=fields)
-    assert response.status_code == 303
+    assert response.status_code == 200
+    assert SIGN_IN in set_cookies(response)
 
 
 def test_an_exapp_store_cannot_start_a_sign_in(tmp_path: Path, idp: Idp) -> None:

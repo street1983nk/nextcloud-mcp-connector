@@ -1039,8 +1039,15 @@ def test_a_failing_identity_source_hands_nothing_over_and_takes_the_password_bac
     """The onboarding asks the injected source like the consent decision does (CR-01)."""
 
     class Broken:
-        async def identifies(self, request: object, expected_account_id: str) -> bool:
+        async def identifies(
+            self, request: object, expected_account_id: str, *, flow_id: str | None = None
+        ) -> bool:
             raise RuntimeError("identity backend down")
+
+        async def pending_step(
+            self, request: object, *, flow_id: str, expected_account_id: str
+        ) -> None:
+            return None
 
     async def provider() -> OAuthStore:
         return store
