@@ -27,6 +27,7 @@ import stat
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import uvicorn
 from mcp.server.transport_security import TransportSecuritySettings
@@ -44,7 +45,7 @@ from .nextcloud.http import configure_logging
 from .nextcloud.target import NextcloudTarget
 from .oauth import crypto, oidc, throttle
 from .oauth.consent import consent_routes
-from .oauth.metadata import metadata_routes
+from .oauth.metadata import OPENID_CONFIGURATION_SUFFIX, metadata_routes
 from .oauth.oidc_identity import OidcBrowserIdentitySource
 from .oauth.oidc_routes import OIDC_CALLBACK_PATH, oidc_routes
 from .oauth.provider import NextcloudOAuthProvider, auth_routes
@@ -229,8 +230,22 @@ def build_oauth_app(
         )
 
     app.router.routes.append(Route("/health", _health, methods=["GET"]))
+    discovery = metadata_routes(
+        env, dcr_enabled=policy.dcr_enabled, cimd_enabled=policy.cimd_enabled
+    )
+    if not urlsplit(resolved.public_url).path.strip("/"):
+        # On its own host the RFC 8414 path is reachable at the domain root, so the OpenID
+        # Connect variant is not needed to find the document. Served anyway, it tells clients
+        # that this is an OpenID provider, which it is not (no ID token, no userinfo), and
+        # ChatGPT then turns on its OIDC mode for the connector. Under a path prefix it stays,
+        # because there it is the variant a client finds without help.
+        discovery = [
+            route
+            for route in discovery
+            if not (isinstance(route, Route) and route.path == OPENID_CONFIGURATION_SUFFIX)
+        ]
     for route in (
-        *metadata_routes(env, dcr_enabled=policy.dcr_enabled, cimd_enabled=policy.cimd_enabled),
+        *discovery,
         *auth_routes(env, provider=provider, throttle=counters),
         *consent_routes(
             env,

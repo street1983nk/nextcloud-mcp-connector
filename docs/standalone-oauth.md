@@ -122,6 +122,12 @@ headers. The rate limiter, however, reads the client address from `X-Forwarded-F
 (see the operations notes), so **the reverse proxy must be the only way to reach this
 process** and must set that header itself.
 
+Discovery: `/.well-known/oauth-protected-resource/mcp` and
+`/.well-known/oauth-authorization-server`. On a public address without a path prefix the
+OpenID Connect variant `/.well-known/openid-configuration` is not served, because this
+process is not an OpenID provider and clients such as ChatGPT would otherwise switch on
+their OIDC mode for it. Under a path prefix it stays, as in the ExApp.
+
 `GET /health` answers `{"status": "ok", "version": ...}` without authentication and is the
 probe to use.
 

@@ -411,7 +411,7 @@ def test_mcp_with_an_unknown_bearer_is_401(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     "path",
-    [PRM_SUFFIX, OPENID_CONFIGURATION_SUFFIX, AS_METADATA_SUFFIX],
+    [PRM_SUFFIX, AS_METADATA_SUFFIX],
 )
 def test_discovery_documents_are_served(tmp_path: Path, path: str) -> None:
     app, _ = make_app(tmp_path)
@@ -857,3 +857,17 @@ def test_the_redaction_is_installed_once() -> None:
     entry_oauth.redact_access_log()
     entry_oauth.redact_access_log()
     assert sum(isinstance(f, entry_oauth.RedactCallbackQuery) for f in access.filters) == 1
+
+
+def test_no_openid_configuration_on_a_host_of_its_own(tmp_path: Path) -> None:
+    """Not an OpenID provider: without a path prefix the RFC 8414 path is enough."""
+    app, _ = make_app(tmp_path)
+    with TestClient(app, base_url=PUBLIC_URL) as client:
+        assert client.get(OPENID_CONFIGURATION_SUFFIX).status_code == 404
+        assert client.get("/.well-known/oauth-authorization-server").status_code == 200
+
+
+def test_the_openid_variant_stays_under_a_path_prefix(tmp_path: Path) -> None:
+    app, _ = make_app(tmp_path, **{config.ENV_PUBLIC_URL: f"{PUBLIC_URL}/connector"})
+    paths = {getattr(route, "path", "") for route in app.router.routes}
+    assert OPENID_CONFIGURATION_SUFFIX in paths
