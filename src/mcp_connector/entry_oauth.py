@@ -252,6 +252,30 @@ async def _health(request: Request) -> JSONResponse:
     return JSONResponse({"status": "ok", "version": __version__}, headers=NO_STORE)
 
 
+class RedactCallbackQuery(logging.Filter):
+    """Drop the query string of the OIDC callback from uvicorn's access log.
+
+    uvicorn logs every request with its full path and query. The callback query carries a
+    single-use authorization code and the sign-in state, so the line keeps the path and
+    status and replaces the query with a marker. Other paths are left as they are.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3 and isinstance(args[2], str):
+            path = args[2]
+            if path.split("?", 1)[0] == OIDC_CALLBACK_PATH and "?" in path:
+                record.args = (*args[:2], f"{OIDC_CALLBACK_PATH}?[redacted]", *args[3:])
+        return True
+
+
+def redact_access_log() -> None:
+    """Install :class:`RedactCallbackQuery` on uvicorn's access logger, once."""
+    access = logging.getLogger("uvicorn.access")
+    if not any(isinstance(item, RedactCallbackQuery) for item in access.filters):
+        access.addFilter(RedactCallbackQuery())
+
+
 class BodyLimit:
     """Refuse a request body larger than ``limit`` before the route reads it.
 
@@ -332,4 +356,5 @@ def main() -> None:
     if not port_raw.isdigit() or not 0 < int(port_raw) < 65536:
         logger.error("%s must be a port number.", config.ENV_BIND_PORT)
         raise SystemExit(2)
+    redact_access_log()
     uvicorn.run(app, host=host, port=int(port_raw), proxy_headers=True, server_header=False)

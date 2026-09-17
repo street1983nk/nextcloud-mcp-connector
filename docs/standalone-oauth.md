@@ -159,6 +159,9 @@ and the secret files must be readable by it without granting anything to others.
 
 ## Operations and security notes
 
+The process's own access log never shows the query string of `/oidc/callback`; it is
+replaced with `?[redacted]`. Logs in front of it (reverse proxy, CDN) need the same rule.
+
 - **Redact the query string of `/oidc/callback` in every access log this process or its
   proxy writes.** A successful callback carries an authorization code from the identity
   provider in that query string.

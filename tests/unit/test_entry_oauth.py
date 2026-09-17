@@ -1,5 +1,6 @@
 """Unit tests for ``entry_oauth``: settings, secret file, the standalone application."""
 
+import logging
 import os
 from collections.abc import Mapping
 from pathlib import Path
@@ -819,3 +820,40 @@ def test_an_outbound_link_button_keeps_its_horizontal_padding() -> None:
     from mcp_connector.exapp.ui import layout
 
     assert ".action .btn-link," in layout.STYLESHEET
+
+
+def _access_record(path: str) -> logging.LogRecord:
+    return logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        __file__,
+        1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("127.0.0.1:1", "GET", path, "1.1", 400),
+        None,
+    )
+
+
+def test_the_access_log_never_carries_the_callback_code() -> None:
+    record = _access_record("/oidc/callback?state=abc&code=SECRET")
+    assert entry_oauth.RedactCallbackQuery().filter(record)
+    line = record.getMessage()
+    assert "SECRET" not in line
+    assert "state=" not in line
+    assert "/oidc/callback?[redacted]" in line
+
+
+@pytest.mark.parametrize(
+    "path", ["/oidc/callback", "/.well-known/oauth-authorization-server?x=1", "/oidc/callbackx?a=1"]
+)
+def test_other_access_log_lines_stay_as_they_are(path: str) -> None:
+    record = _access_record(path)
+    entry_oauth.RedactCallbackQuery().filter(record)
+    assert path in record.getMessage()
+
+
+def test_the_redaction_is_installed_once() -> None:
+    access = logging.getLogger("uvicorn.access")
+    entry_oauth.redact_access_log()
+    entry_oauth.redact_access_log()
+    assert sum(isinstance(f, entry_oauth.RedactCallbackQuery) for f in access.filters) == 1
