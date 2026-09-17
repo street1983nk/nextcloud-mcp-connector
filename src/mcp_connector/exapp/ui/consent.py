@@ -36,7 +36,7 @@ its route declarations, so a link and its route cannot drift apart.
 """
 
 from collections.abc import Mapping
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlencode
 
 from starlette.responses import Response
 
@@ -406,9 +406,8 @@ def _onwards(flow_id: str, env: Mapping[str, str] | None) -> str:
 
 
 def _host(env: Mapping[str, str] | None) -> str:
-    """The configured public host, never the Host header of the request (T-03-02)."""
-    configured = config.public_url(env)
-    return urlsplit(configured).netloc or configured
+    """Where the user signs in, from configuration, never the Host header (T-03-02)."""
+    return config.sign_in_host(env)
 
 
 #: Where "Start over" leads, which is the same path ``exapp/ui/errors.py`` uses for the

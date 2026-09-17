@@ -38,7 +38,6 @@ import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Final
-from urllib.parse import urlsplit
 
 from starlette.responses import Response
 
@@ -170,13 +169,12 @@ def error_page(
 
 
 def _host(env: Mapping[str, str] | None) -> str:
-    """The configured public host, never the Host header of the request (T-03-02).
+    """Where the user signs in, from configuration, never the Host header (T-03-02).
 
     Filled for every page instead of only for the one that names it, so a body that starts
     naming the host later cannot ship with an unfilled placeholder in it.
     """
-    configured = config.public_url(env)
-    return urlsplit(configured).netloc or configured
+    return config.sign_in_host(env)
 
 
 def new_reference() -> str:

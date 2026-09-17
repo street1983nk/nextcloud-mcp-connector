@@ -43,7 +43,6 @@ apart, and the dependency runs in one direction only.
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from urllib.parse import urlsplit
 
 from starlette.responses import Response
 
@@ -332,9 +331,8 @@ def _connected_on(created_at: int) -> str:
 
 
 def _host(env: Mapping[str, str] | None) -> str:
-    """The configured public host, never the Host header of the request (T-03-02)."""
-    configured = config.public_url(env)
-    return urlsplit(configured).netloc or configured
+    """Where the user signs in, from configuration, never the Host header (T-03-02)."""
+    return config.sign_in_host(env)
 
 
 #: Where the footer link of this page leads: the browser onboarding, for an app that cannot

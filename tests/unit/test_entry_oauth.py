@@ -11,6 +11,7 @@ from starlette.testclient import TestClient
 
 from mcp_connector import config, deps, entry_oauth
 from mcp_connector.errors import ToolError
+from mcp_connector.exapp.ui import consent as ui_consent
 from mcp_connector.oauth import oidc
 from mcp_connector.oauth.metadata import (
     AS_METADATA_SUFFIX,
@@ -765,3 +766,49 @@ def test_the_health_probe_answers_without_authentication(tmp_path: Path) -> None
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
     assert set(response.json()) == {"status", "version"}
+
+
+# --- the host the browser pages name --------------------------------------------------------
+
+
+def test_standalone_pages_name_the_nextcloud_as_the_sign_in_host() -> None:
+    env = {
+        config.ENV_AUTH_MODE: config.AUTH_MODE_OAUTH,
+        config.ENV_URL: "https://cloud.example.com/nextcloud",
+        config.ENV_PUBLIC_URL: PUBLIC_URL,
+    }
+    assert config.sign_in_host(env) == "cloud.example.com"
+
+
+def test_the_exapp_keeps_naming_its_public_host() -> None:
+    env = {
+        config.ENV_URL: "https://elsewhere.example.com",
+        config.ENV_PUBLIC_URL: "https://cloud.example.com/exapps/mcp_connector",
+    }
+    assert config.sign_in_host(env) == "cloud.example.com"
+
+
+def test_the_sign_in_and_consent_texts_name_the_nextcloud() -> None:
+    env = {
+        config.ENV_AUTH_MODE: config.AUTH_MODE_OAUTH,
+        config.ENV_URL: "https://cloud.example.com",
+        config.ENV_PUBLIC_URL: PUBLIC_URL,
+    }
+    handoff = ui_consent.handoff_page(
+        "ChatGPT", "https://cloud.example.com/login/v2/flow/abc", "flow-1", env=env
+    )
+    consent = ui_consent.consent_page(
+        "ChatGPT",
+        "client-1",
+        "https://client.example/cb",
+        "alice",
+        "flow-1",
+        "confirm",
+        unverified=True,
+        env=env,
+    )
+    for page in (handoff, consent):
+        text = bytes(page.body).decode()
+        assert "cloud.example.com" in text
+        # The header bar still names this app's own address, and nothing else does.
+        assert text.count("mcp.example.com") == 1

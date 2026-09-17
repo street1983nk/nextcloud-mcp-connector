@@ -308,6 +308,23 @@ def public_url(env: Mapping[str, str] | None = None) -> str:
     return (source.get(ENV_PUBLIC_URL) or "").strip().rstrip("/") or DEFAULT_PUBLIC_URL
 
 
+def sign_in_host(env: Mapping[str, str] | None = None) -> str:
+    """The host where a user signs in to Nextcloud, as the browser pages name it.
+
+    In the ExApp the app lives under the Nextcloud domain, so that is the public address of
+    this app. The standalone OAuth deployment runs on a host of its own, and there the pages
+    have to name the Nextcloud (``NC_MCP_URL``): the sign in, and the password prompt the
+    pages warn about, happen there and not here. Never read from a request (T-03-02).
+    """
+    source = os.environ if env is None else env
+    configured = public_url(source)
+    if oauth_configured(source):
+        nextcloud = (source.get(ENV_URL) or "").strip()
+        if nextcloud:
+            configured = nextcloud
+    return urlsplit(configured).netloc or configured
+
+
 def persistent_storage(env: Mapping[str, str] | None = None) -> Path:
     """Return the directory the OAuth store writes into, or say what is missing.
 
