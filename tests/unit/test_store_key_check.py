@@ -165,8 +165,46 @@ async def test_two_workers_with_different_keys_cannot_both_open_a_new_store(
 
     refused = [result for result in results if isinstance(result, store.StoreKeyMismatch)]
     opened = [result for result in results if isinstance(result, store.OAuthStore)]
-    assert len(refused) == 1
-    assert len(opened) == 1
+    assert len(refused) == 1, results
+    assert len(opened) == 1, results
+
+
+@pytest.mark.anyio
+async def test_two_workers_opening_a_new_store_never_see_a_lock_error(tmp_path: Path) -> None:
+    """Both switch the new file to WAL at once; SQLite does not wait there on its own.
+
+    Before the retry this failed in roughly a third of the rounds with "database is locked".
+    """
+    for index in range(30):
+        directory = tmp_path / f"round-{index}"
+        directory.mkdir(mode=0o700)
+        results = await asyncio.gather(
+            opener(directory, KEY)(), opener(directory, KEY)(), return_exceptions=True
+        )
+        assert all(isinstance(result, store.OAuthStore) for result in results), results
+
+
+def test_the_wal_switch_waits_for_a_lock_and_then_gives_up(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Busy:
+        def __init__(self, failures: int) -> None:
+            self.failures = failures
+            self.calls = 0
+
+        def execute(self, sql: str) -> None:
+            self.calls += 1
+            if self.calls <= self.failures:
+                raise sqlite3.OperationalError("database is locked")
+
+    monkeypatch.setattr(store, "_WAL_RETRY_SECONDS", 0)
+    patient = Busy(failures=3)
+    store._enable_wal(patient)  # type: ignore[arg-type]
+    assert patient.calls == 4
+
+    monkeypatch.setattr(store, "_BUSY_TIMEOUT_SECONDS", 0)
+    with pytest.raises(sqlite3.OperationalError):
+        store._enable_wal(Busy(failures=10**6))  # type: ignore[arg-type]
 
 
 @pytest.mark.anyio

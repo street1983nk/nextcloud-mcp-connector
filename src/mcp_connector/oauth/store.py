@@ -1974,13 +1974,32 @@ def _connect(path: Path, *, schema: bool = True) -> sqlite3.Connection:
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path, isolation_level=None, timeout=_BUSY_TIMEOUT_SECONDS)
-    conn.execute("PRAGMA journal_mode = WAL")
+    _enable_wal(conn)
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute(f"PRAGMA busy_timeout = {_BUSY_TIMEOUT_MS}")
     if schema:
         conn.executescript(SCHEMA)
         _add_missing_columns(conn)
     return conn
+
+
+def _enable_wal(conn: sqlite3.Connection) -> None:
+    """Switch the file to WAL, waiting for another connection that is doing the same.
+
+    SQLite does not call the busy handler for this pragma: when two processes open a new
+    file at the same moment, the second switch answers "database is locked" at once instead
+    of waiting. That made two workers starting together fail at random. The switch is
+    retried for as long as the busy timeout would have waited, then the error stands.
+    """
+    deadline = time.monotonic() + _BUSY_TIMEOUT_SECONDS
+    while True:
+        try:
+            conn.execute("PRAGMA journal_mode = WAL")
+            return
+        except sqlite3.OperationalError as exc:
+            if "locked" not in str(exc).lower() or time.monotonic() >= deadline:
+                raise
+            time.sleep(_WAL_RETRY_SECONDS)
 
 
 def _add_missing_columns(conn: sqlite3.Connection) -> None:
@@ -2053,6 +2072,9 @@ def _auth_code_row(row: tuple[Any, ...]) -> AuthCodeRow:
 #: writes two rows, short enough that a wedged process answers instead of hanging.
 _BUSY_TIMEOUT_MS = 5000
 _BUSY_TIMEOUT_SECONDS = _BUSY_TIMEOUT_MS / 1000
+
+#: Pause between two attempts to switch a new file to WAL (see :func:`_enable_wal`).
+_WAL_RETRY_SECONDS = 0.01
 
 
 def _insert_refresh_token(
