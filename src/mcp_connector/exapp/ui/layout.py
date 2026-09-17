@@ -203,6 +203,9 @@ button {
 .btn-secondary { background: #FFFFFF; color: #1F3A5F; }
 .action { margin-top: 32px; margin-bottom: 0; }
 .action a { display: inline-block; min-height: 44px; padding: 8px 0; }
+/* ``.action a`` above sets a horizontal padding of zero, and it is more specific than a
+   single class, so the button look of an outbound link needs the same specificity. */
+.action .btn-link,
 .btn-link {
   background: #1F3A5F;
   color: #FFFFFF;
@@ -210,6 +213,8 @@ button {
   font-weight: 600;
   padding: 8px 24px;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 .status { font-weight: 600; }
 :focus-visible { outline: 3px solid #1F3A5F; outline-offset: 2px; }

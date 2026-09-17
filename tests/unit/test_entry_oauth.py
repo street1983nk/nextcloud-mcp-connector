@@ -812,3 +812,10 @@ def test_the_sign_in_and_consent_texts_name_the_nextcloud() -> None:
         assert "cloud.example.com" in text
         # The header bar still names this app's own address, and nothing else does.
         assert text.count("mcp.example.com") == 1
+
+
+def test_an_outbound_link_button_keeps_its_horizontal_padding() -> None:
+    """``.action a`` resets the padding; the button look must win over it (seen live)."""
+    from mcp_connector.exapp.ui import layout
+
+    assert ".action .btn-link," in layout.STYLESHEET
