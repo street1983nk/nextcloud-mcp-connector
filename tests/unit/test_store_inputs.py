@@ -9,6 +9,7 @@ these paths may reach the development fallback or create a key.
 import inspect
 import os
 import stat
+import sys
 from pathlib import Path
 
 import pytest
@@ -330,6 +331,9 @@ def test_an_oversized_key_file_is_refused(tmp_path: Path) -> None:
 
 @posix_only
 def test_a_fifo_does_not_block_the_start(tmp_path: Path) -> None:
+    if sys.platform == "win32":
+        # Also for the type checker: ``os.mkfifo`` does not exist on Windows.
+        pytest.skip("no FIFOs on Windows")
     fifo = tmp_path / "data.key"
     os.mkfifo(fifo, 0o600)
     with pytest.raises(ToolError) as raised:

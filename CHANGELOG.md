@@ -13,6 +13,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing here is released.
 
+### Added
+
+- A standalone OAuth deployment without AppAPI: the console script `nc-mcp-oauth` serves the
+  same `/mcp` endpoint, authorization server and consent screen for a Nextcloud it reaches
+  over HTTPS. Because there is no AppAPI header naming the account behind a browser, the
+  consent decision is additionally confirmed by the organization's OIDC single sign-on that
+  Nextcloud already trusts through `user_oidc`. Configuration, secrets and operation are
+  described in `docs/standalone-oauth.md`. The ExApp is not affected.
+
+### Changed
+
+- A finished Nextcloud sign in now asks Nextcloud once more for the canonical account id
+  (OCS `cloud/user`) before the connection is stored. That call has no retry: if it fails,
+  the sign in is discarded and its app password is handed back, so a short network hiccup
+  at that moment means starting the connection again. Connections are compared and paused
+  by that account id from now on; connections stored before keep their login name.
+
+### Fixed
+
+- Accounts whose login name differs from their user id, for example with LDAP or
+  alternative login names, can now approve a connection. The consent decision compared the
+  user id AppAPI reports with the login name of the sign in, so for these accounts every
+  approval was refused. No existing connection is affected, because none could be created.
+
 ## [0.1.15] - 2026-09-17
 
 A text correction, and the reason it is its own release: the store reads the manifest

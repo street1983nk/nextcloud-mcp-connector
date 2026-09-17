@@ -104,6 +104,11 @@ by others, and needs a persistent volume: without one, every restart loses every
 authorization, and the failure looks exactly like a working installation until the first
 restart.
 
+**These permission checks run on POSIX systems only** (Linux, macOS, containers). Windows
+models a read-only flag in these bits and nothing else, so there the process does not check
+them, and the ACLs of the key file, the secret file and the storage directory are the whole
+boundary. Restrict them to the account that runs the connector.
+
 ## Running
 
 The console script is `nc-mcp-oauth`. It validates the configuration, checks the data key,

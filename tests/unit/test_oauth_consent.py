@@ -2581,8 +2581,14 @@ def test_the_connection_stores_the_login_name_and_the_account_id(store: OAuthSto
     assert row.nc_account_id == ACCOUNT_ID
 
 
-def test_the_decision_belongs_to_the_account_id_and_not_the_login_name(store: OAuthStore) -> None:
-    """AppAPI names the browser by its account id; that is what the decision compares."""
+def test_an_account_whose_login_name_differs_from_its_uid_can_decide(store: OAuthStore) -> None:
+    """LDAP and alternative login names: the fix of #5, kept on purpose.
+
+    AppAPI names the browser by its account id (the UID), while the sign in reports the
+    login name. Comparing the two made consent a total fail-closed outage for every such
+    account. The decision compares the account id, and the login name alone is refused.
+    Do not "fix" this back to ``nc_user``.
+    """
     provider = make(store)
     register(provider)
     client, flow_id = signed_in_as_account(provider, ACCOUNT_ID)
