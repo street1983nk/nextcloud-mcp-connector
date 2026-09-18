@@ -70,6 +70,7 @@ Every variable `load_settings` and `main` read. All are required unless marked o
 | `NC_MCP_OIDC_PROVIDER_ID` | The numeric id of the `user_oidc` provider in Nextcloud, matching the mapping strategy above. |
 | `NC_MCP_OIDC_MAPPING` | The identity mapping strategy. Only `user_oidc_unique_uid_sub_v1` exists today; any other value is refused. |
 | `NC_MCP_OIDC_ALGORITHMS` | Optional, comma-separated. Signing algorithms an ID token may use. Defaults to `RS256`. Only asymmetric algorithms may be listed. |
+| `NC_MCP_TRUST_FORWARDED_FOR` | Optional. `1` when a reverse proxy sets `X-Forwarded-For` and is the only way in; the rate limiter then counts per forwarded address. Default off in this mode. |
 | `NC_MCP_BIND_HOST` | Optional. Interface `nc-mcp-oauth` binds to. Defaults to `127.0.0.1`. |
 | `NC_MCP_BIND_PORT` | Optional. Port `nc-mcp-oauth` binds to. Defaults to `8765`. |
 
@@ -118,9 +119,11 @@ message on stderr; nothing partially starts.
 It binds to `NC_MCP_BIND_HOST` (default `127.0.0.1`) and `NC_MCP_BIND_PORT` (default
 `8765`), and is meant to run behind a TLS-terminating reverse proxy, never exposed directly.
 Addresses, links and cookies are built from `NC_MCP_PUBLIC_URL`, never from forwarded
-headers. The rate limiter, however, reads the client address from `X-Forwarded-For` as sent
-(see the operations notes), so **the reverse proxy must be the only way to reach this
-process** and must set that header itself.
+headers. The rate limiter uses the address of the peer it is talking to. In this mode
+`X-Forwarded-For` is ignored unless `NC_MCP_TRUST_FORWARDED_FOR` says otherwise, because
+without a proxy in front that header is whatever the caller wrote, and one caller could
+then spend the limit of everyone else. Set `NC_MCP_TRUST_FORWARDED_FOR=1` when a reverse
+proxy sets the header itself and **is the only way to reach this process**.
 
 Discovery: `/.well-known/oauth-protected-resource/mcp` and
 `/.well-known/oauth-authorization-server`. On a public address without a path prefix the
@@ -167,6 +170,10 @@ and the secret files must be readable by it without granting anything to others.
 
 The process's own access log never shows the query string of `/oidc/callback`; it is
 replaced with `?[redacted]`. Logs in front of it (reverse proxy, CDN) need the same rule.
+
+Rate limiting counts per client address. Behind a proxy that address comes from the first
+entry of `X-Forwarded-For`, which only means something when nothing but that proxy can
+reach this process; see `NC_MCP_TRUST_FORWARDED_FOR` above.
 
 - **Redact the query string of `/oidc/callback` in every access log this process or its
   proxy writes.** A successful callback carries an authorization code from the identity

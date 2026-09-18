@@ -29,7 +29,7 @@ only; the ExApp keeps its AppAPI identity and never serves them.
 import logging
 import re
 import secrets
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from urllib.parse import urlencode
 
 from starlette.datastructures import QueryParams
@@ -38,6 +38,7 @@ from starlette.responses import RedirectResponse, Response
 from starlette.routing import Route
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from .. import config
 from ..exapp.responses import (
     NO_STORE,
     BodyTooLarge,
@@ -138,7 +139,7 @@ def oidc_routes(
             CLASS_OIDC_CALLBACK,
             machine=False,
             env=env,
-            identity=_source,
+            identity=_source_key(env),
         ),
         env,
     )
@@ -318,9 +319,18 @@ def _cheap_refusals(app: ASGIApp, env: Mapping[str, str] | None) -> ASGIApp:
     return guard
 
 
-def _source(request: Request) -> str:
-    """The per source key of the callback counter; never empty, so nothing is unthrottled."""
-    return source_of(request) or "unknown"
+def _source_key(env: Mapping[str, str] | None) -> Callable[[Request], str]:
+    """The per source key of the callback counter; never empty, so nothing is unthrottled.
+
+    Whether a forwarded address may be that key is configuration of the deployment
+    (:func:`mcp_connector.config.trust_forwarded_for`), read once when the routes are built.
+    """
+    trusted = config.trust_forwarded_for(env)
+
+    def key(request: Request) -> str:
+        return source_of(request, trust_forwarded=trusted) or "unknown"
+
+    return key
 
 
 def _usable_state(params: QueryParams) -> str | None:

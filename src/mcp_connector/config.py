@@ -80,6 +80,7 @@ ENV_OIDC_CLIENT_SECRET_FILE = "NC_MCP_OIDC_CLIENT_SECRET_FILE"  # noqa: S105 - a
 ENV_OIDC_PROVIDER_ID = "NC_MCP_OIDC_PROVIDER_ID"
 ENV_OIDC_MAPPING = "NC_MCP_OIDC_MAPPING"
 ENV_OIDC_ALGORITHMS = "NC_MCP_OIDC_ALGORITHMS"
+ENV_TRUST_FORWARDED_FOR = "NC_MCP_TRUST_FORWARDED_FOR"
 ENV_BIND_HOST = "NC_MCP_BIND_HOST"
 ENV_BIND_PORT = "NC_MCP_BIND_PORT"
 
@@ -306,6 +307,33 @@ def public_url(env: Mapping[str, str] | None = None) -> str:
     """Public base URL of this MCP server, used for the bearer discovery document."""
     source = os.environ if env is None else env
     return (source.get(ENV_PUBLIC_URL) or "").strip().rstrip("/") or DEFAULT_PUBLIC_URL
+
+
+def trust_forwarded_for(env: Mapping[str, str] | None = None) -> bool:
+    """Whether the throttle may take the client address from ``X-Forwarded-For``.
+
+    Behind HaRP the peer of every request is the proxy, so the forwarded address is the
+    only value that tells two callers apart, and the ExApp keeps reading it. A standalone
+    deployment may be reachable without a proxy in front, and then the header is whatever
+    the caller wrote: reading it would let one source spend the limit of every other. So
+    the default flips with the mode, and ``NC_MCP_TRUST_FORWARDED_FOR`` decides it for a
+    deployment that does run behind a proxy (or for an ExApp that must not).
+    """
+    source = os.environ if env is None else env
+    value = (source.get(ENV_TRUST_FORWARDED_FOR) or "").strip().lower()
+    if not value:
+        return not oauth_configured(source)
+    if value in _TRUE_VALUES:
+        return True
+    if value in _FALSE_VALUES:
+        return False
+    logger.warning(
+        "%s is %r, which is neither true nor false. The forwarded address is %s.",
+        ENV_TRUST_FORWARDED_FOR,
+        value,
+        "read" if not oauth_configured(source) else "ignored",
+    )
+    return not oauth_configured(source)
 
 
 def sign_in_host(env: Mapping[str, str] | None = None) -> str:

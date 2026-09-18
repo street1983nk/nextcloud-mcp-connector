@@ -14,6 +14,7 @@ from mcp_connector import config, deps, entry_oauth
 from mcp_connector.errors import ToolError
 from mcp_connector.exapp.ui import consent as ui_consent
 from mcp_connector.oauth import oidc
+from mcp_connector.oauth import throttle as throttle_module
 from mcp_connector.oauth.metadata import (
     AS_METADATA_SUFFIX,
     OPENID_CONFIGURATION_SUFFIX,
@@ -871,3 +872,60 @@ def test_the_openid_variant_stays_under_a_path_prefix(tmp_path: Path) -> None:
     app, _ = make_app(tmp_path, **{config.ENV_PUBLIC_URL: f"{PUBLIC_URL}/connector"})
     paths = {getattr(route, "path", "") for route in app.router.routes}
     assert OPENID_CONFIGURATION_SUFFIX in paths
+
+
+# --- the client address the throttle counts ------------------------------------------------
+
+
+def _request_with(forwarded: str | None) -> Request:
+    headers = [] if forwarded is None else [(b"x-forwarded-for", forwarded.encode())]
+    return Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "path": "/authorize",
+            "query_string": b"",
+            "headers": headers,
+            "client": ("203.0.113.9", 1234),
+        }
+    )
+
+
+def test_the_standalone_mode_ignores_a_forwarded_address_by_default() -> None:
+    env = {config.ENV_AUTH_MODE: config.AUTH_MODE_OAUTH}
+    assert config.trust_forwarded_for(env) is False
+    assert throttle_module.source_of(_request_with("198.51.100.7"), trust_forwarded=False) == (
+        "203.0.113.9"
+    )
+
+
+def test_the_exapp_keeps_reading_the_forwarded_address() -> None:
+    assert config.trust_forwarded_for({}) is True
+    assert throttle_module.source_of(_request_with("198.51.100.7")) == "198.51.100.7"
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("1", True), ("true", True), ("0", False), ("off", False), ("?", False)],
+)
+def test_the_switch_decides_in_the_standalone_mode(value: str, expected: bool) -> None:
+    env = {config.ENV_AUTH_MODE: config.AUTH_MODE_OAUTH, config.ENV_TRUST_FORWARDED_FOR: value}
+    assert config.trust_forwarded_for(env) is expected
+
+
+def test_an_exapp_can_be_told_not_to_read_the_header() -> None:
+    assert config.trust_forwarded_for({config.ENV_TRUST_FORWARDED_FOR: "0"}) is False
+
+
+def test_a_forged_address_does_not_split_the_counter_in_standalone_mode(tmp_path: Path) -> None:
+    """Every refusal counts against the same source, whatever the caller writes."""
+    app, _ = make_app(tmp_path)
+    with TestClient(app, base_url=PUBLIC_URL) as client:
+        statuses = [
+            client.get(
+                f"{OIDC_CALLBACK_PATH}?state={'x' * 43}&code=abc",
+                headers={"x-forwarded-for": f"198.51.100.{index}"},
+            ).status_code
+            for index in range(throttle_module.FAILURE_LIMIT + 1)
+        ]
+    assert statuses[-1] == 429
