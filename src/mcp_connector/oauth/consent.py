@@ -98,7 +98,7 @@ from ..exapp.ui.consent import (
 from ..nextcloud.target import NextcloudTarget
 from . import cimd, crypto, loginflow, registry
 from .browser_identity import BrowserIdentitySource
-from .principal import login_name_of, principal_of
+from .principal import display_name_of, login_name_of, principal_of
 from .provider import NextcloudOAuthProvider
 from .registry import redirect_uri_allowed
 from .store import FlowRow, OAuthStore
@@ -376,7 +376,7 @@ async def _screen(
             browser_identity,
             principal_of(signed_in),
             client,
-            login_name_of(signed_in),
+            display_name_of(signed_in),
             row,
             store,
             provider,
@@ -411,7 +411,7 @@ async def _screen(
     # The canonical account id, resolved with the fresh app password before anything is
     # stored: the principal of this connection. Without it there is no authorization, and
     # the credential goes back like on every other refusal of this branch (pitfall 13).
-    account = await loginflow.account_id(
+    account = await loginflow.account(
         credentials.login_name, credentials.app_password, target=nextcloud
     )
     if account is None:
@@ -424,7 +424,7 @@ async def _screen(
             logger.exception("the flow record of an unresolved sign in could not be removed")
         return _generic("the account of the finished sign in could not be resolved", env)
 
-    disabled = await _access_disabled(store, account)
+    disabled = await _access_disabled(store, account.account_id)
     if disabled is not False:
         # ``None`` is the store that could not answer, and that is never a "no" (fail closed,
         # D-37, the same choice the transport boundary of phase 4 makes).
@@ -439,7 +439,8 @@ async def _screen(
             flow_id,
             client_id=row.client_id,
             nc_user=credentials.login_name,
-            nc_account_id=account,
+            nc_account_id=account.account_id,
+            nc_display_name=account.display_name,
             app_password=credentials.app_password,
             scopes=row.scopes,
             resource=row.resource,
@@ -456,9 +457,11 @@ async def _screen(
     return await _decision_or_step(
         request,
         browser_identity,
-        account,
+        account.account_id,
         client,
-        credentials.login_name,
+        # The row this sign in just wrote says the same thing, and reading it back would be
+        # a query for a value this function is already holding.
+        account.display_name or credentials.login_name,
         row,
         store,
         provider,
@@ -701,7 +704,7 @@ async def _decide(
 
     decision = str(form.get(DECISION_PARAM) or "")
     if decision == DECISION_APPROVE:
-        return await _approve(store, row, client, login_name_of(authorization), env)
+        return await _approve(store, row, client, display_name_of(authorization), env)
     if decision == DECISION_DENY:
         return await _deny(store, row, client, login_name_of(authorization), nextcloud, env)
     # Neither button. Nothing is granted and nothing is refused, so nothing changes.
@@ -712,7 +715,7 @@ async def _approve(
     store: OAuthStore,
     row: FlowRow,
     client: OAuthClientInformationFull,
-    user: str,
+    shown_name: str,
     env: Mapping[str, str] | None,
 ) -> Response:
     """Turn the consent of a person into one short lived, single use authorization code.
@@ -747,7 +750,7 @@ async def _approve(
         return _page(errors.error_page("E3", env=env))
 
     if not row.redirect_uri:
-        return connected_page(_name(client), user, env=env)
+        return connected_page(_name(client), shown_name, env=env)
 
     # ``iss`` is the mix-up protection of RFC 9207: a client that talks to more than one
     # authorization server can tell from it which one answered, and refuse a response that
@@ -763,14 +766,14 @@ async def _approve(
     # those browsers refuse to follow a redirect to the client and the user is left on a
     # blank page. The page navigates instead, which no browser checks against that
     # directive, and it does so without naming a foreign origin in the policy.
-    return connected_page(_name(client), user, target=target, env=env)
+    return connected_page(_name(client), shown_name, target=target, env=env)
 
 
 async def _deny(
     store: OAuthStore,
     row: FlowRow,
     client: OAuthClientInformationFull,
-    user: str,
+    login_name: str,
     nextcloud: NextcloudTarget,
     env: Mapping[str, str] | None,
 ) -> Response:
@@ -786,12 +789,17 @@ async def _deny(
     that arrives while an approval of the same flow is underway must not take back what the
     other one just granted, and the second of the two decisions is the second press of the
     button, whichever button it was.
+
+    ``login_name`` is the login name and not a name to read: it authenticates the revocation
+    below. The approval takes the display name instead, because the only thing it does with
+    a name is print it. The two are the same string on most instances and are not on the one
+    where it matters (LDAP), so they are two parameters with two names.
     """
     if not await store.redeem_flow(row.flow_id):
         logger.info("a denial arrived for a flow another decision had already spent")
         return _page(errors.error_page("E3", env=env))
 
-    await _withdraw(store, row, user, nextcloud)
+    await _withdraw(store, row, login_name, nextcloud)
 
     if not row.redirect_uri:
         return denied_page(_name(client), env=env)
@@ -808,7 +816,7 @@ async def _deny(
 async def _withdraw(
     store: OAuthStore,
     row: FlowRow,
-    user: str,
+    login_name: str,
     nextcloud: NextcloudTarget,
 ) -> None:
     """Take back what the sign in already handed out, and forget the flow that produced it.
@@ -820,7 +828,7 @@ async def _withdraw(
     """
     password = await _app_password(store, row.flow_id)
     if password:
-        await loginflow.revoke_app_password(user, password, target=nextcloud)
+        await loginflow.revoke_app_password(login_name, password, target=nextcloud)
     await store.delete_authorization(row.flow_id)
     await store.delete_flow(row.flow_id)
 

@@ -39,12 +39,14 @@ from ..responses import NO_STORE
 from . import icons, strings
 
 __all__ = [
+    "ACCOUNT_NAME_LIMIT",
     "CLIENT_NAME_LIMIT",
     "CSP_TEMPLATE",
     "HEAD_EXTRA_PATTERN",
     "ROW_MONO",
     "ROW_MUTED",
     "STYLESHEET",
+    "account_name",
     "action",
     "app_path",
     "button_primary",
@@ -78,6 +80,11 @@ NONCE_BYTES = 16
 
 #: The rendered client name is cut here (03-UI-SPEC.md, Component Inventory).
 CLIENT_NAME_LIMIT = 80
+
+#: The rendered account name is cut at the same place, for the same reason. It is its own
+#: constant because the two values come from different places and may not follow each other
+#: by accident: a client names itself, an account is named by the Nextcloud it lives on.
+ACCOUNT_NAME_LIMIT = 80
 
 #: The only fragment a caller may add to the head of a page: the meta refresh of a waiting
 #: screen (03-UI-SPEC.md, S2). An open head parameter would be a hole in the one rule this
@@ -518,12 +525,33 @@ def client_name(raw: str) -> str:
     that is not shown as an empty gap but as the fallback wording, because a nameless app
     asking for access is itself information the user should read.
     """
+    return _readable(raw, CLIENT_NAME_LIMIT) or strings.CLIENT_NAME_FALLBACK
+
+
+def account_name(raw: str, *, fallback: str = "") -> str:
+    """Make the name of an account safe to show, before it is escaped.
+
+    The same treatment :func:`client_name` gives a client name, and for the same reason: a
+    display name is written on the Nextcloud side, so it is text this application did not
+    choose, and a page that prints it should not be shapeable by it. The difference is the
+    fallback. A client with no readable name still has to be announced as something, while
+    an account always has a second name that is true, so the caller passes the login name
+    and an unusable display name simply does not replace it.
+    """
+    return _readable(raw, ACCOUNT_NAME_LIMIT) or _readable(fallback, ACCOUNT_NAME_LIMIT)
+
+
+def _readable(raw: str, limit: int) -> str:
+    """Foreign text reduced to one printable line of at most ``limit`` characters.
+
+    Empty when nothing survives, which is the caller's signal to use whatever it has
+    instead. This is the one place the reduction happens, so two kinds of foreign name
+    cannot drift into two different ideas of what is safe to print.
+    """
     printable = "".join(character for character in (raw or "") if character.isprintable())
     collapsed = " ".join(printable.split())
-    if not collapsed:
-        return strings.CLIENT_NAME_FALLBACK
-    if len(collapsed) > CLIENT_NAME_LIMIT:
-        return collapsed[: CLIENT_NAME_LIMIT - len(_TRUNCATION_MARK)] + _TRUNCATION_MARK
+    if len(collapsed) > limit:
+        return collapsed[: limit - len(_TRUNCATION_MARK)] + _TRUNCATION_MARK
     return collapsed
 
 

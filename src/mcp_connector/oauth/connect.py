@@ -296,7 +296,7 @@ async def _wait(
     credentials = result.credentials
     # The principal of this sign in: the canonical account id behind the fresh app password.
     # Without it nothing is handed over, and the credential goes back (pitfall 13).
-    account = await loginflow.account_id(
+    account = await loginflow.account(
         credentials.login_name, credentials.app_password, target=nextcloud
     )
     if account is None:
@@ -307,7 +307,7 @@ async def _wait(
         return _generic("the account of the finished sign in could not be resolved", env)
 
     try:
-        identified = await browser_identity.identifies(request, account)
+        identified = await browser_identity.identifies(request, account.account_id)
     except Exception:
         # A source is a security boundary: its failure is a refusal, never a fallback.
         logger.error("the browser identity source could not decide the onboarding identity")
@@ -331,7 +331,7 @@ async def _wait(
     # the credential of a paused account may not be rendered, and because both refusals owe
     # the same thing: the app password exists at Nextcloud from the 200 of the poll, and this
     # refusal is the reason nobody will ever use it (pitfall 13, D-34).
-    disabled = await _access_disabled(opened, account)
+    disabled = await _access_disabled(opened, account.account_id)
     if disabled is not False:
         # ``None`` is the store that could not answer, and that is never a "no" (fail closed,
         # D-37, the same choice the transport boundary of phase 4 makes).

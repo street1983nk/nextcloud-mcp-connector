@@ -20,25 +20,46 @@ with an account id writes to the chain of that id, which is the chain AppAPI cal
 same account already use; where login name and account id differ (LDAP), the older OAuth
 entries stay readable under the login name chain and new ones follow the account id.
 
+A third name exists and is not part of the rule above: the **display name** is what the
+instance calls the account in its own interface. It is for reading only. It is never
+compared, never stored as identity, and a connection without one reads exactly as every
+connection read before the column existed, because the fallback is the login name.
+
 No call site picks a name or compares identities on its own; it asks :func:`principal_of`,
-:func:`login_name_of` and :func:`same_principal`. Before a row exists, the principal of a
-finished sign in is the resolved account id itself.
+:func:`login_name_of`, :func:`display_name_of` and :func:`same_principal`. Before a row
+exists, the principal of a finished sign in is the resolved account id itself.
 """
 
 import secrets
 from typing import Protocol
 
-__all__ = ["login_name_of", "principal_of", "same_principal"]
+__all__ = ["display_name_of", "login_name_of", "principal_of", "same_principal"]
 
 
 class Authorized(Protocol):
-    """What this rule reads from a stored connection."""
+    """What this rule reads from a stored connection to answer an identity question."""
 
     @property
     def nc_user(self) -> str: ...
 
     @property
     def nc_account_id(self) -> str | None: ...
+
+
+class Named(Protocol):
+    """What this rule reads to answer a display question, which is not every row.
+
+    Deliberately a second protocol. An access token row carries identity and no display
+    name, and widening :class:`Authorized` to demand one would either put a column on rows
+    that have no use for it or invite a ``None`` default that means "not asked" in one place
+    and "no name" in another.
+    """
+
+    @property
+    def nc_user(self) -> str: ...
+
+    @property
+    def nc_display_name(self) -> str | None: ...
 
 
 def principal_of(authorization: Authorized) -> str:
@@ -52,6 +73,17 @@ def principal_of(authorization: Authorized) -> str:
 def login_name_of(authorization: Authorized) -> str:
     """The value Basic authentication and app password revocation need for this connection."""
     return authorization.nc_user
+
+
+def display_name_of(authorization: Named) -> str:
+    """The name a page shows for this connection. Never an identity, never a comparison.
+
+    The display name the instance answered with at sign in time, or the login name when
+    there is none. The fallback is the whole compatibility story of this value: a row from
+    before the column, an instance that sets no display name and an answer that carried
+    nothing usable all read the way they always read.
+    """
+    return authorization.nc_display_name or authorization.nc_user
 
 
 def same_principal(received: str, expected: str) -> bool:

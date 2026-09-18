@@ -242,7 +242,9 @@ def consent_page(
     """
     name = layout.client_name(client_name)
     blocks = [
-        layout.paragraph(strings.CONSENT_IDENTITY.format(user=user, host=_host(env))),
+        layout.paragraph(
+            strings.CONSENT_IDENTITY.format(user=layout.account_name(user), host=_host(env))
+        ),
     ]
     if unverified:
         blocks.append(
@@ -343,7 +345,11 @@ def connected_page(
     it has to say two things: it worked, and there is nothing left to do here.
     """
     name = layout.client_name(client_name)
-    blocks = [layout.paragraph(strings.RESULT_CONNECTED_BODY.format(client=name, user=user))]
+    blocks = [
+        layout.paragraph(
+            strings.RESULT_CONNECTED_BODY.format(client=name, user=layout.account_name(user))
+        )
+    ]
     if target:
         blocks = [
             layout.paragraph(strings.RESULT_RETURN_BODY.format(client=name)),

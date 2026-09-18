@@ -1741,6 +1741,98 @@ async def test_an_older_file_grows_the_column_and_keeps_its_rows_legacy(tmp_path
 
 
 @pytest.mark.anyio
+async def test_a_display_name_is_stored_and_read_back_by_every_reader(tmp_path: Path) -> None:
+    """One column, five readers. A SELECT that forgets it shifts every field behind it."""
+    subject = open_store(tmp_path)
+    await with_client(subject)
+    await subject.create_authorization(
+        AUTH_ID,
+        client_id=CLIENT_ID,
+        nc_user="alice@example.com",
+        nc_account_id="a1b2c3",
+        nc_display_name="Alice Adams",
+        app_password=APP_PASSWORD,
+        scopes=SCOPES,
+        resource=RESOURCE,
+    )
+
+    one = await subject.load_authorization(AUTH_ID)
+    by_client = await subject.authorizations_of_client(CLIENT_ID)
+    by_user = await subject.authorizations_of_user("a1b2c3")
+
+    assert one is not None
+    for row in (one, *by_client, *by_user):
+        assert row.auth_id == AUTH_ID
+        assert row.nc_user == "alice@example.com"
+        assert row.nc_account_id == "a1b2c3"
+        assert row.nc_display_name == "Alice Adams"
+        assert row.scopes == SCOPES
+        assert row.resource == RESOURCE
+
+
+@pytest.mark.anyio
+async def test_a_connection_without_a_display_name_stores_none(tmp_path: Path) -> None:
+    """An instance that sets no display name writes NULL, not an empty string."""
+    subject = open_store(tmp_path)
+    await with_client(subject)
+    await subject.create_authorization(
+        AUTH_ID,
+        client_id=CLIENT_ID,
+        nc_user=NC_USER,
+        nc_account_id=NC_USER,
+        app_password=APP_PASSWORD,
+        scopes=SCOPES,
+        resource=RESOURCE,
+    )
+
+    row = await subject.load_authorization(AUTH_ID)
+
+    assert row is not None
+    assert row.nc_display_name is None
+
+
+@pytest.mark.anyio
+async def test_an_older_file_grows_the_display_name_column_and_keeps_its_rows(
+    tmp_path: Path,
+) -> None:
+    """A store written before nc_display_name: the row survives and shows the login name."""
+    path = tmp_path / store.STORE_FILENAME
+    conn = sqlite3.connect(path)
+    try:
+        conn.executescript(store.SCHEMA.replace("  nc_display_name TEXT,\n", ""))
+        conn.execute(
+            "INSERT INTO clients (client_id, metadata_json, registered_at) VALUES (?, ?, ?)",
+            (CLIENT_ID, "{}", 1),
+        )
+        conn.execute(
+            "INSERT INTO authorizations (auth_id, client_id, nc_user, nc_account_id, "
+            "app_password_enc, scopes, resource, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                AUTH_ID,
+                CLIENT_ID,
+                NC_USER,
+                NC_USER,
+                crypto.encrypt(KEY, b"pw", aad=AUTH_ID),
+                SCOPES,
+                RESOURCE,
+                1,
+            ),
+        )
+        conn.commit()
+        assert "nc_display_name" not in {
+            row[1] for row in conn.execute("PRAGMA table_info(authorizations)")
+        }
+    finally:
+        conn.close()
+
+    row = await open_store(tmp_path).load_authorization(AUTH_ID)
+
+    assert row is not None
+    assert row.nc_display_name is None
+    assert row.nc_account_id == NC_USER
+
+
+@pytest.mark.anyio
 async def test_the_pause_sweep_keeps_a_pause_whose_account_still_has_a_connection(
     tmp_path: Path,
 ) -> None:

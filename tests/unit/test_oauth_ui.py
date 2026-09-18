@@ -259,6 +259,28 @@ def test_an_empty_client_name_falls_back_to_a_readable_placeholder() -> None:
     assert layout.client_name("\x00\x01") == strings.CLIENT_NAME_FALLBACK
 
 
+def test_an_account_name_gets_the_same_treatment_a_client_name_gets() -> None:
+    """A display name is written on the Nextcloud side, so the page does not take it as is."""
+    assert layout.account_name("  Alice   Adams \n") == "Alice Adams"
+    assert layout.account_name("Alice\u0000Adams") == "AliceAdams"
+    long_name = "A" * 200
+    rendered = layout.account_name(long_name)
+    assert len(rendered) <= layout.ACCOUNT_NAME_LIMIT
+    assert rendered.startswith("AAAA")
+
+
+def test_an_unusable_account_name_falls_back_to_the_name_that_is_true() -> None:
+    """Unlike a client, an account always has a second name, so there is no placeholder."""
+    assert layout.account_name("   ", fallback="alice") == "alice"
+    assert layout.account_name("\x00\x01", fallback="alice") == "alice"
+    assert layout.account_name("", fallback="alice") == "alice"
+
+
+def test_an_account_name_without_a_fallback_is_allowed_to_be_empty() -> None:
+    """The caller that has nothing to fall back on gets nothing, not an invented word."""
+    assert layout.account_name("   ") == ""
+
+
 def test_a_redirect_uri_is_shown_in_full_and_wraps() -> None:
     """Truncating the return address would hide exactly the part an attacker changed."""
     document = parse(sample_page())

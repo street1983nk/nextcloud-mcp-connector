@@ -134,7 +134,9 @@ def connections_page(
     """
     blocks = [
         *_setup(env),
-        layout.paragraph(strings.CONSENT_IDENTITY.format(user=user, host=_host(env))),
+        layout.paragraph(
+            strings.CONSENT_IDENTITY.format(user=layout.account_name(user), host=_host(env))
+        ),
         *_result(result, result_client),
         *_switch(paused, switch_token, env),
     ]

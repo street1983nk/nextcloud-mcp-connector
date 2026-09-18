@@ -100,9 +100,12 @@ def poll_body() -> dict[str, str]:
 ACCOUNT_URL = f"{BASE_URL}{loginflow.ACCOUNT_PATH}"
 
 
-def account_body(account: str = LOGIN_NAME) -> dict[str, object]:
+def account_body(account: str = LOGIN_NAME, display_name: str | None = None) -> dict[str, object]:
     """The answer of OCS ``cloud/user`` for the fresh app password: the canonical id."""
-    return {"ocs": {"meta": {"status": "ok", "statuscode": 200}, "data": {"id": account}}}
+    data: dict[str, object] = {"id": account}
+    if display_name is not None:
+        data["displayname"] = display_name
+    return {"ocs": {"meta": {"status": "ok", "statuscode": 200}, "data": data}}
 
 
 @pytest.fixture
@@ -2008,7 +2011,7 @@ def test_the_page_lands_on_its_heading_and_not_on_the_granting_button(
     assert "autofocus" not in page[page.index("<button") :]
 
 
-def out_of_band(store: OAuthStore, flow_id: str) -> None:
+def out_of_band(store: OAuthStore, flow_id: str, *, display_name: str | None = None) -> None:
     """A finished sign in of a client this server cannot redirect anywhere (S4)."""
     asyncio.run(
         store.create_flow(
@@ -2029,6 +2032,7 @@ def out_of_band(store: OAuthStore, flow_id: str) -> None:
             client_id=CLIENT_ID,
             nc_user=LOGIN_NAME,
             nc_account_id=LOGIN_NAME,
+            nc_display_name=display_name,
             app_password=APP_PASSWORD,
             scopes="nextcloud",
             resource=RESOURCE,
@@ -2600,6 +2604,124 @@ def test_an_account_whose_login_name_differs_from_its_uid_can_decide(store: OAut
     assert refused.headers.get("location") is None
     assert granted.status_code == 200, granted.text
     assert asyncio.run(store.load_flow(flow_id)) is None, "the approval spent the flow"
+
+
+DISPLAY_NAME = "Alice Adams"
+
+
+def signed_in_with_a_display_name(
+    provider: provider_module.NextcloudOAuthProvider,
+) -> tuple[TestClient, str, Any]:
+    """A sign in on an instance that has a display name for the account."""
+    client, flow_id, _target = opened(provider)
+    with respx.mock:
+        respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(
+            return_value=httpx.Response(
+                200, json=account_body(ACCOUNT_ID, display_name=DISPLAY_NAME)
+            )
+        )
+        page = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
+    assert page.status_code == 200, page.text
+    return client, flow_id, page
+
+
+def test_the_sign_in_stores_the_display_name_beside_the_two_identities(
+    store: OAuthStore,
+) -> None:
+    """Three names, three jobs: one to sign in with, one to own by, one to read."""
+    provider = make(store)
+    register(provider)
+    _client, flow_id, _page = signed_in_with_a_display_name(provider)
+
+    row = asyncio.run(store.load_authorization(flow_id))
+
+    assert row is not None
+    assert row.nc_user == LOGIN_NAME
+    assert row.nc_account_id == ACCOUNT_ID
+    assert row.nc_display_name == DISPLAY_NAME
+
+
+def test_the_consent_screen_names_the_person_and_not_the_login(store: OAuthStore) -> None:
+    """What the screen is for: the reader has to recognise the account they are granting."""
+    provider = make(store)
+    register(provider)
+    client, flow_id, page = signed_in_with_a_display_name(provider)
+
+    assert strings.CONSENT_IDENTITY.format(user=DISPLAY_NAME, host=HOST) in page.text
+
+    reloaded = client.get(consent_url(flow_id))
+
+    assert reloaded.status_code == 200, reloaded.text
+    assert strings.CONSENT_IDENTITY.format(user=DISPLAY_NAME, host=HOST) in reloaded.text
+
+
+def test_the_result_page_names_the_person_too(store: OAuthStore) -> None:
+    """The page a client without a return address leaves the reader on (S4)."""
+    provider = make(store)
+    register(provider)
+    client = TestClient(application(provider))
+    out_of_band(store, "flow-named", display_name=DISPLAY_NAME)
+
+    granted = decide(client, "flow-named", ui_consent.DECISION_APPROVE, store=store)
+
+    assert granted.status_code == 200, granted.text
+    assert strings.RESULT_CONNECTED_BODY.format(client=CLIENT_NAME, user=DISPLAY_NAME) in (
+        granted.text
+    )
+
+
+def test_without_a_display_name_the_screen_still_names_the_login(store: OAuthStore) -> None:
+    """An instance that sets none reads exactly as it did before the column existed."""
+    provider = make(store)
+    register(provider)
+    _client, flow_id = signed_in_as_account(provider, ACCOUNT_ID)
+
+    row = asyncio.run(store.load_authorization(flow_id))
+
+    assert row is not None
+    assert row.nc_display_name is None
+
+    reloaded = _client.get(consent_url(flow_id))
+
+    assert strings.CONSENT_IDENTITY.format(user=LOGIN_NAME, host=HOST) in reloaded.text
+
+
+def test_a_denial_revokes_with_the_login_name_and_never_the_display_name(
+    store: OAuthStore,
+) -> None:
+    """The one place the two names must not be swapped: Basic auth against Nextcloud."""
+    provider = make(store)
+    register(provider)
+    client, flow_id, _page = signed_in_with_a_display_name(provider)
+
+    with respx.mock:
+        revoke = respx.delete(REVOKE_URL).mock(return_value=httpx.Response(200, json={}))
+        denied = decide(client, flow_id, ui_consent.DECISION_DENY, store=store, user=ACCOUNT_ID)
+
+    assert denied.status_code == 200, denied.text
+    assert revoke.call_count == 1
+    sent = revoke.calls.last.request
+    expected = base64.b64encode(f"{LOGIN_NAME}:{APP_PASSWORD}".encode()).decode()
+    assert sent.headers["Authorization"] == f"Basic {expected}"
+
+
+def test_a_hostile_display_name_cannot_shape_the_consent_screen(store: OAuthStore) -> None:
+    """The name comes from the Nextcloud side, so the page treats it like any foreign text."""
+    provider = make(store)
+    register(provider)
+    hostile = "Alice\n\n" + "A" * 300
+    client, flow_id, _target = opened(provider)
+    with respx.mock:
+        respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
+        respx.get(ACCOUNT_URL).mock(
+            return_value=httpx.Response(200, json=account_body(ACCOUNT_ID, display_name=hostile))
+        )
+        page = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
+
+    assert page.status_code == 200, page.text
+    assert hostile not in page.text
+    assert "A" * 200 not in page.text
 
 
 def test_a_pause_of_the_account_id_refuses_the_sign_in(store: OAuthStore) -> None:

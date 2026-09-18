@@ -53,10 +53,11 @@ __all__ = [
     "POLL_PATH",
     "POLL_PENDING",
     "REVOKE_TIMEOUT",
+    "Account",
     "AppCredentials",
     "FlowStart",
     "PollResult",
-    "account_id",
+    "account",
     "poll_once",
     "revoke_app_password",
     "safe_user_agent",
@@ -72,8 +73,13 @@ POLL_PATH = "/login/v2/poll"
 
 #: The OCS route that names the account a request authenticates as. Its ``id`` is the
 #: canonical Nextcloud account id, which can differ from the login name (LDAP, alternative
-#: login names).
+#: login names), and the same answer carries the display name a person recognises.
 ACCOUNT_PATH = "/ocs/v2.php/cloud/user"
+
+#: The display name in the ``cloud/user`` answer. Nextcloud has spelled it both ways over
+#: the years and still sends both on current versions, so both are read, in this order. A
+#: missing display name is not an error: the caller falls back to the login name.
+DISPLAY_NAME_KEYS = ("displayname", "display-name")
 
 #: The OCS route that deletes the app password a request authenticates with.
 APP_PASSWORD_PATH = "/ocs/v2.php/core/apppassword"  # noqa: S105 - a route, not a password
@@ -123,6 +129,20 @@ class FlowStart:
 
 
 @dataclass(frozen=True, slots=True, repr=False)
+class Account:
+    """Who a fresh app password belongs to, as one OCS answer tells it.
+
+    ``account_id`` is the canonical account id and the principal of the connection
+    (``oauth/principal.py``). ``display_name`` is what a person recognises themselves by and
+    is for reading only: it is never compared, never stored as identity and may be ``None``,
+    which is the ordinary case on an instance that does not set one.
+    """
+
+    account_id: str
+    display_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class AppCredentials:
     """The result of a completed sign in: one user, one dedicated app password."""
 
@@ -278,13 +298,19 @@ async def revoke_app_password(
     return False
 
 
-async def account_id(login_name: str, app_password: str, *, target: NextcloudTarget) -> str | None:
-    """The canonical account id behind a fresh app password, or ``None``.
+async def account(login_name: str, app_password: str, *, target: NextcloudTarget) -> Account | None:
+    """The account behind a fresh app password, or ``None``.
 
     One authenticated OCS request right after the poll. The answer decides who the
     connection belongs to (the principal rule), so anything but a clean 200 with a
     non-empty, printable ``id`` is ``None`` and the caller refuses the sign in. One attempt,
     no retry, and nothing of the exchange is logged (the rules of this module).
+
+    The same answer carries the display name, and it is taken along here because this is the
+    only request that asks for it: the consent screen renders from a stored row long after
+    this exchange, and fetching a name there would buy a second round trip on a route that
+    budgets exactly one. An absent or unusable display name is ``None`` and never a refusal;
+    identity is the id, and the id alone.
     """
     url = f"{target.base_url}{ACCOUNT_PATH}"
     client = shared_client()
@@ -310,7 +336,24 @@ async def account_id(login_name: str, app_password: str, *, target: NextcloudTar
     if found is None or not found.isprintable() or found != found.strip():
         logger.error("the account lookup at %s answered without a usable account id", url)
         return None
-    return found
+    return Account(account_id=found, display_name=_display_name(data))
+
+
+def _display_name(data: object) -> str | None:
+    """The display name of a ``cloud/user`` answer, or ``None`` when there is none to show.
+
+    Only the shape is checked here, not the content: whitespace and control characters are a
+    rendering question and are answered where the value is rendered
+    (``exapp/ui/layout.account_name``). A name that is nothing but whitespace is ``None``
+    already, because an empty line in the page would say less than the login name does.
+    """
+    if not isinstance(data, dict):
+        return None
+    for key in DISPLAY_NAME_KEYS:
+        value = _text(data.get(key))
+        if value is not None and value.strip():
+            return value
+    return None
 
 
 def _payload(response: httpx.Response, url: str) -> Any:

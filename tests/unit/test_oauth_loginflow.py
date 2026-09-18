@@ -503,8 +503,9 @@ def test_the_module_no_longer_reads_the_deploy_environment() -> None:
 ACCOUNT_URL = f"{BASE_URL}{loginflow.ACCOUNT_PATH}"
 
 
-def ocs_user(value: object) -> dict[str, object]:
-    return {"ocs": {"meta": {"status": "ok", "statuscode": 200}, "data": {"id": value}}}
+def ocs_user(value: object, **extra: object) -> dict[str, object]:
+    data: dict[str, object] = {"id": value, **extra}
+    return {"ocs": {"meta": {"status": "ok", "statuscode": 200}, "data": data}}
 
 
 @respx.mock
@@ -512,7 +513,8 @@ def ocs_user(value: object) -> dict[str, object]:
 async def test_the_account_id_is_read_with_the_fresh_app_password() -> None:
     route = respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=ocs_user("a1b2c3")))
 
-    assert await loginflow.account_id(LOGIN_NAME, APP_PASSWORD, target=TARGET) == "a1b2c3"
+    found = await loginflow.account(LOGIN_NAME, APP_PASSWORD, target=TARGET)
+    assert found == loginflow.Account(account_id="a1b2c3", display_name=None)
 
     assert route.call_count == 1
     sent = route.calls.last.request
@@ -550,7 +552,7 @@ async def test_the_account_id_is_read_with_the_fresh_app_password() -> None:
 )
 async def test_an_unusable_answer_is_no_account(response: httpx.Response) -> None:
     respx.get(ACCOUNT_URL).mock(return_value=response)
-    assert await loginflow.account_id(LOGIN_NAME, APP_PASSWORD, target=TARGET) is None
+    assert await loginflow.account(LOGIN_NAME, APP_PASSWORD, target=TARGET) is None
 
 
 @respx.mock
@@ -560,5 +562,52 @@ async def test_an_unreachable_nextcloud_is_no_account_and_logs_no_secret(
 ) -> None:
     respx.get(ACCOUNT_URL).mock(side_effect=httpx.ConnectError("down"))
     with caplog.at_level(logging.DEBUG, logger="mcp_connector"):
-        assert await loginflow.account_id(LOGIN_NAME, APP_PASSWORD, target=TARGET) is None
+        assert await loginflow.account(LOGIN_NAME, APP_PASSWORD, target=TARGET) is None
     assert APP_PASSWORD not in caplog.text
+
+
+@respx.mock
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        ({"displayname": "Alice Adams"}, "Alice Adams"),
+        ({"display-name": "Alice Adams"}, "Alice Adams"),
+        ({"displayname": "Alice Adams", "display-name": "Stale"}, "Alice Adams"),
+        ({"displayname": "", "display-name": "Alice Adams"}, "Alice Adams"),
+        ({"displayname": "   "}, None),
+        ({"displayname": 42}, None),
+        ({}, None),
+    ],
+    ids=[
+        "displayname",
+        "hyphenated",
+        "both",
+        "empty first",
+        "whitespace",
+        "number",
+        "absent",
+    ],
+)
+async def test_the_display_name_is_taken_along_or_left_out(
+    data: dict[str, object], expected: str | None
+) -> None:
+    """The display name rides on the answer that resolves the account, and never fails it."""
+    respx.get(ACCOUNT_URL).mock(return_value=httpx.Response(200, json=ocs_user("a1b2c3", **data)))
+
+    found = await loginflow.account(LOGIN_NAME, APP_PASSWORD, target=TARGET)
+
+    assert found is not None
+    assert found.account_id == "a1b2c3"
+    assert found.display_name == expected
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_display_name_does_not_rescue_an_unusable_account_id() -> None:
+    """Identity is the id. A name is never a substitute for one."""
+    respx.get(ACCOUNT_URL).mock(
+        return_value=httpx.Response(200, json=ocs_user("", displayname="Alice Adams"))
+    )
+
+    assert await loginflow.account(LOGIN_NAME, APP_PASSWORD, target=TARGET) is None

@@ -309,6 +309,10 @@ CREATE TABLE IF NOT EXISTS authorizations (
   -- connection. NULL only in rows an ExApp wrote before the column existed; for those the
   -- principal stays nc_user (oauth/principal.py).
   nc_account_id TEXT,
+  -- The display name the instance had for that account at sign in time, for reading only.
+  -- NULL when the instance has none, when the row predates the column, or when the answer
+  -- carried nothing usable; the pages fall back to nc_user then (oauth/principal.py).
+  nc_display_name TEXT,
   app_password_enc BLOB NOT NULL,
   scopes TEXT NOT NULL,
   resource TEXT NOT NULL,
@@ -442,6 +446,7 @@ class AuthorizationRow:
     revoked_at: int | None
     cleanup_at: int | None = None
     nc_account_id: str | None = None
+    nc_display_name: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -774,6 +779,7 @@ class OAuthStore:
         app_password: str,
         scopes: str,
         resource: str,
+        nc_display_name: str | None = None,
         now: int | None = None,
     ) -> None:
         """Store one connection: one user, one dedicated Nextcloud app password.
@@ -781,6 +787,10 @@ class OAuthStore:
         ``nc_account_id`` is required and may not be blank: no new connection exists without
         its canonical account id (the principal rule). Only rows written before the column
         existed lack it.
+
+        ``nc_display_name`` is optional and carries no identity. It is what the pages show
+        instead of the login name, and a connection without one reads exactly as it did
+        before the column existed.
         """
         if not nc_account_id.strip():
             raise ValueError("a new connection needs its canonical account id")
@@ -790,9 +800,19 @@ class OAuthStore:
         def work(conn: sqlite3.Connection) -> None:
             conn.execute(
                 "INSERT INTO authorizations (auth_id, client_id, nc_user, nc_account_id, "
-                "app_password_enc, scopes, resource, created_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (auth_id, client_id, nc_user, nc_account_id, blob, scopes, resource, moment),
+                "nc_display_name, app_password_enc, scopes, resource, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    auth_id,
+                    client_id,
+                    nc_user,
+                    nc_account_id,
+                    nc_display_name,
+                    blob,
+                    scopes,
+                    resource,
+                    moment,
+                ),
             )
 
         await self._write(work)
@@ -801,7 +821,7 @@ class OAuthStore:
         def work(conn: sqlite3.Connection) -> AuthorizationRow | None:
             row = conn.execute(
                 "SELECT auth_id, client_id, nc_user, scopes, resource, created_at, revoked_at, "
-                "cleanup_at, nc_account_id FROM authorizations WHERE auth_id = ?",
+                "cleanup_at, nc_account_id, nc_display_name FROM authorizations WHERE auth_id = ?",
                 (auth_id,),
             ).fetchone()
             return None if row is None else _authorization_row(row)
@@ -909,7 +929,8 @@ class OAuthStore:
         def work(conn: sqlite3.Connection) -> list[AuthorizationRow]:
             rows = conn.execute(
                 "SELECT auth_id, client_id, nc_user, scopes, resource, created_at, "
-                "revoked_at, cleanup_at, nc_account_id FROM authorizations WHERE client_id = ? "
+                "revoked_at, cleanup_at, nc_account_id, nc_display_name FROM authorizations "
+                "WHERE client_id = ? "
                 "ORDER BY created_at LIMIT ?",
                 (client_id, capped),
             ).fetchall()
@@ -938,7 +959,7 @@ class OAuthStore:
         def work(conn: sqlite3.Connection) -> list[AuthorizationRow]:
             rows = conn.execute(
                 "SELECT auth_id, client_id, nc_user, scopes, resource, created_at, "
-                "revoked_at, cleanup_at, nc_account_id FROM authorizations "
+                "revoked_at, cleanup_at, nc_account_id, nc_display_name FROM authorizations "
                 "WHERE COALESCE(nc_account_id, nc_user) = ? "
                 "AND revoked_at IS NULL ORDER BY created_at DESC",
                 (nc_user,),
@@ -973,7 +994,7 @@ class OAuthStore:
         def work(conn: sqlite3.Connection) -> list[AuthorizationRow]:
             rows = conn.execute(
                 "SELECT auth_id, client_id, nc_user, scopes, resource, created_at, "
-                "revoked_at, cleanup_at, nc_account_id FROM authorizations "
+                "revoked_at, cleanup_at, nc_account_id, nc_display_name FROM authorizations "
                 "ORDER BY created_at LIMIT ?",
                 (_NO_LIMIT,),
             ).fetchall()
@@ -1104,7 +1125,8 @@ class OAuthStore:
         def work(conn: sqlite3.Connection) -> list[AuthorizationRow]:
             rows = conn.execute(
                 "SELECT a.auth_id, a.client_id, a.nc_user, a.scopes, a.resource, a.created_at, "
-                "a.revoked_at, a.cleanup_at, a.nc_account_id FROM authorizations AS a "
+                "a.revoked_at, a.cleanup_at, a.nc_account_id, a.nc_display_name "
+                "FROM authorizations AS a "
                 "LEFT JOIN flows AS f ON f.flow_id = a.auth_id "
                 "WHERE a.revoked_at IS NULL AND f.flow_id IS NULL AND a.created_at < ? "
                 "AND NOT EXISTS (SELECT 1 FROM auth_codes AS c WHERE c.auth_id = a.auth_id) "
@@ -2028,6 +2050,11 @@ def _add_missing_columns(conn: sqlite3.Connection) -> None:
     columns = {row[1] for row in conn.execute("PRAGMA table_info(authorizations)")}
     if "cleanup_at" not in columns:
         conn.execute("ALTER TABLE authorizations ADD COLUMN cleanup_at INTEGER")
+    if "nc_display_name" not in columns:
+        # Nullable, no default and no backfill, for the same reason nc_account_id has none:
+        # the value belongs to a sign in that already happened, and inventing one would put
+        # a name on a page that nothing ever answered with.
+        conn.execute("ALTER TABLE authorizations ADD COLUMN nc_display_name TEXT")
     if "nc_account_id" not in columns:
         # Nullable, no default and no backfill: an older row keeps meaning what it meant, a
         # connection whose principal is its login name (oauth/principal.py).
@@ -2042,7 +2069,10 @@ def _add_missing_columns(conn: sqlite3.Connection) -> None:
 def _authorization_row(row: tuple[Any, ...]) -> AuthorizationRow:
     """One shape for the three places that read a connection, in the column order they
     all select. The third reader arrived with the connections page of phase 4, and a third
-    hand written copy of eight fields is how two of them end up meaning different things."""
+    hand written copy of eight fields is how two of them end up meaning different things.
+
+    Every caller selects through this one mapper, so a column added to the shape is added to
+    every reader's SELECT in the same change or the positions stop meaning what they say."""
     return AuthorizationRow(
         auth_id=row[0],
         client_id=row[1],
@@ -2053,6 +2083,7 @@ def _authorization_row(row: tuple[Any, ...]) -> AuthorizationRow:
         revoked_at=row[6],
         cleanup_at=row[7],
         nc_account_id=row[8],
+        nc_display_name=row[9],
     )
 
 

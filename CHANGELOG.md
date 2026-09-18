@@ -15,6 +15,14 @@ Nothing here is released.
 
 ### Added
 
+- The consent screen and the result page name the account by its Nextcloud display name
+  instead of its login name, when the instance has one. The display name is read from the
+  same `cloud/user` answer that already resolves the account id, so it costs no extra
+  request, and it is stored beside the connection because those pages render long after
+  that answer. It is a label only: nothing is compared, owned or revoked by it. An instance
+  without a display name, and every connection made before this version, reads exactly as
+  before.
+
 - A standalone OAuth deployment without AppAPI: the console script `nc-mcp-oauth` serves the
   same `/mcp` endpoint, authorization server and consent screen for a Nextcloud it reaches
   over HTTPS. Because there is no AppAPI header naming the account behind a browser, the

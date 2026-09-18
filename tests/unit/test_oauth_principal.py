@@ -53,6 +53,31 @@ def test_a_row_with_an_account_id_is_owned_by_that_id() -> None:
     assert principal.login_name_of(row) == "alice@example.com"
 
 
+def test_a_row_without_a_display_name_reads_as_it_always_did() -> None:
+    """The fallback is the whole compatibility story: legacy rows, and instances with none."""
+    assert ROW.nc_display_name is None
+    assert principal.display_name_of(ROW) == "alice"
+
+
+def test_a_display_name_is_shown_and_still_owns_nothing() -> None:
+    """The name a person reads is not the name anything is compared against."""
+    row = dataclasses.replace(
+        ROW,
+        nc_user="alice@example.com",
+        nc_account_id="a1b2c3",
+        nc_display_name="Alice Adams",
+    )
+    assert principal.display_name_of(row) == "Alice Adams"
+    assert principal.principal_of(row) == "a1b2c3"
+    assert principal.login_name_of(row) == "alice@example.com"
+
+
+def test_an_empty_display_name_is_not_a_name() -> None:
+    """A column that holds an empty string says nothing, so it says the login name."""
+    row = dataclasses.replace(ROW, nc_display_name="")
+    assert principal.display_name_of(row) == "alice"
+
+
 def test_the_comparison_is_constant_time() -> None:
     source = Path(principal.__file__).read_text(encoding="utf-8")
     assert "compare_digest" in source
@@ -80,6 +105,12 @@ def code_of(relative: str) -> str:
 @pytest.mark.parametrize("relative", RULED)
 def test_no_ruled_file_reads_the_stored_name_directly(relative: str) -> None:
     assert ".nc_user" not in code_of(relative)
+
+
+@pytest.mark.parametrize("relative", RULED)
+def test_no_ruled_file_reads_the_stored_display_name_directly(relative: str) -> None:
+    """The fallback lives in one function. A second copy of it is a second answer."""
+    assert ".nc_display_name" not in code_of(relative)
 
 
 @pytest.mark.parametrize("relative", RULED)
