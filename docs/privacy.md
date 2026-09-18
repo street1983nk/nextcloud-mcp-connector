@@ -35,6 +35,7 @@ once before. Together the two hold these personal data:
 | Data | Where | Form |
 |------|-------|------|
 | Nextcloud user id | `authorizations.nc_user`, `authorizations.nc_account_id`, `user_access.nc_user` | plain; `nc_user` is the login name the request runs as, `nc_account_id` the canonical account id that decides ownership and the pause switch |
+| Nextcloud display name | `authorizations.nc_display_name` | plain; the name the instance had for the account when the connection was made, usually the person's own name. It is shown on the consent screen so the account is recognisable, and nothing is compared, owned or revoked by it. Empty when the instance sets no display name, and for connections made before this column existed |
 | Nextcloud app password | `authorizations.app_password_enc` | encrypted at rest, AES-GCM with a fresh nonce per record, bound to its authorization id as additional authenticated data |
 | OAuth authorization codes, refresh and access tokens | `auth_codes`, `refresh_tokens`, `access_tokens` | stored only as a hash, never in the clear |
 | Client registrations | `clients` | the assistant apps and their redirect targets; the secret issued to a client is stored as a hash only, never in the clear |
