@@ -11,6 +11,8 @@ shared by everybody.
 hits from inside documents (scans included) with the rights of the signed in user; the
 answer's `note` says what was matched. Proof:
 [tests/integration/test_content_hit_fidelity.py](../tests/integration/test_content_hit_fidelity.py).
+Together they are the retrieval layer for your own RAG: you bring the model, and no
+content leaves your server.
 
 
 Everything below was executed against **n8n 2.37.10**

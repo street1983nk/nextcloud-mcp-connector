@@ -5,6 +5,16 @@ Review with /gsd:review-backlog before planning a new phase.
 
 ## BL-01: Findling synergy, a prominent banner on both sides (after the 1.0.0 release)
 
+**STATUS 2026-09-23: DONE.** Banner in allen drei READMEs seit `aed6bdd` (PR #3, 0.1.12),
+kompakte Fassung Owner-abgenommen 11.09. (`74167b5`), mit Fidelity-Beweis statt der
+Versionszeile des Entwurfs. Store-Satz seit `7ae2249`; mit diesem Quick-Fix in schlichter
+Sprache ohne das Akronym (BL-01-Audience-Split), gehalten von einem Gate in
+`tests/unit/test_exapp_env_setup.py`, reist mit dem nächsten Release. n8n-Guide trägt
+Content-Hits-Absatz plus Retrieval-Schicht-Satz. Die Resources-Sektion aus diesem Eintrag
+existiert seit dem Faktenlisten-Umbau nicht mehr, der Link sitzt im Satz. Außerhalb dieses
+Repos: die Spiegelung auf der Findling-Seite (deren BL-F01) und eine docs-site, die es in
+diesem Repo nicht gibt. Tote-Link-Falle gegenstandslos, Findling 1.2.0 ist im Store.
+
 **Trigger:** Findling is released to the app store as 1.0.0. Note that there is no
 separate v1.0: owner decisions D-08 and D-11 bundle full text, OCR and semantic
 search into one store first release. That is deliberately the right moment for this
