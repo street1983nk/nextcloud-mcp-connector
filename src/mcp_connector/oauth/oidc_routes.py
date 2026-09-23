@@ -49,7 +49,7 @@ from ..exapp.responses import (
 )
 from ..exapp.ui import errors, layout, strings
 from ..exapp.ui.consent import CONFIRM_PARAM, CONSENT_PATH, FLOW_PARAM
-from . import crypto, oidc
+from . import crypto, exchange_enroll, oidc
 from .principal import same_principal
 from .provider import NextcloudOAuthProvider
 from .store import OIDC_TTL, OAuthStore
@@ -274,10 +274,12 @@ async def _callback(
         logger.error("the authorization of an OIDC sign in could not be read")
         return _refused(env)
     expected = ""
+    flow_client = ""
     if authorization is not None and authorization.revoked_at is None:
         # The canonical account id and nothing else: a legacy row without one has no
         # standalone identity (no fallback to the login name).
         expected = authorization.nc_account_id or ""
+        flow_client = authorization.client_id
     if not same_principal(account, expected):
         logger.warning("an OIDC sign in named another account than the Nextcloud sign in")
         return _refused(env)
@@ -294,11 +296,26 @@ async def _callback(
         return _refused(env)
 
     query = urlencode({FLOW_PARAM: transaction.flow_id})
-    target = f"{layout.app_path(CONSENT_PATH, env)}?{query}"
+    target = f"{_return_path(flow_client, env)}?{query}"
     response = RedirectResponse(target, status_code=303, headers=_REDIRECT_HEADERS)
     _set_cookie(response, PROOF_COOKIE, proof)
     response.delete_cookie(SIGN_IN_COOKIE, path="/", secure=True, httponly=True, samesite="lax")
     return response
+
+
+def _return_path(client_id: str, env: Mapping[str, str] | None) -> str:
+    """Where a finished callback sends the browser: the page of its own transaction.
+
+    There is a choice here at all because the independent sign in is a mechanism and not a
+    consent page. The enrollment of the exchange path (plan 23-05) confirms on its own
+    page, and its authorization rides under the reserved holding client, so that client is
+    what tells the two transactions apart. A hard wired consent target would send every
+    second user of this mechanism to a page on which their transaction does not exist.
+    Only the target of a success is picked here; every refusal stays what it was.
+    """
+    if client_id == exchange_enroll.EXCHANGE_PENDING_CLIENT_ID:
+        return layout.app_path(exchange_enroll.ENROLL_PATH, env)
+    return layout.app_path(CONSENT_PATH, env)
 
 
 def _cheap_refusals(app: ASGIApp, env: Mapping[str, str] | None) -> ASGIApp:

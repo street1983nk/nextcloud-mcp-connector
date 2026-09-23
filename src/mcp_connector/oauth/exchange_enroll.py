@@ -44,6 +44,7 @@ __all__ = [
     "ENROLL_BOUND",
     "ENROLL_EXPIRED",
     "ENROLL_FAILED",
+    "ENROLL_PATH",
     "ENROLL_PAUSED",
     "ENROLL_PENDING",
     "ENROLL_SIGNED_IN",
@@ -75,6 +76,11 @@ _BINDING_CLIENT_METADATA = '{"client_name":"Token exchange bindings (CRED-02), n
 #: The name Nextcloud shows in the grant dialog and under "Devices and sessions" for the
 #: app password of a binding. ``loginflow`` puts its fixed prefix in front.
 ENROLLMENT_CLIENT_NAME = "token exchange binding"
+
+#: The path of the enrollment page. The page itself is plan 23-06, but the OIDC callback
+#: sends a confirmed enrollment browser back here today, so the constant lives with the
+#: mechanics and 23-06 reuses it: two pages must not hold two truths about one path.
+ENROLL_PATH = "/exchange"
 
 #: The named outcomes of the three steps. Strings and not an enum, for the reason
 #: ``loginflow.py`` gives: the unknown case has to stay reachable in a test.
