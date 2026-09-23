@@ -270,11 +270,11 @@ _.create_auth_code
 # the task that calls it, exactly as the entry announced it would.
 
 # --- The binding read of plan 23-04 ------------------------------------------------------
-# binding_of: the one living authorization of an account under a reserved client. Task 1 of
-# plan 23-04 parks it here, because the read was written and tested before its caller
-# existed. Task 2 of the same plan adds oauth/exchange_binding.py, whose account source
-# reads the binding through it, so the name leaves the list with the task that calls it.
-_.binding_of
+# Empty on purpose, and that is the rule of this file at work rather than an omission. Task 1
+# of plan 23-04 parked binding_of here, because the read was written and tested before its
+# caller existed. Task 2 of the same plan added oauth/exchange_binding.py, whose account
+# source reads the binding through it, so the name left the list with the task that calls
+# it, exactly as the entry announced it would.
 
 # --- The exchange checker, wired in by the chain of plan 22-02 ---------------------------
 # _decode_payload: the one method of _PreparsedJWT in oauth/exchange.py. PyJWT documents it
