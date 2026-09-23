@@ -269,6 +269,13 @@ _.create_auth_code
 # branch of ChainedVerifier.resolve_identity, which calls it, so the name left the list with
 # the task that calls it, exactly as the entry announced it would.
 
+# --- The binding read of plan 23-04 ------------------------------------------------------
+# binding_of: the one living authorization of an account under a reserved client. Task 1 of
+# plan 23-04 parks it here, because the read was written and tested before its caller
+# existed. Task 2 of the same plan adds oauth/exchange_binding.py, whose account source
+# reads the binding through it, so the name leaves the list with the task that calls it.
+_.binding_of
+
 # --- The exchange checker, wired in by the chain of plan 22-02 ---------------------------
 # _decode_payload: the one method of _PreparsedJWT in oauth/exchange.py. PyJWT documents it
 # as the hook a subclass overrides to decode a payload differently, and PyJWT.decode is what

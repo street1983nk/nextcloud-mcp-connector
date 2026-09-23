@@ -968,6 +968,33 @@ class OAuthStore:
 
         return await self._read(work)
 
+    async def binding_of(self, principal: str, client_id: str) -> AuthorizationRow | None:
+        """The one living authorization of this account under exactly this client, or None.
+
+        Answers "has this account a living authorization under this reserved client", never
+        "which connections has this account". The client identifier is a parameter, not a
+        constant of this module: the store knows nothing of the exchange path, and a second
+        reserved client (the browser sign in today, something else tomorrow) needs no line
+        here. ``LIMIT 1`` on the youngest row is honest: the writing side (plan 23-05) excludes
+        a second living binding per account and client, and the youngest is still the right
+        answer when somebody wrote rows by hand. Empty values are ``None`` before anything is
+        read, for the reason :meth:`authorizations_of_user` gives: the app context owns nothing.
+        """
+        if not principal.strip() or not client_id.strip():
+            return None
+
+        def work(conn: sqlite3.Connection) -> AuthorizationRow | None:
+            row = conn.execute(
+                "SELECT auth_id, client_id, nc_user, scopes, resource, created_at, "
+                "revoked_at, cleanup_at, nc_account_id, nc_display_name FROM authorizations "
+                "WHERE COALESCE(nc_account_id, nc_user) = ? AND client_id = ? "
+                "AND revoked_at IS NULL ORDER BY created_at DESC LIMIT 1",
+                (principal, client_id),
+            ).fetchone()
+            return None if row is None else _authorization_row(row)
+
+        return await self._read(work)
+
     async def all_authorizations(self) -> list[AuthorizationRow]:
         """Every connection this deployment ever wrote, oldest first, unfiltered (05-06).
 
