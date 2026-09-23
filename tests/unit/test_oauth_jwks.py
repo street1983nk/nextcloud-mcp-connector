@@ -16,8 +16,12 @@ import pytest
 import respx
 from cryptography.hazmat.primitives.asymmetric import rsa
 from jwt.algorithms import RSAAlgorithm
+from starlette.requests import Request
+from starlette.responses import Response
+from starlette.testclient import TestClient
+from starlette.types import Receive, Scope, Send
 
-from mcp_connector.oauth import jwks
+from mcp_connector.oauth import jwks, throttle
 
 ORIGIN = "https://auth.example.com"
 JWKS_URL = f"{ORIGIN}/oauth/v2/keys"
@@ -533,3 +537,201 @@ async def test_forget_on_a_never_filled_key_set_does_nothing_and_raises_nothing(
 
     assert await keys.key(KID, "RS256") is not None
     assert route.call_count == 1
+
+
+# --- how many outgoing fetches a peer can order per window, measured after phase 23 (IN-05) -
+#
+# The question BL-21/IN-05 asks, and the reason it waited for this phase: how many fetches
+# at the identity provider can a holder of a valid exchange token order per window of
+# ``throttle.WINDOW`` seconds? Before phase 23 no exchange token had an identity, so every
+# call of that branch ended as a refusal, was counted in ``CLASS_EXCHANGE`` and ran into
+# ``EXCHANGE_LIMIT``. Since phase 23 a valid token is answered with 200, is not counted, and
+# pays one earlier refusal back, so the old ceiling is gone and the number had to be measured
+# again rather than reasoned about.
+
+#: How many revocation cycles one window is driven with. One past ``EXCHANGE_LIMIT`` on
+#: purpose: that is the ceiling which used to cap this lever, so a run that gets a fetch out
+#: of the thirty-first cycle is the measurement that the cap is no longer there.
+REVOCATION_CYCLES = throttle.EXCHANGE_LIMIT + 1
+
+#: How often the miss cooldown opens inside one window. Derived here and held against the
+#: measured counter below, never asserted on its own.
+COOLDOWN_STEPS = int(throttle.WINDOW // jwks.JWKS_KID_COOLDOWN_SECONDS)
+
+#: The spacing of the cycles, chosen so that the whole run fits inside a single window.
+SECONDS_PER_CYCLE = throttle.WINDOW / (REVOCATION_CYCLES + 1)
+
+#: The total this file measured on 2026-09-23 for both levers pulled alternately inside one
+#: window. Written down as a number rather than computed in the assertion, so that a run
+#: which produces a different one is red and readable instead of quietly self-consistent.
+MEASURED_FETCHES_PER_WINDOW = 36
+
+#: The account a signed revocation would come from. ``CLASS_CONNECTIONS`` is keyed by it.
+ACCOUNT = "alice"
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_each_revocation_cycle_orders_exactly_one_fetch_and_thirty_one_fit_in_a_window() -> (
+    None
+):
+    """Lever a of IN-05: a revocation plus one valid call costs exactly one outgoing fetch.
+
+    ``forget`` clears the cache and puts the stamp at minus infinity, so the call that
+    follows takes the expiry branch, and that branch never consults the miss cooldown. One
+    cycle, one fetch, and nothing in this layer slows the next one down.
+
+    ``forget`` is called directly because it is what a revocation reaches here:
+    ``chain.ChainedVerifier.invalidate`` calls ``forget_keys`` on the exchange branch, and
+    that link is measured in ``test_oauth_exchange_chain.py``, not a second time in this
+    file. What a revocation costs a peer in reality is a proved browser identity: the
+    revocation routes sit behind the consent surface and the account page, so this lever is
+    bounded by how often somebody can sign in and revoke, and by nothing in this process.
+
+    What this does not measure: the number is per process and per issuer. Two workers hold
+    two ``KeySet`` instances and therefore two of these numbers, exactly as the throttle
+    holds two of its counters.
+    """
+    route = serve()
+    clock = Clock()
+    keys = key_set(clock)
+
+    for _cycle in range(REVOCATION_CYCLES):
+        keys.forget()
+        assert await keys.key(KID, "RS256") is not None
+        clock.advance(SECONDS_PER_CYCLE)
+
+    assert clock.now - 1_000.0 < throttle.WINDOW, "the whole run has to sit inside one window"
+    assert route.call_count == REVOCATION_CYCLES, (
+        f"{REVOCATION_CYCLES} revocation cycles ordered {route.call_count} outgoing fetches, "
+        f"expected {REVOCATION_CYCLES}, one per cycle and none of them braked"
+    )
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_unknown_key_ids_alone_order_five_fetches_per_window_and_no_more() -> None:
+    """Lever b of IN-05: the miss cooldown is the only ceiling this layer puts up itself.
+
+    Measured with a hand-turned clock that jumps in cooldown-sized steps rather than
+    computed from the two constants: what is asserted is the counter of the route, and the
+    derived ``COOLDOWN_STEPS`` is only held against it.
+
+    The flood inside each step is part of the measurement and not decoration: ten further
+    invented key ids between two steps have to cost nothing at all, which is the property
+    the cooldown exists for.
+    """
+    route = serve()
+    clock = Clock()
+    keys = key_set(clock)
+    await keys.key(KID, "RS256")
+    route.reset()
+
+    for step in range(COOLDOWN_STEPS):
+        with pytest.raises(Refused):
+            await keys.key(f"invented-{step}", "RS256")
+        for inside in range(10):
+            with pytest.raises(Refused):
+                await keys.key(f"invented-{step}-{inside}", "RS256")
+        clock.advance(jwks.JWKS_KID_COOLDOWN_SECONDS)
+
+    assert COOLDOWN_STEPS == 5, "five cooldowns of sixty seconds fit into a window of three hundred"
+    assert route.call_count == COOLDOWN_STEPS, (
+        f"unknown key ids ordered {route.call_count} outgoing fetches in one window, "
+        f"expected {COOLDOWN_STEPS}: one per cooldown, whatever arrives between them"
+    )
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_both_levers_in_one_window_measure_thirty_six_outgoing_fetches() -> None:
+    """IN-05, the whole number: both levers pulled alternately inside one window.
+
+    This is the case the two measurements above cannot be added up into, and the reason the
+    number in the docstring of ``jwks.forget`` had to come from a run. The two levers touch
+    the same two fields: a revocation makes the cache stale, and an unknown key id against a
+    *stale* cache takes the expiry branch, which never looks at the miss cooldown and never
+    spends it. So the cooldown does not brake the first invented key id after a revocation
+    at all, and the one that follows it, against the refilled cache, is the only one the
+    cooldown ever sees.
+
+    Measured on 2026-09-23: thirty-one revocation cycles plus two invented key ids each,
+    spaced so the run sits inside one window of ``throttle.WINDOW`` seconds, order
+    thirty-six outgoing fetches. The two part numbers happen to add up to the same total
+    here, and that agreement is asserted below as a second reading rather than used as the
+    expectation: what fixes the number is the counter of the route.
+
+    What this does not measure: one process, one issuer, and no HTTP layer. The revocations
+    a real peer needs are browser round trips against a proved identity, and two workers
+    would hold two key sets and therefore two of this number.
+    """
+    route = serve()
+    clock = Clock()
+    keys = key_set(clock)
+
+    for cycle in range(REVOCATION_CYCLES):
+        keys.forget()
+        with pytest.raises(Refused):
+            # Against the stale cache: the expiry branch fetches and leaves the cooldown
+            # untouched, which is the interaction this case exists for.
+            await keys.key(f"invented-{cycle}", "RS256")
+        with pytest.raises(Refused):
+            # Against the cache the line above refilled: this one is the miss branch, and
+            # it is the only one of the two the cooldown can refuse.
+            await keys.key(f"invented-{cycle}-again", "RS256")
+        clock.advance(SECONDS_PER_CYCLE)
+
+    assert clock.now - 1_000.0 < throttle.WINDOW, "the whole run has to sit inside one window"
+    assert route.call_count == MEASURED_FETCHES_PER_WINDOW, (
+        f"both levers in one window ordered {route.call_count} outgoing fetches, "
+        f"expected the measured {MEASURED_FETCHES_PER_WINDOW}"
+    )
+    assert MEASURED_FETCHES_PER_WINDOW == REVOCATION_CYCLES + COOLDOWN_STEPS, (
+        f"the measured {MEASURED_FETCHES_PER_WINDOW} reads as {REVOCATION_CYCLES} expiry "
+        f"fetches plus {COOLDOWN_STEPS} miss fetches; if this ever disagrees with the "
+        "counter above, the counter is the truth and this reading is the stale one"
+    )
+
+
+async def _revocation_succeeded(scope: Scope, receive: Receive, send: Send) -> None:
+    """The answer a successful revocation writes: 200, and nothing for the counter."""
+    await Response(status_code=200)(scope, receive, send)
+
+
+def _the_signed_account(_request: Request) -> str:
+    """What HaRP signs onto the account page, in the shape ``Throttled`` asks for."""
+    return ACCOUNT
+
+
+def test_a_successful_revocation_is_not_braked_by_its_own_path_class() -> None:
+    """The side finding of IN-05, measured through the real wrapper and not read off a module.
+
+    ``CLASS_CONNECTIONS`` is what stands in front of the account page a revocation is
+    ordered from. It counts refusals and pays one back on every success, and it is keyed by
+    the signed account without the ceiling of the path class (HI-01). So a peer that keeps
+    revoking successfully never brakes itself, which is why lever a above has no ceiling
+    from the throttle either and why the number in ``jwks.forget`` has to be a measured one.
+
+    This is not a defect: a successful revocation is a wanted action, and a page that
+    refused the emergency brake of an account after ten uses would be the worse design. It
+    is written down because it is the reason the old calculation of IN-05 no longer holds.
+    """
+    counters = throttle.Throttle()
+    guarded = throttle.Throttled(
+        _revocation_succeeded,
+        counters,
+        throttle.CLASS_CONNECTIONS,
+        machine=False,
+        identity=_the_signed_account,
+    )
+    client = TestClient(guarded)
+
+    answered = [client.post("/connections").status_code for _cycle in range(REVOCATION_CYCLES)]
+
+    assert answered == [200] * REVOCATION_CYCLES, (
+        f"{REVOCATION_CYCLES} successful revocations were answered {sorted(set(answered))}, "
+        "expected [200]: this class counts refusals, so a success never fills it"
+    )
+    assert counters.retry_after(throttle.CLASS_CONNECTIONS, ACCOUNT, shared=False) == 0, (
+        "and the counter behind them is still open, which is what lets lever a run on"
+    )
