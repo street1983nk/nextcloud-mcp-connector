@@ -56,6 +56,8 @@ __all__ = [
     "AUTH_ID_CLAIM",
     "CACHE_LIMIT",
     "CLIENT_NAME_CLAIM",
+    "CREDENTIAL_APP_PASSWORD",
+    "CREDENTIAL_IMPERSONATE",
     "OAUTH_STATE_ATTR",
     "IdentitySource",
     "OAuthIdentity",
@@ -99,6 +101,16 @@ CLIENT_NAME_CLAIM = "client_name"
 #: ``deps.py`` reads. One constant, so the two sides cannot drift apart.
 OAUTH_STATE_ATTR = "oauth_identity"
 
+#: The credential way of every connection that exists today: an app password of its own,
+#: created for one connection, which is Basic authentication towards Nextcloud
+#: (``nextcloud/credentials.py``, ``MODE_BASIC``).
+CREDENTIAL_APP_PASSWORD = "app-password"  # noqa: S105 - the name of a credential way, not a password
+
+#: The credential way plan 23-03 builds: the container speaks with ``APP_SECRET`` on behalf
+#: of an account, without anything ever having been provisioned for that account. Nothing
+#: hands this value out yet; it exists so both ways are named in one place from the start.
+CREDENTIAL_IMPERSONATE = "appapi-impersonation"
+
 #: The hard ceiling of the process cache. A dictionary that grows with every token somebody
 #: presents is a denial of service with a delay, so it is emptied when it is full rather
 #: than trimmed cleverly: the entries live five seconds anyway, and a simpler rule is one
@@ -129,6 +141,13 @@ class OAuthIdentity:
     it is attacker chosen input, and the one place that quotes it is the one that writes it
     into a line or onto a page. It defaults to the empty string and never to ``None``, so a
     reader never has to distinguish "no name" from "no field".
+
+    ``credential`` says **where** the Nextcloud credential of this request comes from, and
+    never who the caller is. ``app_password`` is empty under
+    :data:`CREDENTIAL_IMPERSONATE`, because there is none; the credential layer reads this
+    field and never the emptiness of the password, because "empty" could also be a broken
+    read. It defaults to :data:`CREDENTIAL_APP_PASSWORD`, which is everything that exists
+    today, so no existing construction site changes meaning.
     """
 
     nc_user: str
@@ -138,13 +157,15 @@ class OAuthIdentity:
     principal: str
     revoked: bool = False
     client_name: str = ""
+    credential: str = CREDENTIAL_APP_PASSWORD
 
     def __repr__(self) -> str:
         return (
             f"OAuthIdentity(nc_user={self.nc_user!r}, principal={self.principal!r}, "
             f"auth_id={self.auth_id!r}, "
             f"client_id={self.client_id!r}, client_name={self.client_name!r}, "
-            f"revoked={self.revoked!r}, app_password='***')"
+            f"revoked={self.revoked!r}, credential={self.credential!r}, "
+            f"app_password='***')"
         )
 
 
