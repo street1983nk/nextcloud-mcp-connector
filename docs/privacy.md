@@ -45,6 +45,7 @@ once before. Together the two hold these personal data:
 | Name of the called tool | `audit.sqlite3`, `entries.tool` | plain, the name of the tool the assistant asked for |
 | Time of the call | `audit.sqlite3`, `entries.at` | Unix seconds, the moment the row was written |
 | The assistant app that called | `audit.sqlite3`, `entries.client_id`, `entries.client_name`, `entries.auth_id` | the registered id of the client, its registered name cleaned and cut to 80 characters, and the id of the connection it used |
+| The acting party of a delegated call | `audit.sqlite3`, `entries.actor` | for a call made with a token obtained through the token exchange path, the acting party of the identity provider's realm (the `azp` claim of that token), cleaned and cut the same way a registered client name is; empty for every other call; the word `unknown` in a row that records the log being switched or a gap being marked, because the administrator behind those cannot be determined |
 | Outcome of the call | `audit.sqlite3`, `entries.outcome`, `entries.reason` | one of `ok`, `rejected`, `failed`, and where a call was refused a fixed identifier of the reason, never the sentence of an error |
 | How long the call took | `audit.sqlite3`, `entries.duration_ms` | milliseconds |
 | Names of the parameters | `audit.sqlite3`, `entries.params` | a sorted list of parameter names as JSON, never a value |

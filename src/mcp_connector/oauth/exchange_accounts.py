@@ -28,9 +28,12 @@ __all__ = [
 #: registered client, because the acting party is a client of a foreign realm: it registered
 #: over there, not here, and a row in our client table would be a registration nobody made.
 #: The identifier stands in the identity and therefore in every audit line, so a reader can
-#: tell an exchange call from a call of a registered client without the audit chain growing
-#: a new field. Same form and same kind of reasoning as ``connect.CONNECT_CLIENT_ID``, and a
-#: different value, so the two reserved paths can never be confused.
+#: tell an exchange call from a call of a registered client at a glance. The chain grew no
+#: column for it: the acting party of such a call took the one the schema already had for
+#: who acted, ``entries.actor`` (AUDIT-07), and this identifier stays the name the identity
+#: itself is booked under. Same form and same kind of reasoning as
+#: ``connect.CONNECT_CLIENT_ID``, and a different value, so the two reserved paths can never
+#: be confused.
 EXCHANGE_CLIENT_ID: Final[str] = "urn:mcp-connector:token-exchange"
 
 #: The upper bound of the acting party on its way into an identity. The same number as
@@ -56,8 +59,9 @@ class ExchangeAccounts(Protocol):
       D-12, which keeps a chain when the account list cannot be read, because there a kept
       chain costs storage while here a passed uncertainty would cost somebody's data.
     * The checked claim set rides along so the implementation can write the acting party
-      into the identity (:func:`acting_party`); it never reads an identity out of it. The
-      principal is the first parameter and the only name an account may be found under.
+      into the ``actor`` field of the identity (:func:`acting_party`); it never reads an
+      identity out of it. The principal is the first parameter and the only name an account
+      may be found under.
     """
 
     async def identity_for(
@@ -68,11 +72,14 @@ class ExchangeAccounts(Protocol):
 def acting_party(claims: Mapping[str, Any]) -> str:
     """The ``azp`` of a checked claim set, as the value that may enter an identity.
 
-    This becomes ``client_name`` of the exchange identity: the acting party of the foreign
-    realm, next to :data:`EXCHANGE_CLIENT_ID` in every audit line. The value comes from a
-    foreign realm, so it is treated exactly like the name a client gives itself at
-    registration: carried unquoted, quoted only where it is written into a line or onto a
-    page (``audit/store.py`` cleans it again on its way into a row).
+    This becomes ``actor`` of the exchange identity and therefore the ``actor`` column of
+    every audit line of this path, next to :data:`EXCHANGE_CLIENT_ID` and never in
+    ``client_name``: no client is registered here, so a registered name would be a claim
+    nobody can look up. The value comes from a foreign realm, so it is treated exactly like
+    the name a client gives itself at registration: carried unquoted, quoted only where it
+    is written into a line or onto a page. ``audit/store.py`` cleans it again on its way
+    into a row, under its own bound ``ACTOR_LIMIT`` and under the one rule of
+    ``audit/text.py``, which is wider than the filter below.
 
     Text or the empty string, never an exception: control and format characters are
     removed (a line break could fake a log line, a right-to-left override could turn one
