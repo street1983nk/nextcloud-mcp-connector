@@ -157,7 +157,10 @@ async def test_a_bound_account_becomes_the_identity_of_its_authorization(tmp_pat
     assert identity.app_password == BOUND_PASSWORD
     assert identity.auth_id == "binding-1"
     assert identity.client_id == EXCHANGE_CLIENT_ID
-    assert identity.client_name == AZP
+    assert identity.actor == AZP
+    assert identity.client_name == "", (
+        "no client is registered here, so there is no registered name to carry"
+    )
     assert identity.credential == CREDENTIAL_APP_PASSWORD
     assert identity.revoked is False
 
@@ -172,7 +175,7 @@ async def test_the_acting_party_is_read_from_the_claims_and_may_be_empty(tmp_pat
     identity = await source.identity_for(MAPPED, {"sub": MAPPED})
 
     assert identity is not None
-    assert identity.client_name == ""
+    assert identity.actor == ""
 
 
 # --- every other state is one silent refusal, and none of them writes ----------------------

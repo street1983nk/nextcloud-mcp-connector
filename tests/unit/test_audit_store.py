@@ -351,6 +351,96 @@ async def test_params_are_a_sorted_list_of_names_and_no_column_holds_a_value(
     assert A_VALUE not in " ".join(str(column) for column in row)
 
 
+async def test_an_acting_party_is_cleaned_on_the_same_rule_as_a_client_name(
+    tmp_path: Path,
+) -> None:
+    """T-24-01: ``actor`` carries a value of a foreign realm and goes through one rule.
+
+    The same hostile text in both columns has to come out the same way. A column that keeps
+    its own idea of what is printable is how R-18-06 happened once already.
+    """
+    subject = open_store(tmp_path)
+    hostile = "kc\nclient‮" + "x" * 200
+    await subject.append(
+        store.Entry(
+            chain=ALICE,
+            tool="files_read",
+            nc_user="alice",
+            actor=hostile,
+            client_name=hostile,
+            outcome=store.OUTCOME_OK,
+            at=1000,
+        )
+    )
+
+    (row,) = rows(tmp_path)
+    actor, client_name = row[4], row[9]
+    assert "\n" not in actor
+    assert "‮" not in actor
+    assert len(actor) <= store.ACTOR_LIMIT
+    assert actor == client_name[: store.ACTOR_LIMIT], "one rule, applied twice, not two rules"
+
+
+async def test_the_canonical_field_list_is_the_seventeen_of_phase_eighteen(
+    tmp_path: Path,
+) -> None:
+    """Pitfall 1 of phase 24: the acting party took a column that was already there.
+
+    ``CANONICAL_FIELDS`` is the order a row is hashed in. An eighteenth entry would put one
+    more ``null`` into the JSON list of every row written before it, so every line of every
+    existing installation would answer ``modified`` at the next check.
+    """
+    assert store.CANONICAL_FIELDS == (
+        "seq",
+        "chain",
+        "kind",
+        "at",
+        "actor",
+        "nc_user",
+        "tool",
+        "client_id",
+        "auth_id",
+        "client_name",
+        "outcome",
+        "reason",
+        "duration_ms",
+        "params",
+        "removed",
+        "gap_chain",
+        "gap_hash",
+    )
+
+
+async def test_rows_written_through_one_store_verify_through_a_second_one(
+    tmp_path: Path,
+) -> None:
+    """A file that already has rows stays checkable: the chain was not re-shaped.
+
+    Written through one store object and checked through another one over the same file, so
+    the digest is recomputed from what is on disk and never from anything the writer kept in
+    memory. This is the measurement behind "an existing chain stays verifiable".
+    """
+    writer = open_store(tmp_path)
+    await write_calls(writer, ALICE, [1000, 1001])
+    await writer.append(
+        store.Entry(
+            chain=ALICE,
+            tool="files_read",
+            nc_user="alice",
+            actor="kc-client-of-another-realm",
+            client_id="urn:mcp-connector:token-exchange",
+            outcome=store.OUTCOME_OK,
+            params=["path"],
+            at=1002,
+        )
+    )
+
+    reader = open_store(tmp_path)
+
+    assert await reader.verify_chains() == []
+    assert len(rows(tmp_path)) == 3
+
+
 # --- what the check finds, and what it does not ---------------------------------------
 # Three answers, not one: changed, missing, and explained. A check that only shouts "broken"
 # fails success criterion 3 of the roadmap even when it is technically right.

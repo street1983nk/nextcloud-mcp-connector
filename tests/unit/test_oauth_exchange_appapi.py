@@ -112,7 +112,10 @@ async def test_a_known_principal_becomes_the_impersonation_identity() -> None:
     assert identity.app_password == ""
     assert identity.auth_id == ""
     assert identity.client_id == exchange_accounts.EXCHANGE_CLIENT_ID
-    assert identity.client_name == exchange_accounts.acting_party(CLAIMS)
+    assert identity.actor == exchange_accounts.acting_party(CLAIMS)
+    assert identity.client_name == "", (
+        "no client is registered here, so there is no registered name to carry"
+    )
     assert identity.credential == CREDENTIAL_IMPERSONATE
     assert identity.revoked is False
     assert users.calls == 1

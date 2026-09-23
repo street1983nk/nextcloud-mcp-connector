@@ -23,7 +23,7 @@ from starlette.requests import Request
 
 from mcp_connector.audit import AUDIT_STATE_ATTR
 from mcp_connector.audit.record import Recorder
-from mcp_connector.audit.store import CLIENT_NAME_LIMIT, AuditStore, Entry
+from mcp_connector.audit.store import ACTOR_LIMIT, CLIENT_NAME_LIMIT, AuditStore, Entry
 from mcp_connector.errors import (
     REASON_PERMISSION_DENIED,
     REASON_UNSPECIFIED,
@@ -41,6 +41,15 @@ AUTH_ID = "the-flow-this-authorization-was-born-in"
 CLIENT_ID = "9d0f8f1a-0b3c-4a0e-9f4c-000000000001"
 CLIENT_NAME = "Claude"
 
+#: The ``azp`` of an exchanged token: a client of a foreign realm, which registered over
+#: there and never here.
+ACTING_PARTY = "kc-client-of-another-realm"
+
+#: U+202E. Inside an output line it turns the reading direction of everything after it
+#: round, which is why the cleaning rule of this project names a character class instead of
+#: listing the C0 range (R-18-06).
+RIGHT_TO_LEFT_OVERRIDE = "‮"
+
 #: The value the third case hunts for. It is not a word of any column name, so a hit is a
 #: leak and never a coincidence.
 SECRET_VALUE = "SECRETVALUE"
@@ -51,7 +60,7 @@ REFUSAL_MESSAGE = "No permission to write to /private/payroll-2026.txt."
 REFUSAL_HINT = "Ask the owner of the folder to share it with write permission."
 
 
-def identity(client_name: str = CLIENT_NAME) -> OAuthIdentity:
+def identity(client_name: str = CLIENT_NAME, actor: str = "") -> OAuthIdentity:
     """The identity the transport boundary resolves once per request."""
     return OAuthIdentity(
         nc_user=NC_USER,
@@ -60,6 +69,7 @@ def identity(client_name: str = CLIENT_NAME) -> OAuthIdentity:
         auth_id=AUTH_ID,
         client_id=CLIENT_ID,
         client_name=client_name,
+        actor=actor,
     )
 
 
@@ -355,3 +365,64 @@ async def test_a_control_character_in_a_name_becomes_a_space_and_melts_no_two_wo
     await probe(ctx=context, path="/notes")
 
     assert one_row(audit_file)["client_name"] == "Claude Assistant"
+
+
+# --- the acting party of an exchanged token (AUDIT-07) --------------------------------------
+
+
+@pytest.mark.anyio
+async def test_an_exchange_call_records_the_acting_party_in_its_own_column(
+    recorder: Recorder, audit_file: Path
+) -> None:
+    """AUDIT-07: the ``azp`` stands in ``actor`` and leaves ``client_name`` alone."""
+    context = FakeContext(
+        params=call_of(path="/notes"),
+        recorder=recorder,
+        who=identity(client_name="", actor=ACTING_PARTY),
+    )
+
+    await probe(ctx=context, path="/notes")
+
+    row = one_row(audit_file)
+    assert row["actor"] == ACTING_PARTY
+    assert row["client_name"] is None, "an empty registered name is no name at all"
+
+
+@pytest.mark.anyio
+async def test_a_call_of_a_registered_client_leaves_the_acting_party_empty(
+    recorder: Recorder, audit_file: Path
+) -> None:
+    """The ordinary row keeps the column it had: nobody delegated, so nobody is named."""
+    context = FakeContext(params=call_of(path="/notes"), recorder=recorder, who=identity())
+
+    await probe(ctx=context, path="/notes")
+
+    assert one_row(audit_file)["actor"] is None
+
+
+@pytest.mark.anyio
+async def test_a_hostile_acting_party_is_cleaned_and_cut_before_it_is_written(
+    recorder: Recorder, audit_file: Path
+) -> None:
+    """T-24-01: the value comes from a foreign realm, so it is written by somebody else.
+
+    The line break could fake a row of the admin output, and the right-to-left override could
+    turn the reading direction of everything behind it round (R-18-06). Neither reaches the
+    row, and the rule that stops them is the one rule of ``audit/text.py`` rather than the
+    narrower filter ``acting_party`` already applied on the way into the identity.
+    """
+    hostile = "kc\n" + RIGHT_TO_LEFT_OVERRIDE + "client" + "x" * 200
+    context = FakeContext(
+        params=call_of(path="/notes"),
+        recorder=recorder,
+        who=identity(client_name="", actor=hostile),
+    )
+
+    await probe(ctx=context, path="/notes")
+
+    stored = one_row(audit_file)["actor"]
+    assert stored is not None
+    assert "\n" not in stored
+    assert RIGHT_TO_LEFT_OVERRIDE not in stored
+    assert len(stored) <= ACTOR_LIMIT
+    assert stored.startswith("kc client")
