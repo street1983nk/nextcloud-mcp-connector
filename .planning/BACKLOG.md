@@ -814,4 +814,44 @@ naechsten Lesen falsch ist.
 abgewiesener Versuche und braucht dafuer einen 429-Lauf gegen die gebaute ExApp, also genau
 den Test aus IN-04; und es ist die Phase, in der die Grenze aus IN-05 nachgemessen gehoert.
 
+**Status:** RESOLVED
+
+- **IN-04 gemessen (2026-09-23, Plan 24-07):**
+  `tests/unit/test_exapp_entry.py::test_repeated_exchange_refusals_end_in_429_on_the_built_exapp_application`,
+  dazu das Wortgate `..._names_no_check_that_failed` und der Gegenfall
+  `test_without_the_appapi_headers_the_401_is_the_handshake_one_and_still_counted`.
+- **IN-05 gemessen (2026-09-23, Plan 24-07):** die Zahl steht im Docstring von
+  `KeySet.forget` in `src/mcp_connector/oauth/jwks.py`; gemessen wird sie in
+  `tests/unit/test_oauth_jwks.py::test_both_levers_in_one_window_measure_thirty_six_outgoing_fetches`.
+
+## BL-22: Zwei Beobachtungen aus den Messungen des Plans 24-07 (keine Haertung in Phase 24)
+
+**Found:** 2026-09-23, beim Nachmessen von BL-21. Beide Punkte sind gemessen und keiner von
+beiden ist ein Fehler; sie stehen hier, weil die Phase 24 ausdruecklich misst und nicht
+haertet, und weil der naechste Leser sie sonst ein zweites Mal entdeckt.
+
+**1. Der Widerrufs-Hebel auf `jwks.forget` hat seit Phase 23 gar keine Decke mehr aus der
+Drosselung.** Gemessen: 31 Zyklen aus Widerruf plus gueltigem Aufruf bestellen 31
+ausgehende Abrufe, einer je Zyklus, innerhalb eines Fensters von 300 Sekunden. Vorher
+deckelte `EXCHANGE_LIMIT` die Zyklen bei 30 je Quelle, weil jede Exchange-Anfrage als
+Abweisung zaehlte. Heute zaehlt weder der erfolgreiche Aufruf (200) noch der erfolgreiche
+Widerruf (`CLASS_CONNECTIONS` zaehlt Abweisungen). Praktisch begrenzt den Hebel nur noch,
+dass jeder Zyklus eine bewiesene Browser-Identitaet braucht, und 36 Abrufe je Fenster sind
+keine Last, die ein Identitaetsanbieter spuert. Wenn das je anders bewertet wird, ist die
+kleinste Bremse eine eigene Karenz auf `forget` selbst, nicht eine weitere Drosselklasse.
+
+**2. Ein 401 aus dem AppAPI-Handshake zaehlt in `CLASS_EXCHANGE` mit.** Gemessen: die
+`Throttled`-Huelle haengt aussen und entscheidet allein am `Authorization`-Header
+(`chain.exchange_shaped_request`), also zaehlt auch eine Anfrage, die am Handshake stirbt.
+Das ist fuer sich richtig, so eine Anfrage ist vor-authentischer Laerm auf derselben Klasse.
+Der Nebeneffekt: wer den App-Secret nicht kennt, kann trotzdem den geteilten
+`PATH_CEILING` von 200 je Fenster fuellen und die Exchange-Klasse fuer alle schliessen.
+Hinter HaRP signiert der Proxy jede Anfrage, der Fall verlangt also direkten Zugriff auf den
+Container. Kein Fix in Phase 24; falls doch, waere die Stelle die `applies`-Bedingung, die
+zusaetzlich einen gueltigen Handshake verlangen koennte.
+
+**Wann:** offen, beides ohne Termin. Punkt 1 vor der naechsten Betrachtung der
+Drosselgrenzen wieder nachmessen, Punkt 2 mitnehmen, falls die ExApp je ohne Proxy erreichbar
+gemacht wird.
+
 **Status:** OPEN

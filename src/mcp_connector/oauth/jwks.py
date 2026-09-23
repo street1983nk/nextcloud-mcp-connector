@@ -206,6 +206,25 @@ class KeySet:
         way to reset the cooldown from the outside, which is precisely the amplifier they
         were written against. What this leaves behind is the state of a cache nobody ever
         filled, and nothing besides.
+
+        What it costs, measured and not estimated (2026-09-23, one process and one issuer,
+        ``tests/unit/test_oauth_jwks.py``): 36 outgoing fetches per window of 300 seconds,
+        which reads as 31 plus 5. A revocation makes the cache stale, so the call behind it
+        takes the expiry branch and orders one fetch, and nothing here brakes the cycle that
+        follows; 31 cycles were driven inside one window and every one of them cost its
+        fetch. The other 5 are the miss branch, the one ceiling this layer raises itself:
+        300 seconds over the 60 of :data:`JWKS_KID_COOLDOWN_SECONDS`. The two were measured
+        together rather than added up, because they share the fields above: an unknown key
+        id against a *stale* cache takes the expiry branch as well and never spends the
+        cooldown, so only the second invented key id of a cycle is ever braked by it. Phase
+        23 is why this number is not the older one. Before it no exchange token had an
+        identity, so every call of that branch ended as a refusal, was counted in
+        ``CLASS_EXCHANGE`` and ran into ``EXCHANGE_LIMIT``, which capped the cycles at 30
+        per source; since then a valid token is answered with 200, is not counted and pays
+        one earlier refusal back, and a successful revocation is not counted by
+        ``CLASS_CONNECTIONS`` either. What bounds this lever today is that every cycle needs
+        a proved browser identity to revoke with, and two workers hold two key sets and
+        therefore two of this number.
         """
         self._keys.keys.clear()
         self._keys.fetched_at = float("-inf")
