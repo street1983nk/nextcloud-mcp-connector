@@ -613,3 +613,18 @@ def test_the_account_claim_default_is_the_one_claim_every_token_carries() -> Non
     """``sub`` is the only claim Keycloak writes into every exchanged token, and phase 21
     already checks it for shape. Every other claim hangs on an open F13 answer."""
     assert config.DEFAULT_EXCHANGE_ACCOUNT_CLAIM == "sub"
+
+
+def test_the_two_mapping_variables_stand_in_the_exchange_namespace() -> None:
+    """MAP-01: only a variable of ``EXCHANGE_VARIABLES`` refuses a configured but disarmed
+    start, so a mapping variable outside the collection would be the hole of T-22-02."""
+    assert config.ENV_EXCHANGE_MAPPING in config.EXCHANGE_VARIABLES
+    assert config.ENV_EXCHANGE_OIDC_PROVIDER_ID in config.EXCHANGE_VARIABLES
+
+
+def test_the_mapping_default_is_the_account_id_profile_of_the_mapping_module() -> None:
+    """``config`` imports nothing from ``oauth``, so the default stands here as a string;
+    this test is what keeps the two spellings from drifting apart."""
+    from mcp_connector.oauth import mapping
+
+    assert config.DEFAULT_EXCHANGE_MAPPING == mapping.MAPPING_ACCOUNT_ID_V1

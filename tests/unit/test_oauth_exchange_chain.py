@@ -35,7 +35,7 @@ from starlette.testclient import TestClient
 from mcp_connector import config, entry_oauth
 from mcp_connector.errors import ToolError
 from mcp_connector.exapp.middleware import RequireOAuthBearer
-from mcp_connector.oauth import chain, exchange, oidc, throttle
+from mcp_connector.oauth import chain, exchange, mapping, oidc, throttle
 from mcp_connector.oauth.metadata import RESOURCE_SUFFIX, TOOL_SCOPE
 from mcp_connector.oauth.verifier import AUTH_ID_CLAIM, IdentitySource, OAuthIdentity
 
@@ -244,6 +244,110 @@ def test_a_blank_account_claim_refuses(blank: str) -> None:
         chain.load_exchange_config(armed(**{config.ENV_EXCHANGE_ACCOUNT_CLAIM: blank}))
 
     assert config.ENV_EXCHANGE_ACCOUNT_CLAIM in excinfo.value.message
+
+
+# --- the mapping profile is configuration with a documented default (MAP-01) ---------------
+
+
+def test_an_armed_path_without_a_mapping_takes_the_documented_default() -> None:
+    """The account id profile: the assumption an installation without an F13 answer is
+    least wrong with, because the provider carries the canonical id itself."""
+    loaded = chain.load_exchange_config(armed())
+
+    assert loaded is not None
+    assert loaded.mapping.strategy == config.DEFAULT_EXCHANGE_MAPPING
+    assert loaded.mapping.account_claim == config.DEFAULT_EXCHANGE_ACCOUNT_CLAIM
+    assert loaded.mapping.oidc_provider_id is None
+
+
+def test_the_sub_profile_is_configurable_with_its_provider_id() -> None:
+    loaded = chain.load_exchange_config(
+        armed(
+            **{
+                config.ENV_EXCHANGE_MAPPING: mapping.MAPPING_USER_OIDC_SUB_V1,
+                config.ENV_EXCHANGE_OIDC_PROVIDER_ID: "7",
+            }
+        )
+    )
+
+    assert loaded is not None
+    assert loaded.mapping.strategy == mapping.MAPPING_USER_OIDC_SUB_V1
+    assert loaded.mapping.oidc_provider_id == 7
+    assert loaded.mapping.account_claim == config.DEFAULT_EXCHANGE_ACCOUNT_CLAIM
+
+
+def test_the_mapping_carries_the_configured_account_claim() -> None:
+    """One value, read once: the claim of the namespace is the claim the mapping reads."""
+    loaded = chain.load_exchange_config(
+        armed(**{config.ENV_EXCHANGE_ACCOUNT_CLAIM: "nextcloud_uid"})
+    )
+
+    assert loaded is not None
+    assert loaded.mapping.account_claim == "nextcloud_uid"
+    assert loaded.account_claim == "nextcloud_uid"
+
+
+def test_an_unknown_mapping_name_is_a_refusal_that_names_the_variable() -> None:
+    with pytest.raises(ToolError) as excinfo:
+        chain.load_exchange_config(armed(**{config.ENV_EXCHANGE_MAPPING: "a-secret-profile"}))
+
+    assert config.ENV_EXCHANGE_MAPPING in excinfo.value.message
+    assert "a-secret-profile" not in f"{excinfo.value.message} {excinfo.value.hint}"
+
+
+def test_the_sub_profile_without_a_provider_id_names_the_missing_variable() -> None:
+    with pytest.raises(ToolError) as excinfo:
+        chain.load_exchange_config(
+            armed(**{config.ENV_EXCHANGE_MAPPING: mapping.MAPPING_USER_OIDC_SUB_V1})
+        )
+
+    assert config.ENV_EXCHANGE_OIDC_PROVIDER_ID in excinfo.value.message
+
+
+@pytest.mark.parametrize("raw", ["abc", "0", "-1", " "])
+def test_an_unusable_provider_id_is_a_refusal_that_names_the_variable(raw: str) -> None:
+    with pytest.raises(ToolError) as excinfo:
+        chain.load_exchange_config(
+            armed(
+                **{
+                    config.ENV_EXCHANGE_MAPPING: mapping.MAPPING_USER_OIDC_SUB_V1,
+                    config.ENV_EXCHANGE_OIDC_PROVIDER_ID: raw,
+                }
+            )
+        )
+
+    assert config.ENV_EXCHANGE_OIDC_PROVIDER_ID in excinfo.value.message
+
+
+def test_a_refused_provider_id_is_never_repeated_in_the_refusal() -> None:
+    with pytest.raises(ToolError) as excinfo:
+        chain.load_exchange_config(
+            armed(
+                **{
+                    config.ENV_EXCHANGE_MAPPING: mapping.MAPPING_USER_OIDC_SUB_V1,
+                    config.ENV_EXCHANGE_OIDC_PROVIDER_ID: "a-secret-provider-value",
+                }
+            )
+        )
+
+    assert "a-secret-provider-value" not in f"{excinfo.value.message} {excinfo.value.hint}"
+
+
+def test_a_provider_id_next_to_the_account_id_profile_is_a_half_state() -> None:
+    """A value nobody reads is a half state, refused for the reason ``_optional`` refuses
+    an empty variable: the operator believes it does something until somebody measures."""
+    with pytest.raises(ToolError) as excinfo:
+        chain.load_exchange_config(armed(**{config.ENV_EXCHANGE_OIDC_PROVIDER_ID: "7"}))
+
+    assert config.ENV_EXCHANGE_OIDC_PROVIDER_ID in excinfo.value.message
+
+
+def test_a_mapping_alone_without_the_switch_refuses_the_start() -> None:
+    """The new variables stand in ``EXCHANGE_VARIABLES``, so T-22-02 covers them too."""
+    with pytest.raises(ToolError) as excinfo:
+        chain.load_exchange_config({config.ENV_EXCHANGE_MAPPING: config.DEFAULT_EXCHANGE_MAPPING})
+
+    assert config.ENV_EXCHANGE_ENABLED in excinfo.value.message
 
 
 # --- every rule of phase 21 arrives as a named refusal -------------------------------------
