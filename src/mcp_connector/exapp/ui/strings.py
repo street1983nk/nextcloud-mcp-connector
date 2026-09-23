@@ -123,6 +123,23 @@ __all__ = [
     "ERROR_THROTTLED_TITLE",
     "ERROR_TIMEOUT_BODY",
     "ERROR_TIMEOUT_TITLE",
+    "EXCHANGE_BODY",
+    "EXCHANGE_BOUND_BODY",
+    "EXCHANGE_BOUND_TITLE",
+    "EXCHANGE_CONFIRM_BODY",
+    "EXCHANGE_CONFIRM_TITLE",
+    "EXCHANGE_DETAIL_CREATED",
+    "EXCHANGE_DETAIL_PARTY",
+    "EXCHANGE_GONE_BODY",
+    "EXCHANGE_GONE_TITLE",
+    "EXCHANGE_REACH",
+    "EXCHANGE_REVOKED_BODY",
+    "EXCHANGE_REVOKED_TITLE",
+    "EXCHANGE_REVOKE_ACTION",
+    "EXCHANGE_REVOKE_ANYTIME",
+    "EXCHANGE_REVOKE_HINT",
+    "EXCHANGE_TITLE",
+    "EXCHANGE_WAIT_BODY",
     "FOOTER_PASSWORD_PROMPT",
     "IDENTITY_HANDOFF_ACTION",
     "IDENTITY_HANDOFF_BODY",
@@ -254,6 +271,76 @@ CONNECT_RESULT_REVOKE = (
     "You can end this connection at any time in Nextcloud under Settings, Security, Devices and "
     "sessions. It is listed there under the name of this connector."
 )
+
+# --- The exchange enrollment of CRED-02 (plan 23-06, standalone only) ----------------------
+#
+# The page on which a person allows their organization's service to act on their Nextcloud,
+# sees that permission and withdraws it. The wording never names the mechanics: no
+# credential kind, no protocol word, no value a machine reads. What the reader has to know
+# is who acts, how far it reaches, and that the permission is theirs to take back, at once.
+
+EXCHANGE_TITLE = "Access for your organization's service"
+
+EXCHANGE_BODY = (
+    "Your organization runs a service that can use your Nextcloud on your behalf. It only "
+    "works after you allow it here once, with your own sign in at {host}. This page never "
+    "asks for your password."
+)
+
+EXCHANGE_REACH = (
+    "The service reaches exactly as far as your own account reaches, and nothing further."
+)
+
+EXCHANGE_REVOKE_ANYTIME = (
+    "You can withdraw this permission on this page at any time, and a withdrawal takes "
+    "effect immediately."
+)
+
+EXCHANGE_WAIT_BODY = (
+    "Finish the sign in in the other window. This page checks every few seconds and "
+    "continues on its own as soon as you are signed in. If the other window is gone, "
+    "start over."
+)
+
+#: The step between the finished Nextcloud sign in and the permission: the same independent
+#: sign-on the consent decision demands (CR-01), because the sign in alone does not prove
+#: who is sitting in front of this page.
+EXCHANGE_CONFIRM_TITLE = "Confirm it is you"
+
+EXCHANGE_CONFIRM_BODY = (
+    "Before the permission is created, confirm with your organization's single sign-on "
+    "that this is you."
+)
+
+EXCHANGE_BOUND_TITLE = "Access is set up"
+
+EXCHANGE_BOUND_BODY = (
+    "Your organization's service may use your Nextcloud as {user}, exactly as far as your "
+    "own account reaches."
+)
+
+EXCHANGE_DETAIL_CREATED = "Allowed on"
+
+EXCHANGE_DETAIL_PARTY = "Acting service"
+
+EXCHANGE_REVOKE_HINT = (
+    "Withdrawing takes effect immediately: the very next request of the service is refused."
+)
+
+EXCHANGE_REVOKE_ACTION = "Withdraw this permission"
+
+EXCHANGE_REVOKED_TITLE = "Permission withdrawn"
+
+EXCHANGE_REVOKED_BODY = (
+    "The service no longer has access to your Nextcloud. You can allow it again below at any time."
+)
+
+#: The answer to a resubmitted withdrawal, an unknown handle, a handle of another account
+#: and a wrong or missing form value, which are one answer on purpose: a page that told
+#: them apart would answer a stranger whether that permission exists (the S8 contract).
+EXCHANGE_GONE_TITLE = "Already withdrawn"
+
+EXCHANGE_GONE_BODY = "That permission is not there any more. Nothing changed."
 
 # --- S3, consent -------------------------------------------------------------------------
 

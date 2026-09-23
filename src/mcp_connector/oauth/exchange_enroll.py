@@ -30,6 +30,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from .. import config
+from ..exapp.ui.exchange import ENROLL_PATH
 from ..nextcloud.target import NextcloudTarget
 from . import loginflow
 from .connect import FLOW_ID_BYTES
@@ -77,10 +78,10 @@ _BINDING_CLIENT_METADATA = '{"client_name":"Token exchange bindings (CRED-02), n
 #: app password of a binding. ``loginflow`` puts its fixed prefix in front.
 ENROLLMENT_CLIENT_NAME = "token exchange binding"
 
-#: The path of the enrollment page. The page itself is plan 23-06, but the OIDC callback
-#: sends a confirmed enrollment browser back here today, so the constant lives with the
-#: mechanics and 23-06 reuses it: two pages must not hold two truths about one path.
-ENROLL_PATH = "/exchange"
+# The path of the enrollment page is re-exported above from ``exapp.ui.exchange``, where it
+# stands next to the forms that write it into the document, so the page, these mechanics and
+# the OIDC callback share one truth about one address and the dependency runs in one
+# direction only (the rule of every page module of this project).
 
 #: The named outcomes of the three steps. Strings and not an enum, for the reason
 #: ``loginflow.py`` gives: the unknown case has to stay reachable in a test.
