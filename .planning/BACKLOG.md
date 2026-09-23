@@ -660,6 +660,17 @@ gone. Measure before fixing the design.
 
 ## BL-17: Derive the OAuth public URL from NEXTCLOUD_URL (AIO no-config installs)
 
+**STATUS 2026-09-23: DONE.** Ableitung `<NEXTCLOUD_URL>/exapps/<APP_ID>` als drittes
+Kettenglied in `entry_exapp._resolved_env` und im IssuerRefused-Rescue (Quick-Task
+260923-bl17: Commits `dac73f5`/`cfb74aa` Kern in `config_values`, `62ed52b`/`5063a9f`
+Verdrahtung, `6b215f8` Doku). Der abgeleitete Kandidat läuft durch denselben
+Validierungskern wie ein Admin-Formwert (`_validated_address`: https oder Loopback per
+RFC 8414, IN-03-Normalisierung), ein internes oder http-`NEXTCLOUD_URL` leitet nichts ab,
+fail-closed bleibt byte-genau, und die Fehler-/Rescue-Texte nennen drei Quellen.
+Präzedenz Formwert > `NC_MCP_PUBLIC_URL` > Ableitung > Default durch Tests gepinnt;
+Split-Domain-Deployments brauchen weiterhin den Override (dokumentiert in
+docs/oauth-setup.md, docs/faq.md, info.xml).
+
 **Found:** 2026-09-14, jekkel's closing comment on issue #4 after confirming the
 421 fix. The fix derives the allowed hosts from `NEXTCLOUD_URL`, but the public
 URL that shapes the OAuth responses (issuer, endpoint URLs) still has to be set
