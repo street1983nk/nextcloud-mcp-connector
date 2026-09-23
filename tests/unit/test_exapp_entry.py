@@ -2724,3 +2724,169 @@ def test_the_armed_path_hangs_the_throttle_outside_the_transport_boundary() -> N
 
     assert isinstance(outer, throttle.Throttled)
     assert isinstance(outer._app, RequireAppApi)
+
+
+# --- the 429 of the exchange path, measured on the built ExApp application (IN-04) --------
+
+#: Where the armed namespace of this file would fetch its key set. The measurements below
+#: register it so that "nothing went out" is a count on an answering route and not the
+#: absence of one: an unregistered address would end a run for a reason of the harness.
+EXCHANGE_JWKS_URL = f"{EXCHANGE_ISSUER}{chain.DEFAULT_JWKS_PATH}"
+
+#: A value with the shape of a compact JWS and nothing readable in it. It enters the
+#: exchange branch and dies at its unreadable header, before a signature is checked and
+#: before a key id is looked up, which is what makes the fetch count provable.
+SHAPED_LIKE_A_JWS = "a.b.c"
+
+#: What this server issues itself: ``secrets.token_urlsafe`` has no dot in its alphabet, so
+#: a value of this shape never reaches the exchange branch and is never counted.
+SHAPED_LIKE_A_STORE_TOKEN = "a-token-this-server-issued-itself"
+
+#: The words the 429 of a machine route may not speak, the list of the OAuth twin
+#: (``test_oauth_exchange_chain.py``). Naming any of them would tell a caller which of the
+#: checks in front of the throttle they reached (T-24-03).
+NO_CHECK_IS_NAMED = ("exchange", "signature", "issuer", "audience", "claim", "key")
+
+
+def serve_the_key_set() -> respx.Route:
+    """The key set route of the configured issuer, registered only to be counted.
+
+    What the answer carries does not matter here and is deliberately the smallest legal
+    document: every measurement below asserts that this route was never called, so a body
+    that could satisfy a fetch would prove nothing extra and a key of its own would only
+    add a generated RSA pair to the import cost of this file.
+    """
+    return respx.get(EXCHANGE_JWKS_URL).mock(return_value=httpx.Response(200, json={"keys": []}))
+
+
+def handshake_less_call(client: TestClient, token: str) -> Any:
+    """The same MCP request as :func:`bearer_call`, minus the AppAPI headers.
+
+    The one difference that decides whether a measurement of this section is worth
+    anything, which is why it is a helper of its own and not an inline dictionary.
+    """
+    return client.post(
+        "/mcp", json=INITIALIZE, headers={**MCP_HEADERS, "Authorization": f"Bearer {token}"}
+    )
+
+
+@respx.mock
+def test_repeated_exchange_refusals_end_in_429_on_the_built_exapp_application(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """IN-04: the twin of the OAuth measurement, run on the path F13 actually reaches.
+
+    Until now the 429 of ``CLASS_EXCHANGE`` was measured against ``build_oauth_app`` and
+    only structurally asserted here, although the ExApp is the deployment the exchange path
+    was written for. The wrapper is shared and the wiring is line for line the same, so what
+    this adds is not a suspicion but the measurement itself.
+
+    One line of headers separates this from the OAuth twin: in the ExApp build
+    ``require_appapi`` runs before the bearer check, so ``bearer_call`` sends
+    ``appapi_headers(user="")`` with every request. Without them the 401 would be the
+    handshake 401 and this run would be green without ever having reached the throttled
+    path, which is what the counter case below stands next to it for.
+    """
+    keys = serve_the_key_set()
+    env, _ = with_a_local_store({**OAUTH_ENV, **EXCHANGE_ENV}, tmp_path, monkeypatch)
+
+    with TestClient(entry_exapp.build_exapp_app(env)) as client:
+        refused = [
+            bearer_call(client, SHAPED_LIKE_A_JWS) for _attempt in range(throttle.EXCHANGE_LIMIT)
+        ]
+        throttled = bearer_call(client, SHAPED_LIKE_A_JWS)
+        dotless = bearer_call(client, SHAPED_LIKE_A_STORE_TOKEN)
+
+    assert [answer.status_code for answer in refused] == [401] * throttle.EXCHANGE_LIMIT, (
+        "every attempt up to the limit is refused and none of them is throttled yet"
+    )
+    assert all(
+        "www-authenticate" in {key.lower() for key in answer.headers} for answer in refused
+    ), "these are the bearer 401s of the OAuth branch, so the run got past require_appapi"
+    assert throttled.status_code == 429, "the attempt past the limit is the throttled one"
+    assert int(throttled.headers["Retry-After"]) > 0, (
+        "a 429 that promised an immediate retry would invite the request it exists against"
+    )
+    assert keys.call_count == 0, "an unreadable header never costs an outgoing fetch"
+    assert dotless.status_code == 401, (
+        "the exception of the MCP route holds for our own tokens: a dotless bearer is "
+        "neither counted nor throttled, in the very state an attacker just produced"
+    )
+
+
+@respx.mock
+def test_the_429_of_the_exchange_path_of_the_exapp_names_no_check_that_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-24-03: the same body as on every other machine route, and no hint in it.
+
+    The word gate of the OAuth twin, applied to the ExApp answer. The list is spelled out
+    here rather than read from ``errors``: plan 24-02 may turn it into a shared constant in
+    this same wave, and a test that anticipated that would measure a module that does not
+    exist yet.
+    """
+    serve_the_key_set()
+    env, _ = with_a_local_store({**OAUTH_ENV, **EXCHANGE_ENV}, tmp_path, monkeypatch)
+
+    with TestClient(entry_exapp.build_exapp_app(env)) as client:
+        for _attempt in range(throttle.EXCHANGE_LIMIT):
+            bearer_call(client, SHAPED_LIKE_A_JWS)
+        throttled = bearer_call(client, SHAPED_LIKE_A_JWS)
+
+    assert throttled.status_code == 429
+    assert throttled.json()["error"] == "temporarily_unavailable"
+    spoken = throttled.text.lower()
+    for word in NO_CHECK_IS_NAMED:
+        assert word not in spoken, f"the 429 of the ExApp names {word!r}"
+
+
+@respx.mock
+def test_without_the_appapi_headers_the_401_is_the_handshake_one_and_still_counted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The counter case of the measurement above, and the reason it is a case of its own.
+
+    Both answers are a 401, so a run that never got past ``require_appapi`` would look from
+    the status codes alone exactly like the measured one. What tells them apart is measured
+    here: the bearer 401 of the OAuth branch carries the ``WWW-Authenticate`` challenge with
+    the discovery pointer, while the handshake 401 carries nothing at all, because the
+    caller behind those headers is a proxy and every hint would name the check that rejected
+    it (T-02-03). That difference is what makes the main measurement a measurement.
+
+    What is *not* different is the counting, and this was measured rather than read out of
+    ``throttle.py``: the wrapper hangs outside the boundary and decides from the
+    ``Authorization`` header alone (``chain.exchange_shaped_request``), so a request that
+    dies at the handshake is counted in ``CLASS_EXCHANGE`` exactly like one that dies at the
+    bearer check. One request with the handshake plus ``EXCHANGE_LIMIT - 1`` without it fill
+    the limit together, which is the whole statement: the plan of this task expected the
+    handshake 401 to go uncounted, and the run says otherwise. It is the right behaviour, a
+    handshake-less request with an exchange-shaped bearer is pre-authentic noise on the same
+    class, but it is not the behaviour that was assumed.
+    """
+    keys = serve_the_key_set()
+    env, _ = with_a_local_store({**OAUTH_ENV, **EXCHANGE_ENV}, tmp_path, monkeypatch)
+
+    with TestClient(entry_exapp.build_exapp_app(env)) as client:
+        with_the_handshake = bearer_call(client, SHAPED_LIKE_A_JWS)
+        without_the_handshake = [
+            handshake_less_call(client, SHAPED_LIKE_A_JWS)
+            for _attempt in range(throttle.EXCHANGE_LIMIT - 1)
+        ]
+        throttled = bearer_call(client, SHAPED_LIKE_A_JWS)
+
+    assert with_the_handshake.status_code == 401
+    assert "www-authenticate" in {key.lower() for key in with_the_handshake.headers}, (
+        "the bearer 401 points at the metadata, which is the answer the main run measured"
+    )
+    assert [answer.status_code for answer in without_the_handshake] == [401] * (
+        throttle.EXCHANGE_LIMIT - 1
+    )
+    assert not any(
+        "www-authenticate" in {key.lower() for key in answer.headers}
+        for answer in without_the_handshake
+    ), "the handshake 401 names no check and points nowhere (T-02-03)"
+    assert throttled.status_code == 429, (
+        f"{throttle.EXCHANGE_LIMIT - 1} handshake 401s plus one bearer 401 fill the limit: "
+        "the throttle counts both, because it reads the Authorization header alone"
+    )
+    assert keys.call_count == 0, "neither kind of refusal costs an outgoing fetch"
