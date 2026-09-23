@@ -574,8 +574,8 @@ def test_the_read_and_the_start_have_their_two_throttle_classes() -> None:
     against FLOW_LIMIT, and it may not share a class with the reads, because a successful
     read pays one attempt back (WR-03) and a shared counter would let a reload of the
     invitation erase the count of the flows an attacker opened."""
-    assert throttle_module.CLASS_EXCHANGE_ENROLL in throttle_module.__all__
-    assert throttle_module.CLASS_EXCHANGE_ENROLL_START in throttle_module.__all__
+    assert "CLASS_EXCHANGE_ENROLL" in throttle_module.__all__
+    assert "CLASS_EXCHANGE_ENROLL_START" in throttle_module.__all__
     assert throttle_module.CLASS_EXCHANGE_ENROLL != throttle_module.CLASS_EXCHANGE_ENROLL_START
 
 

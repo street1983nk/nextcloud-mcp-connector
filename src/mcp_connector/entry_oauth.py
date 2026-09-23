@@ -43,7 +43,7 @@ from .exapp.middleware import RequireOAuthBearer
 from .exapp.responses import NO_STORE
 from .nextcloud.http import configure_logging
 from .nextcloud.target import NextcloudTarget
-from .oauth import chain, crypto, exchange_binding, oidc, throttle
+from .oauth import chain, crypto, exchange_binding, exchange_enroll, oidc, throttle
 from .oauth.consent import consent_routes
 from .oauth.metadata import OPENID_CONFIGURATION_SUFFIX, metadata_routes
 from .oauth.oidc_identity import OidcBrowserIdentitySource
@@ -328,6 +328,26 @@ def build_oauth_app(
             for route in discovery
             if not (isinstance(route, Route) and route.path == OPENID_CONFIGURATION_SUFFIX)
         ]
+    # The enrollment page of the exchange binding (CRED-02, plan 23-06) exists only while
+    # the path is armed, and in the off state the address does not exist at all rather than
+    # answering emptily: an address that is not there is the smallest attack surface, and
+    # the factory state stays the very structure of every release before this milestone,
+    # not merely the same behaviour (the rule of the throttle wrapper above).
+    # ``end_connection`` is the provider's, so the withdrawal runs over the one revocation
+    # path of this deployment and empties the verifier caches with it (T-04-35).
+    enrollment = (
+        exchange_enroll.exchange_routes(
+            env,
+            nextcloud=resolved.nextcloud,
+            store_provider=store,
+            browser_identity=browser_identity,
+            end_connection=provider.end_connection,
+            acting_party=", ".join(exchange_config.settings.azp_allowed),
+            throttle=counters,
+        )
+        if exchange_config is not None
+        else []
+    )
     for route in (
         *discovery,
         *auth_routes(env, provider=provider, throttle=counters),
@@ -339,6 +359,7 @@ def build_oauth_app(
             throttle=counters,
         ),
         *oidc_routes(env, provider=provider, client=identity_client, throttle=counters),
+        *enrollment,
     ):
         if isinstance(route, Route):
             route.app = BodyLimit(route.app, MAX_BROWSER_BODY_BYTES)

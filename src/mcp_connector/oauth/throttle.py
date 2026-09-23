@@ -100,6 +100,8 @@ __all__ = [
     "CLASS_CONNECTIONS",
     "CLASS_CONNECT_START",
     "CLASS_EXCHANGE",
+    "CLASS_EXCHANGE_ENROLL",
+    "CLASS_EXCHANGE_ENROLL_START",
     "CLASS_OIDC_CALLBACK",
     "CLASS_OIDC_START",
     "CLASS_REGISTER",
@@ -151,6 +153,16 @@ CLASS_OIDC_CALLBACK = "oidc-callback"
 #: server issued itself is never counted here and never refused here, which leaves the
 #: exception of D-37 standing for the path every existing installation runs on.
 CLASS_EXCHANGE = "exchange"
+
+#: The enrollment page of the exchange binding (CRED-02, standalone, plan 23-06). Two
+#: classes for one address, the split of ``connect``: the POST opens a Nextcloud login
+#: flow, so every one of its requests is counted against :data:`FLOW_LIMIT` (CR-02,
+#: T-23-27), while the reads count refusals like every other browser page. They may not
+#: share a class, because a successful request pays one counted attempt back (WR-03), so
+#: one shared counter would let a reload of the invitation erase the count of the flows an
+#: attacker just opened.
+CLASS_EXCHANGE_ENROLL = "exchange-enroll"
+CLASS_EXCHANGE_ENROLL_START = "exchange-enroll-start"
 
 #: How many failed attempts one source may make per path class before it has to wait. Ten
 #: is generous for every legitimate shape of failure (a mistyped link, a stale tab, a

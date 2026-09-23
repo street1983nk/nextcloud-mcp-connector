@@ -17,27 +17,57 @@ demands a live flow whose authorization carries a canonical account id before th
 independent sign in can even start, so the row has to exist first, and it can do nothing,
 because ``binding_of`` filters on the other client.
 
-No route, no request and no page lives here. The three steps are functions whose every
-outcome is a named value, so a test can measure each of them; the routes and the pages
-arrive with plan 23-06. None of these functions raises outward, for the reason the pages of
-``connect.py`` give: whoever calls them renders an answer for a person.
+The three steps are functions whose every outcome is a named value, so a test can measure
+each of them; none of them raises outward, for the reason the pages of ``connect.py`` give:
+whoever calls them renders an answer for a person. Since plan 23-06 the routes around them
+live here as well: :func:`exchange_routes` hands out one address with two verbs, built like
+``connections_routes``, and it is attached by ``entry_oauth`` alone and only while the
+exchange path is armed.
 """
 
 import logging
 import secrets
 import time
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 
+from starlette.datastructures import FormData
+from starlette.requests import Request
+from starlette.responses import Response
+from starlette.routing import Route
+
 from .. import config
-from ..exapp.ui.exchange import ENROLL_PATH
+from ..errors import ToolError
+from ..exapp.responses import BodyTooLarge, BodyUnreadable, bounded_body, form_or_none, with_body
+from ..exapp.ui import errors
+from ..exapp.ui.exchange import (
+    ACTION_FIELD,
+    ACTION_START,
+    ENROLL_PATH,
+    FLOW_PARAM,
+    Binding,
+    bound_page,
+    handoff_page,
+    identity_page,
+    invitation_page,
+    waiting_page,
+)
 from ..nextcloud.target import NextcloudTarget
-from . import loginflow
+from . import crypto, loginflow
+from .browser_identity import BrowserIdentitySource
 from .connect import FLOW_ID_BYTES
+from .connections import MAX_FORM_BYTES
 from .exchange_accounts import EXCHANGE_CLIENT_ID
 from .metadata import RESOURCE_SUFFIX, TOOL_SCOPE
 from .principal import login_name_of, principal_of
-from .store import OAuthStore
+from .store import AuthorizationRow, OAuthStore
+from .throttle import (
+    CLASS_EXCHANGE_ENROLL,
+    CLASS_EXCHANGE_ENROLL_START,
+    FLOW_LIMIT,
+    Throttle,
+    Throttled,
+)
 
 __all__ = [
     "ENROLLMENT_CLIENT_NAME",
@@ -57,8 +87,17 @@ __all__ = [
     "abort_enrollment",
     "begin_enrollment",
     "complete_enrollment",
+    "exchange_routes",
     "settle_enrollment",
 ]
+
+#: How a caller hands in its own store, the same shape ``oauth/connect.py`` uses.
+type StoreProvider = Callable[[], Awaitable[OAuthStore]]
+
+#: The one revocation of this deployment, handed in rather than imported: the withdrawal
+#: goes through ``provider.end_connection`` and never through the store, because only that
+#: path also empties the caches of the verifier chain (T-03-62, T-04-35).
+type EndConnection = Callable[[str, str], Awaitable[bool]]
 
 #: The reserved client id of the holding row: an enrollment that signed in and is not yet
 #: confirmed. Same form as ``connect.CONNECT_CLIENT_ID`` and marked as not allowed for the
@@ -388,3 +427,252 @@ async def _access_disabled(store: OAuthStore, nc_user: str) -> bool | None:
 def _moment(now: int | None) -> int:
     """Whole seconds, in one place, so a deadline is compared against one clock."""
     return int(time.time()) if now is None else now
+
+
+# --- the routes of the enrollment page (plan 23-06) -----------------------------------------
+
+
+def exchange_routes(
+    env: Mapping[str, str] | None = None,
+    *,
+    nextcloud: NextcloudTarget,
+    store_provider: StoreProvider,
+    browser_identity: BrowserIdentitySource,
+    end_connection: EndConnection,
+    acting_party: str = "",
+    throttle: Throttle | None = None,
+) -> list[Route]:
+    """One address for the whole enrollment, in the shape of ``connections_routes``.
+
+    One named action field and every state change a POST; the ``GET`` branch is the
+    invitation, the waiting screen, the step to the independent sign in or the page of the
+    binding, whatever the procedure says. Attached by ``entry_oauth`` alone and only while
+    the exchange path is armed: in the off state this address does not exist at all.
+
+    **The ownership check is the one strict line of this surface** (T-23-26): the binding
+    is written only after ``browser_identity.identifies(request, account_id,
+    flow_id=...)`` answered ``True``, immediately before the write and in the same request
+    run. A failure of the source itself is a refusal and never a fallback, word for word as
+    ``connect._wait`` has it: a source is a security boundary.
+
+    ``end_connection`` is ``provider.end_connection``, handed in like the connections page
+    takes it, so the withdrawal runs over the one revocation path of this deployment and
+    the caches of the verifier chain are emptied with it (T-04-35).
+
+    ``acting_party`` is what the page of a binding names as the service that acts: the
+    configured allowed parties of the exchange path, handed in by the deployment because
+    only it holds the validated configuration. Foreign realm text, treated by the page
+    like a client name.
+
+    Throttled as a browser surface and in two classes (T-23-27): the starting POST opens a
+    Nextcloud login flow and answers 200 when it succeeds, so it counts every request
+    against :data:`~mcp_connector.oauth.throttle.FLOW_LIMIT` (CR-02); the reads count
+    refusals. A throttled request here is a person in a browser, so the answer is the
+    error page E6 and never JSON.
+    """
+
+    async def enrollment(request: Request) -> Response:
+        """The GET branch: whatever the procedure behind the flow id looks like right now."""
+        flow_id = request.query_params.get(FLOW_PARAM) or ""
+        if not flow_id:
+            return invitation_page(env=env)
+        store = await _store_or_page(store_provider, env)
+        if isinstance(store, Response):
+            return store
+        return await _resume(request, store, flow_id)
+
+    async def act(request: Request) -> Response:
+        """The POST branch: two named actions, and everything else is the invitation, 400."""
+        store = await _store_or_page(store_provider, env)
+        if isinstance(store, Response):
+            return store
+        if _oversized(request):
+            logger.warning("a form larger than this page has fields for was refused unread")
+            return invitation_page(status_code=400, env=env)
+        try:
+            raw = await bounded_body(request, MAX_FORM_BYTES)
+        except BodyTooLarge:
+            logger.warning("a form larger than this page has fields for was refused unread")
+            return invitation_page(status_code=400, env=env)
+        except BodyUnreadable:
+            return _generic("a submitted form could not be read", env)
+        form = await form_or_none(with_body(request, raw))
+        if form is None:
+            return _generic("a submitted form could not be parsed", env)
+        return await _act(request, form, store)
+
+    async def _act(request: Request, form: FormData, store: OAuthStore) -> Response:
+        action = str(form.get(ACTION_FIELD) or "")
+        if action == ACTION_START:
+            return await _start(store)
+        # ACTION_REVOKE arrives with task 3 of this plan; until then it is an action this
+        # route does not know, exactly like every other one.
+        return invitation_page(status_code=400, env=env)
+
+    async def _start(store: OAuthStore) -> Response:
+        started = await begin_enrollment(store, nextcloud=nextcloud)
+        if started.outcome != ENROLL_STARTED:
+            return _generic("the enrollment could not be started", env)
+        return handoff_page(started.login_url, started.flow_id, env=env)
+
+    async def _resume(request: Request, store: OAuthStore, flow_id: str) -> Response:
+        """One flow id, read back: the holding row decides whether the sign in is done.
+
+        The 200 of a Login Flow v2 poll arrives exactly once, so a browser that returns
+        from the independent sign in must not poll again: when the holding row of this
+        flow already exists, the only step left is the confirmation.
+        """
+        try:
+            holding = await store.load_authorization(flow_id)
+        except Exception:
+            logger.exception("an enrollment could not be read back")
+            return _generic("the enrollment could not be read back", env)
+        if holding is not None and _is_holding(holding):
+            # ``or ""`` only narrows the type: ``_is_holding`` already required the id.
+            return await _confirm(request, store, flow_id, holding.nc_account_id or "")
+
+        result = await complete_enrollment(store, flow_id, nextcloud=nextcloud, env=env)
+        if result.outcome == ENROLL_PENDING:
+            return waiting_page(flow_id, env=env)
+        if result.outcome == ENROLL_SIGNED_IN:
+            return await _confirm(request, store, flow_id, result.account_id)
+        if result.outcome == ENROLL_PAUSED:
+            return _page(errors.error_page(errors.PAUSED, env=env))
+        if result.outcome == ENROLL_EXPIRED:
+            # A procedure that ran out, never existed or names a row that is no holding
+            # row reads exactly like no procedure at all: the invitation, 200 (T-23-28).
+            return invitation_page(env=env)
+        return _generic("the enrollment could not be finished", env)
+
+    async def _confirm(
+        request: Request, store: OAuthStore, flow_id: str, account_id: str
+    ) -> Response:
+        """The ownership check, immediately before the only write of this surface.
+
+        ``identifies`` consumes the browser proof exactly once and compares its account
+        with the one the sign in produced. Only ``True`` settles; ``False`` shows the step
+        to the independent sign in while the procedure lives and writes nothing; and an
+        exception of the source is a refusal, never a pass (T-23-26).
+        """
+        if not account_id:
+            return invitation_page(env=env)
+        try:
+            identified = await browser_identity.identifies(request, account_id, flow_id=flow_id)
+        except Exception:
+            # A source is a security boundary: its failure is a refusal, never a fallback.
+            logger.error("the browser identity source could not decide the enrollment identity")
+            return _generic("the browser identity could not be decided", env)
+        if not identified:
+            try:
+                step = await browser_identity.pending_step(
+                    request, flow_id=flow_id, expected_account_id=account_id
+                )
+            except Exception:
+                logger.error("the browser identity source could not offer its step")
+                return _generic("the browser identity could not be decided", env)
+            if step is None:
+                # A proof this source reads but did not redeem is not a confirmation.
+                return invitation_page(env=env)
+            return identity_page(step.action_path, dict(step.fields), env=env)
+
+        settled = await settle_enrollment(store, flow_id, nextcloud=nextcloud)
+        if settled.outcome not in (ENROLL_BOUND, ENROLL_ALREADY_BOUND):
+            return _generic("the confirmed enrollment could not be settled", env)
+        return await _bound(store, settled.auth_id)
+
+    async def _bound(store: OAuthStore, auth_id: str) -> Response:
+        """The page of one binding, with the anti forgery value of exactly this binding."""
+        try:
+            row = await store.load_authorization(auth_id)
+        except Exception:
+            logger.exception("a settled binding could not be read back")
+            return _generic("the binding could not be read back", env)
+        if row is None:
+            return _generic("the binding could not be read back", env)
+        return bound_page(
+            Binding(
+                auth_id=auth_id,
+                created_at=row.created_at,
+                acting_party=acting_party,
+                token=store.form_token(auth_id, purpose=crypto.PURPOSE_DISCONNECT),
+            ),
+            user=row.nc_display_name or login_name_of(row),
+            env=env,
+        )
+
+    counters = throttle if throttle is not None else Throttle()
+    reads = Route(ENROLL_PATH, enrollment, methods=["GET"])
+    starts = Route(ENROLL_PATH, act, methods=["POST"])
+    reads.app = Throttled(reads.app, counters, CLASS_EXCHANGE_ENROLL, machine=False, env=env)
+    # The POST is the one request of this address that makes Nextcloud open a login flow,
+    # so every one of them is counted and not only the refused ones (CR-02, T-23-27). Its
+    # own class, for the reason spelled at the two constants: the reads pay attempts back.
+    starts.app = Throttled(
+        starts.app,
+        counters,
+        CLASS_EXCHANGE_ENROLL_START,
+        machine=False,
+        env=env,
+        count_all=True,
+        limit=FLOW_LIMIT,
+    )
+    return [reads, starts]
+
+
+def _is_holding(row: AuthorizationRow) -> bool:
+    """Whether this row is the holding row of a signed in enrollment, and nothing else.
+
+    The client filter is what keeps an ordinary connection out of this procedure: a caller
+    that names the auth id of one gets the same answer as an unknown flow, and the row is
+    never touched (the guard ``settle_enrollment`` holds a second time).
+    """
+    return (
+        row.client_id == EXCHANGE_PENDING_CLIENT_ID
+        and row.revoked_at is None
+        and bool(row.nc_account_id)
+    )
+
+
+def _oversized(request: Request) -> bool:
+    """Whether this request announces more body than this page could possibly need (LO-08).
+
+    The announcement and not the body: a request that announces nothing passes here and
+    meets ``responses.bounded_body`` in the handler, which counts what really arrives
+    (IN-01). A header that is not a number is refused as well.
+    """
+    announced = request.headers.get("content-length") or "0"
+    try:
+        return int(announced) > MAX_FORM_BYTES
+    except ValueError:
+        return True
+
+
+async def _store_or_page(
+    store: StoreProvider, env: Mapping[str, str] | None
+) -> OAuthStore | Response:
+    """The store, or the page that ends the request. Never an exception into the framework.
+
+    Fail closed (D-37): an incomplete environment, an unwritable volume and an unreadable
+    data key are one answer to the user, and all three are an administrator's problem.
+    """
+    try:
+        return await store()
+    except ToolError as exc:
+        logger.error("the enrollment page has no store: %s %s", exc.message, exc.hint)
+        return _generic("the store could not be opened", env)
+    except Exception:
+        logger.exception("the enrollment page could not open its store")
+        return _generic("the store could not be opened", env)
+
+
+def _generic(what: str, env: Mapping[str, str] | None) -> Response:
+    """The generic page plus the one log line that carries its reference (T-03-24)."""
+    response, reference = errors.error_page("E7", env=env)
+    logger.error("%s (reference %s)", what, reference)
+    return response
+
+
+def _page(built: tuple[Response, str]) -> Response:
+    """Take the response of an error page whose reference nobody has to log."""
+    response, _ = built
+    return response
