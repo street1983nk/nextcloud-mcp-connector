@@ -92,7 +92,7 @@ from ..errors import IssuerRefused
 from ..exapp.responses import NO_STORE, form_or_none, json_response
 from ..exapp.ui.consent import consent_url
 from ..nextcloud.target import NextcloudTarget
-from . import cimd, loginflow
+from . import cimd, exchange_accounts, loginflow
 from .metadata import (
     AS_METADATA_SUFFIX,
     PUBLIC_CLIENT_AUTH_METHOD,
@@ -1221,10 +1221,19 @@ class NextcloudOAuthProvider(
         deletes it (plan 03-06): the connection never existed as far as its user is
         concerned, and keeping a ciphertext of a credential nobody may use is worse than
         losing the record of it. A failure is logged and counted as not swept.
+
+        The reserved client of the finished exchange bindings is excepted, because a
+        binding never owns a token of its own and would match this sweep forever; its app
+        password still goes back, on the user's own revocation (plan 23-06) and with
+        ``occ mcp_connector:purge``.
         """
         try:
             store = await self.store()
-            rows = await store.abandoned_authorizations(SWEEP_LIMIT, now=self._now())
+            rows = await store.abandoned_authorizations(
+                SWEEP_LIMIT,
+                now=self._now(),
+                except_clients=(exchange_accounts.EXCHANGE_CLIENT_ID,),
+            )
         except Exception as exc:
             logger.error("the sweep of abandoned sign ins found no store: %s", type(exc).__name__)
             return 0

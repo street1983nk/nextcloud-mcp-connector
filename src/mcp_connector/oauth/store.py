@@ -1127,7 +1127,7 @@ class OAuthStore:
         return await self._read(work)
 
     async def abandoned_authorizations(
-        self, limit: int, *, now: int | None = None
+        self, limit: int, *, now: int | None = None, except_clients: tuple[str, ...] = ()
     ) -> list[AuthorizationRow]:
         """Connections that were written by a sign in and then never used for anything.
 
@@ -1144,23 +1144,42 @@ class OAuthStore:
         a sign in nobody finished or a connection that ended by running out. Both own an
         app password that has to go back.
 
+        ``except_clients`` names the clients whose rows are wanted without a token. Empty,
+        and every existing caller passes nothing, means literally the behaviour above. A
+        row without a token is normally a sign in nobody finished, but since this milestone
+        there is a second kind that never owns one and is wanted anyway: a connection that
+        acts under a foreign token instead of one of its own (the binding of the token
+        exchange). The client identifiers are a parameter and not a constant of this
+        module, for the reason :meth:`binding_of` gives: the store knows nothing of the
+        exchange path. Whoever widens this exception must first be able to say who else
+        ever hands the app password of the excepted rows back; for the exchange path the
+        answer is the user's own revocation and ``occ mcp_connector:purge``. The names
+        travel as ``?`` placeholders, never as text inside the statement.
+
         ``limit`` is not optional. The caller pays for every row with one Nextcloud request,
         and an unbounded sweep on a browser path is a timeout waiting to happen.
         """
         moment = _moment(now)
+        # Built from the length of the tuple alone: only "?" marks enter the statement, the
+        # values themselves always travel as parameters.
+        exclusion = ""
+        if except_clients:
+            marks = ", ".join("?" for _ in except_clients)
+            exclusion = "AND a.client_id NOT IN (" + marks + ") "
 
         def work(conn: sqlite3.Connection) -> list[AuthorizationRow]:
             rows = conn.execute(
-                "SELECT a.auth_id, a.client_id, a.nc_user, a.scopes, a.resource, a.created_at, "
+                "SELECT a.auth_id, a.client_id, a.nc_user, a.scopes, a.resource, a.created_at, "  # noqa: S608 - the concatenated piece holds "?" marks only, never a value
                 "a.revoked_at, a.cleanup_at, a.nc_account_id, a.nc_display_name "
                 "FROM authorizations AS a "
                 "LEFT JOIN flows AS f ON f.flow_id = a.auth_id "
                 "WHERE a.revoked_at IS NULL AND f.flow_id IS NULL AND a.created_at < ? "
-                "AND NOT EXISTS (SELECT 1 FROM auth_codes AS c WHERE c.auth_id = a.auth_id) "
+                + exclusion
+                + "AND NOT EXISTS (SELECT 1 FROM auth_codes AS c WHERE c.auth_id = a.auth_id) "
                 "AND NOT EXISTS (SELECT 1 FROM refresh_tokens AS r WHERE r.auth_id = a.auth_id) "
                 "AND NOT EXISTS (SELECT 1 FROM access_tokens AS t WHERE t.auth_id = a.auth_id) "
                 "ORDER BY a.created_at LIMIT ?",
-                (moment - FLOW_TTL, limit),
+                (moment - FLOW_TTL, *except_clients, limit),
             ).fetchall()
             return [_authorization_row(row) for row in rows]
 
