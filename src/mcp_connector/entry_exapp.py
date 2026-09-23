@@ -488,7 +488,46 @@ def _resolved_env() -> tuple[dict[str, str], frozenset[str]]:
             "deploy environment: %s",
             ", ".join(sorted(overlay)),
         )
-    return {**env, **overlay}, refused
+    resolved = {**env, **overlay}
+    # The third link of the precedence chain (BL-17), hung in AFTER the overlay merge so a
+    # stored admin value and the deploy variable both win exactly as before. Injected into
+    # the resolved mapping rather than read anywhere else, so every consumer of the public
+    # address sees it without a signature change, including deployment_hosts and the 421
+    # warning below.
+    _fill_public_url_from_derivation(resolved)
+    return resolved, refused
+
+
+def _fill_public_url_from_derivation(resolved: dict[str, str]) -> bool:
+    """Fill an empty public address with the one derived from ``NEXTCLOUD_URL`` (BL-17).
+
+    The third link of the precedence chain of plan 05-01, between the deploy variable and
+    the documented default. It runs in two places and is one function so the rescue of
+    :func:`main` falls back to the same line of code instead of a copy: here after the
+    overlay merge, and in the ``IssuerRefused`` branch after the unusable variable was
+    dropped.
+
+    The candidate is validated by :func:`config_values.derived_public_url` exactly like an
+    admin form value (assumption A2 of phase 05, answered with validation instead of
+    trust), so a filled address here is never the silent broken default A2 warned about,
+    and an http downgrade or an internal name fills nothing. The INFO line names the
+    variables and never a value (T-05-21): a container log has to say which source won,
+    and it must not carry an address.
+    """
+    if (resolved.get(config.ENV_PUBLIC_URL) or "").strip():
+        return False
+    derived = config_values.derived_public_url(resolved)
+    if derived is None:
+        return False
+    resolved[config.ENV_PUBLIC_URL] = derived
+    logger.info(
+        "neither the administration settings of this app nor %s name a public address, so "
+        "this start derives its own from %s as the documented /exapps/<app id> path. A "
+        "stored value or the variable wins over the derived address on any later start.",
+        config.ENV_PUBLIC_URL,
+        config.ENV_NEXTCLOUD_URL,
+    )
+    return True
 
 
 def main() -> None:
@@ -544,9 +583,11 @@ def main() -> None:
         # anything is built, because the state it records is the state the application below
         # is about to be built with (D-15, D-16). It never raises: see :func:`_record_the_switch`.
         _record_the_switch(resolved)
-        # The one value an installation has to set (WR-09). It becomes the issuer, the audience
-        # of every token, the resource_metadata pointer, the prefix of every form action and
-        # the target of the consent redirect.
+        # The value every OAuth answer is formed from (WR-09). It becomes the issuer, the
+        # audience of every token, the resource_metadata pointer, the prefix of every form
+        # action and the target of the consent redirect. Since BL-17 it no longer has to be
+        # set by hand on every installation: `_resolved_env` derives it from NEXTCLOUD_URL
+        # when neither the form nor the variable produced one.
         #
         # Until plan 05-04 this was SystemExit(2), and that exit was the deadlock of a one
         # click installation: a store install in NC 34 sets no variable at all (05-RESEARCH,
@@ -556,10 +597,15 @@ def main() -> None:
         # refusing to run any more. It is kept by this error line and by the visible setup state
         # on the connections page, while the process stays alive long enough to be configured.
         #
-        # No address is derived from NEXTCLOUD_URL here, deliberately (assumption A2): AppAPI
-        # sets that variable with https replaced by http and it may be an internal address. A
-        # derived value would be a silent default with broken discovery, which looks exactly
-        # like a configured installation and is the failure this plan removes.
+        # Assumption A2 said: derive nothing from NEXTCLOUD_URL, because AppAPI sets that
+        # variable with https replaced by http and it may be an internal address, so a
+        # derived value would be a silent default with broken discovery. A2's worry is
+        # answered now instead of ignored (BL-17): the derivation in `_resolved_env` runs its
+        # candidate through the same validation core as an admin form value
+        # (`config_values._validated_address`, https or loopback per RFC 8414), an http
+        # downgrade or an internal name derives nothing, and a derived address is named in
+        # the log rather than silent. This branch is therefore only reached when all three
+        # sources are empty or unusable, and "no silent broken default" stays true.
         if (
             config.exapp_configured(resolved)
             and not (resolved.get(config.ENV_PUBLIC_URL) or "").strip()
@@ -579,14 +625,15 @@ def main() -> None:
                 else "no public address is stored in Nextcloud either"
             )
             logger.error(
-                "%s is not set and %s. Until a usable one is set, every discovery document, "
-                "the audience of every token and the consent redirect name %s, and no client "
-                'can connect. Set it in "%s", then disable and enable this app again '
-                "(occ app_api:app:disable %s, occ app_api:app:enable %s). This process keeps "
-                "serving on purpose, so that form exists at all; the connections page says "
-                "the same thing.",
+                "%s is not set, %s, and no usable address could be derived from %s. Until a "
+                "usable one is set, every discovery document, the audience of every token "
+                'and the consent redirect name %s, and no client can connect. Set it in "%s", '
+                "then disable and enable this app again (occ app_api:app:disable %s, "
+                "occ app_api:app:enable %s). This process keeps serving on purpose, so that "
+                "form exists at all; the connections page says the same thing.",
                 config.ENV_PUBLIC_URL,
                 state,
+                config.ENV_NEXTCLOUD_URL,
                 config.DEFAULT_PUBLIC_URL,
                 strings.ADMIN_SETTINGS_PLACE,
                 app_id,
@@ -621,14 +668,17 @@ def main() -> None:
         # a value the administrator typed stays where she typed it, so she finds it in the form
         # and corrects it instead of silently losing what she entered.
         #
-        # Both places are named, and that is IN-02 of the re-review. The line used to say "the
-        # stored value is kept ... correct it where it was entered" and point at the form
-        # alone. Since the prevention half of CR-01 refuses an unusable form value in
+        # All three sources are named, and that is the successor of IN-02. The line used to
+        # say "the stored value is kept ... correct it where it was entered" and point at the
+        # form alone. Since the prevention half of CR-01 refuses an unusable form value in
         # `config_values._public_url`, the case that really reaches this branch is the other
         # one: a deploy variable, which nothing validates. An administrator sent to the form
-        # then looks for a stored value that is not there. Naming both sources with the rule
-        # between them is true whichever of the two it was, and the INFO line of
-        # `_resolved_env` above says which one won on this start.
+        # then looks for a stored value that is not there. Naming the sources with the rule
+        # between them is true whichever it was, and the INFO lines of `_resolved_env` above
+        # say which one won on this start. Since BL-17 the drop below falls onto the third
+        # source before the documented default: the same derivation `_resolved_env` uses, and
+        # it cannot raise a second `IssuerRefused`, because the https-or-loopback rule of the
+        # validation core covers the SDK's issuer rule (CR-01 prevention).
         #
         # The value itself is never named: it may have come out of the form and travelled over
         # HTTP (T-05-21), and this log is read by everyone who reads container logs.
@@ -659,24 +709,36 @@ def main() -> None:
             )
             raise SystemExit(2) from None
         resolved.pop(config.ENV_PUBLIC_URL, None)
+        derived_in_force = _fill_public_url_from_derivation(resolved)
+        outcome = (
+            f"serves with the address derived from {config.ENV_NEXTCLOUD_URL}"
+            if derived_in_force
+            else (
+                "keeps serving with the documented default in the meantime; the "
+                "connections page says the same thing"
+            )
+        )
         logger.error(
             "%s %s Nothing is deleted in Nextcloud, so every value stays where it was set. "
             'Correct the deploy variable %s, or enter a usable address in "%s" (a stored '
-            "value wins over the variable), then disable and enable this app again "
-            "(occ app_api:app:disable %s, occ app_api:app:enable %s). This process keeps "
-            "serving with the documented default in the meantime; the connections page "
-            "says the same thing.",
+            "value wins over the variable, and the variable wins over the address derived "
+            "from %s), then disable and enable this app again (occ app_api:app:disable %s, "
+            "occ app_api:app:enable %s). This process %s.",
             exc.message,
             exc.hint,
             config.ENV_PUBLIC_URL,
             strings.ADMIN_SETTINGS_PLACE,
+            config.ENV_NEXTCLOUD_URL,
             app_id,
             app_id,
+            outcome,
         )
         try:
-            # Exactly one more attempt, and with the address gone: config.public_url answers
-            # the loopback default now, which the SDK accepts. A build that fails again fails
-            # for a different reason, and that is not something to retry.
+            # Exactly one more attempt, and with the unusable address gone: the derivation
+            # above filled the mapping when NEXTCLOUD_URL allowed it, otherwise
+            # config.public_url answers the loopback default now, and the SDK accepts both.
+            # A build that fails again fails for a different reason, and that is not
+            # something to retry.
             app = build_exapp_app(resolved)
         except ToolError as second:
             logger.error("%s %s", second.message, second.hint)
