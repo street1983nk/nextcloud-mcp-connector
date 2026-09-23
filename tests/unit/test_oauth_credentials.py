@@ -29,12 +29,18 @@ from starlette.requests import Request
 
 from mcp_connector import config, deps
 from mcp_connector.exapp.target import exapp_target
-from mcp_connector.nextcloud.credentials import MODE_BASIC, MODES
+from mcp_connector.nextcloud.credentials import MODE_APPAPI, MODE_BASIC, MODES
 from mcp_connector.oauth import provider as provider_module
 from mcp_connector.oauth import registry
+from mcp_connector.oauth.exchange_accounts import EXCHANGE_CLIENT_ID
 from mcp_connector.oauth.metadata import TOOL_SCOPE
 from mcp_connector.oauth.store import OAuthStore
-from mcp_connector.oauth.verifier import OAUTH_STATE_ATTR, OAuthIdentity, StoreTokenVerifier
+from mcp_connector.oauth.verifier import (
+    CREDENTIAL_IMPERSONATE,
+    OAUTH_STATE_ATTR,
+    OAuthIdentity,
+    StoreTokenVerifier,
+)
 
 APP_ID = "mcp_connector"
 APP_SECRET = "app-secret-test"
@@ -305,3 +311,135 @@ def test_the_credentials_use_the_login_name_and_not_the_principal(exapp_env: Non
     )
 
     assert creds.user == "alice@example.com"
+
+
+# --- the second branch of the credential layer: AppAPI impersonation (CRED-01) ---------------
+
+
+def impersonation(**fields: Any) -> OAuthIdentity:
+    """The identity a mapped account arrives with: no password, no stored authorization."""
+    values: dict[str, Any] = {
+        "app_password": "",
+        "auth_id": "",
+        "client_id": EXCHANGE_CLIENT_ID,
+        "credential": CREDENTIAL_IMPERSONATE,
+    }
+    values.update(fields)
+    return identity(**values)
+
+
+@pytest.fixture
+def standalone_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The standalone OAuth deployment: no AppAPI variables, so there is no app secret."""
+    for name in (
+        config.ENV_APP_ID,
+        config.ENV_APP_SECRET,
+        config.ENV_APP_VERSION,
+        config.ENV_AA_VERSION,
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv(config.ENV_AUTH_MODE, config.AUTH_MODE_OAUTH)
+    monkeypatch.setenv(config.ENV_URL, BASE_URL)
+
+
+def missing_identity_message() -> str:
+    """The refusal of a request without a user context, read off the real branch."""
+    with pytest.raises(deps.MCPError) as raised:
+        deps.resolve_credentials(FakeContext(headers=appapi_headers(user="")))
+    return raised.value.message
+
+
+def test_an_impersonation_identity_becomes_appapi_credentials_in_the_exapp_mode(
+    exapp_env: None,
+) -> None:
+    """CRED-01: the container acts in the name of the mapped account, nothing provisioned.
+
+    The user is the principal of the identity, the secret is the app secret of this
+    installation, and the three deployment values are the ones AppAPI handed this container.
+    """
+    creds = deps.resolve_credentials(
+        FakeContext(headers=appapi_headers(user=""), identity=impersonation())
+    )
+
+    assert creds.mode == MODE_APPAPI
+    assert creds.user == NC_USER
+    assert creds.secret == APP_SECRET
+    assert creds.base_url == BASE_URL
+    assert creds.app_id == APP_ID
+    assert creds.app_version == APP_VERSION
+    assert creds.aa_version == AA_VERSION
+
+
+def test_the_impersonation_way_never_uses_the_empty_app_password(exapp_env: None) -> None:
+    """The credential layer reads the way and never the emptiness of the password field."""
+    creds = deps.resolve_credentials(
+        FakeContext(headers=appapi_headers(user=""), identity=impersonation())
+    )
+
+    assert creds.secret != ""
+    assert creds.mode != MODE_BASIC
+
+
+def test_outside_the_exapp_mode_the_same_identity_is_an_indistinguishable_refusal(
+    standalone_env: None,
+) -> None:
+    """T-23-12: without ExApp settings there is no app secret to impersonate with.
+
+    Word for word the same message as a request without any identity, so the outside
+    cannot tell the difference between the two refusals.
+    """
+    with pytest.raises(deps.MCPError) as raised:
+        deps.resolve_credentials(FakeContext(headers={}, identity=impersonation()))
+
+    with pytest.raises(deps.MCPError) as missing:
+        deps.resolve_credentials(FakeContext(headers={}))
+
+    assert raised.value.message == missing.value.message
+    assert APP_SECRET not in raised.value.message
+    assert NC_USER not in raised.value.message
+
+
+def test_an_impersonation_identity_with_an_empty_user_is_a_refusal(exapp_env: None) -> None:
+    """T-02-12: an empty user id in the AppAPI header would be the app context, never built."""
+    with pytest.raises(deps.MCPError) as raised:
+        deps.resolve_credentials(
+            FakeContext(
+                headers=appapi_headers(user=""),
+                identity=impersonation(nc_user="", principal=""),
+            )
+        )
+
+    assert raised.value.message == missing_identity_message()
+    assert APP_SECRET not in raised.value.message
+
+
+def test_a_revoked_impersonation_identity_gets_the_revocation_answer_first(
+    exapp_env: None,
+) -> None:
+    """``revoked`` is checked before the credential way, in both branches alike."""
+    with pytest.raises(deps.MCPError) as raised:
+        deps.resolve_credentials(
+            FakeContext(headers=appapi_headers(user=""), identity=impersonation(revoked=True))
+        )
+
+    assert "connect" in raised.value.message.lower()
+    assert APP_SECRET not in raised.value.message
+
+
+def test_nothing_of_the_impersonation_branch_reaches_a_log_or_a_repr(
+    exapp_env: None, caplog: pytest.LogCaptureFixture
+) -> None:
+    """T-23-13: no app secret, no principal and no header in a line or a repr."""
+    with caplog.at_level(logging.DEBUG):
+        creds = deps.resolve_credentials(
+            FakeContext(headers=appapi_headers(user=""), identity=impersonation())
+        )
+
+    assert caplog.text.strip() == ""
+    assert APP_SECRET not in repr(creds)
+
+
+def test_the_no_user_context_message_exists_exactly_once_in_the_module() -> None:
+    """One sentence for every refusal that must stay indistinguishable from the others."""
+    source = Path(deps.__file__).read_text(encoding="utf-8")
+    assert source.count("This request has no user context") == 1
