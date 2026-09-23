@@ -189,7 +189,18 @@ Plans:
   4. Eine Messdatei neben den bestehenden Client-Nachweisen zeigt zwei über Exchange gemappte Konten, von denen keines die Dateien des anderen sieht, gemessen und nicht argumentiert
   5. Eine Doku unter `docs/` führt von der Keycloak-Seite bis zum ersten Werkzeugaufruf, nennt die empfohlene Audience-Konvention und das `occ oauth2:add-client`-Playbook und sagt ausdrücklich, was der Pfad nicht leistet und was an F13s vier offenen Antworten hängt
 
-**Plans**: TBD
+**Plans**: 9 plans
+
+Plans:
+- [ ] 24-01-PLAN.md: Die handelnde Partei (azp) als eigenes Feld in der Audit-Zeile, ueber die bestehende Spalte `actor` (AUDIT-07)
+- [ ] 24-02-PLAN.md: Der Ablehnungsbezeichner an `ExchangeRefused`, sechs gruppierte Gruende, und das Antwort-Gate gegen ein Orakel (AUDIT-07)
+- [ ] 24-03-PLAN.md: Die gefegte Abweisungskette `x:exchange` und die Schreibbremse des vor-authentischen Pfads (AUDIT-07)
+- [ ] 24-04-PLAN.md: Der Ablehnungsschreiber an der Kette, an beiden Einstiegspunkten, plus das Gate gegen Claim-Leaks (AUDIT-07)
+- [ ] 24-05-PLAN.md: Die Regel des Trockenlaufs als reine Funktion, mit eigenem Schluesselsatz und Drift-Gate (EXCH-06)
+- [ ] 24-06-PLAN.md: `occ mcp_connector:exchange:check` als viertes Kommando, mit gemessener Bodygrenze (EXCH-06)
+- [ ] 24-07-PLAN.md: BL-21: der gemessene 429-Lauf gegen die gebaute ExApp (IN-04) und die nachgemessene JWKS-Abrufgrenze (IN-05)
+- [ ] 24-08-PLAN.md: Der Zwei-Konten-Negativbeweis als Messdatei `docs/exchange-evidence.md` (EXCH-07)
+- [ ] 24-09-PLAN.md: Die Einrichtungsdoku `docs/token-exchange.md` von der Keycloak-Seite bis zum ersten Werkzeugaufruf (EXCH-08)
 
 **Reihenfolge-Begründung**: Die Serialisierung folgt drei unabhängig belegten Punkten aus `research/SUMMARY.md`. Phase 20 steht zuerst, weil eine zweite Schlüsselsatz-Implementierung die Sorte Doppelpflege erzeugt, bei der eine Lücke später nur in einer der zwei Kopien geschlossen wird. Phase 21 baut den Prüfer als freistehende Funktionen, weil vier der zwölf kritischen Pitfalls dort vollständig gegen selbst erzeugte Schlüssel verifizierbar sind, ohne auf F13 zu warten. Phase 22 fasst Konfiguration und Kette zusammen, weil die Kette die Feldnamen der Konfiguration ohnehin kennen muss und beide denselben Aus-Zustand beweisen. Phase 23 kommt nach der Kette, weil die Vollmachtsfrage mit D-v1.6-01 entschieden ist und nur noch umgesetzt wird, und Phase 24 zuletzt, weil Audit-Zeile, Lasttest und Zwei-Konten-Beweis einen betriebsfähigen Pfad voraussetzen.
 
@@ -219,8 +230,8 @@ Plans:
 | 20. JWKS-Schicht und PyJWT-Stand | v1.6 | 2/2 | Complete   | 2026-09-19 |
 | 21. Exchange-Verifier | v1.6 | 2/2 | Complete   | 2026-09-19 |
 | 22. Konfiguration, Kette und Drosselung | v1.6 | 3/3 | Complete   | 2026-09-19 |
-| 23. Konto-Mapping und Credential-Wege | v1.6 | 0/6 | Planned | - |
-| 24. Audit-Anschluss und Nachweis | v1.6 | 0/0 | Not started | - |
+| 23. Konto-Mapping und Credential-Wege | v1.6 | 6/6 | Complete | 2026-09-23 |
+| 24. Audit-Anschluss und Nachweis | v1.6 | 0/9 | Planned | - |
 
 ## Next
 
