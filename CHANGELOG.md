@@ -53,6 +53,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   those is never counted and never refused by this bound, not even while a flood of foreign
   ones is running. With the exchange path off, nothing of this hangs at the route at all.
 
+### Changed
+
+- The Findling sentence of the three store descriptions speaks plain language and no
+  longer carries the acronym; a unit gate holds the rule, and the store page shows the
+  new wording with the next release.
+
 ## [0.2.1] - 2026-09-18
 
 Text only, and it needs its own release because the store reads the manifest at upload

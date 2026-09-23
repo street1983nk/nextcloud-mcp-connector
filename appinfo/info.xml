@@ -68,7 +68,7 @@
 - Tools: files, calendar, notes, Deck, contacts, Tables, Talk, mail (read only) and one search across all of it
 - Nothing destructive: no delete, no move, no share; nothing in the background, no telemetry
 
-Together with [Findling](https://apps.nextcloud.com/apps/findling), this connector forms the retrieval layer for your own RAG: search hits include document contents, scans included, with exactly the rights of the asking user.
+Together with [Findling](https://apps.nextcloud.com/apps/findling), search hits include the contents of your documents, scans included, with exactly the rights of the asking user.
 
 ### Enterprise
 
@@ -85,7 +85,7 @@ Requirements:
 - Werkzeuge: Dateien, Kalender, Notizen, Deck, Kontakte, Tables, Talk, Mail (nur lesen) und eine Suche über alles
 - Nichts Destruktives: kein Löschen, kein Verschieben, kein Teilen; nichts im Hintergrund, keine Telemetrie
 
-Zusammen mit [Findling](https://apps.nextcloud.com/apps/findling) ergibt dieser Connector die Retrieval-Schicht für Ihr eigenes RAG: Suchtreffer enthalten Dokumentinhalte, auch aus Scans, mit genau den Rechten des fragenden Nutzers.
+Zusammen mit [Findling](https://apps.nextcloud.com/apps/findling) enthalten Suchtreffer die Inhalte Ihrer Dokumente, auch aus Scans, mit genau den Rechten des fragenden Nutzers.
 
 ### Enterprise
 
@@ -102,7 +102,7 @@ Anforderungen:
 - Outils : fichiers, calendrier, notes, Deck, contacts, Tables, Talk, mail (lecture seule) et une recherche sur tout
 - Rien de destructif : pas de suppression, pas de déplacement, pas de partage ; rien en arrière-plan, pas de télémétrie
 
-Avec [Findling](https://apps.nextcloud.com/apps/findling), ce connecteur forme la couche de récupération de votre propre RAG : les résultats de recherche incluent le contenu des documents, numérisations comprises, avec exactement les droits de l'utilisateur qui demande.
+Avec [Findling](https://apps.nextcloud.com/apps/findling), les résultats de recherche incluent le contenu de vos documents, numérisations comprises, avec exactement les droits de l'utilisateur qui demande.
 
 ### Enterprise
 
