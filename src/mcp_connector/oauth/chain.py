@@ -46,6 +46,18 @@ milestone changes. What an operator configures, and what this module defaults:
     exchanged token of Keycloak carries.
 ``config.ENV_EXCHANGE_ALGORITHMS``
     Defaults to ``exchange.DEFAULT_EXCHANGE_ALGORITHMS``, comma separated when set.
+``config.ENV_EXCHANGE_MAPPING``
+    Which mapping profile of ``oauth/mapping.py`` turns the checked claim set of an
+    exchanged token into the canonical Nextcloud principal (MAP-01). Defaults to
+    ``config.DEFAULT_EXCHANGE_MAPPING``: the value of the configured claim is the account
+    id itself, which is the case in which the provider carries the canonical id and the
+    assumption an installation without an F13 answer is least wrong with. The rules of a
+    profile live in the mapping module and are not written a second time here.
+``config.ENV_EXCHANGE_OIDC_PROVIDER_ID``
+    No default, and it belongs to the sub profile alone: the positive numeric id of the
+    ``user_oidc`` provider its derivation is keyed with. Set while the account id profile
+    is in force, it is refused rather than ignored, because a value nobody reads is the
+    same half state an empty variable is.
 
 Nothing that came out of the environment is logged or put into a message anywhere in this
 module: not the issuer, not the audience, not the claim name. Refusals name variables. An
@@ -70,6 +82,7 @@ from .exchange import (
     ExchangeSettings,
     ExchangeTokenChecker,
 )
+from .mapping import MappingSettings
 from .metadata import RESOURCE_SUFFIX, TOOL_SCOPE
 from .verifier import IdentitySource, OAuthIdentity
 
@@ -105,8 +118,10 @@ _HINT = (
     f"The token exchange path stays off until {config.ENV_EXCHANGE_ENABLED} arms it. "
     f"Armed, it requires {config.ENV_EXCHANGE_ISSUER} and {config.ENV_EXCHANGE_AZP}; "
     f"{config.ENV_EXCHANGE_JWKS_URI}, {config.ENV_EXCHANGE_JWKS_ORIGIN}, "
-    f"{config.ENV_EXCHANGE_AUDIENCE}, {config.ENV_EXCHANGE_ACCOUNT_CLAIM} and "
-    f"{config.ENV_EXCHANGE_ALGORITHMS} have defaults, documented in oauth/chain.py."
+    f"{config.ENV_EXCHANGE_AUDIENCE}, {config.ENV_EXCHANGE_ACCOUNT_CLAIM}, "
+    f"{config.ENV_EXCHANGE_ALGORITHMS} and {config.ENV_EXCHANGE_MAPPING} have defaults, "
+    f"documented in oauth/chain.py; {config.ENV_EXCHANGE_OIDC_PROVIDER_ID} belongs to the "
+    "sub profile alone."
 )
 
 
@@ -119,12 +134,16 @@ class ExchangeConfig:
     """
 
     settings: ExchangeSettings
-    #: Which claim of an exchanged token names the account. Nobody evaluates it in this
-    #: phase; MAP-01 in phase 23 maps it onto a Nextcloud account. It is read here anyway
-    #: because CONF-01 makes it configuration with a documented default, and because a
-    #: configuration value that is first read in the phase that needs it ends up living
-    #: between mapping code instead of next to the other seven variables of its namespace.
+    #: Which claim of an exchanged token names the account. Since 23-01 the mapping below
+    #: reads it: it travels as ``mapping.account_claim`` into
+    #: ``mapping.principal_from_claims``, which is the one function that turns the checked
+    #: claim set into the canonical principal. It stays here as well, as the configured
+    #: value next to the other variables of its namespace.
     account_claim: str
+    #: The validated mapping profile of MAP-01, built by :func:`load_exchange_config` from
+    #: the two mapping variables of the namespace. Half configured breaks the start with a
+    #: named refusal; nothing reads an identity out of it before plan 23-02.
+    mapping: MappingSettings
 
 
 def load_exchange_config(env: Mapping[str, str] | None = None) -> ExchangeConfig | None:
@@ -149,6 +168,8 @@ def load_exchange_config(env: Mapping[str, str] | None = None) -> ExchangeConfig
         _optional(source, config.ENV_EXCHANGE_ACCOUNT_CLAIM)
         or config.DEFAULT_EXCHANGE_ACCOUNT_CLAIM
     )
+    mapping_name = _optional(source, config.ENV_EXCHANGE_MAPPING) or config.DEFAULT_EXCHANGE_MAPPING
+    oidc_provider_id = _provider_id(_optional(source, config.ENV_EXCHANGE_OIDC_PROVIDER_ID))
     raw_algorithms = _optional(source, config.ENV_EXCHANGE_ALGORITHMS)
     algorithms = (
         _allowlist(raw_algorithms, config.ENV_EXCHANGE_ALGORITHMS)
@@ -175,7 +196,24 @@ def load_exchange_config(env: Mapping[str, str] | None = None) -> ExchangeConfig
         raise ToolError(
             message=f"The token exchange configuration is invalid: {exc}.", hint=_HINT
         ) from None
-    return ExchangeConfig(settings=settings, account_claim=account_claim)
+    try:
+        mapping = MappingSettings(
+            strategy=mapping_name, account_claim=account_claim, oidc_provider_id=oidc_provider_id
+        )
+    except ValueError as exc:
+        # The same seam as three lines above: the rules live in ``oauth/mapping.py`` and
+        # are not written a second time here. The translation names the two variables the
+        # operator can act on, because the ValueError names a field, and a field name in a
+        # container log points at this app rather than at the value that has to change. The
+        # text of the ValueError never repeats a value, which is why it travels unchanged.
+        raise ToolError(
+            message=(
+                f"The token exchange mapping configured by {config.ENV_EXCHANGE_MAPPING} and "
+                f"{config.ENV_EXCHANGE_OIDC_PROVIDER_ID} is invalid: {exc}."
+            ),
+            hint=_HINT,
+        ) from None
+    return ExchangeConfig(settings=settings, account_claim=account_claim, mapping=mapping)
 
 
 def _refuse_a_disarmed_configuration(source: Mapping[str, str]) -> None:
@@ -272,6 +310,25 @@ def _optional(source: Mapping[str, str], name: str) -> str | None:
             ),
         )
     return value
+
+
+def _provider_id(raw: str | None) -> int | None:
+    """The provider id as a positive whole number, or ``None`` when it is not configured.
+
+    The refusal follows the rule of every reader in this module: it names the variable and
+    never repeats the value, and it falls here rather than in the mapping constructor so an
+    operator reads "this variable is not a number" instead of a type complaint about a
+    field of an object no deployment ever sees. What number is acceptable for which profile
+    stays a rule of ``oauth/mapping.py`` and is not judged here.
+    """
+    if raw is None:
+        return None
+    if not raw.isdigit() or int(raw, 10) <= 0:
+        raise ToolError(
+            message=(f"{config.ENV_EXCHANGE_OIDC_PROVIDER_ID} is not a positive whole number."),
+            hint=_HINT,
+        )
+    return int(raw, 10)
 
 
 def _allowlist(raw: str, name: str) -> tuple[str, ...]:

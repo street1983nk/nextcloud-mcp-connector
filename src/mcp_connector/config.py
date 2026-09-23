@@ -84,10 +84,10 @@ ENV_TRUST_FORWARDED_FOR = "NC_MCP_TRUST_FORWARDED_FOR"
 ENV_BIND_HOST = "NC_MCP_BIND_HOST"
 ENV_BIND_PORT = "NC_MCP_BIND_PORT"
 
-# The token exchange path of milestone v1.6 (CONF-01, EXCH-*). It gets a namespace of its
-# own because it is a second verification path next to the tokens this server issues
+# The token exchange path of milestone v1.6 (CONF-01, EXCH-*, MAP-01). It gets a namespace
+# of its own because it is a second verification path next to the tokens this server issues
 # itself, and one prefix has to show which variables arm a foreign issuer. The switch
-# stands first and the path is off without it; the other seven are read by
+# stands first and the path is off without it; the other nine are read by
 # ``oauth/chain.load_exchange_config`` and by nothing in this module.
 ENV_EXCHANGE_ENABLED = "NC_MCP_EXCHANGE_ENABLED"
 ENV_EXCHANGE_ISSUER = "NC_MCP_EXCHANGE_ISSUER"
@@ -97,6 +97,14 @@ ENV_EXCHANGE_AUDIENCE = "NC_MCP_EXCHANGE_AUDIENCE"
 ENV_EXCHANGE_AZP = "NC_MCP_EXCHANGE_AZP"
 ENV_EXCHANGE_ACCOUNT_CLAIM = "NC_MCP_EXCHANGE_ACCOUNT_CLAIM"
 ENV_EXCHANGE_ALGORITHMS = "NC_MCP_EXCHANGE_ALGORITHMS"
+#: Which mapping profile of ``oauth/mapping.py`` turns the checked claim set of an exchanged
+#: token into the canonical Nextcloud principal (MAP-01). The default is
+#: :data:`DEFAULT_EXCHANGE_MAPPING`, documented there with its reasoning.
+ENV_EXCHANGE_MAPPING = "NC_MCP_EXCHANGE_MAPPING"
+#: The positive numeric id of the ``user_oidc`` provider the sub profile derives account ids
+#: with. It belongs to that profile alone and has no default: set next to the account id
+#: profile it is refused, because a value nobody reads is a half state.
+ENV_EXCHANGE_OIDC_PROVIDER_ID = "NC_MCP_EXCHANGE_OIDC_PROVIDER_ID"
 
 #: Which claim of an exchanged token names the account, unless an operator configures
 #: another one. ``sub`` is the only claim Keycloak writes into every exchanged token and the
@@ -105,6 +113,16 @@ ENV_EXCHANGE_ALGORITHMS = "NC_MCP_EXCHANGE_ALGORITHMS"
 #: one of the four F13 answers that are still open, which is why the claim is configuration
 #: here and not a constant in the mapping code of phase 23.
 DEFAULT_EXCHANGE_ACCOUNT_CLAIM = "sub"
+
+#: The mapping profile an armed path takes when none is configured: the value of the
+#: configured claim is taken unchanged as the canonical account id (``account_id_v1`` in
+#: ``oauth/mapping.py``). That is the case in which the provider carries the canonical
+#: Nextcloud id itself, and it is the assumption an installation without an answer to the
+#: open F13 questions is least wrong with: it invents nothing, derives nothing and is the
+#: LDAP-capable profile, in which a login name never occurs. The name stands here as a
+#: string and not as an import, because ``config`` imports nothing from ``oauth``; a test
+#: holds it against the constant of the mapping module so the two cannot drift apart.
+DEFAULT_EXCHANGE_MAPPING = "account_id_v1"
 
 #: Every name of the namespace, the switch included. This is the collection
 #: ``oauth/chain.load_exchange_config`` holds a disarmed process against, so a configured but
@@ -119,6 +137,8 @@ EXCHANGE_VARIABLES: tuple[str, ...] = (
     ENV_EXCHANGE_AZP,
     ENV_EXCHANGE_ACCOUNT_CLAIM,
     ENV_EXCHANGE_ALGORITHMS,
+    ENV_EXCHANGE_MAPPING,
+    ENV_EXCHANGE_OIDC_PROVIDER_ID,
 )
 
 Mode = Literal["stdio", "exapp", "oauth", "http_passthrough", "http_static_bearer"]
