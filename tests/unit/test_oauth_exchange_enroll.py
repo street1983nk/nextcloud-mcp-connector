@@ -1013,7 +1013,14 @@ def test_the_same_exchanged_token_is_accepted_before_and_refused_after_revocatio
         return_value=httpx.Response(200)
     )
     env = measure_env(tmp_path)
-    app_store = OAuthStore(tmp_path / "storage" / STORE_FILE, bytes.fromhex(MEASURE_KEY_HEX))
+    # Owner-only before the first write: the application opens this same path strictly
+    # below and its opener refuses any group or other bits on POSIX, while SQLite alone
+    # would create the file with the umask default (0644).
+    store_path = tmp_path / "storage" / STORE_FILE
+    store_path.parent.mkdir(parents=True, exist_ok=True)
+    store_path.touch()
+    store_path.chmod(0o600)
+    app_store = OAuthStore(store_path, bytes.fromhex(MEASURE_KEY_HEX))
     asyncio.run(seed_binding(app_store))
     app = entry_oauth.build_oauth_app(env)
     token = signed_exchange_token()

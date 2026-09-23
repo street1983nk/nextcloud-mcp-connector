@@ -412,8 +412,17 @@ def standalone_env(tmp_path: Path) -> dict[str, str]:
 
 
 def app_store(tmp_path: Path) -> OAuthStore:
-    """The very store file of the built application, opened with its configured data key."""
-    return OAuthStore(tmp_path / "storage" / STORE_FILE, bytes.fromhex(SECRET_KEY_HEX))
+    """The very store file of the built application, opened with its configured data key.
+
+    The file is laid down owner-only before the first write, because the application opens
+    this same path strictly afterwards and its opener refuses any group or other bits on
+    POSIX; SQLite alone would create the file with the umask default (0644).
+    """
+    path = tmp_path / "storage" / STORE_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch()
+    path.chmod(0o600)
+    return OAuthStore(path, bytes.fromhex(SECRET_KEY_HEX))
 
 
 def app_store_rows(tmp_path: Path) -> int:
