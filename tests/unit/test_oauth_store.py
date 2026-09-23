@@ -505,6 +505,142 @@ async def test_an_unknown_or_empty_account_has_an_empty_connection_list(tmp_path
     assert await subject.authorizations_of_user("") == []
 
 
+# --- the one living binding of an account under a reserved client (CRED-02) ----------
+
+#: A reserved identifier of the shape the exchange path books under. Deliberately not the
+#: real one: the store knows no reserved client, so any value has to work the same way.
+RESERVED_CLIENT = "urn:mcp-connector:a-reserved-path"
+OTHER_CLIENT = "client-0815"
+
+
+async def with_reserved_binding(
+    subject: store.OAuthStore,
+    *,
+    auth_id: str = "binding-1",
+    nc_user: str = NC_USER,
+    account_id: str | None = None,
+    client_id: str = RESERVED_CLIENT,
+    moment: int = 1_000,
+) -> None:
+    """One living authorization under a reserved client, the row plan 23-05 will write."""
+    await subject.save_client(client_id, metadata_json='{"client_id": "reserved"}', allowed=False)
+    await subject.create_authorization(
+        auth_id,
+        client_id=client_id,
+        nc_user=nc_user,
+        nc_account_id=account_id or nc_user,
+        app_password=APP_PASSWORD,
+        scopes=SCOPES,
+        resource=RESOURCE,
+        now=moment,
+    )
+
+
+@pytest.mark.anyio
+async def test_the_living_binding_of_an_account_is_found_under_its_client(
+    tmp_path: Path,
+) -> None:
+    """The one question of the read: a living row of this account under exactly this client."""
+    subject = open_store(tmp_path)
+    await with_reserved_binding(subject, account_id="acc-1", nc_user="alice-login")
+
+    row = await subject.binding_of("acc-1", RESERVED_CLIENT)
+
+    assert row is not None
+    assert row.auth_id == "binding-1"
+    assert row.nc_user == "alice-login"
+    assert row.nc_account_id == "acc-1"
+    assert row.client_id == RESERVED_CLIENT
+    assert row.revoked_at is None
+
+
+@pytest.mark.anyio
+async def test_a_legacy_binding_without_an_account_id_is_found_by_its_login_name(
+    tmp_path: Path,
+) -> None:
+    """The single legacy branch of the principal rule holds for this read as well."""
+    subject = open_store(tmp_path)
+    await with_reserved_binding(subject)
+    modify(
+        tmp_path,
+        "INSERT INTO authorizations (auth_id, client_id, nc_user, nc_account_id, "
+        "app_password_enc, scopes, resource, created_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)",
+        ("legacy-binding", RESERVED_CLIENT, "legacy-login", b"blob", SCOPES, RESOURCE, 5_000),
+    )
+
+    row = await subject.binding_of("legacy-login", RESERVED_CLIENT)
+
+    assert row is not None
+    assert row.auth_id == "legacy-binding"
+    assert row.nc_account_id is None
+
+
+@pytest.mark.anyio
+async def test_a_revoked_binding_is_not_found(tmp_path: Path) -> None:
+    """A revoked authorization ended; the very next read no longer answers with it."""
+    subject = open_store(tmp_path)
+    await with_reserved_binding(subject)
+    assert await subject.binding_of(NC_USER, RESERVED_CLIENT) is not None
+
+    await subject.revoke_authorization("binding-1")
+
+    assert await subject.binding_of(NC_USER, RESERVED_CLIENT) is None
+
+
+@pytest.mark.anyio
+async def test_a_binding_of_another_client_is_not_found_for_this_one(tmp_path: Path) -> None:
+    """The client filter cuts both ways, even for rows of the very same account."""
+    subject = open_store(tmp_path)
+    await with_reserved_binding(subject, client_id=OTHER_CLIENT)
+
+    assert await subject.binding_of(NC_USER, RESERVED_CLIENT) is None
+    assert await subject.binding_of(NC_USER, OTHER_CLIENT) is not None
+
+
+@pytest.mark.anyio
+async def test_a_binding_of_another_account_is_not_found(tmp_path: Path) -> None:
+    """Same client, another account: never an answer for this principal."""
+    subject = open_store(tmp_path)
+    await with_reserved_binding(subject, nc_user=OTHER_USER)
+
+    assert await subject.binding_of("carol", RESERVED_CLIENT) is None
+
+
+@pytest.mark.anyio
+async def test_an_empty_principal_or_client_answers_none_before_reading(tmp_path: Path) -> None:
+    """The app context owns nothing here, and the refusal costs no read at all."""
+    subject = open_store(tmp_path)
+
+    assert await subject.binding_of("", RESERVED_CLIENT) is None
+    assert await subject.binding_of("   ", RESERVED_CLIENT) is None
+    assert await subject.binding_of(NC_USER, "") is None
+    assert await subject.binding_of(NC_USER, "   ") is None
+    # No read happened: the lazily created store file was never even opened.
+    assert not (tmp_path / store.STORE_FILENAME).exists()
+
+
+@pytest.mark.anyio
+async def test_of_two_living_bindings_the_youngest_answers(tmp_path: Path) -> None:
+    """The writing side excludes this state; if it exists anyway, the youngest is the truth."""
+    subject = open_store(tmp_path)
+    await with_reserved_binding(subject, auth_id="binding-older", moment=1_000)
+    await subject.create_authorization(
+        "binding-newer",
+        client_id=RESERVED_CLIENT,
+        nc_user=NC_USER,
+        nc_account_id=NC_USER,
+        app_password=APP_PASSWORD,
+        scopes=SCOPES,
+        resource=RESOURCE,
+        now=2_000,
+    )
+
+    row = await subject.binding_of(NC_USER, RESERVED_CLIENT)
+
+    assert row is not None
+    assert row.auth_id == "binding-newer"
+
+
 # --- the per account access switch (EXAPP-02, D-47 to D-50) ------------------------
 
 
