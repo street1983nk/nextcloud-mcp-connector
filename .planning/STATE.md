@@ -801,6 +801,7 @@ Items acknowledged and carried forward from previous milestone close:
 | 2026-09-23 | BL-15 Rest: ehrliche Tool-Beschreibung von unified_search, Contract-Pin umgedreht, Backlog geschlossen | 9a32764, 6ee0a03, 5c4c043 | .planning/quick/260923-bl15-honest-search-note/ |
 | 2026-09-23 | BL-17: Public-URL aus NEXTCLOUD_URL abgeleitet (AIO-No-Config), Präzedenzkette Formwert > Variable > Ableitung > Default gepinnt, Rescue fällt auf Ableitung, Doku umgestellt | dac73f5, cfb74aa, 62ed52b, 5063a9f, 6b215f8 | .planning/quick/260923-bl17-public-url-derivation/ |
 | 2026-09-23 | BL-01 Rest: RAG-Akronym aus den drei Store-Descriptions (neues Gate, Rot-Beweis), Retrieval-Schicht-Satz im n8n-Guide, README-Banner verifiziert, BL-01 STATUS DONE | ff5685b, fdac6f5, fe4929e | .planning/quick/260923-bl01-findling-banner/ |
+| 2026-09-23 | CI-Hotfix: die zwei Phase-23-Tests säen die Store-Datei der gebauten App jetzt owner-only (touch + chmod 0600), sonst verweigert sie der Strict-Opener auf POSIX (CI rot, Windows grün); kein Eingriff in src/ | 1bec2d3 | .planning/quick/260923-ci-store-mode-hotfix/ |
 
 ## Session Continuity
 
