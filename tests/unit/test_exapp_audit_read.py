@@ -100,12 +100,19 @@ class Deployment:
         return self.store
 
     def write_calls(
-        self, chain: str, moments: list[int], *, client_name: str | None = None
+        self,
+        chain: str,
+        moments: list[int],
+        *,
+        client_name: str | None = None,
+        actor: str | None = None,
     ) -> None:
         """Ordinary rows through the public interface, so the chain of the file is real."""
-        asyncio.run(self._write_calls(chain, moments, client_name))
+        asyncio.run(self._write_calls(chain, moments, client_name, actor))
 
-    async def _write_calls(self, chain: str, moments: list[int], client_name: str | None) -> None:
+    async def _write_calls(
+        self, chain: str, moments: list[int], client_name: str | None, actor: str | None
+    ) -> None:
         for at in moments:
             await self.store.append(
                 store.Entry(
@@ -113,11 +120,27 @@ class Deployment:
                     tool="files_search",
                     nc_user=chain.removeprefix("u:"),
                     client_name=client_name,
+                    actor=actor,
                     outcome=store.OUTCOME_OK,
                     params=["query", "dir"],
                     at=at,
                 )
             )
+
+    def write_switch(self, *, at: int) -> None:
+        """The row of D-15, so the second meaning of the ``actor`` column is covered too."""
+        asyncio.run(self._write_switch(at))
+
+    async def _write_switch(self, at: int) -> None:
+        await self.store.append(
+            store.Entry(
+                chain=store.CHAIN_INSTANCE,
+                kind=store.KIND_SWITCH,
+                at=at,
+                actor=store.ACTOR_UNKNOWN,
+                outcome="on",
+            )
+        )
 
     def fill(self, count: int) -> None:
         """``count`` rows with an own connection, in one transaction.
@@ -679,6 +702,83 @@ def test_a_column_that_holds_nothing_is_a_dash_and_never_the_word_none(live: Dep
     assert "None" not in call(live).text
 
 
+# --- the acting party of an exchanged token (AUDIT-07) --------------------------------
+
+
+#: Where the acting party stands in a line: directly behind the client name, so the two
+#: names of a call are read next to each other and never mistaken for one another.
+ACTOR_COLUMN = 5
+
+#: How many columns a line of this answer has. Written down here because the whole point of
+#: the case below is that the number moved, and a case that counts what it found proves
+#: nothing about what it should have found.
+LINE_COLUMNS = 10
+
+
+def test_a_line_carries_the_acting_party_behind_the_client_name(tmp_path: Path) -> None:
+    """AUDIT-07 in the shape an administrator reads: the ``azp`` has a column of its own."""
+    deployment = Deployment(tmp_path)
+    deployment.write_calls(ALICE, [1000], client_name=None, actor="kc-client-of-another-realm")
+
+    _, lines, _ = parts(call(deployment).text)
+    columns = lines[0].split(audit_read.FIELD_SEPARATOR)
+
+    assert len(columns) == LINE_COLUMNS
+    assert columns[ACTOR_COLUMN] == "kc-client-of-another-realm"
+    assert columns[ACTOR_COLUMN - 1] == audit_read.NULL_FIELD, "the client name, and it is empty"
+
+
+def test_a_call_without_an_acting_party_shows_a_dash_in_that_column(live: Deployment) -> None:
+    """The honest placeholder of this module, and never an empty column between two separators."""
+    _, lines, _ = parts(call(live).text)
+    columns = lines[0].split(audit_read.FIELD_SEPARATOR)
+
+    assert len(columns) == LINE_COLUMNS
+    assert columns[ACTOR_COLUMN] == audit_read.NULL_FIELD
+
+
+def test_a_switch_row_keeps_its_word_in_the_same_column(tmp_path: Path) -> None:
+    """The column says two things (D-16 and AUDIT-07) and loses neither of them."""
+    deployment = Deployment(tmp_path)
+    deployment.write_switch(at=1000)
+
+    _, lines, _ = parts(call(deployment).text)
+    columns = lines[0].split(audit_read.FIELD_SEPARATOR)
+
+    assert columns[ACTOR_COLUMN] == store.ACTOR_UNKNOWN
+
+
+def test_an_acting_party_with_an_override_loses_it_in_both_shapes(tmp_path: Path) -> None:
+    """T-24-01: the value comes from a foreign realm, so it goes through the cleaning rule.
+
+    A right-to-left override would turn the reading direction of everything behind it round,
+    so a line could show one acting party and mean another one. The column goes through
+    ``_cleaned`` and not through ``_field`` for exactly this.
+    """
+    override = "‮"
+    deployment = Deployment(tmp_path)
+    deployment.write_calls(ALICE, [1000], actor=f"kc{override}client")
+
+    text = call(deployment).text
+    document = call(deployment, options={audit_read.JSON_OPTION: True}).json()
+
+    assert override not in text
+    assert override not in json.dumps(document)
+    assert "kc client" in text, "the character became a space and melted no two words"
+
+
+def test_the_document_carries_the_acting_party_next_to_the_client_name(
+    tmp_path: Path,
+) -> None:
+    """The machine readable shape gets the same field, in the same form as the other name."""
+    deployment = Deployment(tmp_path)
+    deployment.write_calls(ALICE, [1000], actor="kc-client-of-another-realm")
+
+    first = call(deployment, options={audit_read.JSON_OPTION: True}).json()["entries"][0]
+
+    assert first["actor"] == "kc-client-of-another-realm"
+
+
 def test_a_line_carries_the_moment_as_utc_to_the_second(live: Deployment) -> None:
     """A console line with the timezone of its reader in it cannot be compared with the line
     above it, so every moment is UTC and says so."""
@@ -737,6 +837,7 @@ def test_an_entry_of_the_document_carries_every_field_of_the_row(live: Deploymen
         "client_id": None,
         "auth_id": None,
         "client_name": "A Client With A Name",
+        "actor": None,
         "outcome": store.OUTCOME_OK,
         "reason": None,
         "duration_ms": None,
