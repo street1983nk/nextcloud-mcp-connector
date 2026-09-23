@@ -10,18 +10,37 @@ part of the tests, because "writes nothing" has to be a measurement and not a se
 (T-23-18).
 """
 
+import asyncio
+import base64
+import json
 import logging
 import sqlite3
+import time
 from collections.abc import Mapping
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
+import httpx
+import jwt
 import pytest
+import respx
+from cryptography.hazmat.primitives.asymmetric import rsa
+from jwt.algorithms import RSAAlgorithm
+from mcp.server.auth.provider import AccessToken
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse, Response
+from starlette.routing import Route
+from starlette.testclient import TestClient
 
-from mcp_connector.oauth import exchange_binding
+from mcp_connector import config, deps, entry_oauth
+from mcp_connector.exapp.middleware import RequireOAuthBearer
+from mcp_connector.oauth import chain, exchange_binding
 from mcp_connector.oauth.exchange_accounts import EXCHANGE_CLIENT_ID, ExchangeAccounts
+from mcp_connector.oauth.metadata import RESOURCE_SUFFIX
 from mcp_connector.oauth.store import AuthorizationRow, OAuthStore
-from mcp_connector.oauth.verifier import CREDENTIAL_APP_PASSWORD
+from mcp_connector.oauth.verifier import CREDENTIAL_APP_PASSWORD, OAuthIdentity
 
 #: A key that is not secret, because it never leaves this file.
 KEY = bytes(range(32))
@@ -321,3 +340,229 @@ def test_the_claims_parameter_takes_any_mapping(tmp_path: Path) -> None:
     signature = inspect.signature(exchange_binding.BoundAccounts.identity_for)
     annotation = signature.parameters["claims"].annotation
     assert annotation in (Mapping[str, Any], "Mapping[str, Any]")
+
+
+# --- the standalone deployment: the binding acts, everything else is one 401 ----------------
+
+ISSUER = "https://idp.example.org/realms/f13"
+PUBLIC_URL = "https://mcp.example.org"
+AUDIENCE = f"{PUBLIC_URL}{RESOURCE_SUFFIX}"
+JWKS_URL = f"{ISSUER}{chain.DEFAULT_JWKS_PATH}"
+KID = "key-1"
+BASE_URL = "http://nc.test"
+SECRET_KEY_HEX = "ab" * 32
+
+PRIVATE = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+ARMED_ENV = {
+    config.ENV_EXCHANGE_ENABLED: "1",
+    config.ENV_EXCHANGE_ISSUER: ISSUER,
+    config.ENV_EXCHANGE_AZP: AZP,
+    config.ENV_PUBLIC_URL: PUBLIC_URL,
+}
+
+
+def serve_jwks() -> respx.Route:
+    entry = json.loads(RSAAlgorithm.to_jwk(PRIVATE.public_key()))
+    entry.update({"kid": KID, "use": "sig", "alg": "RS256"})
+    return respx.get(JWKS_URL).mock(return_value=httpx.Response(200, json={"keys": [entry]}))
+
+
+def exchange_token(**overrides: Any) -> str:
+    now = int(time.time())
+    values: dict[str, Any] = {
+        "iss": ISSUER,
+        "sub": MAPPED,
+        "aud": AUDIENCE,
+        "exp": now + 300,
+        "iat": now,
+        "typ": "Bearer",
+        "azp": AZP,
+    }
+    values.update(overrides)
+    return jwt.encode(values, PRIVATE, algorithm="RS256", headers={"kid": KID})
+
+
+def broken_signature_token() -> str:
+    """The same token with a signature that holds nothing: valid shape, invalid proof."""
+    header, payload, signature = exchange_token().split(".")
+    return f"{header}.{payload}.{'A' * len(signature)}"
+
+
+def standalone_env(tmp_path: Path) -> dict[str, str]:
+    """The standalone deployment of ``entry_oauth`` with the exchange path armed."""
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    storage.chmod(0o700)
+    key_file = tmp_path / "key"
+    key_file.write_text(SECRET_KEY_HEX)
+    key_file.chmod(0o600)
+    return {
+        config.ENV_URL: BASE_URL,
+        config.ENV_AUTH_MODE: config.AUTH_MODE_OAUTH,
+        config.ENV_PUBLIC_URL: PUBLIC_URL,
+        config.ENV_OAUTH_STORAGE_DIR: str(storage),
+        config.ENV_OAUTH_DATA_KEY_FILE: str(key_file),
+        config.ENV_OIDC_ISSUER: "https://idp.example.com",
+        config.ENV_OIDC_CLIENT_ID: "the-client-id",
+        config.ENV_OIDC_PROVIDER_ID: "7",
+        config.ENV_OIDC_MAPPING: "user_oidc_unique_uid_sub_v1",
+        **{name: value for name, value in ARMED_ENV.items() if name != config.ENV_PUBLIC_URL},
+    }
+
+
+def app_store(tmp_path: Path) -> OAuthStore:
+    """The very store file of the built application, opened with its configured data key."""
+    return OAuthStore(tmp_path / "storage" / STORE_FILE, bytes.fromhex(SECRET_KEY_HEX))
+
+
+def app_store_rows(tmp_path: Path) -> int:
+    """The authorization rows of the application's store file; none when nothing wrote it."""
+    path = tmp_path / "storage" / STORE_FILE
+    if not path.exists():
+        return 0
+    conn = sqlite3.connect(path)
+    try:
+        return conn.execute("SELECT COUNT(*) FROM authorizations").fetchone()[0]
+    finally:
+        conn.close()
+
+
+def post_mcp(client: TestClient, token: str) -> Any:
+    return client.post(
+        "/mcp",
+        json={},
+        headers={
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+
+@respx.mock
+def test_the_401_without_a_binding_matches_the_401_of_a_broken_signature(tmp_path: Path) -> None:
+    """Success criterion 4 of the phase, as a comparison of two real answers (T-23-17).
+
+    The first token passes every rule of phase 21 and fails only at the missing binding; the
+    second fails at the signature. Status, body and the complete headers have to be equal,
+    so no caller can learn which of the checks fired, whether the account exists or whether
+    it has a binding. And the refusal writes nothing: the store holds the same number of
+    rows afterwards (T-23-18).
+    """
+    route = serve_jwks()
+    app = entry_oauth.build_oauth_app(standalone_env(tmp_path))
+    before = app_store_rows(tmp_path)
+
+    with TestClient(app, base_url=PUBLIC_URL) as client:
+        first = post_mcp(client, exchange_token())
+        second = post_mcp(client, broken_signature_token())
+
+    assert first.status_code == 401
+    assert second.status_code == 401
+    assert first.content == second.content
+    assert dict(first.headers) == dict(second.headers)
+    assert "resource_metadata=" in first.headers["www-authenticate"]
+    assert route.call_count >= 1, "the first token went through the whole checker"
+    assert app_store_rows(tmp_path) == before, "the refusal left no row behind"
+
+
+@respx.mock
+def test_with_a_binding_the_same_token_passes_the_boundary_of_the_built_app(
+    tmp_path: Path,
+) -> None:
+    """The wiring of the entry point, measured end to end: the very 401 of the test above
+    becomes a pass the moment the account has a pre-granted binding in the store."""
+    serve_jwks()
+    env = standalone_env(tmp_path)
+    asyncio.run(with_binding(app_store(tmp_path)))
+    app = entry_oauth.build_oauth_app(env)
+
+    with TestClient(app, base_url=PUBLIC_URL) as client:
+        response = post_mcp(client, exchange_token())
+
+    assert response.status_code != 401, "the boundary resolved the binding to an identity"
+
+
+class _ExplodingStoreBranch:
+    """A store branch that flies apart on contact: the scaffold below never asks it."""
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        raise AssertionError("the store branch was asked about an exchange token")
+
+    async def resolve_identity(self, access: AccessToken) -> OAuthIdentity | None:
+        raise AssertionError("the store branch was asked to resolve an exchange token")
+
+    def invalidate(self) -> None:
+        raise AssertionError("the store branch was emptied by a test that does not revoke")
+
+
+@respx.mock
+def test_a_bound_account_acts_towards_nextcloud_with_its_own_basic_auth(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The whole credential way in one measurement: a real signed exchange token, the real
+    chain over a real store, the real transport boundary, and the outgoing Nextcloud request
+    of the tool carries Basic authentication with the login name and the bound app password.
+
+    The tool is a stand-in for the same reason the proof of plan 23-02 used one: what this
+    plan built is everything up to and including the credentials of the call, not the MCP
+    protocol framing around a tool. ``deps.resolve_credentials`` is the real credential
+    layer, and the captured request is a real outgoing request.
+    """
+    for name in (
+        "NC_MCP_STATIC_BEARER",
+        "NC_MCP_APP_PASSWORD",
+        "NC_MCP_USER",
+        "APP_ID",
+        "APP_SECRET",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv(config.ENV_AUTH_MODE, config.AUTH_MODE_OAUTH)
+    monkeypatch.setenv(config.ENV_URL, BASE_URL)
+    serve_jwks()
+    nextcloud = respx.get(f"{BASE_URL}/status.php").mock(return_value=httpx.Response(200, json={}))
+
+    subject = open_store(tmp_path)
+    asyncio.run(with_binding(subject))
+    boundary = chain.build_chain(
+        _ExplodingStoreBranch(),
+        env=ARMED_ENV,
+        accounts=exchange_binding.BoundAccounts(opener_of(subject)),
+    )
+
+    async def tool(request: Request) -> Response:
+        ctx = SimpleNamespace(
+            headers=dict(request.headers), request_context=SimpleNamespace(request=request)
+        )
+        credentials = deps.resolve_credentials(ctx)
+        async with httpx.AsyncClient() as outgoing:
+            answer = await outgoing.get(
+                f"{credentials.base_url}/status.php",
+                auth=(credentials.user, credentials.secret),
+            )
+        return PlainTextResponse("served" if answer.status_code == 200 else "failed")
+
+    async def never_disabled(principal: str) -> bool:
+        del principal
+        return False
+
+    app = Starlette(routes=[Route("/mcp", tool, methods=["POST"])])
+    for route in app.router.routes:
+        if isinstance(route, Route):
+            route.app = RequireOAuthBearer(
+                route.app,
+                {config.ENV_PUBLIC_URL: PUBLIC_URL},
+                token_verifier=boundary,
+                access_check=never_disabled,
+            )
+
+    with TestClient(app, base_url=PUBLIC_URL) as client:
+        response = client.post("/mcp", headers={"Authorization": f"Bearer {exchange_token()}"})
+
+    assert response.status_code == 200
+    assert response.text == "served"
+    assert nextcloud.call_count == 1
+    sent = nextcloud.calls.last.request
+    expected = "Basic " + base64.b64encode(f"{LOGIN}:{BOUND_PASSWORD}".encode()).decode()
+    assert sent.headers["Authorization"] == expected

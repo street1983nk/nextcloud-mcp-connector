@@ -17,7 +17,7 @@ from mcp_connector import config, deps, entry_oauth
 from mcp_connector.errors import ToolError
 from mcp_connector.exapp.middleware import RequireOAuthBearer
 from mcp_connector.exapp.ui import consent as ui_consent
-from mcp_connector.oauth import chain, oidc
+from mcp_connector.oauth import chain, exchange_binding, oidc
 from mcp_connector.oauth import throttle as throttle_module
 from mcp_connector.oauth.metadata import (
     AS_METADATA_SUFFIX,
@@ -1170,3 +1170,30 @@ def test_the_chain_is_hung_in_when_the_settings_are_handed_in_as_well(
 
     assert isinstance(guard._token_verifier, chain.ChainedVerifier)
     assert taken[0].__self__ is guard._token_verifier
+
+
+# --- the account source of the standalone deployment (CRED-02) -----------------------------
+
+
+def test_the_armed_path_hands_the_bound_account_source_into_the_chain(tmp_path: Path) -> None:
+    """The armed application builds the one account source of this mode, and it builds it
+    from the very store opener the verifier and the provider use: a second opener would be
+    a second view on the same revocation."""
+    guard = boundary_of(entry_oauth.build_oauth_app(base_env(tmp_path, **EXCHANGE_ENV)))
+    verifier = guard._token_verifier
+
+    assert isinstance(verifier, chain.ChainedVerifier)
+    accounts = verifier._accounts
+    assert isinstance(accounts, exchange_binding.BoundAccounts)
+    store_branch = verifier._store
+    assert isinstance(store_branch, StoreTokenVerifier)
+    assert accounts._store is store_branch._store
+
+
+def test_without_the_namespace_no_account_source_exists_at_the_boundary(tmp_path: Path) -> None:
+    """The off state is the same structure as before this plan: the store verifier itself,
+    and therefore no chain and no account source anywhere behind ``/mcp``."""
+    guard = boundary_of(entry_oauth.build_oauth_app(base_env(tmp_path)))
+
+    assert isinstance(guard._token_verifier, StoreTokenVerifier)
+    assert not isinstance(guard._token_verifier, chain.ChainedVerifier)
