@@ -9,7 +9,7 @@ asked for.
 That only holds while the set of identifiers stays small and readable. A free string handed
 to ``reason=`` would walk straight past :data:`mcp_connector.errors.REASONS`, so the last
 case of this file walks the whole of ``src/mcp_connector`` and refuses any ``reason=`` that
-is not one of the six constants, naming file and line of every finding (the shape of
+is not one of the twelve constants, naming file and line of every finding (the shape of
 ``tests/contract/test_no_destructive_calls.py``).
 """
 
@@ -21,6 +21,12 @@ import pytest
 
 from mcp_connector import config, ids, paging
 from mcp_connector.errors import (
+    REASON_EXCHANGE_ACCOUNT,
+    REASON_EXCHANGE_CLAIMS,
+    REASON_EXCHANGE_FAILED,
+    REASON_EXCHANGE_ISSUER,
+    REASON_EXCHANGE_KEY,
+    REASON_EXCHANGE_MALFORMED,
     REASON_GUARD_TRIPPED,
     REASON_UNSPECIFIED,
     REASONS,
@@ -30,10 +36,12 @@ from mcp_connector.tools import talk
 
 SRC = Path(__file__).resolve().parents[2] / "src" / "mcp_connector"
 
-#: The one error class of this package that does not end in ``Error``. Every other one does
+#: The two error classes of this package that do not end in ``Error``. Every other one does
 #: (``ToolError``, ``AppMissingError``, ``ConflictError``), so the walk below recognises them
-#: by their suffix and this name by hand.
-_ERROR_CLASSES_WITHOUT_THE_SUFFIX = frozenset({"IssuerRefused"})
+#: by their suffix and these names by hand. ``ExchangeRefused`` joined the set with AUDIT-07:
+#: since it carries a ``reason`` of its own, a free string handed to it would otherwise have
+#: walked past the frozen set on the one path a stranger reaches without a key.
+_ERROR_CLASSES_WITHOUT_THE_SUFFIX = frozenset({"ExchangeRefused", "IssuerRefused"})
 
 
 def _is_an_error_construction(call: ast.Call) -> bool:
@@ -47,6 +55,30 @@ def _is_an_error_construction(call: ast.Call) -> bool:
     func = call.func
     name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
     return name.endswith("Error") or name in _ERROR_CLASSES_WITHOUT_THE_SUFFIX
+
+
+def _findings_in(source: str, relative: str) -> list[str]:
+    """Every ``reason=`` of an error construction in ``source`` that is not a ``REASON_*``.
+
+    The walk over ``src/`` and the counter-proof below run through this one function on
+    purpose. A counter-proof written against a second, hand-made copy of the rule would
+    prove something about that copy and nothing about the gate.
+    """
+    findings: list[str] = []
+    tree = ast.parse(source, filename=relative)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call) or not _is_an_error_construction(node):
+            continue
+        for word in node.keywords:
+            if word.arg != "reason":
+                continue
+            value = word.value
+            if isinstance(value, ast.Name) and value.id.startswith("REASON_"):
+                continue
+            if isinstance(value, ast.Attribute) and value.attr.startswith("REASON_"):
+                continue
+            findings.append(f"{relative}:{value.lineno}: reason= is not a REASON_* constant")
+    return findings
 
 
 @pytest.mark.anyio
@@ -87,7 +119,44 @@ def test_any_other_raise_site_stays_honestly_unspecified() -> None:
     """The roughly 223 untouched raise sites read as "not determined", not as a guess (D-17)."""
     assert ToolError("m", "h").reason == REASON_UNSPECIFIED
     assert REASON_UNSPECIFIED in REASONS
-    assert len(REASONS) == 6
+    assert len(REASONS) == 12
+
+
+def test_the_six_exchange_reasons_are_frozen_and_name_their_path() -> None:
+    """AUDIT-07: a reader of an audit line sees which path refused without looking it up.
+
+    The prefix is the whole point of the six names: ``guard_tripped`` could have come from
+    any guard of this server, ``exchange_claims`` could not. Grouped rather than one name
+    per fixed phrase, because eighteen names in a chained audit trail would resolve a
+    refusal down to the single rule that fell, which is the oracle the checker refuses to
+    be (the phrases stay in the DEBUG line).
+    """
+    exchange_reasons = {
+        REASON_EXCHANGE_MALFORMED,
+        REASON_EXCHANGE_KEY,
+        REASON_EXCHANGE_ISSUER,
+        REASON_EXCHANGE_CLAIMS,
+        REASON_EXCHANGE_ACCOUNT,
+        REASON_EXCHANGE_FAILED,
+    }
+    assert len(exchange_reasons) == 6
+    assert exchange_reasons <= REASONS
+    assert all(name.startswith("exchange_") for name in exchange_reasons)
+
+
+def test_the_gate_reports_a_free_text_handed_to_an_exchange_refusal() -> None:
+    """The counter-proof: the walk below would see a made-up reason on the exchange path.
+
+    Without this case the walk over ``src/`` proves only that today's source is clean, which
+    it would also do if the class had quietly dropped out of the recognised set.
+    """
+    invented = 'raise ExchangeRefused("the token is empty", reason="made up on the spot")\n'
+    assert _findings_in(invented, "invented.py") == [
+        "invented.py:1: reason= is not a REASON_* constant"
+    ]
+
+    named = 'raise ExchangeRefused("the token is empty", reason=REASON_EXCHANGE_MALFORMED)\n'
+    assert _findings_in(named, "invented.py") == []
 
 
 def test_every_reason_under_src_is_one_of_the_frozen_constants() -> None:
@@ -95,19 +164,7 @@ def test_every_reason_under_src_is_one_of_the_frozen_constants() -> None:
     findings: list[str] = []
     for path in sorted(SRC.rglob("*.py")):
         relative = path.relative_to(SRC).as_posix()
-        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call) or not _is_an_error_construction(node):
-                continue
-            for word in node.keywords:
-                if word.arg != "reason":
-                    continue
-                value = word.value
-                if isinstance(value, ast.Name) and value.id.startswith("REASON_"):
-                    continue
-                if isinstance(value, ast.Attribute) and value.attr.startswith("REASON_"):
-                    continue
-                findings.append(f"{relative}:{value.lineno}: reason= is not a REASON_* constant")
+        findings.extend(_findings_in(path.read_text(encoding="utf-8"), relative))
 
     assert findings == [], (
         "a literal at reason= bypasses the frozen set of errors.REASONS, and a seventh reason "
