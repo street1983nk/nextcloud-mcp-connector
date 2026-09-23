@@ -32,6 +32,38 @@ browser finish a sign-in another one performed.
 Those all read an AppAPI or occ identity this process does not have. A standalone
 deployment that also needs them belongs to the ExApp mode instead.
 
+One browser page is attached on top of the consent screen, and only when the token exchange
+path is armed: the enrollment page `/exchange`. It is described in the next section.
+
+## The enrollment page (`/exchange`)
+
+With `NC_MCP_EXCHANGE_ENABLED` armed, this mode attaches one further browser address,
+`/exchange`. In the factory state the address does not exist at all, so an installation that
+arms nothing is built exactly as it was before this page existed.
+
+The page exists because an exchanged token is a standing permission. A service of the
+organization may act in a user's name against `/mcp`, and the user has to grant that once,
+see it, and be able to take it back. The page is therefore three things in one address:
+
+- **the invitation**, which explains the permission and starts a Nextcloud Login Flow v2,
+- **the confirmation**, which demands the very same independent single sign-on the consent
+  screen demands (CR-01, the flow described under "The consent flow, from the user's side"),
+  because without an AppAPI header nothing else proves that the browser confirming the
+  permission is the browser that just signed in to Nextcloud,
+- **the permission itself**, with the day it was granted, the service it names, and the
+  action that withdraws it.
+
+A withdrawal runs over the same single revocation path as any other one in this app, so the
+app password behind the permission goes back to Nextcloud and the next call of the exchanged
+token is refused immediately, without a restart. Every refusal of the page is one answer: an
+unknown procedure, one of another account, an already withdrawn permission and a missing form
+value are indistinguishable from the outside.
+
+The connections page is still not attached; `/exchange` shows only the one exchange
+permission of the account in front of it and nothing else. How the token exchange path is
+configured end to end, on this side and at the identity provider, gets its own setup
+document; here the page is named so that the list above stays true.
+
 ## Requirements
 
 - Nextcloud reachable over HTTPS from this process, at the URL in `NC_MCP_URL`.

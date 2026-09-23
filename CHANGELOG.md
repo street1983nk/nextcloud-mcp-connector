@@ -63,6 +63,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the MCP route holds unchanged for the tokens this app issues itself: a call carrying one of
   those is never counted and never refused by this bound, not even while a flood of foreign
   ones is running. With the exchange path off, nothing of this hangs at the route at all.
+- In the standalone deployment a user grants, sees and withdraws the permission behind an
+  exchanged token, on one browser page at `/exchange`. An exchanged token without such a
+  granted permission is refused, so nobody gets a standing pass in a user's name without
+  that user having granted it once. The page appears only while the exchange path is armed;
+  in the factory state the address does not exist. Granting demands the same independent
+  single sign-on as a consent decision, so the browser confirming the permission is proven
+  to be the browser that just signed in to Nextcloud, and the permission is written only
+  after that proof. The page then shows the permission with the day it was granted and the
+  service that may act, and it carries the action that withdraws it. A withdrawal runs over
+  the same revocation path as every other one in this app: the app password goes back to
+  Nextcloud, and the immediately following call with the same exchanged token is refused,
+  without a restart and without anything being emptied by hand. Every refusal of the page is
+  one answer, so it says nothing about which permission exists.
 
 ### Changed
 
