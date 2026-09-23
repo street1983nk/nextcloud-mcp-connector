@@ -120,9 +120,9 @@ def resolve_clients(ctx: Any) -> NcClients:
 
 @dataclass(frozen=True, slots=True)
 class Caller:
-    """Who made one tool call, in the four values a record of it may name (D-08).
+    """Who made one tool call, in the five values a record of it may name (D-08, AUDIT-07).
 
-    Four fields and no fifth. There is no Nextcloud password here, and that absence is the
+    Five fields and no sixth. There is no Nextcloud password here, and that absence is the
     point: the recording path must not use :func:`resolve_credentials`, whose result carries
     the live app password of the connection (``nextcloud/credentials.py``) and which raises
     ``MCPError`` when a request has no user context. A recorder may do neither. It may not
@@ -137,19 +137,28 @@ class Caller:
     the AppAPI impersonation, stdio, the static bearer and the passthrough mode. ``None``
     and not the empty string: there is nothing to name, which is a different fact from a
     client that registered without a name.
+
+    ``actor`` is the fifth field, and it is a field of its own because the acting party of a
+    delegation is not the client the delegation runs under (AUDIT-07). Over the token
+    exchange path the caller is a client of a foreign realm, booked here under one reserved
+    client id; without a column for it a reader would have to read ``client_id`` alongside
+    to work out which of the two kinds of name ``client_name`` is carrying this time, and a
+    record that has to be decoded that way is one nobody checks. ``None`` on every path
+    without a delegation, which is every path that exists apart from the exchange one.
     """
 
     nc_user: str
     client_id: str | None
     auth_id: str | None
     client_name: str | None
+    actor: str | None = None
 
 
 def resolve_caller(ctx: Any) -> Caller | None:
     """Name the caller of this tool call, or answer ``None``. Never raise, never call out.
 
     Two sources and no third, in this order. The identity the transport boundary resolved
-    from a verified bearer once per request, which fills all four fields; otherwise the
+    from a verified bearer once per request, which fills all five fields; otherwise the
     Nextcloud user id of the AppAPI handshake, which is signed with ``APP_SECRET`` and
     parsed locally, and which fills the user alone. Reading is defensive at every step, in
     the shape of :func:`_oauth_identity`: a context without a request, a request without
@@ -174,6 +183,9 @@ def resolve_caller(ctx: Any) -> Caller | None:
             client_id=identity.client_id,
             auth_id=identity.auth_id,
             client_name=identity.client_name,
+            # The empty string of the identity and "nobody named" are the same fact in a
+            # row, so the two are not carried as two.
+            actor=identity.actor or None,
         )
 
     request = _request_of(ctx)
@@ -188,7 +200,7 @@ def resolve_caller(ctx: Any) -> Caller | None:
         return None
     if not user:
         return None
-    return Caller(nc_user=user, client_id=None, auth_id=None, client_name=None)
+    return Caller(nc_user=user, client_id=None, auth_id=None, client_name=None, actor=None)
 
 
 class StaticBearerVerifier:

@@ -142,6 +142,15 @@ class OAuthIdentity:
     into a line or onto a page. It defaults to the empty string and never to ``None``, so a
     reader never has to distinguish "no name" from "no field".
 
+    ``actor`` is the acting party of a delegation: the ``azp`` of a token this server did
+    not issue, which names a client of a foreign realm (AUDIT-07). It is a different fact
+    from ``client_name``, which is why it is a field of its own and not the same column used
+    twice: a registered client named itself **here**, an acting party registered somewhere
+    else, and a reader who has only one name column cannot tell the two apart without
+    reading ``client_id`` alongside. Both are foreign text and both are carried unquoted,
+    under the same rule and for the same reason. It defaults to the empty string, which is
+    every path that has no delegation, so no existing construction site changes meaning.
+
     ``credential`` says **where** the Nextcloud credential of this request comes from, and
     never who the caller is. ``app_password`` is empty under
     :data:`CREDENTIAL_IMPERSONATE`, because there is none; the credential layer reads this
@@ -157,6 +166,7 @@ class OAuthIdentity:
     principal: str
     revoked: bool = False
     client_name: str = ""
+    actor: str = ""
     credential: str = CREDENTIAL_APP_PASSWORD
 
     def __repr__(self) -> str:

@@ -75,6 +75,9 @@ class BoundAccounts:
             client_id=self._client_id,
             principal=principal_of(row),
             revoked=row.revoked_at is not None,
-            client_name=acting_party(claims),
+            # The acting party and not a client name: over the exchange path no client is
+            # registered here, so ``client_name`` keeps its empty default, and the ``azp``
+            # takes the column that says who acted (AUDIT-07).
+            actor=acting_party(claims),
             credential=CREDENTIAL_APP_PASSWORD,
         )

@@ -126,6 +126,27 @@ def _clamped_client_name(raw: str | None) -> str | None:
     return printable(raw, limit=store.CLIENT_NAME_LIMIT) or None
 
 
+def _clamped_actor(raw: str | None) -> str | None:
+    """The acting party of a delegation, made safe to write down and bounded in length.
+
+    The neighbour of :func:`_clamped_client_name`, under the same rule and cut at
+    :data:`~mcp_connector.audit.store.ACTOR_LIMIT`. The difference worth naming is against
+    ``oauth.exchange_accounts.acting_party``, which cleaned the very same value once already
+    on its way into the identity: that one filters with ``str.isprintable`` and drops what it
+    refuses, while the rule of :mod:`mcp_connector.audit.text` replaces it with a space and
+    collapses runs of whitespace afterwards. Two rules that agree about most characters and
+    not about all of them were R-18-06, so the value is cleaned again here rather than
+    trusted, and the one rule of this application is the one that decides what a row carries.
+
+    A value that is empty afterwards is ``None``, for the reason the client name gives:
+    "nothing left to print" names nobody, and an empty column would claim a delegation that
+    nobody can read back.
+    """
+    if raw is None:
+        return None
+    return printable(raw, limit=store.ACTOR_LIMIT) or None
+
+
 def _recorder_of(ctx: Any) -> Recorder | None:
     """The recorder the transport boundary left for this request, or ``None``.
 
@@ -239,7 +260,7 @@ async def note(
                 chain=user_chain(caller.nc_user),
                 kind=KIND_CALL,
                 at=int(time.time()),
-                actor=None,
+                actor=_clamped_actor(caller.actor),
                 nc_user=caller.nc_user,
                 tool=tool,
                 client_id=caller.client_id,

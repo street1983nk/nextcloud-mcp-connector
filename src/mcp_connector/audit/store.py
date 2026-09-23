@@ -48,6 +48,7 @@ from .text import printable
 type Work[T] = Callable[[sqlite3.Connection], T]
 
 __all__ = [
+    "ACTOR_LIMIT",
     "ACTOR_UNKNOWN",
     "AUDIT_FILENAME",
     "CANONICAL_FIELDS",
@@ -153,6 +154,15 @@ _DAY_SECONDS = 86400
 #: control characters never enter a row at all.
 CLIENT_NAME_LIMIT = 80
 
+#: The bound of the acting party of a delegation, the ``azp`` of an exchanged token
+#: (AUDIT-07). The same number as ``oauth.exchange_accounts.MAX_ACTING_PARTY_LENGTH`` and
+#: named a second time here rather than imported: ``audit`` may not import from ``oauth``
+#: (the layering rule of ``audit/record.py``), and a bound this module applies has to stand
+#: in this module. Below :data:`CLIENT_NAME_LIMIT` on purpose, for the reason the other
+#: constant gives as well: the value is never looked up, only printed, and it shares an
+#: output line with a client name that may want the eighty.
+ACTOR_LIMIT = 64
+
 #: How long the loser of a lock waits for the winner. Long enough for a transaction that
 #: writes one row, short enough that a wedged process answers instead of hanging.
 _BUSY_TIMEOUT_MS = 5000
@@ -247,7 +257,11 @@ CREATE TABLE IF NOT EXISTS entries (
   kind        TEXT NOT NULL,
   -- Unix seconds. The moment the row was written, never a moment from a request.
   at          INTEGER NOT NULL,
-  -- D-16: who switched the log. 'unknown' until there is a way to learn it.
+  -- Who acted, and it says two things because two kinds of row need it. In a 'switch' or a
+  -- 'tombstone' row it is 'unknown' (D-16), until there is a way to learn the administrator
+  -- behind it. In a 'call' row of the token exchange path it is the acting party of a
+  -- foreign realm, cleaned and cut like a client name because it comes from outside just as
+  -- much (AUDIT-07). In every other 'call' row it is NULL: nobody delegated anything.
   actor       TEXT,
   -- NULL in the instance chain, which has no account behind it.
   nc_user     TEXT,
@@ -549,6 +563,27 @@ def _clean_client_name(value: str | None) -> str | None:
     return printable(value, limit=CLIENT_NAME_LIMIT) or None
 
 
+def _clean_actor(value: str | None) -> str | None:
+    """Who acted, made safe to print and bounded at :data:`ACTOR_LIMIT`.
+
+    The same rule as :func:`_clean_client_name` and deliberately not a second idea of what is
+    printable: over the token exchange path this column carries the ``azp`` of a foreign
+    realm, so it is written by somebody who is not this application, exactly like a name from
+    a dynamic registration. ``oauth.exchange_accounts.acting_party`` already filtered the
+    value on its way into the identity, with ``str.isprintable`` and nothing else; that is a
+    narrower rule than :func:`mcp_connector.audit.text.printable`, which also collapses runs
+    of whitespace, and a column that trusted the earlier filter would be the fourth version
+    of one rule (R-18-06).
+
+    :data:`ACTOR_UNKNOWN` passes through unchanged, which is what a ``switch`` or
+    ``tombstone`` row needs, and a value that is empty afterwards is ``None``, because
+    "nothing left to print" names nobody.
+    """
+    if value is None:
+        return None
+    return printable(value, limit=ACTOR_LIMIT) or None
+
+
 def _row_values(seq: int, entry: Entry) -> tuple[Any, ...]:
     """The row in the order of :data:`CANONICAL_FIELDS`, which is the order it is hashed in.
 
@@ -560,7 +595,7 @@ def _row_values(seq: int, entry: Entry) -> tuple[Any, ...]:
         entry.chain,
         entry.kind,
         entry.at,
-        entry.actor,
+        _clean_actor(entry.actor),
         entry.nc_user,
         entry.tool,
         entry.client_id,
