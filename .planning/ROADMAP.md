@@ -111,6 +111,7 @@ Kein Milestone-Audit: `/gsd:complete-milestone` lief erst am 2026-09-18 nach, da
 **Plans**: 2 plans
 
 Plans:
+
 - [x] 20-01-PLAN.md: PyJWT auf >=2.14,<3, Lock 2.14.0, cryptography mitgezogen, Audit-Nachtrag (DEP-01)
 - [x] 20-02-PLAN.md: oauth/jwks.py herausgelöst, OIDC verhaltensgleich umgestellt, Abkühlzeit und Single-Flight (EXCH-01)
 
@@ -130,6 +131,7 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
+
 - [x] 21-01-PLAN.md: Prüfkern in `oauth/exchange.py`: Issuer, Signatur über die Schlüsselsatz-Schicht, Algorithmen- und Schlüsseltyp-Allowlist, Standard-Claims, typ-Claim im Payload, Uhrenversatz (EXCH-02)
 - [x] 21-02-PLAN.md: Audience exakt statt Präfix, azp-Allowlist, Negativkorpus und der gemessene Beweis gegen das Ablehnungs-Orakel (EXCH-03)
 
@@ -149,6 +151,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
+
 - [x] 22-01-PLAN.md: Namensraum `NC_MCP_EXCHANGE_*`, Schalter ab Werk aus, dokumentierte Defaults und Startabweisung bei halber Konfiguration (CONF-01)
 - [x] 22-02-PLAN.md: `ChainedVerifier` mit formbasierter Weiche, gemeinsames `invalidate()` bis in den Schlüsselsatz, Einbau an beiden Transportgrenzen (EXCH-04)
 - [x] 22-03-PLAN.md: Pfadklasse `CLASS_EXCHANGE`, gemessene Grenze auf der MCP-Route und der korrigierte Docstring der Ausnahme (EXCH-05)
@@ -169,6 +172,7 @@ Plans:
 **Plans**: 6 plans
 
 Plans:
+
 - [x] 23-01-PLAN.md: Claim-Mapping-Profile (sub-basiert und LDAP-tauglich) und ihre Konfiguration im bestehenden Namensraum (MAP-01)
 - [x] 23-02-PLAN.md: Die Exchange-Identität an der einen benannten Stelle, plus der gemessene Gleichlauf von Pausenschalter, Audit-Kette und Sweep (MAP-01)
 - [x] 23-03-PLAN.md: ExApp: Kontoexistenz fail-closed gegen die Instanz und AppAPI-Impersonation als Credential-Weg (MAP-02, CRED-01)
@@ -192,14 +196,28 @@ Plans:
 **Plans**: 9 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 24-01-PLAN.md: Die handelnde Partei (azp) als eigenes Feld in der Audit-Zeile, ueber die bestehende Spalte `actor` (AUDIT-07)
 - [ ] 24-02-PLAN.md: Der Ablehnungsbezeichner an `ExchangeRefused`, sechs gruppierte Gruende, und das Antwort-Gate gegen ein Orakel (AUDIT-07)
-- [ ] 24-03-PLAN.md: Die gefegte Abweisungskette `x:exchange` und die Schreibbremse des vor-authentischen Pfads (AUDIT-07)
-- [ ] 24-04-PLAN.md: Der Ablehnungsschreiber an der Kette, an beiden Einstiegspunkten, plus das Gate gegen Claim-Leaks (AUDIT-07)
-- [ ] 24-05-PLAN.md: Die Regel des Trockenlaufs als reine Funktion, mit eigenem Schluesselsatz und Drift-Gate (EXCH-06)
-- [ ] 24-06-PLAN.md: `occ mcp_connector:exchange:check` als viertes Kommando, mit gemessener Bodygrenze (EXCH-06)
 - [ ] 24-07-PLAN.md: BL-21: der gemessene 429-Lauf gegen die gebaute ExApp (IN-04) und die nachgemessene JWKS-Abrufgrenze (IN-05)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 24-03-PLAN.md: Die gefegte Abweisungskette `x:exchange` und die Schreibbremse des vor-authentischen Pfads (AUDIT-07)
+- [ ] 24-05-PLAN.md: Die Regel des Trockenlaufs als reine Funktion, mit eigenem Schluesselsatz und Drift-Gate (EXCH-06)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 24-04-PLAN.md: Der Ablehnungsschreiber an der Kette, an beiden Einstiegspunkten, plus das Gate gegen Claim-Leaks (AUDIT-07)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 24-06-PLAN.md: `occ mcp_connector:exchange:check` als viertes Kommando, mit gemessener Bodygrenze (EXCH-06)
 - [ ] 24-08-PLAN.md: Der Zwei-Konten-Negativbeweis als Messdatei `docs/exchange-evidence.md` (EXCH-07)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 24-09-PLAN.md: Die Einrichtungsdoku `docs/token-exchange.md` von der Keycloak-Seite bis zum ersten Werkzeugaufruf (EXCH-08)
 
 **Reihenfolge-Begründung**: Die Serialisierung folgt drei unabhängig belegten Punkten aus `research/SUMMARY.md`. Phase 20 steht zuerst, weil eine zweite Schlüsselsatz-Implementierung die Sorte Doppelpflege erzeugt, bei der eine Lücke später nur in einer der zwei Kopien geschlossen wird. Phase 21 baut den Prüfer als freistehende Funktionen, weil vier der zwölf kritischen Pitfalls dort vollständig gegen selbst erzeugte Schlüssel verifizierbar sind, ohne auf F13 zu warten. Phase 22 fasst Konfiguration und Kette zusammen, weil die Kette die Feldnamen der Konfiguration ohnehin kennen muss und beide denselben Aus-Zustand beweisen. Phase 23 kommt nach der Kette, weil die Vollmachtsfrage mit D-v1.6-01 entschieden ist und nur noch umgesetzt wird, und Phase 24 zuletzt, weil Audit-Zeile, Lasttest und Zwei-Konten-Beweis einen betriebsfähigen Pfad voraussetzen.

@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: F13 Token Exchange Identity Mapper
-status: "Phase 23 ist abgeschlossen und verifiziert (9/9): Claim-Mapping mit zwei Profilen auf den kanonischen Principal (23-01), die Exchange-Identität mit Gleichlauf von Pausenschalter, Audit und Sweep (23-02), AppAPI-Impersonation fail-closed (23-03), die gebundene Kontoquelle des Standalone-Betriebs (23-04), das Enrollment in drei Schritten (23-05) und die Seite zum Sehen und Widerrufen mit gemessenem 200-dann-401 (23-06); als Nächstes Phase 24 (Audit-Anschluss und Nachweis)"
-stopped_at: Completed 22-03-PLAN.md
-last_updated: "2026-09-19T09:57:18.141Z"
-last_activity: 2026-09-19, Plan 22-03 ausgeführt (2 Tasks, TDD, alle Gates grün), EXCH-05 komplett, der Exchange-Pfad ist vor-authentisch gedrosselt
+status: "Phase 24 (Audit-Anschluss und Nachweis) ist geplant: 9 Pläne in 5 Wellen, Checker nach 3 Iterationen PASSED (2 Zahlen-Blocker und das Drift-Gate-Kriterium in 24-05 behoben, Zahlen 23/22/19/3 am Code nachgemessen); Welle 5 trägt einen blockierenden Owner-Checkpoint (Rolle von occ oauth2:add-client im F13-Aufbau); bereit zur Ausführung"
+stopped_at: Phase 24 geplant, bereit für execute-phase
+last_updated: "2026-09-23T20:30:00.000Z"
+last_activity: 2026-09-23, Phase 24 geplant (Research mit Transportgrenzen-Messung, Pattern-Map, 9 Pläne, Checker-Schleife 3 Iterationen bis PASSED)
 progress:
   total_phases: 5
   completed_phases: 3
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-08-21)
 
 ## Current Position
 
-Phase: 23 von 24 (v1.6: Phasen 20-24), ABGESCHLOSSEN (fünf Wellen), verifiziert 9/9
-Plan: 6 von 6 abgeschlossen (23-01/23-02 MAP-01, 23-03 MAP-02+CRED-01, 23-04 bis 23-06 CRED-02)
-Status: Phase 23 komplett und goal-backward verifiziert (23-VERIFICATION.md, result passed, 9/9): getauschte Tokens handeln unter einem existierenden Konto, in beiden Betriebsarten, ohne neue Vollmacht und ohne stille Kontoanlage; als Nächstes Phase 24 (Audit-Anschluss und Nachweis)
-Progress: [██████████] 100%
-Last activity: 2026-09-23, Phase 23 ausgeführt (6 Pläne, 5 Wellen, TDD, 4162 Tests grün) und verifiziert (passed, 9/9); am selben Tag drei Quick-Tasks (BL-15, BL-17, BL-01) abgeschlossen
+Phase: 24 von 24 (v1.6: Phasen 20-24), GEPLANT: 9 Pläne in 5 Wellen, Checker PASSED (Iteration 3)
+Plan: 0 von 9 ausgeführt (24-01/02/07 Welle 1, 24-03/05 Welle 2, 24-04 Welle 3, 24-06/08 Welle 4, 24-09 Welle 5 mit checkpoint:decision zu occ oauth2:add-client)
+Status: Phase 24 geplant und verifiziert (Requirements AUDIT-07/EXCH-06/07/08 abgedeckt, BL-21 als 24-07 eingeplant); als Nächstes execute-phase 24
+Progress: [████████░░] 80% (Phasen 20-23 komplett, 24 geplant)
+Last activity: 2026-09-23, Phase 24 geplant (Research inkl. Transportgrenzen-Messung gegen die NC-35-HaRP-Strecke, Pattern-Map, 9 Pläne, Checker-Schleife: 2 Zahlen-Blocker + Drift-Gate-Widerspruch behoben, dann PASSED); vormittags Phase 23 verifiziert und drei Quick-Tasks (BL-15, BL-17, BL-01) abgeschlossen
 
 ## Performance Metrics
 
