@@ -32,7 +32,7 @@ from starlette.testclient import TestClient
 
 from mcp_connector import config
 from mcp_connector.nextcloud.target import NextcloudTarget
-from mcp_connector.oauth import crypto, oidc, oidc_routes, registry
+from mcp_connector.oauth import crypto, exchange_enroll, oidc, oidc_routes, registry
 from mcp_connector.oauth import provider as provider_module
 from mcp_connector.oauth import throttle as throttle_module
 from mcp_connector.oauth.store import FLOW_TTL, OAuthStore, token_hash
@@ -84,12 +84,13 @@ def with_flow(
     *,
     account_id: str | None = ACCOUNT,
     signed_in: bool = True,
+    client_id: str = MCP_CLIENT_ID,
 ) -> None:
     async def work() -> None:
-        await subject.save_client(MCP_CLIENT_ID, metadata_json="{}")
+        await subject.save_client(client_id, metadata_json="{}")
         await subject.create_flow(
             flow_id,
-            client_id=MCP_CLIENT_ID,
+            client_id=client_id,
             redirect_uri="https://client.example/callback",
             redirect_uri_explicit=True,
             code_challenge="challenge",
@@ -101,7 +102,7 @@ def with_flow(
         if signed_in:
             await subject.create_authorization(
                 flow_id,
-                client_id=MCP_CLIENT_ID,
+                client_id=client_id,
                 nc_user="alice",
                 nc_account_id=account_id or "placeholder",
                 app_password="app-password",
@@ -548,6 +549,31 @@ def test_a_callback_leaves_a_proof_and_goes_back_to_consent(store: OAuthStore, i
     verifier = sent["code_verifier"][0]
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest())
     assert challenge.rstrip(b"=").decode() == idp.state["challenge"]
+
+
+def test_a_callback_of_an_enrollment_goes_back_to_the_enrollment_page(
+    store: OAuthStore, idp: Idp
+) -> None:
+    """The return target follows the client of the transaction's authorization: an
+    enrollment holds its row under the reserved holding client and confirms on its own
+    page, not on the consent page of an OAuth client. Everything else about the callback
+    is byte for byte the answer of the consent case."""
+    with_flow(store, client_id=exchange_enroll.EXCHANGE_PENDING_CLIENT_ID)
+    client = browser(application(store))
+    start(client, store, idp)
+    answer_with(idp)
+
+    response = callback(client, good_query(idp), cookie=own_cookie(idp))
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"{exchange_enroll.ENROLL_PATH}?flow={FLOW_ID}"
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["referrer-policy"] == "no-referrer"
+    proof = cookie_value(response, PROOF)
+    assert len(proof) == 43
+    dropped = {part.strip().lower() for part in set_cookies(response)[SIGN_IN].split(";")[1:]}
+    assert "max-age=0" in dropped
+    assert run(store.browser_proof_principal(proof_handle=proof, flow_id=FLOW_ID)) == ACCOUNT
 
 
 def test_a_callback_is_single_use(store: OAuthStore, idp: Idp) -> None:
