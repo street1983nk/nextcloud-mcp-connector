@@ -104,6 +104,18 @@ MCP_HEADERS = {
 #: :data:`PUBLIC_URL`, so a check can tell which of the two sources won.
 ADMIN_URL = "https://admin.example.com/exapps/mcp_connector"
 
+#: A ``NEXTCLOUD_URL`` the derivation of BL-17 accepts, and the address it derives from it.
+#: Deliberately neither :data:`PUBLIC_URL` nor :data:`ADMIN_URL`, so every check below can
+#: tell which of the three sources won. ``EXAPP_ENV`` keeps ``http://nc.test``, which the
+#: derivation refuses (http on a host that is not loopback), so every older check of this
+#: file keeps measuring the fail-closed path it was written for.
+DERIVED_BASE = "https://aio.example.com"
+DERIVED_URL = f"{DERIVED_BASE}/exapps/{APP_ID}"
+
+#: The admin value read of a check that overrides ``NEXTCLOUD_URL`` with the derivable base:
+#: the OCS read follows that variable, so the fixture below answers on both addresses.
+DERIVED_READ_URL = f"{DERIVED_BASE}{crypto.EXAPP_CONFIG_PATH}{crypto.CONFIG_READ_SUFFIX}"
+
 #: The one outgoing call this file allows: the start time read of the seven admin values, on
 #: the route plan 03-08 measured. The constants come from ``crypto`` rather than being spelled
 #: a second time here.
@@ -150,6 +162,12 @@ def admin_config() -> Iterator[AdminConfig]:
     values: dict[str, str] = {}
     with respx.mock(assert_all_called=False) as router:
         route = router.post(READ_URL).mock(
+            side_effect=lambda request: httpx.Response(200, json=ocs(values))
+        )
+        # The same read on the derivable base of BL-17: a check that overrides
+        # ``NEXTCLOUD_URL`` moves the OCS read with it, and an unanswered route would fail
+        # the start for a reason that has nothing to do with what is under test.
+        router.post(DERIVED_READ_URL).mock(
             side_effect=lambda request: httpx.Response(200, json=ocs(values))
         )
         yield AdminConfig(values, route)
@@ -1485,6 +1503,177 @@ def test_the_start_names_the_keys_it_took_from_nextcloud_and_never_their_values(
     assert registry.ENV_ALLOWED_CLIENTS in messages
     assert ADMIN_URL not in messages
     assert "claude.example" not in messages
+
+
+# --- the third link of the chain: the address derived from NEXTCLOUD_URL (BL-17) ----
+#
+# The derivation itself is measured in test_exapp_config_values.py. What this section holds
+# is the wiring: the precedence chain 1 > 2 > 3 > 4 (stored admin value, deploy variable,
+# derived address, documented default) through the real start path, the rescue that falls
+# back to the derivation after a refused deploy variable, and the fail-closed branch that
+# stays byte for byte reachable when nothing derives.
+
+
+def test_the_derived_address_is_the_one_the_started_app_calls_itself(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The AIO no-config install of BL-17: only ``NEXTCLOUD_URL`` is set, and it is enough.
+
+    No admin value, no ``NC_MCP_PUBLIC_URL``: until this plan such an installation served
+    the loopback default plus a setup state, and the last manual step of a one click
+    installation was typing an address the deploy daemon had already told us.
+    """
+    with caplog.at_level("ERROR", logger="mcp_connector.entry_exapp"):
+        app = start(monkeypatch, tmp_path, env={config.ENV_NEXTCLOUD_URL: DERIVED_BASE})
+
+    assert document_of(app, PRM_SUFFIX)["resource"] == f"{DERIVED_URL}{RESOURCE_SUFFIX}"
+    assert not caplog.records, "a derived address is a configured install, not a setup state"
+
+
+def test_the_deploy_variable_wins_over_the_derivation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Link 2 beats link 3: an explicit deploy option is an operator's decision."""
+    app = start(
+        monkeypatch,
+        tmp_path,
+        env={config.ENV_NEXTCLOUD_URL: DERIVED_BASE, config.ENV_PUBLIC_URL: PUBLIC_URL},
+    )
+
+    assert document_of(app, PRM_SUFFIX)["resource"] == f"{PUBLIC_URL}{RESOURCE_SUFFIX}"
+
+
+def test_the_admin_value_wins_over_the_derivation(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, admin_config: AdminConfig
+) -> None:
+    """Link 1 beats link 3, without link 2 in between: the form wins over everything."""
+    admin_config.values["public_url"] = ADMIN_URL
+
+    app = start(monkeypatch, tmp_path, env={config.ENV_NEXTCLOUD_URL: DERIVED_BASE})
+
+    assert document_of(app, PRM_SUFFIX)["resource"] == f"{ADMIN_URL}{RESOURCE_SUFFIX}"
+
+
+def test_a_refused_admin_value_falls_back_to_the_derivation(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    admin_config: AdminConfig,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A refused value is not a value in force: the chain moves on to the next link.
+
+    The ``_rejected`` warning about the form value still stands in the log, because the
+    administrator who typed it has to learn that it was refused, not that it silently lost.
+    """
+    admin_config.values["public_url"] = UNUSABLE_URL
+
+    with caplog.at_level("DEBUG"):
+        app = start(monkeypatch, tmp_path, env={config.ENV_NEXTCLOUD_URL: DERIVED_BASE})
+
+    assert document_of(app, PRM_SUFFIX)["resource"] == f"{DERIVED_URL}{RESOURCE_SUFFIX}"
+    warnings = [
+        record.getMessage()
+        for record in caplog.records
+        if record.levelno >= logging.WARNING and record.name == "mcp_connector.exapp.config_values"
+    ]
+    assert any("public_url" in message for message in warnings), (
+        "the refusal of the stored value is still told"
+    )
+    assert UNUSABLE_URL not in " ".join(record.getMessage() for record in caplog.records)
+
+
+def test_an_underivable_nextcloud_url_keeps_the_setup_state(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The fail-closed branch of the chain, and the error line now names all three sources.
+
+    ``EXAPP_ENV`` carries ``http://nc.test``, exactly the A2 shape the derivation refuses,
+    so this is the same installation the setup state existed for, and it keeps it.
+    """
+    with caplog.at_level("ERROR", logger="mcp_connector.entry_exapp"):
+        app = start(monkeypatch, tmp_path)
+
+    messages = " ".join(record.getMessage() for record in caplog.records)
+    assert config.ENV_PUBLIC_URL in messages
+    assert "no public address is stored in Nextcloud either" in messages
+    assert config.ENV_NEXTCLOUD_URL in messages, "the third source is named"
+    assert "derived" in messages, "and named as the derivation"
+    default = f"{config.DEFAULT_PUBLIC_URL}{RESOURCE_SUFFIX}"
+    assert document_of(app, PRM_SUFFIX)["resource"] == default
+
+
+def test_the_rescue_after_a_refused_deploy_variable_serves_the_derived_address(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A set but unusable deploy variable stays the loud way, and lands on link 3 now.
+
+    Nothing is stubbed: the real build runs, the real SDK refuses the issuer, the rescue
+    drops the variable and this time finds a derivable ``NEXTCLOUD_URL`` before it reaches
+    the documented default.
+    """
+    with caplog.at_level("ERROR", logger="mcp_connector.entry_exapp"):
+        app = start(
+            monkeypatch,
+            tmp_path,
+            env={
+                config.ENV_PUBLIC_URL: UNUSABLE_URL,
+                config.ENV_NEXTCLOUD_URL: DERIVED_BASE,
+            },
+        )
+
+    assert document_of(app, PRM_SUFFIX)["resource"] == f"{DERIVED_URL}{RESOURCE_SUFFIX}"
+    messages = " ".join(record.getMessage() for record in caplog.records)
+    assert config.ENV_PUBLIC_URL in messages, "the rescue line still tells what was dropped"
+
+
+def test_the_rescue_without_a_derivable_address_serves_the_documented_default(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Link 4 is still the end of the chain: no derivable value, the same rescue as today."""
+    app = start(monkeypatch, tmp_path, env={config.ENV_PUBLIC_URL: UNUSABLE_URL})
+
+    default = f"{config.DEFAULT_PUBLIC_URL}{RESOURCE_SUFFIX}"
+    assert document_of(app, PRM_SUFFIX)["resource"] == default
+
+
+def test_the_rescue_line_names_all_three_sources_and_never_a_value(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The IN-02 successor: the form, the variable and the derivation, with the rule between.
+
+    A line that names two sources sends the administrator looking in two places while a
+    third decided the start; the values themselves stay out of the log, as always
+    (T-05-21, T-05-43).
+    """
+    with caplog.at_level("ERROR", logger="mcp_connector.entry_exapp"):
+        start(monkeypatch, tmp_path, env={config.ENV_PUBLIC_URL: UNUSABLE_URL})
+
+    messages = " ".join(record.getMessage() for record in caplog.records)
+    assert strings.ADMIN_SETTINGS_PLACE in messages
+    assert config.ENV_PUBLIC_URL in messages
+    assert config.ENV_NEXTCLOUD_URL in messages, "the derivation is a source of the sentence"
+    assert "wins over" in messages, "and the precedence rule stands in it"
+    assert UNUSABLE_URL not in messages
+    assert "tls-is-missing.example.org" not in messages
+
+
+def test_the_start_names_the_derivation_as_the_source_that_won(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """T-05-21 for the third source: which one won is said, its value is not.
+
+    The same rule as the overlay line "these values come from the administration
+    settings": an administrator reading the container log has to see where the address in
+    force came from, and never the address itself.
+    """
+    with caplog.at_level("INFO", logger="mcp_connector.entry_exapp"):
+        start(monkeypatch, tmp_path, env={config.ENV_NEXTCLOUD_URL: DERIVED_BASE})
+
+    messages = " ".join(record.getMessage() for record in caplog.records)
+    assert config.ENV_NEXTCLOUD_URL in messages, "the source that won is named"
+    assert config.ENV_PUBLIC_URL in messages, "and so is the way to override it"
+    assert DERIVED_URL not in messages
+    assert "aio.example.com" not in messages, "not even the host of the derived address"
 
 
 # --- the one key that leaves the resolved mapping again (TALK-04, way A of 09-RESEARCH) --
