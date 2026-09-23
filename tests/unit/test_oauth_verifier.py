@@ -500,6 +500,66 @@ async def test_the_verifier_answers_the_sdk_protocol(tmp_path: Path) -> None:
     assert isinstance(subject, verifier_module.IdentitySource)
 
 
+# --- the credential way (MAP-01, plan 23-02) -----------------------------------------------
+
+
+def test_an_identity_built_without_the_field_acts_with_the_app_password() -> None:
+    """Every existing construction site keeps working, and it keeps meaning what it meant."""
+    identity = verifier_module.OAuthIdentity(
+        nc_user=NC_USER,
+        app_password=APP_PASSWORD,
+        auth_id=AUTH_ID,
+        client_id=CLIENT_ID,
+        principal=NC_USER,
+    )
+
+    assert identity.credential == verifier_module.CREDENTIAL_APP_PASSWORD
+
+
+def test_the_two_credential_ways_are_distinct_named_exports() -> None:
+    """Two non-empty strings, told apart by value and published by name."""
+    assert verifier_module.CREDENTIAL_APP_PASSWORD
+    assert verifier_module.CREDENTIAL_IMPERSONATE
+    assert verifier_module.CREDENTIAL_APP_PASSWORD != verifier_module.CREDENTIAL_IMPERSONATE
+    assert {"CREDENTIAL_APP_PASSWORD", "CREDENTIAL_IMPERSONATE"} <= set(verifier_module.__all__)
+
+
+@pytest.mark.anyio
+async def test_the_identity_of_the_store_branch_acts_with_the_app_password(
+    tmp_path: Path,
+) -> None:
+    """The store branch is everything that exists today, so its way is the default."""
+    subject, store = build(tmp_path)
+    await seed(store)
+    access = await subject.verify_token(TOKEN)
+    assert access is not None
+
+    identity = await subject.resolve_identity(access)
+
+    assert identity is not None
+    assert identity.credential == verifier_module.CREDENTIAL_APP_PASSWORD
+
+
+@pytest.mark.anyio
+async def test_the_repr_names_the_credential_way_and_still_masks_the_password(
+    tmp_path: Path,
+) -> None:
+    """The way is public information; the password stays masked exactly as before."""
+    subject, store = build(tmp_path)
+    await seed(store)
+    access = await subject.verify_token(TOKEN)
+    assert access is not None
+
+    identity = await subject.resolve_identity(access)
+
+    assert identity is not None
+    shown = repr(identity)
+    assert "credential" in shown
+    assert verifier_module.CREDENTIAL_APP_PASSWORD in shown
+    assert APP_PASSWORD not in shown
+    assert "app_password='***'" in shown
+
+
 # --- the principal rule ------------------------------------------------------------------
 
 
