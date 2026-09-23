@@ -14,6 +14,7 @@ import re
 import sqlite3
 import time
 from pathlib import Path
+from typing import Any
 
 import httpx
 import jwt
@@ -980,7 +981,12 @@ async def seed_binding(store: OAuthStore) -> None:
     )
 
 
-def post_mcp(client: TestClient, token: str) -> httpx.Response:
+def post_mcp(client: TestClient, token: str) -> Any:
+    """One MCP call with one bearer token.
+
+    ``Any``: the test client answers with the ``httpx2`` response type, the fork the MCP
+    SDK brings, which is a different class from the ``httpx`` one ``respx`` mocks here.
+    """
     return client.post(
         "/mcp",
         json=INITIALIZE,

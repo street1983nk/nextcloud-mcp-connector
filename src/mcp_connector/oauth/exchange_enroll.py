@@ -42,9 +42,14 @@ from ..exapp.responses import BodyTooLarge, BodyUnreadable, bounded_body, form_o
 from ..exapp.ui import errors
 from ..exapp.ui.exchange import (
     ACTION_FIELD,
+    ACTION_REVOKE,
     ACTION_START,
+    AUTH_PARAM,
     ENROLL_PATH,
     FLOW_PARAM,
+    RESULT_GONE,
+    RESULT_REVOKED,
+    TOKEN_PARAM,
     Binding,
     bound_page,
     handoff_page,
@@ -505,8 +510,8 @@ def exchange_routes(
         action = str(form.get(ACTION_FIELD) or "")
         if action == ACTION_START:
             return await _start(store)
-        # ACTION_REVOKE arrives with task 3 of this plan; until then it is an action this
-        # route does not know, exactly like every other one.
+        if action == ACTION_REVOKE:
+            return await _revoke(form, store)
         return invitation_page(status_code=400, env=env)
 
     async def _start(store: OAuthStore) -> Response:
@@ -514,6 +519,58 @@ def exchange_routes(
         if started.outcome != ENROLL_STARTED:
             return _generic("the enrollment could not be started", env)
         return handoff_page(started.login_url, started.flow_id, env=env)
+
+    async def _revoke(form: FormData, store: OAuthStore) -> Response:
+        """End one binding, through the one revocation path of this deployment (T-04-35).
+
+        **Where the principal of the ownership check comes from** (T-23-29, accepted): on
+        the connections page of the ExApp the HaRP signed header proves on every POST anew
+        who is clicking; here no such header exists, and the proof of the independent sign
+        in was consumed the moment the binding was written. The anti forgery value
+        therefore carries the burden: it is an HMAC under the data key of this
+        installation over the disconnect purpose and the handle, it lives at most two hour
+        windows, and it was only ever rendered on a page that only the confirmed account
+        received. Whoever holds it can do exactly one thing: end the very binding its
+        owner wanted to end. That is a deliberate decision; the alternative would have
+        been a second full independent sign in per withdrawal, and the threat register of
+        the plan carries the trade as an ``accept``. So the principal handed to
+        ``end_connection`` is the one of the row itself, and the row is only ever reached
+        with a value this server rendered for exactly that handle.
+
+        Every failure is one answer (T-23-28): an unknown handle, a handle of another
+        account or of an ordinary connection, an already withdrawn one and a wrong or
+        missing form value all end on the invitation with the calm "already withdrawn"
+        callout, so this page is no existence oracle (the S8 promise of ``connections``).
+        The value is checked first and in constant time, so nothing is read for a POST
+        that never saw a rendered page. Only rows under :data:`EXCHANGE_CLIENT_ID` are
+        ended here: the disconnect value of an ordinary connection is minted for the same
+        purpose, and without the client filter the value rendered by the ExApp
+        connections page would end a connection through a surface it never belonged to.
+        """
+        handle = str(form.get(AUTH_PARAM) or "")
+        presented = str(form.get(TOKEN_PARAM) or "")
+        if not handle or not store.form_token_valid(
+            handle, presented, purpose=crypto.PURPOSE_DISCONNECT
+        ):
+            logger.warning("a withdrawal arrived without the anti forgery value of its binding")
+            return invitation_page(result=RESULT_GONE, env=env)
+        try:
+            row = await store.load_authorization(handle)
+        except Exception:
+            logger.exception("a binding could not be read back")
+            return _generic("the binding could not be read", env)
+        if row is None or row.client_id != EXCHANGE_CLIENT_ID or row.revoked_at is not None:
+            return invitation_page(result=RESULT_GONE, env=env)
+        try:
+            # Never the store: only end_connection also empties the caches of the
+            # verifier chain, so the very next call of the same token is refused.
+            ended = await end_connection(principal_of(row), handle)
+        except Exception:
+            logger.exception("a binding could not be ended")
+            return _generic("the binding could not be ended", env)
+        if not ended:
+            return invitation_page(result=RESULT_GONE, env=env)
+        return invitation_page(result=RESULT_REVOKED, env=env)
 
     async def _resume(request: Request, store: OAuthStore, flow_id: str) -> Response:
         """One flow id, read back: the holding row decides whether the sign in is done.
