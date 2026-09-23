@@ -61,6 +61,7 @@ from starlette.responses import Response
 from starlette.routing import Route
 
 from ..audit.store import (
+    ACTOR_LIMIT,
     CHAIN_INSTANCE,
     CLIENT_NAME_LIMIT,
     READ_LIMIT_DEFAULT,
@@ -273,11 +274,17 @@ def _count(number: int, one: str, many: str) -> str:
 def _line(row: tuple[Any, ...]) -> str:
     """One entry on one line, in the order the plan of 19-06 fixed.
 
-    Three of these columns are written by somebody who is not this app: the chain identifier
-    carries an account name, and the client name comes out of a dynamic registration. Both go
-    through :func:`mcp_connector.audit.text.printable`, the one rule of this application for
-    such a value. The rest are identifiers this app writes itself, and ``params`` is a list of
-    parameter *names*: no parameter value is stored (D-06, AUDIT-01), so none can be printed.
+    Four of these columns are written by somebody who is not this app: the chain identifier
+    carries an account name, the client name comes out of a dynamic registration, and the
+    acting party is the ``azp`` of a token issued in a foreign realm (AUDIT-07). All of them
+    go through :func:`mcp_connector.audit.text.printable`, the one rule of this application
+    for such a value. The rest are identifiers this app writes itself, and ``params`` is a
+    list of parameter *names*: no parameter value is stored (D-06, AUDIT-01), so none can be
+    printed.
+
+    The acting party stands directly behind the client name because the two are the two
+    names a call can carry, and a reader compares them: an empty client name next to a
+    filled acting party is what a call over the token exchange path looks like.
     """
     entry = _entry_of_row(row)
     return FIELD_SEPARATOR.join(
@@ -287,6 +294,7 @@ def _line(row: tuple[Any, ...]) -> str:
             printable(entry.chain, limit=CHAIN_LIMIT),
             _field(entry.tool),
             _cleaned(entry.client_name, CLIENT_NAME_LIMIT),
+            _cleaned(entry.actor, ACTOR_LIMIT),
             _field(entry.outcome),
             _field(entry.reason),
             _field(entry.duration_ms),
@@ -362,9 +370,9 @@ def _document(row: tuple[Any, ...]) -> dict[str, Any]:
     and the hashes off the ends of the row, exactly as the docstring of ``read_entries`` says:
     the column order stays written down once, in the module that owns the schema.
 
-    The three values from a stranger are bracketed here as well and not only in the text: a
+    The four values from a stranger are bracketed here as well and not only in the text: a
     document is printed to a console too, and a reader that hands one on has the same problem
-    with a control character that a line has (T-19-22).
+    with a control character that a line has (T-19-22, T-24-01).
     """
     entry = _entry_of_row(row)
     return {
@@ -381,6 +389,7 @@ def _document(row: tuple[Any, ...]) -> dict[str, Any]:
             if entry.client_name is None
             else printable(entry.client_name, limit=CLIENT_NAME_LIMIT)
         ),
+        "actor": None if entry.actor is None else printable(entry.actor, limit=ACTOR_LIMIT),
         "outcome": entry.outcome,
         "reason": entry.reason,
         "duration_ms": entry.duration_ms,
