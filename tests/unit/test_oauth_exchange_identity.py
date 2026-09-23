@@ -16,6 +16,7 @@ import asyncio
 import base64
 import logging
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -179,7 +180,7 @@ def checked_claims(**overrides: Any) -> dict[str, Any]:
     return values
 
 
-def mapped_identity(principal: str, claims: dict[str, Any]) -> OAuthIdentity:
+def mapped_identity(principal: str, claims: Mapping[str, Any]) -> OAuthIdentity:
     """What a real account source of plan 23-03 will answer, in the shape of this plan."""
     return OAuthIdentity(
         nc_user=principal,
@@ -222,7 +223,7 @@ class ExplodingStoreBranch:
 class ExplodingAccounts:
     """The same stand-in for the other direction: an account source that is never asked."""
 
-    async def identity_for(self, principal: str, claims: dict[str, Any]) -> OAuthIdentity | None:
+    async def identity_for(self, principal: str, claims: Mapping[str, Any]) -> OAuthIdentity | None:
         raise AssertionError("the account source was asked although nothing was mapped")
 
 
@@ -256,7 +257,7 @@ class PrincipalAccounts:
         self.seen: list[tuple[str, dict[str, Any]]] = []
         self._error = error
 
-    async def identity_for(self, principal: str, claims: dict[str, Any]) -> OAuthIdentity | None:
+    async def identity_for(self, principal: str, claims: Mapping[str, Any]) -> OAuthIdentity | None:
         self.seen.append((principal, dict(claims)))
         if self._error is not None:
             raise self._error

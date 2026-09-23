@@ -678,8 +678,12 @@ async def test_a_checked_exchange_token_becomes_an_access_token_of_the_acting_pa
 
 
 @pytest.mark.anyio
-async def test_the_subject_of_an_exchange_token_stays_empty_until_phase_23() -> None:
-    """Pitfall 5: a raw ``sub`` in this field would be a login name posing as a principal."""
+async def test_the_subject_of_an_exchange_token_stays_empty() -> None:
+    """Pitfall 5: a raw ``sub`` in this field would be a login name posing as a principal.
+
+    Empty for good since plan 23-02: the identity of a mapped account travels in the request
+    state of the transport boundary, never back into the SDK token model.
+    """
     verifier = chained(RecordingStore(), RecordingChecker())
 
     access = await verifier.verify_token(SHAPED_LIKE_A_JWS)
@@ -719,8 +723,14 @@ async def test_a_foreign_auth_id_claim_cannot_reach_the_store_branch() -> None:
 
 
 @pytest.mark.anyio
-async def test_an_exchange_token_gets_no_identity_in_this_phase() -> None:
-    """Fail closed: the boundary ends a request whose identity source answers ``None``."""
+async def test_an_exchange_token_gets_no_identity_without_an_account_source() -> None:
+    """Fail closed: the boundary ends a request whose identity source answers ``None``.
+
+    Since plan 23-02 the reason is ``accounts=None`` (T-23-07): a chain without a handed in
+    account source is the state after phase 22 and refuses every exchange token, whatever
+    the mapping would have said. ``tests/unit/test_oauth_exchange_identity.py`` holds the
+    armed half of the same branch.
+    """
     store = RecordingStore(resolved=identity())
     verifier = chained(store, RecordingChecker())
     access = await verifier.verify_token(SHAPED_LIKE_A_JWS)
@@ -976,13 +986,13 @@ def standalone_env(tmp_path: Path) -> dict[str, str]:
 def test_a_token_that_passes_every_rule_still_ends_at_the_boundary_with_401(
     tmp_path: Path,
 ) -> None:
-    """EXCH-04 in this phase, end to end: checked is not served, because nothing maps it.
+    """EXCH-04 end to end: checked is not served, because no account source is wired in.
 
     The key set is fetched, which is the proof that the token was not turned away by a
     cheap rule before the signature: it went through the whole checker and was refused at
-    the boundary for the one reason this phase leaves open, the missing account mapping of
-    phase 23. Whoever makes this test go green by handing out an identity has done phase 23
-    in phase 22.
+    the boundary because the entry points hand no account source into ``build_chain`` yet.
+    Whoever makes this test go green by wiring one in has done plan 23-03 or 23-04 early:
+    the wiring belongs to those plans, not to the entry points of today.
     """
     route = serve()
     app = entry_oauth.build_oauth_app(standalone_env(tmp_path))

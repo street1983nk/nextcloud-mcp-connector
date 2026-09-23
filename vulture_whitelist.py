@@ -263,10 +263,11 @@ _.cookie
 _.create_auth_code
 
 # --- The account source seam of plan 23-02 ----------------------------------------------
-# identity_for: the one method of the ExchangeAccounts protocol in oauth/exchange_accounts.py.
-#   Its caller is the EXCHANGE_CLAIM branch of ChainedVerifier.resolve_identity, which is
-#   task 3 of the very same plan; the entry leaves this list with that task's commit.
-_.identity_for
+# Empty on purpose, and that is the rule of this file at work rather than an omission. Task 2
+# of plan 23-02 parked identity_for here, because the ExchangeAccounts protocol was written
+# and tested before its caller existed. Task 3 of the same plan added the EXCHANGE_CLAIM
+# branch of ChainedVerifier.resolve_identity, which calls it, so the name left the list with
+# the task that calls it, exactly as the entry announced it would.
 
 # --- The exchange checker, wired in by the chain of plan 22-02 ---------------------------
 # _decode_payload: the one method of _PreparsedJWT in oauth/exchange.py. PyJWT documents it

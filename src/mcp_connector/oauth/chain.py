@@ -82,7 +82,8 @@ from .exchange import (
     ExchangeSettings,
     ExchangeTokenChecker,
 )
-from .mapping import MappingSettings
+from .exchange_accounts import ExchangeAccounts
+from .mapping import MappingSettings, principal_from_claims
 from .metadata import RESOURCE_SUFFIX, TOOL_SCOPE
 from .verifier import IdentitySource, OAuthIdentity
 
@@ -458,11 +459,21 @@ class ChainedVerifier:
     """
 
     def __init__(
-        self, *, store: StoreBranch, checker: ExchangeBranch, config: ExchangeConfig
+        self,
+        *,
+        store: StoreBranch,
+        checker: ExchangeBranch,
+        config: ExchangeConfig,
+        accounts: ExchangeAccounts | None = None,
     ) -> None:
         self._store = store
         self._checker = checker
         self._config = config
+        #: The one seam the two operating modes differ in (oauth/exchange_accounts.py).
+        #: ``None`` is the state after phase 22 and stays a refusal: an armed chain without
+        #: an account source refuses every exchange token instead of assuming anything
+        #: (T-23-07).
+        self._accounts = accounts
 
     def __repr__(self) -> str:
         # The class of the store branch and the one word that matters, never a configured
@@ -525,17 +536,44 @@ class ChainedVerifier:
         return access
 
     async def resolve_identity(self, access: AccessToken) -> OAuthIdentity | None:
-        """Who a verified token acts as: the store branch answers, the exchange branch does not.
+        """Who a verified token acts as: each branch answers for its own tokens, and this is
+        the one place a checked exchange token becomes an identity (MAP-01).
 
-        ``None`` for an exchanged token, and the transport boundary reads that as "this
-        token may not act" and ends the request. That is the fail closed state EXCH-04 asks
-        for while the account mapping does not exist yet, and it is where phase 23 (MAP-01)
-        puts it: the configured claim onto a canonical principal, the existence check of the
-        account, and the credential path. Exactly one place, and this is it.
+        The exchange branch is two steps and nothing else: the checked claim set is mapped
+        onto the canonical principal through the configured profile
+        (``mapping.principal_from_claims``), and a handed in account source is asked whether
+        that principal acts here. The existence check of the account lives in that source
+        and not in this method, because it is the one thing the two operating modes differ
+        in (``oauth/exchange_accounts.py``); everything around it is the same code for both.
+        Every unclarity is a refusal: no source, no mapping result and every exception of
+        the source answer ``None``, which the transport boundary turns into the end of the
+        request. Store tokens go to the store branch exactly as before.
         """
-        if EXCHANGE_CLAIM in (access.claims or {}):
+        claims = access.claims or {}
+        if EXCHANGE_CLAIM not in claims:
+            return await self._store.resolve_identity(access)
+        if self._accounts is None:
+            # The state after phase 22: an armed chain without an account source refuses.
             return None
-        return await self._store.resolve_identity(access)
+        # The principal comes out of the mapping and never out of ``sub`` directly: a raw
+        # claim in this place would be a login name of a foreign realm posing as the
+        # principal of this server (T-23-06, pitfall 5 of the research).
+        principal = principal_from_claims(claims[EXCHANGE_CLAIM], self._config.mapping)
+        if principal is None:
+            return None
+        try:
+            # ``subject`` of the AccessToken stays empty on purpose: this chain writes the
+            # identity into the request state of the transport boundary, never back into
+            # the SDK token model. And the way from here to the pause switch runs without a
+            # single change to ``exapp/middleware.py``, because that boundary reads
+            # ``identity.principal`` and nothing else.
+            return await self._accounts.identity_for(principal, claims[EXCHANGE_CLAIM])
+        except Exception as exc:
+            # The exact shape of the catch in ``verify_token`` (T-23-08, T-23-09): one
+            # refusal for this one call, one line naming the type of the failure and
+            # nothing else. No principal, no claim, no token.
+            logger.error("an exchange identity could not be resolved: %s", type(exc).__name__)
+            return None
 
     def invalidate(self) -> None:
         """One call, both layers: the answers of the store branch and the cached key set.
@@ -565,6 +603,7 @@ def build_chain(
     *,
     env: Mapping[str, str] | None = None,
     config: ExchangeConfig | None = None,
+    accounts: ExchangeAccounts | None = None,
 ) -> StoreBranch:
     """The one place a deployment hangs the chain in, and the one place it does not.
 
@@ -578,6 +617,10 @@ def build_chain(
     environment is read once per application. Without it the reader runs here; in the off
     state both answers are ``None`` over the same mapping, so a caller that hands in the
     off state loses nothing but a dictionary lookup.
+
+    ``accounts`` is the account source the identity branch of ``resolve_identity`` asks
+    (plans 23-03 and 23-04 build the two implementations). ``None`` keeps the state after
+    phase 22: the chain hangs, and every exchange token is refused at the identity step.
     """
     loaded = config if config is not None else load_exchange_config(env)
     if loaded is None:
@@ -589,4 +632,5 @@ def build_chain(
         # request, which is the load the cache of phase 20 exists to prevent.
         checker=ExchangeTokenChecker(loaded.settings),
         config=loaded,
+        accounts=accounts,
     )
