@@ -22,15 +22,18 @@ their names with the default marked `*`:
 occ app_api:app:register mcp_connector <daemon-config-name> --wait-finish
 ```
 
-Then give the app the one thing it cannot know by itself: the address it is reachable under
-from the internet, without a trailing slash. Left unset it names a loopback default and no
-assistant can complete a connection.
+The app derives its public address on its own: from the `NEXTCLOUD_URL` the deploy daemon
+hands the container, as `<nextcloud url>/exapps/mcp_connector`, as long as that address is
+https (AIO with a custom domain is exactly this case). Only when the derived address cannot
+be right does it need one from you: when `NEXTCLOUD_URL` is internal or http, when this app
+is served under a different domain than Nextcloud, or when the prefix differs. Without any
+usable address it names a loopback default and no assistant can complete a connection.
 
 - **Installed from the app store:** enter it in Nextcloud, under Administration settings,
   MCP Connector. A store installation has no way to pass a deploy variable, so this is the
-  way there, and the value entered here wins over the variable.
-- **Registered with occ:** pass it right away, because the daemon injects a variable only at
-  registration time:
+  way there, and the value entered here wins over the variable and over the derivation.
+- **Registered with occ:** the `--env` value is the override for the derivation; pass it at
+  registration time when you need it, because the daemon injects a variable only then:
 
 ```
 occ app_api:app:register mcp_connector \
@@ -638,10 +641,11 @@ HTTP 500 after 106.5 s   {"data":{"message":"Failed to start ExApp installation"
 No dialog and no question about environment variables, exactly as expected with a single
 configured Docker daemon, which is also why nothing sets `NC_MCP_PUBLIC_URL` on that path.
 The container was created and then restarted in a loop with exit code 2, because release
-`0.1.0` refuses to start without that variable. The current code does not: it logs the
-problem and shows a setup state on its own pages instead of exiting, which is what makes a
-one click install viable at all. Until a release carries that change, a store install ends in
-a crash loop, and the remedy is the `occ` registration this page describes.
+`0.1.0` refuses to start without that variable. The current code does not: it derives the
+public address from `NEXTCLOUD_URL` when the variable is absent, and where nothing derives
+it logs the problem and shows a setup state on its own pages instead of exiting, which is
+what makes a one click install viable at all. Until a release carries that change, a store
+install ends in a crash loop, and the remedy is the `occ` registration this page describes.
 
 ## Related
 

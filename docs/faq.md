@@ -84,10 +84,15 @@ follows from that and what this app puts against it.
 
 ### Does the app need any configuration before a user can connect?
 
-Yes, one value: the public address this app is reachable under,
-`NC_MCP_PUBLIC_URL`. The authorization server calls itself by it, so without it no
-client can complete a connection. What to set, where, and the measurements behind
-it: [oauth-setup.md](oauth-setup.md).
+Usually no. The one value it lives by, the public address it is reachable under, is
+derived from the address of this Nextcloud as
+`<nextcloud url>/exapps/mcp_connector`, and on an AIO-style installation that is
+already the right one. You set it yourself (in the administration settings of this
+app, or as `NC_MCP_PUBLIC_URL`) in three cases: the deploy daemon hands the app an
+internal or http Nextcloud address, this app is served under a different domain
+than Nextcloud, or the prefix differs. The authorization server calls itself by
+that address, so without a usable one no client can complete a connection. What to
+set, where, and the measurements behind it: [oauth-setup.md](oauth-setup.md).
 
 ### A user says the app is switched off for them and nobody switched it off. Why?
 

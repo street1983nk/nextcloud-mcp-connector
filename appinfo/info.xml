@@ -451,12 +451,15 @@ Prérequis :
 		  - is accepted and silently dropped, and the app then runs on the defaults of
 		  - src/mcp_connector/config.py and src/mcp_connector/oauth/registry.py.
 		  -
-		  - NC_MCP_PUBLIC_URL is the one that has to be set on every installation. The
-		  - authorization server calls itself by it: it is the issuer of the metadata
-		  - document, the resource of the protected resource document and the target of the
-		  - resource_metadata pointer in every 401. Left empty, all three name the
-		  - documented default http://127.0.0.1:8765 and no client can complete a
-		  - connection (docs/oauth-setup.md).
+		  - NC_MCP_PUBLIC_URL is the override of the address the app derives on its own.
+		  - The authorization server calls itself by that address: it is the issuer of the
+		  - metadata document, the resource of the protected resource document and the
+		  - target of the resource_metadata pointer in every 401. Since BL-17 an unset
+		  - value falls back to the address derived from NEXTCLOUD_URL as
+		  - [nextcloud url]/exapps/mcp_connector, validated like a form value (https or
+		  - loopback); only when that derives nothing do all three name the documented
+		  - default http://127.0.0.1:8765 and no client can complete a connection
+		  - (docs/oauth-setup.md).
 		  -
 		  - NC_MCP_TALK_SEND is the one variable here that is not about connecting an
 		  - assistant. It closes the outgoing Talk channel of this app for the whole
@@ -486,7 +489,7 @@ Prérequis :
 			<variable>
 				<name>NC_MCP_PUBLIC_URL</name>
 				<display-name>Public URL of this app</display-name>
-				<description>The address this app is reachable under from the internet, without a trailing slash, for example https://cloud.example.com/exapps/mcp_connector. Required for OAuth.</description>			</variable>
+				<description>The address this app is reachable under from the internet, without a trailing slash, for example https://cloud.example.com/exapps/mcp_connector. Optional: left unset, the app derives it from NEXTCLOUD_URL as [nextcloud url]/exapps/mcp_connector, as long as that address is https or loopback. Set it to override the derivation, which split-domain deployments and installations whose NEXTCLOUD_URL is internal or http still need.</description>			</variable>
 			<variable>
 				<name>NC_MCP_OAUTH_DCR</name>
 				<display-name>Allow clients to register themselves</display-name>

@@ -31,6 +31,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   both directions: armed without its required values, and configured without the switch
   that arms it. Nothing verifies an exchanged token yet; this release adds the
   configuration surface and the refusals around it.
+- The public URL is derived when nobody set one: an installation without a stored form
+  value and without `NC_MCP_PUBLIC_URL` now calls itself
+  `<NEXTCLOUD_URL>/exapps/mcp_connector`, the address a HaRP ExApp is reachable under
+  anyway. On Nextcloud AIO with a custom domain that removes the last manual step of a
+  one click installation, asked for in the closing comment of
+  [#4](https://github.com/street1983nk/nextcloud-mcp-connector/issues/4): AIO hands the
+  container its public custom domain as `NEXTCLOUD_URL`, and the 421 fix of 0.1.13
+  already derives the allowed hosts from the same variable. The derived candidate runs
+  through the same validation as a value entered in the admin form (https, or loopback
+  for a local topology), so an internal or http `NEXTCLOUD_URL` derives nothing and the
+  fail-closed behavior stays exactly as it was: documented loopback default, an error
+  line naming all three sources, and the setup state on the connections page. A stored
+  form value and the deploy variable both win over the derivation, and split-domain
+  deployments keep setting the override.
 - Repeated refusals of the token exchange path are bounded before anybody is
   authenticated. An armed path checks a signature and, when a key is unknown, fetches a key
   set, so a stranger repeating a rejected assertion is answered with 429 and a `Retry-After`

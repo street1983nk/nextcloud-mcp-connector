@@ -600,9 +600,9 @@ ADMIN_FIELD_PUBLIC_URL_LABEL = "Public address of this connector"
 
 ADMIN_FIELD_PUBLIC_URL_DESCRIPTION = (
     "The address assistant apps reach this connector at, including the app path, for example "
-    f"{ADMIN_PUBLIC_URL_EXAMPLE}. Clients cannot complete a connection without it. Use the "
-    "address of this Nextcloud as it is reachable from the internet, with https, and no "
-    "trailing slash. A change takes effect after you disable and enable this app again."
+    f"{ADMIN_PUBLIC_URL_EXAMPLE}. Leave it empty to use the address derived from this "
+    "Nextcloud, or enter a value to override that, with https and no trailing slash. A "
+    "change takes effect after you disable and enable this app again."
 )
 
 ADMIN_FIELD_DCR_LABEL = "Let assistant apps register themselves"

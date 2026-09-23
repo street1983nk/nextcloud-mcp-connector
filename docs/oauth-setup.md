@@ -51,9 +51,9 @@ the canonical path and stop.
 
 ## Install
 
-### 1. The public URL, and it is not optional
+### 1. The public URL: derived by default, set to override
 
-`NC_MCP_PUBLIC_URL` is the address this app is reachable under from the outside, without a
+The public URL is the address this app is reachable under from the outside, without a
 trailing slash:
 
 ```
@@ -62,13 +62,29 @@ https://cloud.example.com/exapps/mcp_connector
 
 The authorization server calls itself by this value. It is the `issuer` of the metadata
 document, the `resource` of the protected resource document and the target of the
-`resource_metadata` pointer in every `401`. Left unset, all three name the documented
-default `http://127.0.0.1:8765`, no client can reach it, and the connection fails at the
-first step with "could not discover authorization server".
+`resource_metadata` pointer in every `401`.
+
+Four sources answer it, and the first one that yields a usable address wins:
+
+| # | Source | Notes |
+|---|--------|-------|
+| 1 | The form value stored in Nextcloud (section 3) | wins over everything |
+| 2 | The deploy variable `NC_MCP_PUBLIC_URL` | wins over the derivation |
+| 3 | Derived from `NEXTCLOUD_URL` as `<nextcloud url>/exapps/mcp_connector` | only when that address is https, or loopback for a local topology |
+| 4 | The documented default `http://127.0.0.1:8765` plus a setup state | fail closed: an error line in the log and a notice on the connections page |
+
+On an AIO-style deployment the derivation is enough: AIO hands the container its public
+custom domain as `NEXTCLOUD_URL`, so a no-config installation answers with
+`https://<custom domain>/exapps/mcp_connector` without anybody setting anything. You still
+have to set the value yourself (form or variable) when the derived one cannot be right:
+
+- the deploy daemon hands the app an internal or http `NEXTCLOUD_URL`
+- this app is served under a different domain than Nextcloud (split-domain deployments)
+- the public prefix is not `/exapps/mcp_connector`
 
 The deploy daemon injects a variable into the ExApp container only if the manifest declares
-it. `appinfo/info.xml` declares this one and every switch below; an installation sets the
-value at registration time:
+it. `appinfo/info.xml` declares this one and every switch below; an installation overrides
+the derivation at registration time:
 
 ```
 occ app_api:app:register mcp_connector \
@@ -80,7 +96,7 @@ can be overridden with `NC_EXAPP_PUBLIC_URL`.
 
 An installation from the app store has no way to pass a variable, which is what section 3
 below is for: the same address can be entered in Nextcloud itself, and what is entered there
-wins over this variable.
+wins over this variable and over the derivation.
 
 ### 2. The three switches of AUTH-07
 
@@ -112,7 +128,7 @@ fields:
 
 | Field | Config key | What it sets |
 |-------|------------|--------------|
-| Public address of this connector | `public_url` | `NC_MCP_PUBLIC_URL` |
+| Public address of this connector | `public_url` | `NC_MCP_PUBLIC_URL` (left empty, the address derived from `NEXTCLOUD_URL` applies, see section 1) |
 | Allow apps to register themselves | `oauth_dcr` | `NC_MCP_OAUTH_DCR` |
 | Let apps identify themselves by their own document | `oauth_cimd` | `NC_MCP_OAUTH_CIMD` |
 | Only allow the clients listed below | `oauth_allowlist_only` | `NC_MCP_OAUTH_ALLOWLIST_ONLY` |
