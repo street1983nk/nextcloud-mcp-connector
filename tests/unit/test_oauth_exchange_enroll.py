@@ -9,20 +9,27 @@ a Nextcloud credential behind (pitfall 13, D-34).
 """
 
 import asyncio
+import json
 import re
 import sqlite3
+import time
 from pathlib import Path
 
+import httpx
+import jwt
 import pytest
+import respx
+from cryptography.hazmat.primitives.asymmetric import rsa
+from jwt.algorithms import RSAAlgorithm
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.testclient import TestClient
 
-from mcp_connector import config
+from mcp_connector import config, entry_oauth
 from mcp_connector.exapp.ui import exchange as ui_exchange
 from mcp_connector.exapp.ui import strings as ui_strings
 from mcp_connector.nextcloud.target import NextcloudTarget
-from mcp_connector.oauth import exchange_enroll, loginflow
+from mcp_connector.oauth import chain, crypto, exchange_enroll, loginflow
 from mcp_connector.oauth import throttle as throttle_module
 from mcp_connector.oauth.browser_identity import IdentityStep
 from mcp_connector.oauth.exchange_accounts import EXCHANGE_CLIENT_ID
@@ -786,3 +793,238 @@ async def test_aborting_never_raises_even_when_the_store_does(
     # Best effort: the credential could not be read, the records still went.
     assert await subject.load_authorization(flow_id) is None
     assert await subject.load_flow(flow_id) is None
+
+
+# --- the withdrawal over the page (task 3 of plan 23-06) ---------------------------------
+
+
+def hidden_value(body: str, field: str) -> str:
+    """The value of one hidden input of a rendered page."""
+    match = re.search(rf'name="{field}" value="([^"]+)"', body)
+    assert match is not None, f"the page carries {field} as a hidden value"
+    return match.group(1)
+
+
+def bound_over_the_page(
+    client: TestClient, identity: IdentityStub, flows: LoginFlowStub
+) -> tuple[str, str]:
+    """Drive one whole enrollment and return handle and form value of the bound page."""
+    identity.answer = True
+    flow_id = started_flow(client)
+    page = client.get(ui_exchange.ENROLL_PATH, params={ui_exchange.FLOW_PARAM: flow_id})
+    assert ui_strings.EXCHANGE_BOUND_TITLE in page.text
+    return (
+        hidden_value(page.text, ui_exchange.AUTH_PARAM),
+        hidden_value(page.text, ui_exchange.TOKEN_PARAM),
+    )
+
+
+def revoke_form(handle: str, value: str) -> dict[str, str]:
+    return {
+        ui_exchange.ACTION_FIELD: ui_exchange.ACTION_REVOKE,
+        ui_exchange.AUTH_PARAM: handle,
+        ui_exchange.TOKEN_PARAM: value,
+    }
+
+
+def test_revoking_over_the_page_runs_over_the_one_revocation_path(
+    tmp_path: Path, flows: LoginFlowStub
+) -> None:
+    """The withdrawal calls ``end_connection`` with the principal of the row and never the
+    store, and it answers the invitation with the withdrawn callout."""
+    subject = open_store(tmp_path)
+    identity = IdentityStub()
+    end = EndConnectionStub()
+    client = routed_client(subject, identity, end_connection=end)
+    handle, value = bound_over_the_page(client, identity, flows)
+
+    response = client.post(ui_exchange.ENROLL_PATH, data=revoke_form(handle, value))
+
+    assert response.status_code == 200
+    assert ui_strings.EXCHANGE_REVOKED_TITLE in response.text
+    assert ui_strings.EXCHANGE_REACH in response.text, "the answer is the invitation again"
+    assert end.calls == [(ACCOUNT_ID, handle)]
+
+
+def test_every_failed_withdrawal_is_one_answer(tmp_path: Path, flows: LoginFlowStub) -> None:
+    """T-23-28: a wrong value, a missing value, an unknown handle, a handle of an ordinary
+    connection with its own real value, and an already withdrawn one are one answer, and
+    only the last of them ever reaches the revocation path."""
+    subject = open_store(tmp_path)
+    identity = IdentityStub()
+    end = EndConnectionStub()
+    client = routed_client(subject, identity, end_connection=end)
+    handle, value = bound_over_the_page(client, identity, flows)
+
+    asyncio.run(subject.save_client("client-4711", metadata_json="{}"))
+    asyncio.run(
+        subject.create_authorization(
+            "an-ordinary-connection",
+            client_id="client-4711",
+            nc_user=LOGIN,
+            nc_account_id=ACCOUNT_ID,
+            app_password=PASSWORD,
+            scopes=TOOL_SCOPE,
+            resource="",
+        )
+    )
+    ordinary_value = subject.form_token("an-ordinary-connection", purpose="disconnect")
+
+    end.answer = False  # what end_connection answers for a row that is already revoked
+    answers = [
+        client.post(ui_exchange.ENROLL_PATH, data=revoke_form(handle, "wrong-value")),
+        client.post(
+            ui_exchange.ENROLL_PATH,
+            data={ui_exchange.ACTION_FIELD: ui_exchange.ACTION_REVOKE},
+        ),
+        client.post(ui_exchange.ENROLL_PATH, data=revoke_form("unknown-handle", value)),
+        client.post(
+            ui_exchange.ENROLL_PATH, data=revoke_form("an-ordinary-connection", ordinary_value)
+        ),
+        client.post(ui_exchange.ENROLL_PATH, data=revoke_form(handle, value)),
+    ]
+
+    first = answers[0]
+    assert ui_strings.EXCHANGE_GONE_TITLE in first.text
+    for other in answers[1:]:
+        assert other.status_code == first.status_code
+        assert normalized(other.text) == normalized(first.text)
+    # Only the last case, the already withdrawn one, ever reached the revocation path: an
+    # ordinary connection is filtered by its client before anything is ended.
+    assert end.calls == [(ACCOUNT_ID, handle)]
+
+
+# --- the measured revocation: accepted before, refused after, one app, one token ----------
+
+MEASURE_ISSUER = "https://idp.example.org/realms/f13"
+MEASURE_PUBLIC = "https://mcp.example.org"
+MEASURE_AUDIENCE = f"{MEASURE_PUBLIC}{RESOURCE_SUFFIX}"
+MEASURE_KID = "key-1"
+MEASURE_KEY_HEX = "ab" * 32
+MEASURE_BINDING = "measure-binding-1"
+
+PRIVATE = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+INITIALIZE = {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+        "protocolVersion": "2025-06-18",
+        "capabilities": {},
+        "clientInfo": {"name": "exchange-enroll-measure", "version": "1.0"},
+    },
+}
+
+
+def serve_jwks() -> None:
+    entry = json.loads(RSAAlgorithm.to_jwk(PRIVATE.public_key()))
+    entry.update({"kid": MEASURE_KID, "use": "sig", "alg": "RS256"})
+    respx.get(f"{MEASURE_ISSUER}{chain.DEFAULT_JWKS_PATH}").mock(
+        return_value=httpx.Response(200, json={"keys": [entry]})
+    )
+
+
+def signed_exchange_token() -> str:
+    now = int(time.time())
+    return jwt.encode(
+        {
+            "iss": MEASURE_ISSUER,
+            "sub": ACCOUNT_ID,
+            "aud": MEASURE_AUDIENCE,
+            "exp": now + 300,
+            "iat": now,
+            "typ": "Bearer",
+            "azp": ACTING_PARTY,
+        },
+        PRIVATE,
+        algorithm="RS256",
+        headers={"kid": MEASURE_KID},
+    )
+
+
+def measure_env(tmp_path: Path) -> dict[str, str]:
+    storage = tmp_path / "storage"
+    storage.mkdir()
+    storage.chmod(0o700)
+    key_file = tmp_path / "key"
+    key_file.write_text(MEASURE_KEY_HEX)
+    key_file.chmod(0o600)
+    return {
+        config.ENV_URL: "http://nc.test",
+        config.ENV_AUTH_MODE: config.AUTH_MODE_OAUTH,
+        config.ENV_PUBLIC_URL: MEASURE_PUBLIC,
+        config.ENV_OAUTH_STORAGE_DIR: str(storage),
+        config.ENV_OAUTH_DATA_KEY_FILE: str(key_file),
+        config.ENV_OIDC_ISSUER: "https://idp.example.com",
+        config.ENV_OIDC_CLIENT_ID: "the-client-id",
+        config.ENV_OIDC_PROVIDER_ID: "7",
+        config.ENV_OIDC_MAPPING: "user_oidc_unique_uid_sub_v1",
+        config.ENV_EXCHANGE_ENABLED: "1",
+        config.ENV_EXCHANGE_ISSUER: MEASURE_ISSUER,
+        config.ENV_EXCHANGE_AZP: ACTING_PARTY,
+    }
+
+
+async def seed_binding(store: OAuthStore) -> None:
+    """The row a finished enrollment leaves behind, written the way 23-05 writes it."""
+    await store.save_client(EXCHANGE_CLIENT_ID, metadata_json="{}", allowed=False)
+    await store.create_authorization(
+        MEASURE_BINDING,
+        client_id=EXCHANGE_CLIENT_ID,
+        nc_user=LOGIN,
+        nc_account_id=ACCOUNT_ID,
+        app_password=PASSWORD,
+        scopes=TOOL_SCOPE,
+        resource=MEASURE_AUDIENCE,
+    )
+
+
+def post_mcp(client: TestClient, token: str) -> httpx.Response:
+    return client.post(
+        "/mcp",
+        json=INITIALIZE,
+        headers={
+            "Accept": "application/json, text/event-stream",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+
+@respx.mock
+def test_the_same_exchanged_token_is_accepted_before_and_refused_after_revocation(
+    tmp_path: Path,
+) -> None:
+    """Success criterion 5 of the phase, both halves in one run against one application:
+    a valid exchanged token reaches the MCP transport (200) while its binding lives, the
+    binding is withdrawn over the page, and the immediately following call with the very
+    same token is refused with 401. Nothing is rebuilt and no cache is emptied by hand
+    between the two calls: the withdrawal itself runs over ``end_connection``, the one
+    path that also empties the verifier caches."""
+    serve_jwks()
+    respx.delete(f"http://nc.test{loginflow.APP_PASSWORD_PATH}").mock(
+        return_value=httpx.Response(200)
+    )
+    env = measure_env(tmp_path)
+    app_store = OAuthStore(tmp_path / "storage" / STORE_FILE, bytes.fromhex(MEASURE_KEY_HEX))
+    asyncio.run(seed_binding(app_store))
+    app = entry_oauth.build_oauth_app(env)
+    token = signed_exchange_token()
+    confirm = app_store.form_token(MEASURE_BINDING, purpose=crypto.PURPOSE_DISCONNECT)
+
+    with TestClient(app, base_url=MEASURE_PUBLIC) as client:
+        before = post_mcp(client, token)
+        assert before.status_code == 200, "the living binding lets the token act"
+
+        withdrawal = client.post(
+            ui_exchange.ENROLL_PATH, data=revoke_form(MEASURE_BINDING, confirm)
+        )
+        assert withdrawal.status_code == 200
+        assert ui_strings.EXCHANGE_REVOKED_TITLE in withdrawal.text
+
+        after = post_mcp(client, token)
+        assert after.status_code == 401, "the very next call of the same token is refused"
+
+    row = asyncio.run(app_store.binding_of(ACCOUNT_ID, EXCHANGE_CLIENT_ID))
+    assert row is None, "the withdrawal ended the binding in the store"
