@@ -986,13 +986,15 @@ def standalone_env(tmp_path: Path) -> dict[str, str]:
 def test_a_token_that_passes_every_rule_still_ends_at_the_boundary_with_401(
     tmp_path: Path,
 ) -> None:
-    """EXCH-04 end to end: checked is not served, because no account source is wired in.
+    """EXCH-04 end to end: checked is not served, because this account has no binding.
 
     The key set is fetched, which is the proof that the token was not turned away by a
-    cheap rule before the signature: it went through the whole checker and was refused at
-    the boundary because the entry points hand no account source into ``build_chain`` yet.
-    Whoever makes this test go green by wiring one in has done plan 23-03 or 23-04 early:
-    the wiring belongs to those plans, not to the entry points of today.
+    cheap rule before the signature: it went through the whole checker. Since wave 3 the
+    entry points do hand an account source into ``build_chain`` (here the ``BoundAccounts``
+    of plan 23-04), so the refusal now comes from that source: the store of this
+    application holds no binding for the mapped principal, and an account without one acts
+    as nothing (CRED-02). The binding that would let it pass is written by the enrollment
+    of plan 23-05 and never by this test.
     """
     route = serve()
     app = entry_oauth.build_oauth_app(standalone_env(tmp_path))
