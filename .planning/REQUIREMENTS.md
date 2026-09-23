@@ -27,13 +27,13 @@ Extern getaktet, kein Blocker für den Bau: die vier F13-Entscheidungen aus der 
 
 ### Konto-Mapping
 
-- [ ] **MAP-01**: Das Claim-Mapping auf ein Nextcloud-Konto ist konfigurierbar mit mindestens einem sub-basierten und einem LDAP-tauglichen Profil, und das Ergebnis ist der kanonische Principal (nicht der Anmeldename): Pausenschalter, Audit-Kettenname und Sweep wirken für ein gemapptes Konto nachweislich genauso wie für ein angemeldetes, von einem Test gehalten
-- [ ] **MAP-02**: Ein Token, dessen Claim auf kein existierendes Nextcloud-Konto zeigt, wird abgewiesen; es gibt keine stille Kontoanlage, und die Kontoexistenz-Prüfung entscheidet fail-closed (die umgekehrte Asymmetrie zum bewusst nachsichtigen Audit-Sweep)
+- [x] **MAP-01**: Das Claim-Mapping auf ein Nextcloud-Konto ist konfigurierbar mit mindestens einem sub-basierten und einem LDAP-tauglichen Profil, und das Ergebnis ist der kanonische Principal (nicht der Anmeldename): Pausenschalter, Audit-Kettenname und Sweep wirken für ein gemapptes Konto nachweislich genauso wie für ein angemeldetes, von einem Test gehalten
+- [x] **MAP-02**: Ein Token, dessen Claim auf kein existierendes Nextcloud-Konto zeigt, wird abgewiesen; es gibt keine stille Kontoanlage, und die Kontoexistenz-Prüfung entscheidet fail-closed (die umgekehrte Asymmetrie zum bewusst nachsichtigen Audit-Sweep)
 
 ### Credential-Wege (D-v1.6-01)
 
-- [ ] **CRED-01**: Im ExApp-Modus handelt ein per Exchange gemapptes Konto über AppAPI-Impersonation, ohne dass je Nutzer etwas provisioniert werden muss; die Rechtegrenze bleibt in Nextcloud geprüft
-- [ ] **CRED-02**: Im Standalone-Betrieb wählt das getauschte Token eine bestehende, vom Nutzer vorab im Browser erteilte und gespeicherte Autorisierung aus; es erzeugt keine neue Vollmacht, die Zuordnung ist für den Nutzer sichtbar und einzeln widerrufbar, und ein Token ohne solche Autorisierung wird mit einem unterscheidungsfreien Fehler abgewiesen
+- [x] **CRED-01**: Im ExApp-Modus handelt ein per Exchange gemapptes Konto über AppAPI-Impersonation, ohne dass je Nutzer etwas provisioniert werden muss; die Rechtegrenze bleibt in Nextcloud geprüft
+- [x] **CRED-02**: Im Standalone-Betrieb wählt das getauschte Token eine bestehende, vom Nutzer vorab im Browser erteilte und gespeicherte Autorisierung aus; es erzeugt keine neue Vollmacht, die Zuordnung ist für den Nutzer sichtbar und einzeln widerrufbar, und ein Token ohne solche Autorisierung wird mit einem unterscheidungsfreien Fehler abgewiesen
 
 ### Konfiguration und Schalter
 
@@ -91,10 +91,10 @@ Anerkannt, aber nicht in diesem Milestone.
 | CONF-01 | Phase 22 | Complete |
 | EXCH-04 | Phase 22 | Complete |
 | EXCH-05 | Phase 22 | Complete |
-| MAP-01 | Phase 23 | Pending |
-| MAP-02 | Phase 23 | Pending |
-| CRED-01 | Phase 23 | Pending |
-| CRED-02 | Phase 23 | Pending |
+| MAP-01 | Phase 23 | Complete |
+| MAP-02 | Phase 23 | Complete |
+| CRED-01 | Phase 23 | Complete |
+| CRED-02 | Phase 23 | Complete |
 | AUDIT-07 | Phase 24 | Pending |
 | EXCH-06 | Phase 24 | Pending |
 | EXCH-07 | Phase 24 | Pending |

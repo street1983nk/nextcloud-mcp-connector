@@ -2,7 +2,7 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: F13 Token Exchange Identity Mapper
-status: "Phase 22 ist inhaltlich fertig: Konfigurationsfläche (22-01), Kette hinter der Transportgrenze (22-02) und vor-authentische Drosselung des Exchange-Pfades (22-03). Wiederholte Ablehnungen JWS-förmiger Bearer auf der MCP-Route enden nach EXCHANGE_LIMIT in einer 429 mit Retry-After, die bewusste Ausnahme der Route gilt für die eigenen Tokens unverändert weiter, und ohne bewaffneten Pfad hängt dort gar kein Wrapper; als Nächstes Phase 23 (Konto-Mapping)"
+status: "Phase 23 ist abgeschlossen und verifiziert (9/9): Claim-Mapping mit zwei Profilen auf den kanonischen Principal (23-01), die Exchange-Identitaet mit Gleichlauf von Pausenschalter, Audit und Sweep (23-02), AppAPI-Impersonation fail-closed (23-03), die gebundene Kontoquelle des Standalone-Betriebs (23-04), das Enrollment in drei Schritten (23-05) und die Seite zum Sehen und Widerrufen mit gemessenem 200-dann-401 (23-06); als Naechstes Phase 24 (Audit-Anschluss und Nachweis)
 stopped_at: Completed 22-03-PLAN.md
 last_updated: "2026-09-19T09:57:18.141Z"
 last_activity: 2026-09-19, Plan 22-03 ausgeführt (2 Tasks, TDD, alle Gates grün), EXCH-05 komplett, der Exchange-Pfad ist vor-authentisch gedrosselt
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-08-21)
 
 ## Current Position
 
-Phase: 22 von 24 (v1.6: Phasen 20-24), ABGESCHLOSSEN (drei Wellen)
-Plan: 3 von 3 abgeschlossen (22-01 CONF-01, 22-02 EXCH-04, 22-03 EXCH-05)
-Status: Phase 22 ist inhaltlich fertig: Konfigurationsfläche (22-01), Kette hinter der Transportgrenze (22-02) und vor-authentische Drosselung des Exchange-Pfades (22-03). Wiederholte Ablehnungen JWS-förmiger Bearer auf der MCP-Route enden nach EXCHANGE_LIMIT in einer 429 mit Retry-After, die bewusste Ausnahme der Route gilt für die eigenen Tokens unverändert weiter, und ohne bewaffneten Pfad hängt dort gar kein Wrapper; als Nächstes Phase 23 (Konto-Mapping)
+Phase: 23 von 24 (v1.6: Phasen 20-24), ABGESCHLOSSEN (fuenf Wellen), verifiziert 9/9
+Plan: 6 von 6 abgeschlossen (23-01/23-02 MAP-01, 23-03 MAP-02+CRED-01, 23-04 bis 23-06 CRED-02)
+Status: Phase 23 komplett und goal-backward verifiziert (23-VERIFICATION.md, result passed, 9/9): getauschte Tokens handeln unter einem existierenden Konto, in beiden Betriebsarten, ohne neue Vollmacht und ohne stille Kontoanlage; als Naechstes Phase 24 (Audit-Anschluss und Nachweis)
 Progress: [██████████] 100%
-Last activity: 2026-09-19, Plan 22-03 ausgeführt (2 Tasks, TDD, alle Gates grün), EXCH-05 komplett, der Exchange-Pfad ist vor-authentisch gedrosselt
+Last activity: 2026-09-23, Phase 23 ausgefuehrt (6 Plaene, 5 Wellen, TDD, 4162 Tests gruen) und verifiziert (passed, 9/9); am selben Tag drei Quick-Tasks (BL-15, BL-17, BL-01) abgeschlossen
 
 ## Performance Metrics
 
