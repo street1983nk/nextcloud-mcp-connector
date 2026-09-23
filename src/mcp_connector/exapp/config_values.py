@@ -62,6 +62,7 @@ no signature in the existing code has to change for an admin value to take effec
 """
 
 import logging
+import os
 from collections.abc import Mapping
 from typing import Any, NamedTuple
 from urllib.parse import SplitResult, urlsplit, urlunsplit
@@ -89,6 +90,7 @@ __all__ = [
     "AdminValues",
     "admin_overlay",
     "admin_values",
+    "derived_public_url",
     "read_values",
 ]
 
@@ -352,31 +354,89 @@ def _public_url(raw: str) -> str | None:
 
     What survives all of that leaves in one spelling, see :func:`_one_spelling` (IN-03).
     """
+    outcome = _validated_address(raw)
+    if outcome[0] is None:
+        return _rejected("public_url", outcome[1])
+    return outcome[0]
+
+
+def _validated_address(raw: str) -> tuple[str, None] | tuple[None, str]:
+    """One public address candidate through the whole rule, or the reason it fails.
+
+    The validation core of :func:`_public_url`, extracted for BL-17 so the derived candidate
+    of :func:`derived_public_url` runs through THE SAME rule as a value an administrator
+    typed: one rule, two log texts, and the two sources cannot drift apart. The reason never
+    contains the value, so both callers may log it verbatim (T-05-03).
+    """
     candidate = raw.strip().rstrip("/")
     try:
         candidate = config.normalize_base_url(candidate)
     except ToolError:
-        return _rejected("public_url", "is not a usable base URL")
+        return None, "is not a usable base URL"
 
     parts = urlsplit(candidate)
     if parts.fragment:
-        return _rejected("public_url", "carries a fragment")
+        return None, "carries a fragment"
     try:
         host = parts.hostname
         port = parts.port
     except ValueError:
-        return _rejected("public_url", "has a host or a port this server cannot read")
+        return None, "has a host or a port this server cannot read"
     if not host or parts.username or parts.password:
-        return _rejected("public_url", "has no host or carries credentials")
+        return None, "has no host or carries credentials"
     if port is not None and not 0 < port <= 65535:
-        return _rejected("public_url", "has a port outside the range 1 to 65535")
+        return None, "has a port outside the range 1 to 65535"
     if parts.scheme != "https" and host not in LOOPBACK_HOSTS:
-        return _rejected(
-            "public_url",
+        return None, (
             "is http on a host that is not loopback; the issuer of the authorization "
-            "server has to be https (RFC 8414)",
+            "server has to be https (RFC 8414)"
         )
-    return _one_spelling(parts, host=host, port=port)
+    return _one_spelling(parts, host=host, port=port), None
+
+
+def derived_public_url(env: Mapping[str, str] | None = None) -> str | None:
+    """The public address derived from ``NEXTCLOUD_URL``, or ``None`` (BL-17).
+
+    The derived form is ``<NEXTCLOUD_URL>/exapps/<APP_ID>`` and never the bare instance
+    root, and every part of that form is measured rather than assumed:
+    ``scripts/bootstrap_exapp.sh`` builds exactly this address for the local topology
+    (``${BASE_URL}/exapps/${APP_ID}``), ``docs/exapp-install.md`` names it as where a HaRP
+    ExApp is reachable, and AIO sets ``NEXTCLOUD_URL`` to the public custom domain
+    (``'nextcloud_url' => 'https://' . getenv('NC_DOMAIN')``, quoted in
+    :func:`config.deployment_hosts`). This is the third link of the precedence chain of
+    plan 05-01: a stored admin value and the deploy variable both win over it, and
+    ``entry_exapp._resolved_env`` only asks when neither produced an address.
+
+    Assumption A2 of phase 05 said: no derivation, because AppAPI may rewrite ``https`` to
+    ``http`` and the value may be an internal name, so a derived address would be a silent
+    default with broken discovery. The answer here is validation instead of trust: the
+    candidate runs through :func:`_validated_address`, the SAME core that judges an admin
+    form value (https or loopback per RFC 8414, CR-01; one spelling per IN-03), so a
+    downgraded or internal value derives nothing and the fail-closed path of ``main`` stays.
+
+    Fail soft on purpose, unlike ``config.exapp_settings``: this runs on every start,
+    including the ones with an incomplete environment, and a missing value means exactly
+    "nothing to derive from", which is ``None`` without a log line. An unusable value is one
+    INFO line that names the variable and the reason, never the value (T-05-03).
+    """
+    source = os.environ if env is None else env
+    base = (source.get(config.ENV_NEXTCLOUD_URL) or "").strip().rstrip("/")
+    app_id = (source.get(config.ENV_APP_ID) or "").strip()
+    if not base or not app_id:
+        return None
+
+    outcome = _validated_address(f"{base}/exapps/{app_id}")
+    if outcome[0] is None:
+        logger.info(
+            "no public address was derived on this start: the address built from %s %s. The "
+            "existing ways stay open: enter one in the Nextcloud administration settings of "
+            "this app, or set %s.",
+            config.ENV_NEXTCLOUD_URL,
+            outcome[1],
+            config.ENV_PUBLIC_URL,
+        )
+        return None
+    return outcome[0]
 
 
 def _one_spelling(parts: SplitResult, *, host: str, port: int | None) -> str:
