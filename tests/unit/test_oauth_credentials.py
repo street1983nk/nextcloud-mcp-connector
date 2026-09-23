@@ -357,9 +357,10 @@ def test_an_impersonation_identity_becomes_appapi_credentials_in_the_exapp_mode(
     The user is the principal of the identity, the secret is the app secret of this
     installation, and the three deployment values are the ones AppAPI handed this container.
     """
-    creds = deps.resolve_credentials(
-        FakeContext(headers=appapi_headers(user=""), identity=impersonation())
-    )
+    who = impersonation()
+    assert who.credential == CREDENTIAL_IMPERSONATE, "the way of this identity is the pin"
+
+    creds = deps.resolve_credentials(FakeContext(headers=appapi_headers(user=""), identity=who))
 
     assert creds.mode == MODE_APPAPI
     assert creds.user == NC_USER

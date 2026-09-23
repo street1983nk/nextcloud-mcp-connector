@@ -33,6 +33,15 @@ this call belongs to, and it decides alone:
 There is no fallback in either direction (D-27). A missing OAuth identity does not become
 an app secret impersonation, and a missing AppAPI user does not make a bearer optional;
 each branch either has its own ground or it fails.
+
+The sixth way (CRED-01): in the ExApp mode the identity of a request can come out of an
+exchanged token, and then this container speaks in the name of the mapped account with the
+same mechanism as on the AUTH-01 path, the AppAPI impersonation header. The difference is
+where the name comes from, never what happens afterwards: Nextcloud judges the header and
+the permissions on every request, exactly as it does for a signed in user. D-27 continues
+to hold in both directions around it: a missing ExApp environment does not turn an
+impersonation wish into a Basic sign in, and a missing app password does not turn a
+connection into an impersonation.
 """
 
 import base64
@@ -48,12 +57,12 @@ from mcp.shared.exceptions import MCPError
 from mcp.types import INVALID_REQUEST
 
 from . import config
-from .config import load_stdio_credentials
+from .config import ExAppSettings, load_stdio_credentials
 from .exapp.auth import AppApiRejected, appapi_user, verify_appapi_headers
 from .nextcloud import NcClients
-from .nextcloud.credentials import MODE_BASIC, Credentials
+from .nextcloud.credentials import MODE_APPAPI, MODE_BASIC, Credentials
 from .nextcloud.http import shared_client
-from .oauth.verifier import OAUTH_STATE_ATTR, OAuthIdentity
+from .oauth.verifier import CREDENTIAL_IMPERSONATE, OAUTH_STATE_ATTR, OAuthIdentity
 
 __all__ = [
     "Caller",
@@ -253,7 +262,9 @@ def _credentials_from_appapi(ctx: Any, headers: Mapping[str, str]) -> Credential
         ) from None
 
     if not user:
-        return _credentials_from_oauth(ctx, settings.base_url)
+        # The settings this branch already read travel along: they are what makes the
+        # impersonation way of an exchange identity reachable here and nowhere else.
+        return _credentials_from_oauth(ctx, settings.base_url, exapp=settings)
 
     # The base URL is the one AppAPI deployed us against, never a value from the request.
     return Credentials(
@@ -267,7 +278,9 @@ def _credentials_from_appapi(ctx: Any, headers: Mapping[str, str]) -> Credential
     )
 
 
-def _credentials_from_oauth(ctx: Any, base_url: str) -> Credentials:
+def _credentials_from_oauth(
+    ctx: Any, base_url: str, *, exapp: ExAppSettings | None = None
+) -> Credentials:
     """The fifth credential mode: one OAuth token, one authorization, one app password.
 
     The identity is read and not resolved here. ``exapp/middleware.py`` verified the bearer
@@ -280,17 +293,15 @@ def _credentials_from_oauth(ctx: Any, base_url: str) -> Credentials:
     authentication, exactly like the one a user pastes into a client in the passthrough
     mode. The difference is where it came from, not what it is, and a mode of its own would
     suggest a fifth authentication scheme that does not exist.
+
+    ``exapp`` is only ever handed in by the AppAPI branch above. That is the security half
+    of the impersonation way: the standalone OAuth caller passes nothing, so there is no
+    app secret an exchange identity could be turned into there, and the branch below is
+    unreachable outside the ExApp mode by construction rather than by check.
     """
     identity = _oauth_identity(ctx)
     if identity is None:
-        raise MCPError(
-            code=INVALID_REQUEST,
-            message=(
-                "This request has no user context: it carries neither a signed in Nextcloud "
-                "user nor an authorized connection, and without one there is nothing this "
-                "server is allowed to read."
-            ),
-        )
+        raise _no_user_context()
     if identity.revoked:
         raise MCPError(
             code=INVALID_REQUEST,
@@ -299,12 +310,47 @@ def _credentials_from_oauth(ctx: Any, base_url: str) -> Credentials:
             ),
         )
 
+    if identity.credential == CREDENTIAL_IMPERSONATE:
+        # An empty user id in the AppAPI header would be the app context, a read no signed
+        # in user could reach, so an impersonation identity without a user is a refusal and
+        # never an outgoing call (T-02-12). The refusal is word for word the one a missing
+        # identity gets, so the outside cannot tell the two apart (T-23-12, T-23-13).
+        if exapp is None or not identity.nc_user:
+            raise _no_user_context()
+        return Credentials(
+            base_url=exapp.base_url,
+            user=identity.nc_user,
+            secret=exapp.app_secret,
+            mode=MODE_APPAPI,
+            app_id=exapp.app_id,
+            app_version=exapp.app_version,
+            aa_version=exapp.aa_version,
+        )
+
     # The base URL is the one this app was deployed against, never a value from the request.
     return Credentials(
         base_url=base_url,
         user=identity.nc_user,
         secret=identity.app_password,
         mode=MODE_BASIC,
+    )
+
+
+def _no_user_context() -> MCPError:
+    """The one sentence every request without a usable user context is refused with.
+
+    One sentence in one place, because three refusals share it on purpose: no identity at
+    all, an impersonation identity outside the ExApp mode, and an impersonation identity
+    without a user. Distinguishable refusals would tell a caller which half of the
+    configuration exists (T-23-13).
+    """
+    return MCPError(
+        code=INVALID_REQUEST,
+        message=(
+            "This request has no user context: it carries neither a signed in Nextcloud "
+            "user nor an authorized connection, and without one there is nothing this "
+            "server is allowed to read."
+        ),
     )
 
 
