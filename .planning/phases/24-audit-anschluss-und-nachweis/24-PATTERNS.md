@@ -1,10 +1,10 @@
 # Phase 24: Audit-Anschluss und Nachweis - Pattern Map
 
 **Mapped:** 2026-09-23
-**Files analyzed:** 22 (5 neu in `src/`, 9 geaendert in `src/`, 6 Tests, 2 Doku)
+**Files analyzed:** 22 (5 neu in `src/`, 9 geändert in `src/`, 6 Tests, 2 Doku)
 **Analogs found:** 21 / 22
 
-Quelle der Dateiliste: `24-RESEARCH.md` (Entscheidungen D1 bis D4, Pitfalls 1 bis 10, BL-21/IN-04, BL-21/IN-05, Doku-Bausteine EXCH-08). Es gibt keine CONTEXT.md fuer diese Phase.
+Quelle der Dateiliste: `24-RESEARCH.md` (Entscheidungen D1 bis D4, Pitfalls 1 bis 10, BL-21/IN-04, BL-21/IN-05, Doku-Bausteine EXCH-08). Es gibt keine CONTEXT.md für diese Phase.
 
 Jeder Auszug unten ist aus der genannten Datei gelesen worden, nicht aus einem Suchtreffer geraten. Zeilennummern stehen zum Stand 2026-09-23.
 
@@ -12,28 +12,28 @@ Jeder Auszug unten ist aus der genannten Datei gelesen worden, nicht aus einem S
 
 ## File Classification
 
-| Neue/geaenderte Datei | Rolle | Datenfluss | Naechster Analog | Match |
+| Neue/geaenderte Datei | Rolle | Datenfluss | Nächster Analog | Match |
 |-----------------------|-------|------------|------------------|-------|
 | `src/mcp_connector/oauth/exchange_dryrun.py` (neu) | service, reine Funktionen | transform (Eingabe -> Schrittliste) | `src/mcp_connector/oauth/exchange.py` (`ExchangeTokenChecker.claims_of`, 337-480) | exact |
 | `src/mcp_connector/exapp/exchange_check.py` (neu) | controller (occ-Route) | request-response | `src/mcp_connector/exapp/audit_verify.py` (ganze Datei) | exact |
 | `src/mcp_connector/audit/refusals.py` (neu, optional) | service (Schreibweg) | event-driven, gebremst | `src/mcp_connector/audit/record.py` (`note_switch`, 272-293) | role-match |
-| `src/mcp_connector/audit/store.py` (geaendert) | model / Schema | CRUD (append-only) | sich selbst: `CHAIN_INSTANCE`/`USER_CHAIN_PREFIX` 171-199, `KIND_*` 202-212, `_SILENT_CHAINS` 397-399 | exact (Selbstanalog) |
-| `src/mcp_connector/audit/record.py` (geaendert) | service | event-driven | `note` 208-269 (dieselbe Funktion, ein Feld mehr) | exact |
-| `src/mcp_connector/deps.py` (geaendert) | model (`Caller`) | transform | `Caller` 121-146 + `resolve_caller` 148-191 | exact |
-| `src/mcp_connector/exapp/audit_read.py` (geaendert) | controller (Ausgabe) | request-response | `_line` 273-295 und `_document` 358-390 derselben Datei | exact |
-| `src/mcp_connector/exapp/occ.py` (geaendert) | config (Registrierung) | request-response | dritter Scheme-Eintrag 236-280 | exact |
-| `src/mcp_connector/oauth/chain.py` (geaendert) | middleware (Verifier-Kette) | request-response | `build_chain` 601-636 (Parameter `accounts` als Vorbild) | exact |
-| `src/mcp_connector/oauth/exchange.py` (geaendert) | service (Pruefer) | transform | `ExchangeRefused` 139-144 + `_refused` 147-162 | exact |
-| `src/mcp_connector/oauth/exchange_accounts.py` (geaendert) | Doku/Docstring | - | `EXCHANGE_CLIENT_ID` 27-34 | exact |
-| `src/mcp_connector/errors.py` (geaendert) | config (Konstanten) | - | `REASONS` 14-34 | exact |
-| `src/mcp_connector/oauth/jwks.py` (geaendert) | Doku/Docstring | - | `forget` 196-211 | exact |
-| `src/mcp_connector/entry_exapp.py` (geaendert) | config (Verdrahtung) | - | 130-183 (accounts + recorder), 319-321 (Routenliste) | exact |
-| `src/mcp_connector/entry_oauth.py` (geaendert) | config (Verdrahtung) | - | Zeile 276 (`build_chain`) | exact |
+| `src/mcp_connector/audit/store.py` (geändert) | model / Schema | CRUD (append-only) | sich selbst: `CHAIN_INSTANCE`/`USER_CHAIN_PREFIX` 171-199, `KIND_*` 202-212, `_SILENT_CHAINS` 397-399 | exact (Selbstanalog) |
+| `src/mcp_connector/audit/record.py` (geändert) | service | event-driven | `note` 208-269 (dieselbe Funktion, ein Feld mehr) | exact |
+| `src/mcp_connector/deps.py` (geändert) | model (`Caller`) | transform | `Caller` 121-146 + `resolve_caller` 148-191 | exact |
+| `src/mcp_connector/exapp/audit_read.py` (geändert) | controller (Ausgabe) | request-response | `_line` 273-295 und `_document` 358-390 derselben Datei | exact |
+| `src/mcp_connector/exapp/occ.py` (geändert) | config (Registrierung) | request-response | dritter Scheme-Eintrag 236-280 | exact |
+| `src/mcp_connector/oauth/chain.py` (geändert) | middleware (Verifier-Kette) | request-response | `build_chain` 601-636 (Parameter `accounts` als Vorbild) | exact |
+| `src/mcp_connector/oauth/exchange.py` (geändert) | service (Prüfer) | transform | `ExchangeRefused` 139-144 + `_refused` 147-162 | exact |
+| `src/mcp_connector/oauth/exchange_accounts.py` (geändert) | Doku/Docstring | - | `EXCHANGE_CLIENT_ID` 27-34 | exact |
+| `src/mcp_connector/errors.py` (geändert) | config (Konstanten) | - | `REASONS` 14-34 | exact |
+| `src/mcp_connector/oauth/jwks.py` (geändert) | Doku/Docstring | - | `forget` 196-211 | exact |
+| `src/mcp_connector/entry_exapp.py` (geändert) | config (Verdrahtung) | - | 130-183 (accounts + recorder), 319-321 (Routenliste) | exact |
+| `src/mcp_connector/entry_oauth.py` (geändert) | config (Verdrahtung) | - | Zeile 276 (`build_chain`) | exact |
 | `tests/contract/test_no_claim_leak.py` (neu) | test (Quelltext-Gate) | batch | `tests/contract/test_no_destructive_calls.py` (1-20, 295-349) | exact |
 | `tests/unit/test_oauth_exchange_dryrun.py` (neu) | test | transform | `tests/unit/test_oauth_exchange.py` | role-match |
 | `tests/unit/test_exapp_exchange_check.py` (neu) | test | request-response | `tests/unit/test_exapp_audit_verify.py` | exact |
-| `tests/unit/test_exapp_entry.py` (geaendert, IN-04) | test | request-response | `tests/unit/test_oauth_exchange_chain.py:1171-1202` | exact |
-| `tests/unit/test_oauth_jwks.py` (geaendert, IN-05) | test (Messung) | batch | `respx`-Muster mit `keys.call_count`, siehe `test_oauth_exchange_chain.py:1183,1198` | role-match |
+| `tests/unit/test_exapp_entry.py` (geändert, IN-04) | test | request-response | `tests/unit/test_oauth_exchange_chain.py:1171-1202` | exact |
+| `tests/unit/test_oauth_jwks.py` (geändert, IN-05) | test (Messung) | batch | `respx`-Muster mit `keys.call_count`, siehe `test_oauth_exchange_chain.py:1183,1198` | role-match |
 | `docs/token-exchange.md` (neu) | doc | - | `docs/standalone-oauth.md` | role-match |
 | `docs/exchange-evidence.md` (neu) | doc (Messnachweis) | - | `docs/spike-dav.md` (1-10, 91-139) | exact |
 
@@ -45,9 +45,9 @@ Jeder Auszug unten ist aus der genannten Datei gelesen worden, nicht aus einem S
 
 ### `src/mcp_connector/audit/store.py` (model, CRUD) - D1 und D2
 
-**Analog:** sich selbst. Diese Datei besitzt das Schema; jede Aenderung kopiert das Muster, das sie fuer Kettenarten und Zeilenarten schon traegt.
+**Analog:** sich selbst. Diese Datei besitzt das Schema; jede Änderung kopiert das Muster, das sie für Kettenarten und Zeilenarten schon trägt.
 
-**Muster fuer eine neue Kettenart** (Zeilen 171-199, die zwei bestehenden Arten):
+**Muster für eine neue Kettenart** (Zeilen 171-199, die zwei bestehenden Arten):
 
 ```python
 #: The chain of instance events: the switch of D-15, and the markers for user chains that
@@ -65,9 +65,9 @@ def user_chain(nc_user: str) -> str:
     return f"{USER_CHAIN_PREFIX}{nc_user}"
 ```
 
-Die neue `x:`-Kette wird exakt so eingefuehrt: eine Konstante mit `#:`-Kommentar, der sagt **warum** sie nicht `i:instance` ist (sie muss gefegt werden, sonst Pitfall 2).
+Die neue `x:`-Kette wird exakt so eingeführt: eine Konstante mit `#:`-Kommentar, der sagt **warum** sie nicht `i:instance` ist (sie muss gefegt werden, sonst Pitfall 2).
 
-**Muster fuer einen neuen `kind`** (Zeilen 202-212) - eine Konstante plus ein Satz, keine Migration:
+**Muster für einen neuen `kind`** (Zeilen 202-212) - eine Konstante plus ein Satz, keine Migration:
 
 ```python
 # --- kinds of a row ----------------------------------------------------------------------
@@ -97,7 +97,7 @@ CANONICAL_FIELDS: tuple[str, ...] = (
 
 `actor` steht an Position 5 und ist bei jeder `call`-Zeile heute `None`. Das ist D1 Option A.
 
-**Reinigungsmuster, das auf `actor` auszuweiten ist** (Zeilen 532-576). Heute laeuft nur `client_name` durch `_clean_client_name`:
+**Reinigungsmuster, das auf `actor` auszuweiten ist** (Zeilen 532-576). Heute läuft nur `client_name` durch `_clean_client_name`:
 
 ```python
 def _clean_client_name(value: str | None) -> str | None:
@@ -121,7 +121,7 @@ def _row_values(seq: int, entry: Entry) -> tuple[Any, ...]:
     )
 ```
 
-**Sweep-Muster, das die neue Kette automatisch erfasst** (Zeilen 340, 365-375). `chain <> ?` mit `CHAIN_INSTANCE` in allen fuenf Anweisungen: eine `x:`-Kette faellt dadurch ohne jede Aenderung unter Verfall und Groessengrenze.
+**Sweep-Muster, das die neue Kette automatisch erfasst** (Zeilen 340, 365-375). `chain <> ?` mit `CHAIN_INSTANCE` in allen fünf Anweisungen: eine `x:`-Kette fällt dadurch ohne jede Änderung unter Verfall und Größengrenze.
 
 ```python
 _SWEEPABLE_TOTAL = "SELECT COUNT(*) FROM entries WHERE chain <> ?"
@@ -129,7 +129,7 @@ _OLDEST_ROWS = "SELECT seq, chain, hash FROM entries WHERE chain <> ? ORDER BY s
 _DROP_OLDEST = "DELETE FROM entries WHERE chain <> ? AND seq <= ?"
 ```
 
-**Die eine Stelle, die dabei bricht** (Zeilen 390-399, Pitfall 5). `_SILENT_CHAINS` liefert jede Kette ausser der Instanz-Kette, `_account_of` schneidet nur `u:` ab:
+**Die eine Stelle, die dabei bricht** (Zeilen 390-399, Pitfall 5). `_SILENT_CHAINS` liefert jede Kette außer der Instanz-Kette, `_account_of` schneidet nur `u:` ab:
 
 ```python
 _SILENT_CHAINS = (
@@ -137,7 +137,7 @@ _SILENT_CHAINS = (
 )
 ```
 
-Der Fix ist ein Praefixfilter (`AND chain LIKE 'u:%'`), und der Kommentarblock darueber erklaert bereits, warum nach `chain` und nicht nach `nc_user` gruppiert wird - dieser Satz bleibt stehen und bekommt einen zweiten daneben.
+Der Fix ist ein Präfixfilter (`AND chain LIKE 'u:%'`), und der Kommentarblock darüber erklärt bereits, warum nach `chain` und nicht nach `nc_user` gruppiert wird - dieser Satz bleibt stehen und bekommt einen zweiten daneben.
 
 ---
 
@@ -168,7 +168,7 @@ seq = await audit_store.append(
 )
 ```
 
-**Das Muster fuer eine Zeile ausserhalb des Tool-Pfads** (Zeilen 272-293). Der Ablehnungsschreiber kopiert genau diese Form: kein `ctx`, ein expliziter `moment`, eine `Entry` mit den Feldern, die diese Zeilenart hat, und ein Docstring, der die Wahl von `actor` begruendet.
+**Das Muster für eine Zeile außerhalb des Tool-Pfads** (Zeilen 272-293). Der Ablehnungsschreiber kopiert genau diese Form: kein `ctx`, ein expliziter `moment`, eine `Entry` mit den Feldern, die diese Zeilenart hat, und ein Docstring, der die Wahl von `actor` begründet.
 
 ```python
 async def note_switch(audit_store: AuditStore, *, enabled: bool, moment: int) -> None:
@@ -188,7 +188,7 @@ async def note_switch(audit_store: AuditStore, *, enabled: bool, moment: int) ->
     )
 ```
 
-**Unterschied, der in den Plan gehoert:** `note_switch` laesst einen Fehler durch, `note` nicht. Der Ablehnungsschreiber folgt `note`: der Docstring dort sagt "Never raises, never writes a value", und der Grund (Zeilen 267-269) gilt fuer den vor-authentischen Pfad staerker:
+**Unterschied, der in den Plan gehört:** `note_switch` lässt einen Fehler durch, `note` nicht. Der Ablehnungsschreiber folgt `note`: der Docstring dort sagt "Never raises, never writes a value", und der Grund (Zeilen 267-269) gilt für den vor-authentischen Pfad stärker:
 
 ```python
 except Exception as exc:
@@ -224,7 +224,7 @@ REASON_PERMISSION_DENIED = "permission_denied"  # Nextcloud answered 403
 REASONS: frozenset[str] = frozenset({...})
 ```
 
-Zwei Konsequenzen fuer den Plan: (1) die Zahl "six" im Kommentar wird mitgezogen, (2) `tests/unit/test_errors_reason.py` laeuft ueber `src/` und faellt auf jedes `reason=`, das nicht in dieser Liste steht - der Ablehnungsschreiber muss also bereits benannte Werte verwenden.
+Zwei Konsequenzen für den Plan: (1) die Zahl "six" im Kommentar wird mitgezogen, (2) `tests/unit/test_errors_reason.py` läuft über `src/` und fällt auf jedes `reason=`, das nicht in dieser Liste steht - der Ablehnungsschreiber muss also bereits benannte Werte verwenden.
 
 ---
 
@@ -258,9 +258,9 @@ def _refused(reason: str) -> ExchangeRefused:
     return ExchangeRefused()
 ```
 
-**Zwei Docstrings, die in derselben Aenderung mitgezogen werden muessen:** der von `ExchangeRefused` ("Carries no detail" wird unwahr) und der letzte Absatz von `_refused` (Phase 24 ist jetzt hier).
+**Zwei Docstrings, die in derselben Änderung mitgezogen werden müssen:** der von `ExchangeRefused` ("Carries no detail" wird unwahr) und der letzte Absatz von `_refused` (Phase 24 ist jetzt hier).
 
-**Die Schrittfolge, die der Trockenlauf spiegeln muss** (`claims_of`, Zeilen 337-480). Die festen Phrasen liegen fertig vor und sind die Liste der Pruefschritte:
+**Die Schrittfolge, die der Trockenlauf spiegeln muss** (`claims_of`, Zeilen 337-480). Die festen Phrasen liegen fertig vor und sind die Liste der Prüfschritte:
 
 ```python
 if not token:                                   raise _refused("the token is empty")
@@ -284,7 +284,7 @@ now - iat > max_lifetime                     -> "the token is older than allowed
 sub unbrauchbar                              -> "the token names no usable subject"
 ```
 
-Der Ordnungskommentar dieser Methode ist die Regel, die der Trockenlauf uebernimmt (Zeilen 349-352):
+Der Ordnungskommentar dieser Methode ist die Regel, die der Trockenlauf übernimmt (Zeilen 349-352):
 
 ```
 The order is deliberate: the cheap, local rules fall first, the outgoing key
@@ -295,9 +295,9 @@ read unverified.
 
 ---
 
-### `src/mcp_connector/oauth/exchange_dryrun.py` (neu; service, transform) - EXCH-06, Regelhaelfte
+### `src/mcp_connector/oauth/exchange_dryrun.py` (neu; service, transform) - EXCH-06, Regelhälfte
 
-**Analog:** `src/mcp_connector/oauth/exchange_accounts.py` fuer die Modulform, `src/mcp_connector/oauth/exchange.py` fuer den Inhalt.
+**Analog:** `src/mcp_connector/oauth/exchange_accounts.py` für die Modulform, `src/mcp_connector/oauth/exchange.py` für den Inhalt.
 
 **Modulform: nichts liest die Umgebung, nichts spricht mit irgendwem** (`exchange_accounts.py:1-18`):
 
@@ -317,7 +317,7 @@ from .verifier import OAuthIdentity
 __all__ = ["EXCHANGE_CLIENT_ID", "MAX_ACTING_PARTY_LENGTH", "ExchangeAccounts", "acting_party"]
 ```
 
-**Datenform fuer ein Ergebnis, das kein fertiger Satz ist** (`audit/store.py:436-456`, `ChainFinding`). Das ist das Vorbild fuer "ein Pruefschritt mit seinem Ergebnis": die Regel antwortet in Daten, die Shell macht daraus Text und JSON.
+**Datenform für ein Ergebnis, das kein fertiger Satz ist** (`audit/store.py:436-456`, `ChainFinding`). Das ist das Vorbild für "ein Prüfschritt mit seinem Ergebnis": die Regel antwortet in Daten, die Shell macht daraus Text und JSON.
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -335,7 +335,7 @@ class ChainFinding:
     next_seq: int | None = None
 ```
 
-**Eigener Schluesselsatz** (Pitfall 7). Das Konstruktionsmuster steht in `exchange.py:325-335`; der Trockenlauf baut seine eigene Instanz statt die des laufenden Pruefers zu nehmen:
+**Eigener Schlüsselsatz** (Pitfall 7). Das Konstruktionsmuster steht in `exchange.py:325-335`; der Trockenlauf baut seine eigene Instanz statt die des laufenden Prüfers zu nehmen:
 
 ```python
         # (ExchangeTokenChecker.__init__)
@@ -348,9 +348,9 @@ class ChainFinding:
 
 ---
 
-### `src/mcp_connector/exapp/exchange_check.py` (neu; controller, request-response) - EXCH-06, Konsolenhaelfte
+### `src/mcp_connector/exapp/exchange_check.py` (neu; controller, request-response) - EXCH-06, Konsolenhälfte
 
-**Analog:** `src/mcp_connector/exapp/audit_verify.py`, Datei fuer Datei uebernehmbar.
+**Analog:** `src/mcp_connector/exapp/audit_verify.py`, Datei für Datei übernehmbar.
 
 **Pfadkonstante und Optionsname** (Zeilen 66-77) - die Konstante, aus der `occ.py` den Handlernamen ableitet:
 
@@ -396,7 +396,7 @@ def audit_verify_routes(
     return [Route(AUDIT_VERIFY_PATH, audit_verify, methods=["POST"])]
 ```
 
-**Guard, woertlich uebernehmen** (Zeilen 309-322):
+**Guard, wörtlich übernehmen** (Zeilen 309-322):
 
 ```python
 def _guard(request: Request, env: Mapping[str, str] | None) -> str | Response:
@@ -426,7 +426,7 @@ def _text(body: str, status_code: int = 200) -> Response:
     return Response(body, status_code=status_code, media_type="text/plain", headers=NO_STORE)
 ```
 
-**Der Schluessel, den ein Skript beobachtet** (Zeilen 253-282). Fuer den Trockenlauf heisst er nicht `broken`, sondern `passed`, aus demselben Grund:
+**Der Schlüssel, den ein Skript beobachtet** (Zeilen 253-282). Für den Trockenlauf heißt er nicht `broken`, sondern `passed`, aus demselben Grund:
 
 ```python
 def _machine_readable(overview: StoreOverview, findings: list[ChainFinding]) -> dict[str, Any]:
@@ -444,7 +444,7 @@ def _machine_readable(overview: StoreOverview, findings: list[ChainFinding]) -> 
     }
 ```
 
-**Der Ehrlichkeitssatz am Ende jeder Antwort** (Zeilen 124-129) - das Vorbild fuer Pitfall 8 ("was ein gruener Lauf nicht bedeutet"):
+**Der Ehrlichkeitssatz am Ende jeder Antwort** (Zeilen 124-129) - das Vorbild für Pitfall 8 ("was ein grüner Lauf nicht bedeutet"):
 
 ```python
 #: The last line of every answer, in both shapes. It belongs in the answer and not only in
@@ -456,9 +456,9 @@ LIMIT_SENTENCE = (
 )
 ```
 
-**Body lesen: nicht selbst bauen** (Zeilen 97-110, 325-427). `MAX_BODY_BYTES = 4096`, `MAX_ANNOUNCED_DIGITS = 10`, `TRUE_WORDS`, `_wants_json`/`_set_in`/`_is_set`/`_payload`/`_above_the_body_bound` sind vollstaendig uebernehmbar. Fuer den Tokenwert kommt ein `_value(...)`-Leser dazu; dafuer ist `exapp/audit_read.py:463-499` (`_value`, `_given`) der Analog, weil dort zum ersten Mal Optionen mit **Werten** gelesen werden.
+**Body lesen: nicht selbst bauen** (Zeilen 97-110, 325-427). `MAX_BODY_BYTES = 4096`, `MAX_ANNOUNCED_DIGITS = 10`, `TRUE_WORDS`, `_wants_json`/`_set_in`/`_is_set`/`_payload`/`_above_the_body_bound` sind vollständig übernehmbar. Für den Tokenwert kommt ein `_value(...)`-Leser dazu; dafür ist `exapp/audit_read.py:463-499` (`_value`, `_given`) der Analog, weil dort zum ersten Mal Optionen mit **Werten** gelesen werden.
 
-**Achtung, Groessengrenze:** `MAX_BODY_BYTES = 4096` ist kleiner als `MAX_TOKEN_BYTES = 8192`. Ein Token von 4 bis 8 KB kaeme durch die Bodygrenze dieses Musters nicht durch. Das ist ein Entscheidungspunkt fuer den Plan (Annahme A5 der Recherche) und gehoert als erste Messung des Trockenlauf-Tasks angesetzt.
+**Achtung, Größengrenze:** `MAX_BODY_BYTES = 4096` ist kleiner als `MAX_TOKEN_BYTES = 8192`. Ein Token von 4 bis 8 KB käme durch die Bodygrenze dieses Musters nicht durch. Das ist ein Entscheidungspunkt für den Plan (Annahme A5 der Recherche) und gehört als erste Messung des Trockenlauf-Tasks angesetzt.
 
 ---
 
@@ -489,7 +489,7 @@ OCC_AUDIT_HANDLER = AUDIT_VERIFY_PATH.removeprefix("/")
         },
 ```
 
-**Das Kommando mit Wert-Optionen** (Zeilen 236-259) ist die Form, die der Trockenlauf braucht (`--token=...`): `mode: "optional"` plus `"default": None`. Der Kommentarblock 218-235 darueber ist die Begruendung und darf nicht dupliziert, sondern muss referenziert werden.
+**Das Kommando mit Wert-Optionen** (Zeilen 236-259) ist die Form, die der Trockenlauf braucht (`--token=...`): `mode: "optional"` plus `"default": None`. Der Kommentarblock 218-235 darüber ist die Begründung und darf nicht dupliziert, sondern muss referenziert werden.
 
 **Die drei nicht verhandelbaren Regeln**, aus dem Moduldocstring (Zeilen 12-18):
 
@@ -500,7 +500,7 @@ command line of the whole instance ... So the modes come from the positive list
 ``tests/unit/test_exapp_lifecycle.py`` holds every scheme against that list.
 ```
 
-**Optionsbeschreibung mit benannter Folge** (Pitfall 6). Das Vorbild fuer eine Beschreibung, die eine Konsequenz ausspricht statt sie zu verschweigen, ist `OCC_FORCE_DESCRIPTION` (Zeilen 101-103):
+**Optionsbeschreibung mit benannter Folge** (Pitfall 6). Das Vorbild für eine Beschreibung, die eine Konsequenz ausspricht statt sie zu verschweigen, ist `OCC_FORCE_DESCRIPTION` (Zeilen 101-103):
 
 ```python
 OCC_FORCE_DESCRIPTION = (
@@ -542,7 +542,7 @@ def build_chain(
     )
 ```
 
-Der Ablehnungsschreiber ist der naechste Parameter derselben Art: `refusals: RefusalWriter | None = None`, `None` heisst "Audit-Log aus" (D-14) und haengt nichts.
+Der Ablehnungsschreiber ist der nächste Parameter derselben Art: `refusals: RefusalWriter | None = None`, `None` heißt "Audit-Log aus" (D-14) und hängt nichts.
 
 **Wo die Abweisung abgefangen wird und damit den Schreiber aufrufen muss** (Zeilen 524-536):
 
@@ -558,7 +558,7 @@ Der Ablehnungsschreiber ist der naechste Parameter derselben Art: `refusals: Ref
             return None
 ```
 
-Zweite Stelle, die eine Zeile verdient (`resolve_identity`, Zeilen 552-576): kein Mapping-Ergebnis, keine Kontoquelle, Ausnahme der Quelle. Hier ist das Claim-Set **geprueft**, also darf nach Pitfall 4 hier (und nur hier) ein `azp` in die Zeile.
+Zweite Stelle, die eine Zeile verdient (`resolve_identity`, Zeilen 552-576): kein Mapping-Ergebnis, keine Kontoquelle, Ausnahme der Quelle. Hier ist das Claim-Set **geprüft**, also darf nach Pitfall 4 hier (und nur hier) ein `azp` in die Zeile.
 
 ---
 
@@ -583,7 +583,7 @@ Zweite Stelle, die eine Zeile verdient (`resolve_identity`, Zeilen 552-576): kei
     )
 ```
 
-Das ist genau die Form fuer den Ablehnungsschreiber: gebaut, wenn `config.audit_log_enabled(env)` **und** `exchange_config is not None`, sonst `None`. Er bekommt `audit_store` (denselben Opener), nicht eine zweite Datei.
+Das ist genau die Form für den Ablehnungsschreiber: gebaut, wenn `config.audit_log_enabled(env)` **und** `exchange_config is not None`, sonst `None`. Er bekommt `audit_store` (denselben Opener), nicht eine zweite Datei.
 
 **Routenliste** (Zeilen 319-321) - eine Zeile mehr, in derselben Form:
 
@@ -593,11 +593,11 @@ Das ist genau die Form fuer den Ablehnungsschreiber: gebaut, wenn `config.audit_
         *audit_read_routes(env, store_provider=audit_store),
 ```
 
-**Achtung:** `entry_oauth.py:276` ruft `build_chain` ebenfalls auf. Wenn `build_chain` einen Parameter bekommt, muessen beide Einstiegspunkte entschieden werden - und der Standalone-Betrieb hat kein occ (Open Question 2 der Recherche).
+**Achtung:** `entry_oauth.py:276` ruft `build_chain` ebenfalls auf. Wenn `build_chain` einen Parameter bekommt, müssen beide Einstiegspunkte entschieden werden - und der Standalone-Betrieb hat kein occ (Open Question 2 der Recherche).
 
 ---
 
-### `src/mcp_connector/deps.py` (model) - das fuenfte Feld von `Caller`
+### `src/mcp_connector/deps.py` (model) - das fünfte Feld von `Caller`
 
 **Analog:** Zeilen 121-146 und 148-191.
 
@@ -631,7 +631,7 @@ class Caller:
     return Caller(nc_user=user, client_id=None, auth_id=None, client_name=None)
 ```
 
-**Der Docstring sagt woertlich "Four fields and no fifth".** Er wird in derselben Aenderung mitgezogen, und der neue Satz muss die Begruendung tragen (Delegation belegen), sonst liest die naechste Person den Satz als verletzt. Der AppAPI-Zweig setzt das neue Feld auf `None`, wie er es mit den drei Clientwerten schon tut (Zeilen 136-139).
+**Der Docstring sagt wörtlich "Four fields and no fifth".** Er wird in derselben Änderung mitgezogen, und der neue Satz muss die Begründung tragen (Delegation belegen), sonst liest die nächste Person den Satz als verletzt. Der AppAPI-Zweig setzt das neue Feld auf `None`, wie er es mit den drei Clientwerten schon tut (Zeilen 136-139).
 
 ---
 
@@ -671,7 +671,7 @@ def _cleaned(value: str | None, limit: int) -> str:
     return printable(value, limit=limit) or NULL_FIELD
 ```
 
-`actor` gehoert durch `_cleaned` und nicht durch `_field`: der Wert kommt aus einer fremden Realm. Im JSON-Dokument (Zeilen 370-389) fehlt `actor` heute vollstaendig; es kommt in derselben Form dazu wie `client_name`:
+`actor` gehört durch `_cleaned` und nicht durch `_field`: der Wert kommt aus einer fremden Realm. Im JSON-Dokument (Zeilen 370-389) fehlt `actor` heute vollständig; es kommt in derselben Form dazu wie `client_name`:
 
 ```python
         "client_name": (
@@ -681,7 +681,7 @@ def _cleaned(value: str | None, limit: int) -> str:
         ),
 ```
 
-**Nebenwirkung, die im Plan stehen muss:** `_line` fuegt eine Spalte hinzu. `tests/unit/test_exapp_audit_read.py` prueft die Spaltenzahl, und `docs/`-Beispiele der Ausgabe ziehen mit.
+**Nebenwirkung, die im Plan stehen muss:** `_line` fügt eine Spalte hinzu. `tests/unit/test_exapp_audit_read.py` prüft die Spaltenzahl, und `docs/`-Beispiele der Ausgabe ziehen mit.
 
 ---
 
@@ -705,7 +705,7 @@ Two things make this test trustworthy rather than decorative:
 """
 ```
 
-**Die Maschinerie, woertlich uebernehmbar** (Zeilen 295-328):
+**Die Maschinerie, wörtlich übernehmbar** (Zeilen 295-328):
 
 ```python
 def _source_files() -> list[Path]:
@@ -751,7 +751,7 @@ def _violations(relative: str, lines: Iterable[tuple[int, str]]) -> list[str]:
     """
 ```
 
-**Das inhaltliche Gegenstueck** fuer "die Liste darf keine Dekoration sein" steht in `tests/contract/test_audit_surface.py:101-115`:
+**Das inhaltliche Gegenstück** für "die Liste darf keine Dekoration sein" steht in `tests/contract/test_audit_surface.py:101-115`:
 
 ```python
     assert matched != [], (
@@ -760,11 +760,11 @@ def _violations(relative: str, lines: Iterable[tuple[int, str]]) -> list[str]:
     )
 ```
 
-**Was das Gate von Phase 24 sucht** (aus D2 und Pitfall 4): ein Aufruf von `acting_party` ausserhalb von `resolve_identity` bzw. der Kontoquelle, und jedes `Entry(...)` im Ablehnungsweg, das ein Feld aus einem ungeprueften Claim-Set traegt.
+**Was das Gate von Phase 24 sucht** (aus D2 und Pitfall 4): ein Aufruf von `acting_party` außerhalb von `resolve_identity` bzw. der Kontoquelle, und jedes `Entry(...)` im Ablehnungsweg, das ein Feld aus einem ungeprüften Claim-Set trägt.
 
 ---
 
-### `tests/unit/test_exapp_entry.py` (geaendert) - BL-21 / IN-04
+### `tests/unit/test_exapp_entry.py` (geändert) - BL-21 / IN-04
 
 **Analog:** `tests/unit/test_oauth_exchange_chain.py:1171-1202`, der OAuth-Zwilling.
 
@@ -809,7 +809,7 @@ def bearer_call(client: TestClient, token: str) -> Any:
     )
 ```
 
-`appapi_headers(user="")` ist der Unterschied zum OAuth-Zwilling und der Grund, warum der Test ohne diesen Header gruen waere, ohne den Drosselpfad je zu erreichen (`require_appapi` laeuft davor).
+`appapi_headers(user="")` ist der Unterschied zum OAuth-Zwilling und der Grund, warum der Test ohne diesen Header grün wäre, ohne den Drosselpfad je zu erreichen (`require_appapi` läuft davor).
 
 `EXCHANGE_ENV` (`tests/unit/test_exapp_entry.py:2442-2447`):
 
@@ -822,7 +822,7 @@ EXCHANGE_ENV = {
 }
 ```
 
-**Oracle-Gate daneben** (`test_oauth_exchange_chain.py:1204-1219`) - die Form, die Pitfall 3 haelt:
+**Oracle-Gate daneben** (`test_oauth_exchange_chain.py:1204-1219`) - die Form, die Pitfall 3 hält:
 
 ```python
     assert throttled.json()["error"] == "temporarily_unavailable"
@@ -855,7 +855,7 @@ EXCHANGE_ENV = {
         self._keys.fetched_at = float("-inf")
 ```
 
-Der neue Absatz traegt eine **gemessene** Zahl mit Datum. Das Muster fuer eine gemessene Zahl in einem Docstring steht in `audit/store.py:601-610`:
+Der neue Absatz trägt eine **gemessene** Zahl mit Datum. Das Muster für eine gemessene Zahl in einem Docstring steht in `audit/store.py:601-610`:
 
 ```python
 def used_bytes(conn: sqlite3.Connection) -> int:
@@ -867,7 +867,7 @@ def used_bytes(conn: sqlite3.Connection) -> int:
     """
 ```
 
-Zaehler der Messung: `keys.call_count` aus dem `respx`-Muster oben.
+Zähler der Messung: `keys.call_count` aus dem `respx`-Muster oben.
 
 ---
 
@@ -889,7 +889,7 @@ Zaehler der Messung: `keys.call_count` aus dem `respx`-Muster oben.
 the only credential in play is `APP_SECRET`, ...
 ```
 
-**Der Negativfall, der die Datei traegt** (Zeilen 91-102) - genau die Struktur, die EXCH-07 braucht, mit Rohausgabe und dem Satz, warum `404` und nicht `200` die Aussage ist:
+**Der Negativfall, der die Datei trägt** (Zeilen 91-102) - genau die Struktur, die EXCH-07 braucht, mit Rohausgabe und dem Satz, warum `404` und nicht `200` die Aussage ist:
 
 ```markdown
 ### The negative case: bob cannot reach alice's file, even by the exact path
@@ -906,7 +906,7 @@ The path is already known, so nothing but Nextcloud's own permission check stand
 bob and the file. The answer is `404`, never `200`. This is the mitigation for T-02-50.
 ```
 
-**Confused Deputy** (Zeilen 104-116) - fuer den Exchange-Pfad neu zu messen, weil dort zwei Bearer-Wege nebeneinander liegen.
+**Confused Deputy** (Zeilen 104-116) - für den Exchange-Pfad neu zu messen, weil dort zwei Bearer-Wege nebeneinander liegen.
 
 **Serverseitiger Beweis** (Zeilen 118-131) - die eigentliche Evidenz ist das Impersonation-Log, nicht der Statuscode:
 
@@ -929,13 +929,13 @@ resolved user. ...
 
 ### `docs/token-exchange.md` (neu; doc) - EXCH-08
 
-**Analog:** `docs/standalone-oauth.md` (Einrichtungsdoku, Englisch, mit einem Abschnitt ueber Grenzen). Der offene Anker steht dort in den Zeilen 62-66 und wird von dieser Datei eingeloest:
+**Analog:** `docs/standalone-oauth.md` (Einrichtungsdoku, Englisch, mit einem Abschnitt über Grenzen). Der offene Anker steht dort in den Zeilen 62-66 und wird von dieser Datei eingelöst:
 
 > "How the token exchange path is configured end to end, on this side and at the identity provider, gets its own setup document"
 
-Zehn Bausteine aus `24-RESEARCH.md`, Abschnitt "Doku-Bausteine fuer EXCH-08". Die Quelle fuer die Variablenliste ist **ausschliesslich** der Docstring von `oauth/chain.py:19-65`; eine zweite Fassung der Defaults in der Doku ist genau die Doppelpflege, die dieses Repo schon dreimal bestraft hat (R-18-06).
+Zehn Bausteine aus `24-RESEARCH.md`, Abschnitt "Doku-Bausteine für EXCH-08". Die Quelle für die Variablenliste ist **ausschließlich** der Docstring von `oauth/chain.py:19-65`; eine zweite Fassung der Defaults in der Doku ist genau die Doppelpflege, die dieses Repo schon dreimal bestraft hat (R-18-06).
 
-Doku-Wahrheitsgate beachten: `tests/unit/test_docs_audit_truth.py` existiert bereits und prueft Aussagen der Doku gegen den Code. Der Plan sollte pruefen, ob die neue Datei dort mitgefuehrt werden muss.
+Doku-Wahrheitsgate beachten: `tests/unit/test_docs_audit_truth.py` existiert bereits und prüft Aussagen der Doku gegen den Code. Der Plan sollte prüfen, ob die neue Datei dort mitgeführt werden muss.
 
 ---
 
@@ -944,7 +944,7 @@ Doku-Wahrheitsgate beachten: `tests/unit/test_docs_audit_truth.py` existiert ber
 ### Fremder Text, der in eine Zeile oder auf eine Seite geht
 
 **Quelle:** `src/mcp_connector/audit/text.py` (`printable`), angewandt in `audit/store.py:532-549`, `audit/record.py:108-126`, `exapp/audit_verify.py:285-306`, `exapp/audit_read.py:303-312`.
-**Gilt fuer:** `actor` in `store._row_values`, `actor` in `audit_read._line` und `_document`, jeden Wert des Trockenlaufs, der in die Antwort geht.
+**Gilt für:** `actor` in `store._row_values`, `actor` in `audit_read._line` und `_document`, jeden Wert des Trockenlaufs, der in die Antwort geht.
 
 ```python
 def _clamped_client_name(raw: str | None) -> str | None:
@@ -962,12 +962,12 @@ def _clamped_client_name(raw: str | None) -> str | None:
     return printable(raw, limit=store.CLIENT_NAME_LIMIT) or None
 ```
 
-Wichtig fuer D1: `acting_party` (`oauth/exchange_accounts.py:84-88`) filtert mit `character.isprintable()` und ist **nicht** dieselbe Regel. Ein Test haelt die beiden Wege gegeneinander.
+Wichtig für D1: `acting_party` (`oauth/exchange_accounts.py:84-88`) filtert mit `character.isprintable()` und ist **nicht** dieselbe Regel. Ein Test hält die beiden Wege gegeneinander.
 
 ### Fehlerbehandlung: der Typ, nie die Meldung
 
 **Quelle:** `audit/record.py:267-269`, `exapp/audit_verify.py:169-174`, `oauth/chain.py:528-535, 571-576`.
-**Gilt fuer:** jeden neuen `except`-Block dieser Phase.
+**Gilt für:** jeden neuen `except`-Block dieser Phase.
 
 ```python
 except Exception as exc:
@@ -975,32 +975,32 @@ except Exception as exc:
     logger.error("the audit log could not be checked: %s", type(exc).__name__)
 ```
 
-### Faehigkeit hereinreichen statt importieren
+### Fähigkeit hereinreichen statt importieren
 
 **Quelle:** `oauth/chain.py:601-636` (`accounts`), `exapp/audit_verify.py:147-156` (`store_provider`), `audit/record.py:53-56` (`StoreProvider`).
-**Gilt fuer:** den Ablehnungsschreiber und den Trockenlauf-Store.
+**Gilt für:** den Ablehnungsschreiber und den Trockenlauf-Store.
 
 ```python
 #: How a caller hands in its own store, the shape ``exapp/purge.py`` uses for the OAuth one.
 type StoreProvider = Callable[[], Awaitable[AuditStore]]
 ```
 
-Aus-Zustand heisst: das Objekt selbst zurueckgeben, nicht ein Wrapper mit gleichem Verhalten. Ein Test kann dann `is` sagen.
+Aus-Zustand heißt: das Objekt selbst zurückgeben, nicht ein Wrapper mit gleichem Verhalten. Ein Test kann dann `is` sagen.
 
 ### Nichts geht durch `exapp/middleware.py`
 
-**Quelle:** Phase 22 und 23 haben die Transportgrenze unangetastet gelassen; `exapp/middleware.py:144-147` (401) und `:157-175` (Recorder nur nach bestandener Pruefung).
-**Gilt fuer:** alle Plaene dieser Phase. Der Ablehnungsschreiber haengt in `oauth/chain.py`, nicht an der Grenze.
+**Quelle:** Phase 22 und 23 haben die Transportgrenze unangetastet gelassen; `exapp/middleware.py:144-147` (401) und `:157-175` (Recorder nur nach bestandener Prüfung).
+**Gilt für:** alle Pläne dieser Phase. Der Ablehnungsschreiber hängt in `oauth/chain.py`, nicht an der Grenze.
 
 ### Kein Orakel in der HTTP-Antwort
 
 **Quelle:** `tests/unit/test_oauth_exchange_chain.py:1204-1219`.
-**Gilt fuer:** jeden Plan, der `ExchangeRefused` ein Feld gibt. Der Bezeichner verlaesst den Prozess an genau einer Stelle: der Audit-Zeile.
+**Gilt für:** jeden Plan, der `ExchangeRefused` ein Feld gibt. Der Bezeichner verlässt den Prozess an genau einer Stelle: der Audit-Zeile.
 
-### Jede occ-Antwort ist 200, jeder JSON-Schluessel hat einen Beobachter
+### Jede occ-Antwort ist 200, jeder JSON-Schlüssel hat einen Beobachter
 
-**Quelle:** `exapp/audit_verify.py:25-33` (Begruendung), `:430-436` (`_text`), `:253-282` (`broken`), `exapp/audit_read.py:335-355` (`read`).
-**Gilt fuer:** `exapp/exchange_check.py` (`passed`).
+**Quelle:** `exapp/audit_verify.py:25-33` (Begründung), `:430-436` (`_text`), `:253-282` (`broken`), `exapp/audit_read.py:335-355` (`read`).
+**Gilt für:** `exapp/exchange_check.py` (`passed`).
 
 ---
 
@@ -1008,17 +1008,17 @@ Aus-Zustand heisst: das Objekt selbst zurueckgeben, nicht ein Wrapper mit gleich
 
 | Datei | Rolle | Datenfluss | Grund |
 |-------|-------|------------|-------|
-| Die Schreibbremse des Ablehnungsschreibers (Teil von `audit/refusals.py` bzw. `audit/record.py`) | service | rate-limited write | Es gibt in `src/` keine gebremste Schreibstelle. `oauth/throttle.py` bremst **Anfragen** gegen ein Zeitfenster und lebt im OAuth-Paket; `audit/` darf es nicht importieren (Schichtregel in `audit/record.py:21-25` und `tests/contract/test_module_boundaries.py`). Das naechste verwandte Muster ist die Intervall-Regel `should_sweep` / `should_check_accounts` (`audit/store.py:501-518`): eine reine Funktion auf der Sequenznummer, kein Zaehler auf Modulebene (D-20). Der Planer sollte pruefen, ob die Bremse auf demselben Prinzip gebaut werden kann (Zustand aus der Kette lesen statt im Prozess halten), sonst gilt RESEARCH.md D2 / Pitfall 2 / Open Question 4 als Entwurfsflaeche. |
+| Die Schreibbremse des Ablehnungsschreibers (Teil von `audit/refusals.py` bzw. `audit/record.py`) | service | rate-limited write | Es gibt in `src/` keine gebremste Schreibstelle. `oauth/throttle.py` bremst **Anfragen** gegen ein Zeitfenster und lebt im OAuth-Paket; `audit/` darf es nicht importieren (Schichtregel in `audit/record.py:21-25` und `tests/contract/test_module_boundaries.py`). Das nächste verwandte Muster ist die Intervall-Regel `should_sweep` / `should_check_accounts` (`audit/store.py:501-518`): eine reine Funktion auf der Sequenznummer, kein Zähler auf Modulebene (D-20). Der Planer sollte prüfen, ob die Bremse auf demselben Prinzip gebaut werden kann (Zustand aus der Kette lesen statt im Prozess halten), sonst gilt RESEARCH.md D2 / Pitfall 2 / Open Question 4 als Entwurfsfläche. |
 
 ---
 
-## Decision Points fuer den Planer (aus dem Musterabgleich, nicht aus RESEARCH.md)
+## Decision Points für den Planer (aus dem Musterabgleich, nicht aus RESEARCH.md)
 
-1. **Bodygrenze gegen Tokengroesse.** `MAX_BODY_BYTES = 4096` (`audit_verify.py:97`) gegen `MAX_TOKEN_BYTES = 8192` (`exchange.py:104`). Das kopierte Muster ist zu eng fuer sein neues Datum. Erste Messung des Trockenlauf-Tasks (Annahme A5).
+1. **Bodygrenze gegen Tokengröße.** `MAX_BODY_BYTES = 4096` (`audit_verify.py:97`) gegen `MAX_TOKEN_BYTES = 8192` (`exchange.py:104`). Das kopierte Muster ist zu eng für sein neues Datum. Erste Messung des Trockenlauf-Tasks (Annahme A5).
 2. **`build_chain` hat zwei Aufrufer.** `entry_exapp.py:141` und `entry_oauth.py:276`. Ein neuer Parameter zwingt beide zu einer Entscheidung; im Standalone-Betrieb gibt es kein occ.
-3. **Alle Leser der Spalte `chain`** (Annahme A4). Gefunden wurden: `_SILENT_CHAINS` (store.py:397), `_account_of` (store.py:191), `_SWEEPABLE_TOTAL` (340), die vier Sweep-Anweisungen (365-375), `_COUNT_OF_CHAIN`/`_DROP_CHAIN` (400-401), `audit_read._chain_of` (398) plus `INSTANCE_KEYWORD` (audit_read.py:155), `audit_verify._printable` (285). Jeder gehoert im Plan einzeln geprueft.
+3. **Alle Leser der Spalte `chain`** (Annahme A4). Gefunden wurden: `_SILENT_CHAINS` (store.py:397), `_account_of` (store.py:191), `_SWEEPABLE_TOTAL` (340), die vier Sweep-Anweisungen (365-375), `_COUNT_OF_CHAIN`/`_DROP_CHAIN` (400-401), `audit_read._chain_of` (398) plus `INSTANCE_KEYWORD` (audit_read.py:155), `audit_verify._printable` (285). Jeder gehört im Plan einzeln geprüft.
 4. **`_line` bekommt eine Spalte.** `tests/unit/test_exapp_audit_read.py` und jedes Ausgabebeispiel unter `docs/` ziehen mit.
-5. **`tests/unit/test_errors_reason.py` laeuft ueber `src/`** und faellt auf jedes `reason=`, das nicht in `REASONS` steht. Neue Bezeichner und ihre Verwendung gehoeren in denselben Commit.
+5. **`tests/unit/test_errors_reason.py` läuft über `src/`** und fällt auf jedes `reason=`, das nicht in `REASONS` steht. Neue Bezeichner und ihre Verwendung gehören in denselben Commit.
 
 ---
 
