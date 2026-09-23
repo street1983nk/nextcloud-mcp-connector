@@ -150,12 +150,12 @@ def test_the_gate_reports_a_free_text_handed_to_an_exchange_refusal() -> None:
     Without this case the walk over ``src/`` proves only that today's source is clean, which
     it would also do if the class had quietly dropped out of the recognised set.
     """
-    invented = 'raise ExchangeRefused("the token is empty", reason="made up on the spot")\n'
+    invented = 'raise ExchangeRefused(reason="made up on the spot")\n'
     assert _findings_in(invented, "invented.py") == [
         "invented.py:1: reason= is not a REASON_* constant"
     ]
 
-    named = 'raise ExchangeRefused("the token is empty", reason=REASON_EXCHANGE_MALFORMED)\n'
+    named = "raise ExchangeRefused(reason=REASON_EXCHANGE_MALFORMED)\n"
     assert _findings_in(named, "invented.py") == []
 
 

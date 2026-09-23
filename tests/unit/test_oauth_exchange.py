@@ -31,7 +31,8 @@ import respx
 from cryptography.hazmat.primitives.asymmetric import rsa
 from jwt.algorithms import RSAAlgorithm
 
-from mcp_connector.oauth import exchange
+from mcp_connector import errors
+from mcp_connector.oauth import exchange, jwks
 
 ISSUER = "https://idp.example.org/realms/f13"
 JWKS_URL = f"{ISSUER}/protocol/openid-connect/certs"
@@ -1204,6 +1205,166 @@ async def test_no_corpus_run_writes_token_or_claim_material_into_a_log_line(
         for value in forbidden:
             if value:
                 assert value not in written, f"leaked material in a log line: {case}"
+
+
+# --- the rejection group of AUDIT-07: carried by the exception, never by an answer --------
+#
+# The identifier is the value plan 24-04 writes into an audit line. Everything here is about
+# the two halves of that: no call site may forget it, and no call site may invent one.
+
+EXCHANGE_REASON_NAMES = frozenset(
+    {
+        "REASON_EXCHANGE_MALFORMED",
+        "REASON_EXCHANGE_KEY",
+        "REASON_EXCHANGE_ISSUER",
+        "REASON_EXCHANGE_CLAIMS",
+        "REASON_EXCHANGE_ACCOUNT",
+        "REASON_EXCHANGE_FAILED",
+    }
+)
+
+#: Read from the module, never typed here, so a renamed value cannot leave this file green.
+EXCHANGE_REASONS = frozenset(getattr(errors, name) for name in EXCHANGE_REASON_NAMES)
+
+
+def refused_call_sites() -> list[ast.Call]:
+    """Every ``_refused(...)`` call site of the checker, counted by the AST and not by grep.
+
+    ``grep -c "_refused("`` answers 20 on this module because the definition line counts
+    itself. What the gate is about is call sites, so it parses instead of searching.
+    """
+    tree = ast.parse(inspect.getsource(exchange))
+    return [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and getattr(node.func, "id", "") == "_refused"
+    ]
+
+
+def test_no_refusal_of_the_checker_can_forget_its_group() -> None:
+    """T-24-16: a call site without an identifier would silently fall back to the default.
+
+    The default exists for ``jwks.KeySet``, which calls the factory through a
+    ``Callable[[str], Exception]`` and can hand only one argument. Inside this module the
+    default is never the right answer, and a new rule added without a second argument would
+    be written into the audit trail as a key problem it has nothing to do with. The gate
+    names file and line of every such site.
+    """
+    calls = refused_call_sites()
+    assert len(calls) == 19, "the count of call sites changed; the grouping below has to follow"
+
+    forgotten = [
+        f"oauth/exchange.py:{call.lineno}: _refused() without its rejection group"
+        for call in calls
+        if len(call.args) < 2
+    ]
+    assert forgotten == [], "\n".join(forgotten)
+
+
+def test_every_group_handed_to_a_refusal_is_one_of_the_frozen_six() -> None:
+    """The identifier travels as a positional argument, where the gate of ``errors`` is blind.
+
+    ``tests/unit/test_errors_reason.py`` watches ``reason=`` at an error construction. Here
+    the value is the second argument of a factory, so nothing but this case keeps a made-up
+    string out of the one path a stranger reaches without a key.
+    """
+    handed = [call.args[1] for call in refused_call_sites()]
+    literal = [
+        f"oauth/exchange.py:{node.lineno}" for node in handed if not isinstance(node, ast.Name)
+    ]
+    assert literal == [], f"a group is a name of errors, never a literal: {literal}"
+
+    names = {node.id for node in handed if isinstance(node, ast.Name)}
+    assert names <= EXCHANGE_REASON_NAMES
+    assert all(getattr(errors, name) in errors.REASONS for name in names)
+
+
+def test_a_refusal_without_a_group_reads_as_the_unknown_case() -> None:
+    """The default of the class, which is the honest answer and never a guessed one."""
+    assert exchange.ExchangeRefused().reason == errors.REASON_EXCHANGE_FAILED
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_token_beyond_the_byte_limit_is_a_malformed_token() -> None:
+    serve()
+    with pytest.raises(exchange.ExchangeRefused) as refused:
+        await checker_for().claims_of(token(sub=SUB + "x" * exchange.MAX_TOKEN_BYTES))
+    assert refused.value.reason == errors.REASON_EXCHANGE_MALFORMED
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_foreign_issuer_is_the_issuer_group() -> None:
+    serve()
+    with pytest.raises(exchange.ExchangeRefused) as refused:
+        await checker_for().claims_of(token(iss="https://evil.example.org/realms/f13"))
+    assert refused.value.reason == errors.REASON_EXCHANGE_ISSUER
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_wrong_audience_is_the_claims_group() -> None:
+    serve()
+    with pytest.raises(exchange.ExchangeRefused) as refused:
+        await checker_for().claims_of(token(aud=f"{AUDIENCE}/tenant-b"))
+    assert refused.value.reason == errors.REASON_EXCHANGE_CLAIMS
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_an_unknown_kid_is_the_key_group() -> None:
+    """And with it the one-argument path: the key set layer refuses through the default."""
+    serve()
+    with pytest.raises(exchange.ExchangeRefused) as refused:
+        await checker_for().claims_of(token(kid="kid-nobody-serves"))
+    assert refused.value.reason == errors.REASON_EXCHANGE_KEY
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_an_unreachable_provider_is_the_key_group_as_well() -> None:
+    """The second proof of the default: ``KeySet`` hands one argument and nothing else."""
+    respx.get(JWKS_URL).mock(side_effect=httpx.ConnectError("no route to the provider"))
+    with pytest.raises(exchange.ExchangeRefused) as refused:
+        await checker_for().claims_of(token())
+    assert refused.value.reason == errors.REASON_EXCHANGE_KEY
+
+
+def test_the_key_set_layer_still_takes_a_one_argument_factory() -> None:
+    """The signature the default exists for, read at the layer and not described here.
+
+    A second parameter without a default would have made the factory unusable there, and
+    the key set layer would have had to grow a rejection vocabulary of its own.
+
+    Two sites, not one: ``KeySet.__init__`` takes the factory and ``fetch_json`` takes it a
+    second time, because the hardened round trip refuses on its own (a foreign origin, an
+    unreachable provider, an answer that is too large). Both are the same one-argument
+    contract, and both are the reason the second parameter of ``_refused`` has a default.
+    """
+    assert inspect.getsource(jwks).count("refuse: Callable[[str], Exception]") == 2
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_the_debug_line_carries_the_phrase_and_never_the_group(
+    spoken: list[logging.LogRecord],
+) -> None:
+    """T-24-14: the log keeps the sharper wording, the audit line keeps the coarser one.
+
+    Two readers, two needs. Whoever switches this module to DEBUG holds the instance anyway
+    and is served best by the exact rule; the audit trail is read by an operator and is one
+    copy away from a stranger, so it carries the group. Swapping the phrase for the
+    identifier here would lose the first without gaining anything for the second.
+    """
+    serve()
+    with pytest.raises(exchange.ExchangeRefused):
+        await checker_for().claims_of(token(iss="https://evil.example.org/realms/f13"))
+
+    written = [record.getMessage() for record in spoken]
+    assert written == ["exchange refused: the token comes from another issuer"]
+    for name in EXCHANGE_REASONS:
+        assert name not in written[0]
 
 
 # --- the revocation of phase 22 reaches the key set --------------------------------------
