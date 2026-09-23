@@ -45,6 +45,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   line naming all three sources, and the setup state on the connections page. A stored
   form value and the deploy variable both win over the derivation, and split-domain
   deployments keep setting the override.
+- An exchanged token acts under an existing Nextcloud account in the ExApp deployment.
+  The mapping from the checked claim set to the account runs over the configured profile
+  (`NC_MCP_EXCHANGE_MAPPING`), no account is ever created on this way, and an account that
+  cannot be found, or whose existence cannot be determined, is refused: uncertainty about
+  the account list is a refusal here, deliberately the opposite of the audit sweep, which
+  keeps every chain on the same uncertainty. For such a call the container reaches
+  Nextcloud through AppAPI impersonation in the name of the mapped account, without
+  anything ever being provisioned for it, and the permission boundary stays with
+  Nextcloud: the call sees exactly what that account may see, never more. The account list
+  is cached inside the process for a minute, concurrent calls share one lookup, and after
+  a failed lookup a grace period refuses without asking again.
 - Repeated refusals of the token exchange path are bounded before anybody is
   authenticated. An armed path checks a signature and, when a key is unknown, fetches a key
   set, so a stranger repeating a rejected assertion is answered with 429 and a `Retry-After`

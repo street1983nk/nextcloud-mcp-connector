@@ -41,7 +41,7 @@ from .exapp.purge import purge_routes
 from .exapp.target import exapp_target
 from .exapp.ui import strings
 from .nextcloud.http import USER_AGENT, NoCookieJar, configure_logging
-from .oauth import chain, throttle
+from .oauth import chain, exchange_appapi, throttle
 from .oauth.connect import connect_routes
 from .oauth.connections import connections_routes
 from .oauth.consent import consent_routes
@@ -127,12 +127,18 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
         nextcloud=nextcloud, env=env, policy=policy, store_provider=store
     )
     verifier = StoreTokenVerifier(store_provider=store, get_client=provider.get_client, env=env)
+    # The account source of the exchange path (MAP-02), built here and not per request: it
+    # holds the one account cache of this process, and a source per request would be a fetch
+    # of the whole account list per tool call. Only the armed state builds one, out of the
+    # same exchange_config answer that produced the INFO line above, so the off state has no
+    # object, no cache and no code path where none belongs.
+    accounts = exchange_appapi.AppApiAccounts(env=env) if exchange_config is not None else None
     # The chain of milestone v1.6, and the one place it is hung in. Without a configured
     # exchange path this is the very object above and not a wrapper around it, which is what
     # keeps an installation that never heard of this milestone byte for byte what it was.
     # The configuration read at the top of this function is handed in, so the environment is
     # read once per application.
-    boundary = chain.build_chain(verifier, env=env, config=exchange_config)
+    boundary = chain.build_chain(verifier, env=env, config=exchange_config, accounts=accounts)
     # The last wire of the pair, and the one that makes "revoked" mean "now": the verifier
     # answers from a five second process cache, and a revocation, whether it comes from the
     # user through /revoke or from the reuse detection of the rotation, empties it in the
