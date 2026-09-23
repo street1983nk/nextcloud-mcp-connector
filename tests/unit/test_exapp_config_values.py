@@ -631,6 +631,131 @@ async def test_the_default_in_code_survives_this_validation() -> None:
     }
 
 
+# --- the derived address of BL-17: <NEXTCLOUD_URL>/exapps/<APP_ID> ------------------
+#
+# ``derived_public_url`` is the third link of the precedence chain of plan 05-01: it only
+# speaks when neither the admin form nor ``NC_MCP_PUBLIC_URL`` produced an address, and its
+# candidate runs through the same validation core as a value an administrator typed.
+# Assumption A2 of phase 05 (AppAPI may hand this container an http or internal
+# ``NEXTCLOUD_URL``) is answered with validation instead of trust: such a value derives
+# nothing and the fail-closed path stays. Everything here calls the function directly; the
+# wiring into the start is held by ``test_exapp_entry.py``.
+
+
+def derivation_env(nextcloud_url: str, app_id: str = APP_ID) -> dict[str, str]:
+    """The two variables the derivation reads, and deliberately nothing else.
+
+    No ``APP_SECRET`` and no ``NC_MCP_PUBLIC_URL``: the function has to fail soft on an
+    incomplete deploy environment instead of raising like ``exapp_settings`` does, because
+    it runs on every start, including the ones this chain exists for.
+    """
+    return {config.ENV_NEXTCLOUD_URL: nextcloud_url, config.ENV_APP_ID: app_id}
+
+
+def test_the_derivation_is_published_in_all() -> None:
+    """The catalogue rule of this module: what leaves it stands in ``__all__``."""
+    assert "derived_public_url" in config_values.__all__
+
+
+@pytest.mark.parametrize("base", ["https://cloud.example.com", "https://cloud.example.com/"])
+def test_the_public_address_is_derived_from_nextcloud_url_and_the_app_id(base: str) -> None:
+    """The AIO no-config case of BL-17: only ``NEXTCLOUD_URL`` is set, and it is enough.
+
+    The form is the one ``scripts/bootstrap_exapp.sh`` already builds and
+    ``docs/exapp-install.md`` documents: a HaRP ExApp is reachable under
+    ``<nextcloud_url>/exapps/<appid>``, never under the instance root. A trailing slash on
+    the input decides nothing, exactly as it decides nothing for an admin form value.
+    """
+    assert (
+        config_values.derived_public_url(derivation_env(base))
+        == "https://cloud.example.com/exapps/mcp_connector"
+    )
+
+
+def test_the_derived_address_leaves_in_one_spelling() -> None:
+    """IN-03 applies to derived values too: one spelling of scheme and host, whatever came in.
+
+    The value becomes the ``issuer`` and the prefix of ``resource``, and clients compare
+    both character by character, so a derived value in a second spelling would be the same
+    silent comparison failure the admin form value was cured of.
+    """
+    assert (
+        config_values.derived_public_url(derivation_env("HTTPS://Cloud.Example.COM/"))
+        == "https://cloud.example.com/exapps/mcp_connector"
+    )
+
+
+def test_a_non_loopback_http_nextcloud_url_derives_nothing() -> None:
+    """Assumption A2, answered: an AppAPI http downgrade or an internal name derives nothing.
+
+    This is exactly the RFC 8414 rule of CR-01, applied to the derived candidate: an issuer
+    has to be https unless it points at loopback, so a value like the AIO-internal container
+    name never becomes a silent broken default.
+    """
+    assert config_values.derived_public_url(derivation_env("http://nextcloud-aio-apache")) is None
+
+
+def test_a_loopback_nextcloud_url_still_derives() -> None:
+    """The rule refuses http, it does not refuse development (the measured local topology)."""
+    assert (
+        config_values.derived_public_url(derivation_env("http://127.0.0.1:8081"))
+        == "http://127.0.0.1:8081/exapps/mcp_connector"
+    )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "   ",
+        "not a url",
+        "ftp://x",
+        "https://user:pass@cloud.example.com",
+        "https://cloud.example.com:99999",
+        "https://cloud.example.com:0",
+        "https://[::1",
+    ],
+    ids=[
+        "empty",
+        "whitespace only",
+        "not a url",
+        "a scheme that is not http",
+        "credentials in the URL",
+        "a port above the range",
+        "a port below the range",
+        "an unreadable IPv6 bracket",
+    ],
+)
+def test_garbage_nextcloud_url_values_derive_nothing(value: str) -> None:
+    """Fail soft on every unusable value: ``None`` and never an exception at start time."""
+    assert config_values.derived_public_url(derivation_env(value)) is None
+
+
+def test_a_missing_app_id_derives_nothing() -> None:
+    """Without ``APP_ID`` there is no suffix: the derivation is structurally ExApp-only."""
+    assert (
+        config_values.derived_public_url(derivation_env("https://cloud.example.com", app_id=""))
+        is None
+    )
+
+
+def test_the_derivation_refusal_names_the_variable_and_never_the_value(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """T-05-03 without an exception: the value comes from the deploy environment, but a rule
+    with one exemption is not a rule, and a container log is read by more than its author."""
+    value = "http://nextcloud-aio-apache"
+
+    with caplog.at_level(logging.DEBUG):
+        assert config_values.derived_public_url(derivation_env(value)) is None
+
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert config.ENV_NEXTCLOUD_URL in logged, "the variable is named so the state is findable"
+    assert config.ENV_PUBLIC_URL in logged, "and the line says the existing ways stay open"
+    assert value not in logged
+    assert "nextcloud-aio-apache" not in logged, "not even the host of the value"
+
+
 # --- the overlay: the two switches ------------------------------------------------
 
 
