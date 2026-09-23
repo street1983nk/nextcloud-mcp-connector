@@ -43,7 +43,7 @@ from .exapp.middleware import RequireOAuthBearer
 from .exapp.responses import NO_STORE
 from .nextcloud.http import configure_logging
 from .nextcloud.target import NextcloudTarget
-from .oauth import chain, crypto, oidc, throttle
+from .oauth import chain, crypto, exchange_binding, oidc, throttle
 from .oauth.consent import consent_routes
 from .oauth.metadata import OPENID_CONFIGURATION_SUFFIX, metadata_routes
 from .oauth.oidc_identity import OidcBrowserIdentitySource
@@ -265,11 +265,15 @@ def build_oauth_app(
         nextcloud=resolved.nextcloud, env=env, policy=policy, store_provider=store
     )
     verifier = StoreTokenVerifier(store_provider=store, get_client=provider.get_client, env=env)
+    # The account source of this mode (CRED-02) exists only while the path is armed, and it
+    # is built from the very store opener the provider and the verifier use, not from a
+    # second one: a second instance would be a second view on the same revocation.
+    accounts = exchange_binding.BoundAccounts(store) if exchange_config is not None else None
     # The one place this deployment hangs the chain in, and in the factory state the very
     # object above rather than a wrapper around it. The revocation goes to the chain, not to
     # the verifier inside it: the exchange half caches signature keys for five minutes, and a
     # rotated key must not outlive the revocation that emptied the other half.
-    boundary = chain.build_chain(verifier, env=env, config=exchange_config)
+    boundary = chain.build_chain(verifier, env=env, config=exchange_config, accounts=accounts)
     provider.on_revocation(boundary.invalidate)
 
     counters = throttle.Throttle()
