@@ -794,6 +794,12 @@ Items acknowledged and carried forward from previous milestone close:
 |----------|------|--------|-------------|
 | *(none)* | | | |
 
+## Quick Tasks Completed
+
+| Date | Task | Commits | Directory |
+|------|------|---------|-----------|
+| 2026-09-23 | BL-15 Rest: ehrliche Tool-Beschreibung von unified_search, Contract-Pin umgedreht, Backlog geschlossen | 9a32764, 6ee0a03, 5c4c043 | .planning/quick/260923-bl15-honest-search-note/ |
+
 ## Session Continuity
 
 Last session: 2026-09-19T09:56:28.357Z
