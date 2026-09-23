@@ -443,8 +443,12 @@ async def test_unified_search_is_listed_as_a_pure_read_over_all_providers() -> N
     assert annotations.open_world_hint is False
     assert tool.output_schema is None, "structured_output=False (schema diet)"
 
-    assert "not file contents" in (tool.description or ""), (
-        "pitfall 5 belongs in the sentence the model reads before it calls the tool"
+    description = tool.description or ""
+    assert "not file contents" not in description, (
+        "the blanket claim is false the day a content provider answers (BL-15)"
+    )
+    assert "note" in description, (
+        "the description defers to the per answer note, which carries the truth per call"
     )
 
     schema = tool.input_schema
