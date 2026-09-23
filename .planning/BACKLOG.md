@@ -572,6 +572,13 @@ stays unchecked in REQUIREMENTS.md because its wording asks for a completed sign
 
 ## BL-15: The search note becomes false the day Findling ships (blocker for BL-01)
 
+**STATUS 2026-09-23: DONE.** Der Kern (laufzeitabhängige Note via `_note` und
+`CONTENT_PROVIDERS`, ehrlicher `_TERM_HINT`, Durchreichen in `prepare_context`, Tests
+beider Zweige) kam mit Commit `aed6bdd` (PR #3, 0.1.12). Der Rest, die registrierte
+Tool-Beschreibung in `reg_search.py` samt Contract-Pin, kam mit diesem Quick-Fix
+(Commits `9a32764` Test und `6ee0a03` Fix). `files_search` bewusst unverändert
+(WebDAV, Satz bleibt wahr). BL-01 verliert damit seinen zweiten Blocker.
+
 **Found:** 2026-09-04, while the owner asked whether the combination can be
 advertised as a RAG system. Verified against the code and against STATE.md.
 
