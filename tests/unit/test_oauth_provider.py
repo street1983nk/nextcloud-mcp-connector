@@ -46,7 +46,7 @@ from mcp_connector import config, entry_http
 from mcp_connector.entry_exapp import MCP_PATH, build_exapp_app
 from mcp_connector.exapp.middleware import RequireAppApi
 from mcp_connector.exapp.target import exapp_target
-from mcp_connector.oauth import cimd, loginflow, metadata, registry
+from mcp_connector.oauth import cimd, exchange_accounts, loginflow, metadata, registry
 from mcp_connector.oauth import provider as provider_module
 from mcp_connector.oauth import throttle as throttle_module
 from mcp_connector.oauth.store import (
@@ -2156,6 +2156,76 @@ async def test_the_sweep_takes_at_most_a_handful_per_call(tmp_path: Path) -> Non
         swept = await subject.sweep_abandoned()
 
     assert swept == provider_module.SWEEP_LIMIT
+
+
+@pytest.mark.anyio
+async def test_the_sweep_leaves_a_finished_binding_standing(tmp_path: Path) -> None:
+    """A binding of the exchange path never owns a token (it acts under a foreign one), so
+    it matches the abandoned shape exactly. The sweep excepts its reserved client, and only
+    the user's own revocation (plan 23-06) and the purge ever hand its password back."""
+    subject, store = build(tmp_path)
+    await store.save_client(
+        exchange_accounts.EXCHANGE_CLIENT_ID,
+        metadata_json='{"client_id": "reserved"}',
+        allowed=False,
+    )
+    await store.create_authorization(
+        "the-finished-binding",
+        client_id=exchange_accounts.EXCHANGE_CLIENT_ID,
+        nc_user=NC_USER,
+        nc_account_id=NC_USER,
+        app_password=APP_PASSWORD,
+        scopes=metadata.TOOL_SCOPE,
+        resource=RESOURCE,
+        now=int(time.time()) - FLOW_TTL - 1,
+    )
+
+    with respx.mock:
+        deletion = deletion_route()
+        swept = await subject.sweep_abandoned()
+
+    assert swept == 0
+    assert not deletion.called
+    assert await store.load_authorization("the-finished-binding") is not None
+    # The binding keeps its credential: an immediate second sweep changes nothing either.
+    assert await store.app_password("the-finished-binding") == APP_PASSWORD
+    with respx.mock:
+        deletion_route()
+        assert await subject.sweep_abandoned() == 0
+    assert await store.app_password("the-finished-binding") == APP_PASSWORD
+
+
+@pytest.mark.anyio
+async def test_a_holding_row_under_another_reserved_client_is_still_swept(
+    tmp_path: Path,
+) -> None:
+    """Exactly one client is excepted. A holding row of a sign in nobody confirmed rides
+    under a different reserved client, so the existing sweep takes it and hands its
+    Nextcloud app password back (T-23-23)."""
+    subject, store = build(tmp_path)
+    await store.save_client(
+        "urn:mcp-connector:another-reserved-path",
+        metadata_json='{"client_id": "reserved"}',
+        allowed=False,
+    )
+    await store.create_authorization(
+        "the-holding-row-nobody-confirmed",
+        client_id="urn:mcp-connector:another-reserved-path",
+        nc_user=NC_USER,
+        nc_account_id=NC_USER,
+        app_password=APP_PASSWORD,
+        scopes=metadata.TOOL_SCOPE,
+        resource=RESOURCE,
+        now=int(time.time()) - FLOW_TTL - 1,
+    )
+
+    with respx.mock:
+        deletion = deletion_route()
+        swept = await subject.sweep_abandoned()
+
+    assert swept == 1
+    assert deletion.call_count == 1
+    assert await store.load_authorization("the-holding-row-nobody-confirmed") is None
 
 
 # --- WR-04: a client that runs out gives its app passwords back before its row goes --------

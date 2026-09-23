@@ -641,6 +641,92 @@ async def test_of_two_living_bindings_the_youngest_answers(tmp_path: Path) -> No
     assert row.auth_id == "binding-newer"
 
 
+# --- the sweep exception for finished bindings (CRED-02, plan 23-05) -----------------
+
+#: A second reserved identifier next to :data:`RESERVED_CLIENT`, for the tests that have to
+#: tell "excepted" from "merely reserved". Like the first one, deliberately not a real
+#: constant of the exchange path: the store knows no reserved client.
+SECOND_RESERVED_CLIENT = "urn:mcp-connector:another-reserved-path"
+
+
+async def with_old_tokenless_row(
+    subject: store.OAuthStore, *, auth_id: str, client_id: str, nc_user: str = NC_USER
+) -> None:
+    """A row of exactly the abandoned shape: no flow, no code, no token, old, not revoked."""
+    await subject.save_client(client_id, metadata_json='{"client_id": "reserved"}', allowed=False)
+    await subject.create_authorization(
+        auth_id,
+        client_id=client_id,
+        nc_user=nc_user,
+        nc_account_id=nc_user,
+        app_password=APP_PASSWORD,
+        scopes=SCOPES,
+        resource=RESOURCE,
+        now=1_000,
+    )
+
+
+@pytest.mark.anyio
+async def test_an_excepted_client_is_not_among_the_abandoned_rows(tmp_path: Path) -> None:
+    """A finished binding never owns a token, so it matches the abandoned shape exactly;
+    the exception is what keeps the sweep from revoking it (T-23-24)."""
+    subject = open_store(tmp_path)
+    await with_old_tokenless_row(subject, auth_id="the-binding", client_id=RESERVED_CLIENT)
+    await with_old_tokenless_row(
+        subject, auth_id="the-abandoned-sign-in", client_id=SECOND_RESERVED_CLIENT
+    )
+
+    rows = await subject.abandoned_authorizations(10, except_clients=(RESERVED_CLIENT,))
+
+    assert [row.auth_id for row in rows] == ["the-abandoned-sign-in"]
+
+
+@pytest.mark.anyio
+async def test_without_an_exception_list_the_same_rows_are_abandoned(tmp_path: Path) -> None:
+    """Empty means literally the behaviour of today: every old tokenless row is suspicious."""
+    subject = open_store(tmp_path)
+    await with_old_tokenless_row(subject, auth_id="the-binding", client_id=RESERVED_CLIENT)
+    await with_old_tokenless_row(
+        subject, auth_id="the-abandoned-sign-in", client_id=SECOND_RESERVED_CLIENT
+    )
+
+    rows = await subject.abandoned_authorizations(10)
+
+    assert {row.auth_id for row in rows} == {"the-binding", "the-abandoned-sign-in"}
+
+
+@pytest.mark.anyio
+async def test_only_the_named_clients_are_excepted(tmp_path: Path) -> None:
+    """The exception is exactly the tuple: a second reserved client enjoys nothing by shape,
+    and naming several works the same way as naming one."""
+    subject = open_store(tmp_path)
+    await with_old_tokenless_row(subject, auth_id="row-one", client_id=RESERVED_CLIENT)
+    await with_old_tokenless_row(subject, auth_id="row-two", client_id=SECOND_RESERVED_CLIENT)
+
+    one = await subject.abandoned_authorizations(10, except_clients=(SECOND_RESERVED_CLIENT,))
+    both = await subject.abandoned_authorizations(
+        10, except_clients=(RESERVED_CLIENT, SECOND_RESERVED_CLIENT)
+    )
+
+    assert [row.auth_id for row in one] == ["row-one"]
+    assert both == []
+
+
+@pytest.mark.anyio
+async def test_an_excepted_client_still_hides_nothing_that_has_a_flow_or_a_token(
+    tmp_path: Path,
+) -> None:
+    """The exception widens nothing: a running sign in was never abandoned to begin with."""
+    subject = open_store(tmp_path)
+    await with_old_tokenless_row(subject, auth_id="the-abandoned", client_id=RESERVED_CLIENT)
+    await with_authorization(subject, now=1_000)
+    await subject.create_refresh_token(REFRESH_TOKEN, auth_id=AUTH_ID, family_id=FAMILY)
+
+    rows = await subject.abandoned_authorizations(10, except_clients=(SECOND_RESERVED_CLIENT,))
+
+    assert [row.auth_id for row in rows] == ["the-abandoned"]
+
+
 # --- the per account access switch (EXAPP-02, D-47 to D-50) ------------------------
 
 
