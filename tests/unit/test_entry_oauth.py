@@ -1197,3 +1197,33 @@ def test_without_the_namespace_no_account_source_exists_at_the_boundary(tmp_path
 
     assert isinstance(guard._token_verifier, StoreTokenVerifier)
     assert not isinstance(guard._token_verifier, chain.ChainedVerifier)
+
+
+# --- the enrollment page of the exchange binding hangs only while the path is armed --------
+
+
+def test_the_armed_application_attaches_the_enrollment_page(tmp_path: Path) -> None:
+    """Plan 23-06: the page on which a binding is set up, seen and withdrawn, wrapped in
+    the same body limit as every other browser route."""
+    app = entry_oauth.build_oauth_app(base_env(tmp_path, **EXCHANGE_ENV))
+
+    enrollment = [
+        route
+        for route in app.router.routes
+        if isinstance(route, Route) and route.path == "/exchange"
+    ]
+
+    assert len(enrollment) == 2, "one address, a GET route and a POST route"
+    assert {method for route in enrollment for method in route.methods or ()} >= {"GET", "POST"}
+    assert all(isinstance(route.app, entry_oauth.BodyLimit) for route in enrollment)
+
+
+def test_the_disarmed_application_has_no_exchange_address(tmp_path: Path) -> None:
+    """In the off state the address does not exist at all rather than answering emptily:
+    an address that is not there is the smallest attack surface, and the factory state is
+    the same structure as before this milestone."""
+    app = entry_oauth.build_oauth_app(base_env(tmp_path))
+
+    paths = [route.path for route in app.router.routes if isinstance(route, Route)]
+
+    assert "/exchange" not in paths

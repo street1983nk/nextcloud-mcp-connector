@@ -8,14 +8,23 @@ two properties everything here exists for: a holding row can do nothing, because
 a Nextcloud credential behind (pitfall 13, D-34).
 """
 
+import asyncio
+import re
 import sqlite3
 from pathlib import Path
 
 import pytest
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.testclient import TestClient
 
 from mcp_connector import config
+from mcp_connector.exapp.ui import exchange as ui_exchange
+from mcp_connector.exapp.ui import strings as ui_strings
 from mcp_connector.nextcloud.target import NextcloudTarget
 from mcp_connector.oauth import exchange_enroll, loginflow
+from mcp_connector.oauth import throttle as throttle_module
+from mcp_connector.oauth.browser_identity import IdentityStep
 from mcp_connector.oauth.exchange_accounts import EXCHANGE_CLIENT_ID
 from mcp_connector.oauth.metadata import RESOURCE_SUFFIX, TOOL_SCOPE
 from mcp_connector.oauth.store import OAuthStore
@@ -465,6 +474,300 @@ async def test_aborting_before_the_sign_in_finished_only_drops_the_flow(
 
     assert flows.revoked == []
     assert await subject.load_flow(flow_id) is None
+
+
+# --- the routes of the enrollment page (plan 23-06) -------------------------------------
+
+ACTING_PARTY = "f13-orchestrator"
+OIDC_STEP_PATH = "/oidc/start"
+
+
+class IdentityStub:
+    """A browser identity source of one test: programmable answer, recorded questions."""
+
+    def __init__(self) -> None:
+        self.answer = False
+        self.raises = False
+        self.asked: list[tuple[str, str | None]] = []
+
+    async def identifies(
+        self, request: Request, expected_account_id: str, *, flow_id: str | None = None
+    ) -> bool:
+        if self.raises:
+            raise RuntimeError("the identity source broke")
+        self.asked.append((expected_account_id, flow_id))
+        return self.answer
+
+    async def pending_step(
+        self, request: Request, *, flow_id: str, expected_account_id: str
+    ) -> IdentityStep | None:
+        if self.raises:
+            raise RuntimeError("the identity source broke")
+        return IdentityStep(
+            action_path=OIDC_STEP_PATH,
+            fields={"flow": flow_id, "confirm": "a-rendered-form-value"},
+        )
+
+
+class EndConnectionStub:
+    """The one revocation path, as the routes receive it: recorded, never the store."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+        self.answer = True
+
+    async def __call__(self, principal: str, auth_id: str) -> bool:
+        self.calls.append((principal, auth_id))
+        return self.answer
+
+
+def routed_client(
+    subject: OAuthStore,
+    identity: IdentityStub,
+    *,
+    end_connection: EndConnectionStub | None = None,
+    throttle: throttle_module.Throttle | None = None,
+) -> TestClient:
+    async def opener() -> OAuthStore:
+        return subject
+
+    routes = exchange_enroll.exchange_routes(
+        ENV,
+        nextcloud=TARGET,
+        store_provider=opener,
+        browser_identity=identity,
+        end_connection=end_connection if end_connection is not None else EndConnectionStub(),
+        acting_party=ACTING_PARTY,
+        throttle=throttle,
+    )
+    return TestClient(Starlette(routes=routes))
+
+
+def binding_missing(subject: OAuthStore, account_id: str) -> bool:
+    """Whether the account source of 23-04 still finds nothing for this account."""
+    return asyncio.run(subject.binding_of(account_id, EXCHANGE_CLIENT_ID)) is None
+
+
+def flow_id_of(handoff_body: str) -> str:
+    """The flow id out of the hidden field of the rendered handoff page."""
+    match = re.search(rf'name="{ui_exchange.FLOW_PARAM}" value="([^"]+)"', handoff_body)
+    assert match is not None, "the handoff page carries the flow id as a hidden value"
+    return match.group(1)
+
+
+def normalized(body: str) -> str:
+    """One page body with the per response nonce taken out, so two renders compare."""
+    return re.sub(r"nonce-[A-Za-z0-9_-]+", "nonce-X", re.sub(r'nonce="[^"]+"', 'nonce="X"', body))
+
+
+def started_flow(client: TestClient) -> str:
+    response = client.post(
+        ui_exchange.ENROLL_PATH, data={ui_exchange.ACTION_FIELD: ui_exchange.ACTION_START}
+    )
+    assert response.status_code == 200
+    assert LOGIN_URL in response.text
+    return flow_id_of(response.text)
+
+
+def test_the_read_and_the_start_have_their_two_throttle_classes() -> None:
+    """One address, two counters: the POST that opens a login flow counts every request
+    against FLOW_LIMIT, and it may not share a class with the reads, because a successful
+    read pays one attempt back (WR-03) and a shared counter would let a reload of the
+    invitation erase the count of the flows an attacker opened."""
+    assert throttle_module.CLASS_EXCHANGE_ENROLL in throttle_module.__all__
+    assert throttle_module.CLASS_EXCHANGE_ENROLL_START in throttle_module.__all__
+    assert throttle_module.CLASS_EXCHANGE_ENROLL != throttle_module.CLASS_EXCHANGE_ENROLL_START
+
+
+def test_the_bare_page_is_the_invitation(tmp_path: Path, flows: LoginFlowStub) -> None:
+    client = routed_client(open_store(tmp_path), IdentityStub())
+
+    response = client.get(ui_exchange.ENROLL_PATH)
+
+    assert response.status_code == 200
+    assert ui_strings.EXCHANGE_REACH in response.text
+    assert f'value="{ui_exchange.ACTION_START}"' in response.text
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_starting_opens_a_login_flow_and_answers_the_handoff(
+    tmp_path: Path, flows: LoginFlowStub
+) -> None:
+    subject = open_store(tmp_path)
+    client = routed_client(subject, IdentityStub())
+
+    flow_id = started_flow(client)
+
+    assert flow_rows(tmp_path) == 1
+    assert flow_id
+
+
+def test_a_running_sign_in_answers_the_waiting_screen(tmp_path: Path, flows: LoginFlowStub) -> None:
+    subject = open_store(tmp_path)
+    client = routed_client(subject, IdentityStub())
+    flow_id = started_flow(client)
+    flows.poll = loginflow.PollResult(outcome=loginflow.POLL_PENDING)
+
+    response = client.get(ui_exchange.ENROLL_PATH, params={ui_exchange.FLOW_PARAM: flow_id})
+
+    assert response.status_code == 200
+    assert '<meta http-equiv="refresh" content="3">' in response.text
+
+
+def test_a_finished_sign_in_without_a_proof_shows_the_step_and_writes_no_binding(
+    tmp_path: Path, flows: LoginFlowStub
+) -> None:
+    """The acceptance criterion of T-23-26: no proof, no row under EXCHANGE_CLIENT_ID."""
+    subject = open_store(tmp_path)
+    identity = IdentityStub()
+    client = routed_client(subject, identity)
+    flow_id = started_flow(client)
+
+    response = client.get(ui_exchange.ENROLL_PATH, params={ui_exchange.FLOW_PARAM: flow_id})
+
+    assert response.status_code == 200
+    assert OIDC_STEP_PATH in response.text
+    assert ui_strings.CONSENT_CONFIRM_ACTION in response.text
+    assert binding_missing(subject, ACCOUNT_ID)
+    assert identity.asked == [(ACCOUNT_ID, flow_id)]
+
+
+def test_the_same_call_with_a_proof_writes_the_binding_and_shows_it(
+    tmp_path: Path, flows: LoginFlowStub
+) -> None:
+    """T-23-26 mitigated: the binding is written only after ``identifies`` said yes, in the
+    same request run, and the page shows account, date and acting party."""
+    subject = open_store(tmp_path)
+    identity = IdentityStub()
+    client = routed_client(subject, identity)
+    flow_id = started_flow(client)
+    client.get(ui_exchange.ENROLL_PATH, params={ui_exchange.FLOW_PARAM: flow_id})
+    assert binding_missing(subject, ACCOUNT_ID)
+    identity.answer = True
+
+    response = client.get(ui_exchange.ENROLL_PATH, params={ui_exchange.FLOW_PARAM: flow_id})
+
+    assert response.status_code == 200
+    assert ui_strings.EXCHANGE_BOUND_TITLE in response.text
+    assert DISPLAY in response.text
+    assert ACTING_PARTY in response.text
+    assert f'value="{ui_exchange.ACTION_REVOKE}"' in response.text
+    assert not binding_missing(subject, ACCOUNT_ID)
+
+
+def test_an_already_bound_account_gets_the_page_of_the_existing_binding(
+    tmp_path: Path, flows: LoginFlowStub
+) -> None:
+    subject = open_store(tmp_path)
+    identity = IdentityStub()
+    identity.answer = True
+    client = routed_client(subject, identity)
+    first_flow = started_flow(client)
+    first = client.get(ui_exchange.ENROLL_PATH, params={ui_exchange.FLOW_PARAM: first_flow})
+    assert ui_strings.EXCHANGE_BOUND_TITLE in first.text
+
+    second_flow = started_flow(client)
+    second = client.get(ui_exchange.ENROLL_PATH, params={ui_exchange.FLOW_PARAM: second_flow})
+
+    assert second.status_code == 200
+    assert ui_strings.EXCHANGE_BOUND_TITLE in second.text
+    # No second row was written, and the second credential went back to Nextcloud.
+    assert flows.revoked == [(LOGIN, PASSWORD)]
+
+
+def test_an_unknown_an_expired_and_a_foreign_procedure_read_like_no_procedure(
+    tmp_path: Path, flows: LoginFlowStub
+) -> None:
+    """One answer (T-23-28): a dead procedure is indistinguishable from none at all."""
+    subject = open_store(tmp_path)
+    client = routed_client(subject, IdentityStub())
+    plain = client.get(ui_exchange.ENROLL_PATH)
+
+    expired = asyncio.run(exchange_enroll.begin_enrollment(subject, nextcloud=TARGET, now=1_000))
+    assert expired.outcome == exchange_enroll.ENROLL_STARTED
+    asyncio.run(subject.save_client("client-4711", metadata_json="{}"))
+    asyncio.run(
+        subject.create_authorization(
+            "an-ordinary-connection",
+            client_id="client-4711",
+            nc_user=LOGIN,
+            nc_account_id=ACCOUNT_ID,
+            app_password=PASSWORD,
+            scopes=TOOL_SCOPE,
+            resource="",
+        )
+    )
+
+    for flow_value in ("never-existed", expired.flow_id, "an-ordinary-connection"):
+        response = client.get(ui_exchange.ENROLL_PATH, params={ui_exchange.FLOW_PARAM: flow_value})
+        assert response.status_code == plain.status_code
+        assert normalized(response.text) == normalized(plain.text)
+
+
+def test_a_failing_identity_source_is_a_refusal_and_never_a_binding(
+    tmp_path: Path, flows: LoginFlowStub
+) -> None:
+    """A source is a security boundary: its failure is a refusal, never a fallback."""
+    subject = open_store(tmp_path)
+    identity = IdentityStub()
+    identity.raises = True
+    client = routed_client(subject, identity)
+    flow_id = started_flow(client)
+
+    response = client.get(ui_exchange.ENROLL_PATH, params={ui_exchange.FLOW_PARAM: flow_id})
+
+    assert response.status_code == 500
+    assert ui_strings.ERROR_GENERIC_TITLE in response.text
+    assert binding_missing(subject, ACCOUNT_ID)
+
+
+def test_a_paused_account_meets_the_paused_page(tmp_path: Path, flows: LoginFlowStub) -> None:
+    subject = open_store(tmp_path)
+    client = routed_client(subject, IdentityStub())
+    flow_id = started_flow(client)
+
+    asyncio.run(subject.set_access(ACCOUNT_ID, disabled=True))
+    response = client.get(ui_exchange.ENROLL_PATH, params={ui_exchange.FLOW_PARAM: flow_id})
+
+    assert response.status_code == 403
+    assert flows.revoked == [(LOGIN, PASSWORD)]
+
+
+def test_an_oversized_and_an_unknown_form_are_a_400(tmp_path: Path, flows: LoginFlowStub) -> None:
+    subject = open_store(tmp_path)
+    client = routed_client(subject, IdentityStub())
+
+    oversized = client.post(
+        ui_exchange.ENROLL_PATH,
+        data={
+            ui_exchange.ACTION_FIELD: ui_exchange.ACTION_START,
+            "padding": "p" * 8192,
+        },
+    )
+    unknown = client.post(ui_exchange.ENROLL_PATH, data={ui_exchange.ACTION_FIELD: "surprise"})
+
+    assert oversized.status_code == 400
+    assert unknown.status_code == 400
+    assert flow_rows(tmp_path) == 0, "neither body was ever acted on"
+
+
+def test_repeated_starts_run_into_the_flow_throttle(tmp_path: Path, flows: LoginFlowStub) -> None:
+    """T-23-27: the POST that opens a login flow counts every request, and a throttled
+    caller gets the error page E6, not JSON, because a browser stands here."""
+    subject = open_store(tmp_path)
+    client = routed_client(subject, IdentityStub(), throttle=throttle_module.Throttle())
+
+    start = {ui_exchange.ACTION_FIELD: ui_exchange.ACTION_START}
+    for _ in range(throttle_module.FLOW_LIMIT):
+        allowed = client.post(ui_exchange.ENROLL_PATH, data=start)
+        assert allowed.status_code == 200
+
+    refused = client.post(ui_exchange.ENROLL_PATH, data=start)
+
+    assert refused.status_code == 429
+    assert refused.headers["content-type"].startswith("text/html")
+    assert refused.headers["retry-after"]
+    assert ui_strings.ERROR_THROTTLED_TITLE in refused.text
 
 
 @pytest.mark.anyio
