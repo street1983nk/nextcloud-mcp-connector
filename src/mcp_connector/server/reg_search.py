@@ -27,7 +27,7 @@ async def unified_search(
     ] = "",
     ctx: Context | None = None,
 ) -> str:
-    """Search the whole Nextcloud across all installed search providers (matches names and metadata, not file contents)."""  # noqa: E501
+    """Search the whole Nextcloud across all installed search providers. The note of every answer says whether file contents were matched."""  # noqa: E501
     clients = deps.resolve_clients(ctx)
     return compact(
         await search_tools.unified_search(
