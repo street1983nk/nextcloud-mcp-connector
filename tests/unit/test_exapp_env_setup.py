@@ -1916,6 +1916,25 @@ def test_no_description_names_a_blocked_mailbox(manifest_root: etree._Element) -
         )
 
 
+def test_no_description_carries_the_rag_acronym(manifest_root: etree._Element) -> None:
+    """The store text speaks plain language and never says the acronym (BL-01).
+
+    The audience split of BL-01 sends the acronym to the READMEs and the developer
+    documents; the store description addresses a reader who decides on plain words.
+    The match is case sensitive and bound to word boundaries on purpose: the lowercase
+    substring sits inside "storage", "fragenden" and "interrogeable", so casefolding
+    would turn the gate red over ordinary prose.
+    """
+    for lang in MANIFEST_LANGS:
+        description = _localised(manifest_root, "description", lang)
+        assert description is not None
+        assert re.search(r"\bRAG\b", description) is None, (
+            f"the {_lang_label(lang)} description carries the acronym; "
+            "the store speaks plain language, the acronym lives in the READMEs "
+            "and the developer documents (BL-01 audience split)"
+        )
+
+
 def test_the_text_gate_rejects_a_backtick_and_a_table(manifest_root: etree._Element) -> None:
     """The counter probe: without it, the green run above proves nothing about the gate.
 
