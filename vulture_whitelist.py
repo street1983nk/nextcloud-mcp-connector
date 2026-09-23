@@ -262,6 +262,12 @@ _.cookie
 # about the thing under test. tests/unit/test_oauth_store.py drives it directly.
 _.create_auth_code
 
+# --- The account source seam of plan 23-02 ----------------------------------------------
+# identity_for: the one method of the ExchangeAccounts protocol in oauth/exchange_accounts.py.
+#   Its caller is the EXCHANGE_CLAIM branch of ChainedVerifier.resolve_identity, which is
+#   task 3 of the very same plan; the entry leaves this list with that task's commit.
+_.identity_for
+
 # --- The exchange checker, wired in by the chain of plan 22-02 ---------------------------
 # _decode_payload: the one method of _PreparsedJWT in oauth/exchange.py. PyJWT documents it
 # as the hook a subclass overrides to decode a payload differently, and PyJWT.decode is what
