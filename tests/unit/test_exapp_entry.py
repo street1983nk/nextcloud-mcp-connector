@@ -45,7 +45,15 @@ from mcp_connector.exapp.middleware import RequireAppApi
 from mcp_connector.exapp.ui import connections as ui_connections
 from mcp_connector.exapp.ui import strings
 from mcp_connector.nextcloud import http as nc_http
-from mcp_connector.oauth import chain, connections, crypto, registry, store, throttle
+from mcp_connector.oauth import (
+    chain,
+    connections,
+    crypto,
+    exchange_appapi,
+    registry,
+    store,
+    throttle,
+)
 from mcp_connector.oauth.metadata import (
     AS_METADATA_SUFFIX,
     PRM_SUFFIX,
@@ -2646,6 +2654,41 @@ def test_the_armed_path_hangs_the_chain_and_gives_it_the_revocation(
     assert isinstance(guard._token_verifier, chain.ChainedVerifier)
     assert len(taken) == 1
     assert taken[0].__self__ is guard._token_verifier
+
+
+def test_without_the_namespace_no_account_source_is_built(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The off state builds no account source at all, not one that is never asked.
+
+    A source per application holds the account cache of this process, so in the factory
+    state its absence is structural: the constructor explodes here, and the build succeeds
+    anyway, with the very store verifier of every release before this one at the boundary.
+    """
+
+    class Exploding:
+        def __init__(self, **kwargs: object) -> None:
+            raise AssertionError("an account source was built although the path is off")
+
+    monkeypatch.setattr(entry_exapp.exchange_appapi, "AppApiAccounts", Exploding)
+
+    guard = boundary_of(entry_exapp.build_exapp_app(OAUTH_ENV))
+
+    assert isinstance(guard._token_verifier, StoreTokenVerifier)
+
+
+def test_the_armed_path_hands_the_account_source_into_the_chain() -> None:
+    """MAP-02 arrives at the application: the chain of an armed ExApp holds the source.
+
+    Built once, next to ``build_chain``, and not per request: the source holds the one
+    account cache of this process, and a source per request would be a fetch of the whole
+    account list per tool call.
+    """
+    guard = boundary_of(entry_exapp.build_exapp_app({**OAUTH_ENV, **EXCHANGE_ENV}))
+
+    verifier = guard._token_verifier
+    assert isinstance(verifier, chain.ChainedVerifier)
+    assert isinstance(verifier._accounts, exchange_appapi.AppApiAccounts)
 
 
 def test_a_store_token_is_served_exactly_as_before_while_the_path_is_armed(

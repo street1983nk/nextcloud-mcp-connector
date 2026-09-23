@@ -13,16 +13,37 @@ is a hand clock, so every freshness rule is measured against numbers rather than
 """
 
 import asyncio
+import base64
 import inspect
+import json
 import logging
+import time
 from collections.abc import Mapping
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
+import httpx
+import jwt
 import pytest
+import respx
+from cryptography.hazmat.primitives.asymmetric import rsa
+from jwt.algorithms import RSAAlgorithm
+from mcp.server.auth.provider import AccessToken
+from starlette.applications import Starlette
+from starlette.requests import Request
+from starlette.responses import PlainTextResponse, Response
+from starlette.routing import Route
+from starlette.testclient import TestClient
 
+from mcp_connector import config, deps, entry_exapp
 from mcp_connector.audit import accounts
-from mcp_connector.oauth import exchange_accounts, exchange_appapi
-from mcp_connector.oauth.verifier import CREDENTIAL_IMPERSONATE
+from mcp_connector.exapp.middleware import RequireAppApi
+from mcp_connector.nextcloud.http import shared_client
+from mcp_connector.oauth import chain, exchange_accounts, exchange_appapi
+from mcp_connector.oauth import store as oauth_store_module
+from mcp_connector.oauth.metadata import RESOURCE_SUFFIX
+from mcp_connector.oauth.verifier import CREDENTIAL_IMPERSONATE, OAuthIdentity
 
 AZP = "f13-orchestrator"
 MAPPED = "f13-account-7"
@@ -263,3 +284,283 @@ def test_the_environment_of_the_deployment_reaches_the_list_source() -> None:
 def test_the_source_fits_the_protocol_of_the_chain() -> None:
     subject, _, _ = source()
     assert isinstance(subject, exchange_accounts.ExchangeAccounts)
+
+
+# --- the durchstich: from the exchanged token to the outgoing AppAPI header ------------------
+
+ISSUER = "https://idp.example.org/realms/f13"
+PUBLIC_URL = "https://mcp.example.org"
+AUDIENCE = f"{PUBLIC_URL}{RESOURCE_SUFFIX}"
+JWKS_URL = f"{ISSUER}{chain.DEFAULT_JWKS_PATH}"
+KID = "key-1"
+
+#: The second mapped account of the two-account measurement (T-23-15).
+OTHER = "f13-account-9"
+
+APP_ID = "mcp_connector"
+APP_SECRET = "app-secret-test"
+APP_VERSION = "0.1.0"
+AA_VERSION = "34.0.3"
+BASE_URL = "http://nc.test"
+USERS_URL = f"{BASE_URL}{accounts.USERS_PATH}"
+
+#: The one outgoing data call of the tool-shaped handler below.
+DATA_URL = f"{BASE_URL}/remote.php/dav/"
+
+PRIVATE = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+#: The deploy environment of an armed ExApp: AppAPI identity plus the exchange namespace.
+DEPLOYMENT = {
+    config.ENV_APP_ID: APP_ID,
+    config.ENV_APP_SECRET: APP_SECRET,
+    config.ENV_APP_VERSION: APP_VERSION,
+    config.ENV_AA_VERSION: AA_VERSION,
+    config.ENV_NEXTCLOUD_URL: BASE_URL,
+    config.ENV_PUBLIC_URL: PUBLIC_URL,
+    config.ENV_DISABLE_DNS_REBINDING: "1",
+    config.ENV_EXCHANGE_ENABLED: "1",
+    config.ENV_EXCHANGE_ISSUER: ISSUER,
+    config.ENV_EXCHANGE_AZP: AZP,
+}
+
+INITIALIZE = {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+        "protocolVersion": "2025-06-18",
+        "capabilities": {},
+        "clientInfo": {"name": "test", "version": "0"},
+    },
+}
+MCP_HEADERS = {
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/event-stream",
+}
+
+
+def serve_jwks() -> respx.Route:
+    entry = json.loads(RSAAlgorithm.to_jwk(PRIVATE.public_key()))
+    entry.update({"kid": KID, "use": "sig", "alg": "RS256"})
+    return respx.get(JWKS_URL).mock(return_value=httpx.Response(200, json={"keys": [entry]}))
+
+
+def serve_accounts(names: list[str]) -> respx.Route:
+    """The AppAPI account list of the instance, in the OCS envelope it really answers in."""
+    payload = {"ocs": {"meta": {"status": "ok", "statuscode": 200}, "data": names}}
+    return respx.get(USERS_URL).mock(return_value=httpx.Response(200, json=payload))
+
+
+def exchange_token(sub: str = MAPPED, **overrides: Any) -> str:
+    """A token that passes every rule of phase 21: issuer, audience, azp, age and shape."""
+    now = int(time.time())
+    claims: dict[str, Any] = {
+        "iss": ISSUER,
+        "sub": sub,
+        "aud": AUDIENCE,
+        "exp": now + 300,
+        "iat": now,
+        "typ": "Bearer",
+        "azp": AZP,
+    }
+    claims.update(overrides)
+    return jwt.encode(claims, PRIVATE, algorithm="RS256", headers={"kid": KID})
+
+
+def appapi_headers(user: str = "") -> dict[str, str]:
+    """The headers HaRP puts in front of every request it forwards."""
+    token = base64.b64encode(f"{user}:{APP_SECRET}".encode()).decode()
+    return {
+        "EX-APP-ID": APP_ID,
+        "EX-APP-VERSION": APP_VERSION,
+        "AUTHORIZATION-APP-API": token,
+    }
+
+
+def built_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
+    """The application of ``entry_exapp``, with a local store and no key fetch."""
+
+    async def fake_key(env: object = None) -> bytes:
+        del env
+        return bytes(range(32))
+
+    monkeypatch.setattr(oauth_store_module.crypto, "data_key", fake_key)
+    return entry_exapp.build_exapp_app(
+        {**DEPLOYMENT, config.ENV_APP_PERSISTENT_STORAGE: str(tmp_path)}
+    )
+
+
+def mcp_call(client: TestClient, token: str) -> Any:
+    return client.post(
+        "/mcp",
+        json=INITIALIZE,
+        headers={**MCP_HEADERS, **appapi_headers(), "Authorization": f"Bearer {token}"},
+    )
+
+
+@respx.mock
+def test_a_mapped_account_passes_the_built_application_and_one_call_costs_one_list_fetch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The wiring of the entry point, measured end to end against the built application.
+
+    A token that passes every rule of phase 21 reaches the MCP transport because the
+    account exists, and two calls cost the account list exactly one fetch: the source is
+    built once per application and holds the one cache of this process.
+    """
+    serve_jwks()
+    listed = serve_accounts([MAPPED, "somebody-else"])
+    app = built_app(tmp_path, monkeypatch)
+
+    with TestClient(app, base_url=PUBLIC_URL) as client:
+        first = mcp_call(client, exchange_token())
+        second = mcp_call(client, exchange_token())
+
+    assert first.status_code == 200
+    assert "protocolVersion" in first.text
+    assert second.status_code == 200
+    assert listed.call_count == 1, "the account list is cached, never fetched per call"
+
+
+@respx.mock
+def test_an_account_the_instance_does_not_name_is_401_without_a_data_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """MAP-02 at the boundary: no account, no identity, no call in anybody's name."""
+    serve_jwks()
+    serve_accounts(["somebody-else"])
+    app = built_app(tmp_path, monkeypatch)
+
+    with TestClient(app, base_url=PUBLIC_URL) as client:
+        response = mcp_call(client, exchange_token())
+
+    assert response.status_code == 401
+    assert "resource_metadata=" in response.headers["www-authenticate"]
+    called = {str(call.request.url) for call in respx.calls}
+    assert called <= {JWKS_URL, USERS_URL}, "nothing was asked in the name of the account"
+
+
+@respx.mock
+def test_an_unreadable_account_list_is_401_without_a_data_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The reversed asymmetry end to end: cannot know is refused, exactly like not found."""
+    serve_jwks()
+    respx.get(USERS_URL).mock(return_value=httpx.Response(500))
+    app = built_app(tmp_path, monkeypatch)
+
+    with TestClient(app, base_url=PUBLIC_URL) as client:
+        response = mcp_call(client, exchange_token())
+
+    assert response.status_code == 401
+    called = {str(call.request.url) for call in respx.calls}
+    assert called <= {JWKS_URL, USERS_URL}
+
+
+@respx.mock
+def test_the_401_does_not_distinguish_the_three_refusal_reasons(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """T-23-13: unknown account, unreadable list and unmappable claim are one answer."""
+    serve_jwks()
+    listed = serve_accounts(["somebody-else"])
+    app = built_app(tmp_path, monkeypatch)
+
+    with TestClient(app, base_url=PUBLIC_URL) as client:
+        unknown_account = mcp_call(client, exchange_token())
+        # An untrimmed claim value is refused by the mapping, before the list is asked.
+        unmappable_claim = mcp_call(client, exchange_token(sub=f" {MAPPED}"))
+        listed.mock(return_value=httpx.Response(500))
+        # A fresh source would still hold the cached list; a new application starts empty.
+    app = built_app(tmp_path, monkeypatch)
+    with TestClient(app, base_url=PUBLIC_URL) as client:
+        unreadable_list = mcp_call(client, exchange_token())
+
+    answers = (unknown_account, unmappable_claim, unreadable_list)
+    assert {response.status_code for response in answers} == {401}
+    assert len({response.content for response in answers}) == 1
+    assert len({response.headers["www-authenticate"] for response in answers}) == 1
+
+
+class ExplodingStoreBranch:
+    """The store branch of the chain, never asked: every token below is a compact JWS."""
+
+    async def verify_token(self, token: str) -> AccessToken | None:
+        raise AssertionError("the store branch was asked about an exchange token")
+
+    async def resolve_identity(self, access: AccessToken) -> OAuthIdentity | None:
+        raise AssertionError("the store branch was asked to resolve an exchange token")
+
+    def invalidate(self) -> None:
+        raise AssertionError("the store branch was emptied by a test that does not revoke")
+
+
+@respx.mock
+def test_the_outgoing_appapi_header_carries_the_mapped_principal_and_never_the_other(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The durchstich of CRED-01, measured at the outgoing header and not at a return value.
+
+    Everything on the way is real: the transport boundary, the chain with the checker of
+    phase 21 (its key set served over the network stand-in), the mapping, the account
+    source with the real list reader against the AppAPI route, and the credential layer of
+    ``deps``. The handler behind the boundary is shaped like every tool: it resolves the
+    credentials of its call and makes one outgoing Nextcloud request with them.
+
+    Two different tokens for two different accounts produce two different impersonation
+    headers, and neither carries the name of the other (T-23-15). The header decodes to
+    ``<principal>:<app secret>``, and the three other AppAPI headers are the installation's.
+    """
+    del tmp_path
+    for name, value in DEPLOYMENT.items():
+        monkeypatch.setenv(name, value)
+    serve_jwks()
+    serve_accounts([MAPPED, OTHER])
+    outgoing = respx.get(DATA_URL).mock(return_value=httpx.Response(200))
+
+    verifier = chain.build_chain(
+        ExplodingStoreBranch(),
+        env=DEPLOYMENT,
+        accounts=exchange_appapi.AppApiAccounts(env=DEPLOYMENT),
+    )
+
+    async def tool_shaped(request: Request) -> Response:
+        ctx = SimpleNamespace(
+            headers=request.headers, request_context=SimpleNamespace(request=request)
+        )
+        creds = deps.resolve_credentials(ctx)
+        answer = await shared_client().get(DATA_URL, auth=creds.auth())
+        return PlainTextResponse(str(answer.status_code))
+
+    async def never_paused(principal: str) -> bool:
+        del principal
+        return False
+
+    app = Starlette(routes=[Route("/mcp", tool_shaped, methods=["POST"])])
+    for route in app.router.routes:
+        if isinstance(route, Route):
+            route.app = RequireAppApi(
+                route.app, DEPLOYMENT, token_verifier=verifier, access_check=never_paused
+            )
+
+    with TestClient(app) as client:
+
+        def call(token: str) -> Any:
+            headers = {**appapi_headers(), "Authorization": f"Bearer {token}"}
+            return client.post("/mcp", headers=headers)
+
+        assert call(exchange_token(sub=MAPPED)).status_code == 200
+        assert call(exchange_token(sub=OTHER)).status_code == 200
+
+    assert outgoing.call_count == 2
+    first, second = (call.request.headers for call in outgoing.calls)
+    decoded_first = base64.b64decode(first["AUTHORIZATION-APP-API"]).decode()
+    decoded_second = base64.b64decode(second["AUTHORIZATION-APP-API"]).decode()
+    assert decoded_first == f"{MAPPED}:{APP_SECRET}"
+    assert decoded_second == f"{OTHER}:{APP_SECRET}"
+    assert MAPPED not in decoded_second
+    assert OTHER not in decoded_first
+    for headers in (first, second):
+        assert headers["EX-APP-ID"] == APP_ID
+        assert headers["EX-APP-VERSION"] == APP_VERSION
+        assert headers["AA-VERSION"] == AA_VERSION
