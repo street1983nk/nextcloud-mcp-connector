@@ -9,9 +9,28 @@ The ``reason`` of an error is the only part of it that may ever leave for a log
 concrete: ``dav.py`` says ``f"No permission to write to {path}."`` and names a real path,
 ``caldav.py`` names a real calendar. That is result content, it belongs in the tool answer
 and in no log. A fixed identifier carries the reason without carrying the case.
+
+For the six ``exchange_`` identifiers below, "leave" is narrower still and is named here
+once: the only place they may leave this process is the audit line of AUDIT-07, never an
+HTTP answer and never a log line above DEBUG. The exchange path is reachable before any
+authentication, so a 401 that says which rule fell hands a stranger an oracle he ordered
+with one request (threat T-24-03).
 """
 
-# The six rejection reasons. Each line says which case sets it.
+# Twelve identifiers in two groups, and the grouping is the readable part of an audit line.
+# The first six are the ways a tool call can end: they say what Nextcloud answered or that a
+# guard of this server stepped in. The second six are the ways the exchange token checker
+# turns a foreign token down, one per group of check steps, never per single rule.
+#
+# The second group carries a prefix because it needs one. ``guard_tripped`` could have come
+# from any guard of this server, ``exchange_claims`` could not, and a reader of a line in the
+# hash-chained trail should not have to look the path up. And it stays a group on purpose:
+# ``oauth/exchange.py`` refuses through eighteen fixed phrases, and one identifier per phrase
+# would resolve a refusal down to the exact rule that fell. In a trail an operator reads,
+# that resolution is one copy away from the answer the checker exists not to give, so the
+# phrases stay in the DEBUG line of ``_refused`` and the audit line carries the group.
+#
+# Each line below says which case sets it.
 REASON_UNSPECIFIED = "unspecified"  # not determined; honest instead of guessed
 REASON_PERMISSION_DENIED = "permission_denied"  # Nextcloud answered 403
 REASON_UNKNOWN_ID = "unknown_id"  # Nextcloud answered 404, 409 or 998
@@ -19,7 +38,21 @@ REASON_TIMEOUT = "timeout"  # Nextcloud did not answer in time
 REASON_UNREACHABLE = "unreachable"  # Nextcloud could not be reached at all
 REASON_GUARD_TRIPPED = "guard_tripped"  # a guard of this server stopped the call
 
-# Frozen on purpose: a seventh reason is a decision and belongs into a review, not into a
+# The exchange groups (AUDIT-07). ``oauth/exchange.py`` hands one of these to every refusal.
+# empty, longer than allowed, not text, header or payload unreadable, a foreign header type
+REASON_EXCHANGE_MALFORMED = "exchange_malformed"
+# algorithm not configured, no key named, key set unreachable or unusable, signature broken
+REASON_EXCHANGE_KEY = "exchange_key"
+# the pre-filter on the unverified ``iss``, and nothing else
+REASON_EXCHANGE_ISSUER = "exchange_issuer"
+# standard claims, audience, azp allowlist, typ, non-numeric times, lifetime, age, sub
+REASON_EXCHANGE_CLAIMS = "exchange_claims"
+# the mapping yields no principal, there is no account source, or the source says no
+REASON_EXCHANGE_ACCOUNT = "exchange_account"
+# an unexpected exception in the checking branch: the case where the reason is unknown
+REASON_EXCHANGE_FAILED = "exchange_failed"
+
+# Frozen on purpose: a thirteenth reason is a decision and belongs into a review, not into a
 # diff. ``tests/unit/test_errors_reason.py`` walks src/ and fails on any ``reason=`` that is
 # not one of these names.
 REASONS: frozenset[str] = frozenset(
@@ -30,6 +63,12 @@ REASONS: frozenset[str] = frozenset(
         REASON_TIMEOUT,
         REASON_UNREACHABLE,
         REASON_GUARD_TRIPPED,
+        REASON_EXCHANGE_MALFORMED,
+        REASON_EXCHANGE_KEY,
+        REASON_EXCHANGE_ISSUER,
+        REASON_EXCHANGE_CLAIMS,
+        REASON_EXCHANGE_ACCOUNT,
+        REASON_EXCHANGE_FAILED,
     }
 )
 
