@@ -32,7 +32,7 @@ from mcp.server.auth.provider import AccessToken
 from starlette.requests import Request
 from starlette.testclient import TestClient
 
-from mcp_connector import config, entry_oauth
+from mcp_connector import config, entry_oauth, errors
 from mcp_connector.errors import ToolError
 from mcp_connector.exapp.middleware import RequireOAuthBearer
 from mcp_connector.oauth import chain, exchange, mapping, oidc, throttle
@@ -1201,6 +1201,30 @@ def test_repeated_exchange_refusals_end_in_429_while_the_existing_path_is_untouc
     assert without_a_header.status_code == 401
 
 
+# --- the answer says nothing about which rule fell (AUDIT-07, T-24-03) ---------------------
+#
+# The rejection group of plan 24-02 leaves this process at exactly one place, and that place
+# is the audit line plan 24-04 writes. Not the body, not a header, not a log line above
+# DEBUG. The two cases below are the outward half of that promise.
+
+#: Read from the module, never typed here, so a renamed identifier cannot leave this file
+#: green. ``exchange_`` stands beside them so a seventh group is caught without a change.
+EXCHANGE_REASONS = tuple(sorted(name for name in errors.REASONS if name.startswith("exchange_")))
+
+#: The older list is the one of T-22-15 and stays as it is: the words are what a helpful
+#: error text would reach for, the identifiers are what the new field could leak.
+NAMES_NO_ANSWER_MAY_CARRY = (
+    "exchange",
+    "exchange_",
+    "signature",
+    "issuer",
+    "audience",
+    "claim",
+    "key",
+    *EXCHANGE_REASONS,
+)
+
+
 @respx.mock
 def test_the_429_of_the_exchange_path_names_no_check_that_failed(tmp_path: Path) -> None:
     """T-22-15: the same body as on every other machine route, and no hint in it."""
@@ -1214,6 +1238,62 @@ def test_the_429_of_the_exchange_path_names_no_check_that_failed(tmp_path: Path)
 
     assert throttled.status_code == 429
     assert throttled.json()["error"] == "temporarily_unavailable"
-    spoken = throttled.text.lower()
-    for word in ("exchange", "signature", "issuer", "audience", "claim", "key"):
+    assert len(EXCHANGE_REASONS) == 6, "the six groups are read, not typed"
+    spoken = f"{throttled.headers.get('WWW-Authenticate')} {throttled.text}".lower()
+    for word in NAMES_NO_ANSWER_MAY_CARRY:
+        assert word not in spoken
+
+
+@respx.mock
+def test_four_differently_failing_tokens_get_one_and_the_same_401(tmp_path: Path) -> None:
+    """Pitfall 3, closed by structure instead of by a word list.
+
+    Four tokens that fall at four different rules, against one armed application: an
+    unreadable header, a foreign issuer, an unknown key and a wrong audience, which are the
+    four groups ``exchange_malformed``, ``exchange_issuer``, ``exchange_key`` and
+    ``exchange_claims``. Status, ``WWW-Authenticate`` and body have to be the same three
+    values for all four.
+
+    This is the assertion a later "helpful" error text breaks, and it is stronger than the
+    list above, because it needs no opinion about which word would be the telling one. The
+    group these four refusals carry stays inside the process; the one place it may leave is
+    the audit line of plan 24-04, and that line is not an answer to the caller.
+
+    Four requests, well under ``throttle.EXCHANGE_LIMIT``, so no case is accidentally
+    measured against a 429.
+
+    What carries the answer today, measured: the body is empty and the whole of it is the
+    ``WWW-Authenticate`` challenge, which says ``invalid_token``, ``Authentication
+    required``, the scope and the resource metadata URL, and says that for all four. That
+    is why the header is compared and not only the body; a field appended to the challenge
+    would be the leak this case is built to catch.
+    """
+    serve()
+    app = entry_oauth.build_oauth_app(standalone_env(tmp_path))
+    unknown_kid = jwt.encode(
+        exchange_claims(), PRIVATE, algorithm="RS256", headers={"kid": "kid-nobody-serves"}
+    )
+    bearers = {
+        "an unreadable header": SHAPED_LIKE_A_JWS,
+        "a foreign issuer": exchange_token(iss="https://evil.example.org/realms/f13"),
+        "an unknown key": unknown_kid,
+        "a wrong audience": exchange_token(aud=f"{AUDIENCE}/tenant-b"),
+    }
+
+    answers: dict[str, tuple[int, str | None, str]] = {}
+    with TestClient(app, base_url=PUBLIC_URL) as client:
+        for case, bearer in bearers.items():
+            answer = mcp_call(client, f"Bearer {bearer}")
+            answers[case] = (
+                answer.status_code,
+                answer.headers.get("WWW-Authenticate"),
+                answer.text,
+            )
+
+    assert len(set(answers.values())) == 1, f"the answers differ by case: {answers}"
+
+    status, challenge, body = answers["an unreadable header"]
+    assert status == 401
+    spoken = f"{challenge} {body}".lower()
+    for word in NAMES_NO_ANSWER_MAY_CARRY:
         assert word not in spoken
