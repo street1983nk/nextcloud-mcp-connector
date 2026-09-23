@@ -61,6 +61,13 @@ from urllib.parse import urlsplit
 
 import jwt
 
+from ..errors import (
+    REASON_EXCHANGE_CLAIMS,
+    REASON_EXCHANGE_FAILED,
+    REASON_EXCHANGE_ISSUER,
+    REASON_EXCHANGE_KEY,
+    REASON_EXCHANGE_MALFORMED,
+)
 from .jwks import ALLOWED_ALGORITHMS, KeySet, same_origin
 
 __all__ = [
@@ -137,14 +144,36 @@ logger = logging.getLogger("mcp_connector.oauth.exchange")
 
 
 class ExchangeRefused(Exception):
-    """The token, a claim or the key set did not meet the rules. Carries no detail.
+    """The token, a claim or the key set did not meet the rules. Carries exactly one value.
 
-    Callers answer every refusal the same way (oracle-free); the reason goes to the log
-    as a fixed phrase, never with a value from the token.
+    That value is :attr:`reason`, a fixed identifier out of :data:`errors.REASONS` and one
+    of the six ``exchange_`` groups. It is not a message: the exception carries no argument,
+    prints as the empty string and is the same object for every refusal, which is what the
+    corpus of ``tests/unit/test_oauth_exchange.py`` measures.
+
+    **Where the identifier may go, and this is the whole of it:** into the audit line of
+    AUDIT-07, written by plan 24-04. Nowhere else.
+
+    **Where it may never go:** into an HTTP answer, in a body or in a header, and into any
+    log line above DEBUG. The exchange path is reachable before any authentication, so a
+    401 that says which rule fell is an oracle a stranger orders with one request, and a
+    handful of them tells him whether it was the signature, the audience or the acting
+    party (threat T-24-03). This paragraph is here because without it the next reader takes
+    the field for an oversight and "helpfully" passes it on at the next boundary.
+
+    A group and never the single rule: the eighteen fixed phrases of this module stay in the
+    DEBUG line of :func:`_refused`, where the reader already holds the instance.
     """
 
+    def __init__(self, reason: str = REASON_EXCHANGE_FAILED) -> None:
+        # No argument to ``Exception``: ``str(exc)`` stays empty and ``exc.args`` stays
+        # empty, so a caller who catches every refusal of the corpus still cannot tell two
+        # of them apart. The value lives on the instance, which only the audit writer reads.
+        super().__init__()
+        self.reason = reason
 
-def _refused(reason: str) -> ExchangeRefused:
+
+def _refused(reason: str, identifier: str = REASON_EXCHANGE_KEY) -> ExchangeRefused:
     """One line per refusal, on DEBUG, with a fixed phrase and never a value.
 
     DEBUG and not WARNING, because in the path phase 22 builds this runs before any
@@ -153,13 +182,26 @@ def _refused(reason: str) -> ExchangeRefused:
     synchronous. The key set layer refuses through this same factory, so a provider that
     cannot be reached is quiet here as well.
 
-    That is a deliberate trade and not the end of the story: what an operator needs to
-    see about rejected exchange attempts (today they would stand in no line at all) is
-    AUDIT-07 in phase 24, in the hash-chained audit trail and under its content bans. A
-    log level is no substitute for it.
+    ``reason`` is the phrase for that line and stays the sharper of the two wordings.
+    ``identifier`` is the coarser one and is the value AUDIT-07 writes; the line never
+    carries it, because whoever switches this module to DEBUG is served better by the exact
+    rule and the audit trail is read by someone who must not learn it.
+
+    The default of ``identifier`` is :data:`errors.REASON_EXCHANGE_KEY`, and it is bound to
+    a fact rather than to convenience: the only caller that reaches this factory with one
+    argument is ``jwks.py``, which takes it as a ``Callable[[str], Exception]`` in
+    ``KeySet`` and in ``fetch_json``. Every refusal that comes out of there is about the key
+    set of the provider or about reaching him at all. A second parameter without a default
+    would have broken that signature; inside this module the default is never the answer,
+    which is what the AST gate of ``tests/unit/test_oauth_exchange.py`` holds.
+
+    What an operator needs to see about rejected exchange attempts is AUDIT-07, in the
+    hash-chained audit trail and under its content bans. The identifier is the half of it
+    this module owes; the writing of the line is plan 24-04 and belongs to the chain, which
+    is the only place that knows whether a refusal is worth a row.
     """
     logger.debug("exchange refused: %s", reason)
-    return ExchangeRefused()
+    return ExchangeRefused(identifier)
 
 
 @dataclass(frozen=True, slots=True)
@@ -352,7 +394,7 @@ class ExchangeTokenChecker:
         read unverified.
         """
         if not token:
-            raise _refused("the token is empty")
+            raise _refused("the token is empty", REASON_EXCHANGE_MALFORMED)
         # Bytes before base64, base64 before JSON. Everything behind this line is work a
         # stranger can order with nothing but an HTTP request, so the bound stands in
         # front of the first decoding step and not behind it. A character count never
@@ -360,13 +402,13 @@ class ExchangeTokenChecker:
         # itself bounded; a token is base64url and therefore ASCII, and an input that
         # cannot even be encoded is refused rather than repaired.
         if len(token) > self._max_token_bytes:
-            raise _refused("the token is longer than allowed")
+            raise _refused("the token is longer than allowed", REASON_EXCHANGE_MALFORMED)
         try:
             measured = len(token.encode("utf-8"))
         except UnicodeEncodeError:
-            raise _refused("the token is not text") from None
+            raise _refused("the token is not text", REASON_EXCHANGE_MALFORMED) from None
         if measured > self._max_token_bytes:
-            raise _refused("the token is longer than allowed")
+            raise _refused("the token is longer than allowed", REASON_EXCHANGE_MALFORMED)
         try:
             header = jwt.get_unverified_header(token)
         except Exception:
@@ -376,22 +418,24 @@ class ExchangeTokenChecker:
             # (measured in 2.14.0), and a promise that every input ends in one
             # detail-free exception cannot rest on that asymmetry. Everything this
             # parse raises is a refusal.
-            raise _refused("the token header is unreadable") from None
+            raise _refused("the token header is unreadable", REASON_EXCHANGE_MALFORMED) from None
         algorithm = header.get("alg")
         if algorithm not in self._settings.algorithms:
             # Decided before any other work, so ``none`` and every ``HS*`` fall here,
             # long before a key or a shared secret could be looked at.
-            raise _refused("the token uses an algorithm that is not configured")
+            raise _refused(
+                "the token uses an algorithm that is not configured", REASON_EXCHANGE_KEY
+            )
         kid = header.get("kid")
         if not isinstance(kid, str) or not kid:
-            raise _refused("the token names no key")
+            raise _refused("the token names no key", REASON_EXCHANGE_KEY)
         header_typ = header.get("typ")
         if header_typ is not None and (
             not isinstance(header_typ, str) or header_typ.lower() not in _TYP_HEADERS_FOLDED
         ):
             # Tolerated, not required: see the comment on ACCEPTED_TYP_HEADERS. A missing
             # header type is no reason to refuse; a foreign one is.
-            raise _refused("the token header names another type")
+            raise _refused("the token header names another type", REASON_EXCHANGE_MALFORMED)
         # The pre-authentication cost guard: this checker sits in a path a stranger can
         # reach with nothing but an HTTP request, and without this filter an invented
         # kid in a self-made JWT makes this process fetch the provider's keys. The
@@ -408,9 +452,9 @@ class ExchangeTokenChecker:
             # An unsigned token of about eight kilobytes would otherwise leave this
             # method as a RecursionError, before any authentication (the corpus carries
             # exactly that case).
-            raise _refused("the token payload is unreadable") from None
+            raise _refused("the token payload is unreadable", REASON_EXCHANGE_MALFORMED) from None
         if unverified.get("iss") != self._settings.issuer:
-            raise _refused("the token comes from another issuer")
+            raise _refused("the token comes from another issuer", REASON_EXCHANGE_ISSUER)
         key = await self._keys.key(kid, algorithm)
         try:
             claims = _PreparsedJWT(unverified).decode(
@@ -426,15 +470,27 @@ class ExchangeTokenChecker:
                 # (measured, see the note at ``audience_holds``).
                 options={"require": list(REQUIRED_CLAIMS), "verify_aud": False},
             )
-        except (jwt.PyJWTError, TypeError, OverflowError):
+        except (jwt.PyJWTError, TypeError, OverflowError) as failure:
             # The decoder computes int() on iat, nbf and exp and catches ValueError
             # alone (measured in 2.14.0): an object or a list makes that a TypeError,
             # Infinity an OverflowError, and json.loads accepts that non-standard
             # literal. Neither is a PyJWTError, so both classes are caught here; the
             # own guard below never sees these forms, it sees the numeric string.
-            raise _refused("the token did not meet the standard claims") from None
+            #
+            # One call site, two groups, and the branch is read off the failure rather
+            # than off a second rule of ours: this one decoder call carries the signature
+            # check and the standard claim rules together, and a broken signature is a
+            # statement about the key that signed, not about what the payload said. The
+            # log line stays one phrase either way, because the phrase is written for a
+            # reader who has the instance and sees the token in front of him.
+            raise _refused(
+                "the token did not meet the standard claims",
+                REASON_EXCHANGE_KEY
+                if isinstance(failure, jwt.InvalidSignatureError)
+                else REASON_EXCHANGE_CLAIMS,
+            ) from None
         if not audience_holds(claims.get("aud"), self._settings.audience):
-            raise _refused("the token is meant for another audience")
+            raise _refused("the token is meant for another audience", REASON_EXCHANGE_CLAIMS)
         # Keycloak's Standard Token Exchange V2 writes no ``act`` claim and no delegation
         # semantics, so ``azp``, the client id of the exchanging client, is the only
         # reliable trace of the acting party. The check therefore reads as "allowed
@@ -443,18 +499,20 @@ class ExchangeTokenChecker:
         # in constant time per entry, so the position of a hit teaches nothing.
         azp = claims.get("azp")
         if not isinstance(azp, str):
-            raise _refused("the token names no acting party")
+            raise _refused("the token names no acting party", REASON_EXCHANGE_CLAIMS)
         acting_party_allowed = False
         for party in self._settings.azp_allowed:
             if secrets.compare_digest(azp.encode("utf-8"), party.encode("utf-8")):
                 acting_party_allowed = True
         if not acting_party_allowed:
-            raise _refused("the token was obtained by an unlisted acting party")
+            raise _refused(
+                "the token was obtained by an unlisted acting party", REASON_EXCHANGE_CLAIMS
+            )
         if claims.get("typ") != self._settings.typ_expected:
             # The type lives in the payload: Keycloak marks an access token Bearer and
             # an ID token ID there, while the header varies by client. An ID token of
             # the same realm, same keys and same issuer falls exactly here (pitfall 9).
-            raise _refused("the token is not an access token")
+            raise _refused("the token is not an access token", REASON_EXCHANGE_CLAIMS)
         iat = _number(claims.get("iat"))
         exp = _number(claims.get("exp"))
         if iat is None or exp is None:
@@ -462,17 +520,17 @@ class ExchangeTokenChecker:
             # above lets "1758230000" through its own int() and refuses an object, a list
             # or Infinity before this line is reached. The guard keeps both out of the
             # two lifetime rules below, which are arithmetic.
-            raise _refused("the token carries no numeric times")
+            raise _refused("the token carries no numeric times", REASON_EXCHANGE_CLAIMS)
         # Two rules the decoder does not bring, both refusals and never a shortening:
         # a bounded lifetime and a bounded age. They run on the injected wall clock;
         # the monotonic clock stays with the key set layer (pitfall 6, third part).
         if exp - iat > self._settings.max_lifetime_seconds:
-            raise _refused("the token lives longer than allowed")
+            raise _refused("the token lives longer than allowed", REASON_EXCHANGE_CLAIMS)
         if self._now() - iat > self._settings.max_lifetime_seconds:
-            raise _refused("the token is older than allowed")
+            raise _refused("the token is older than allowed", REASON_EXCHANGE_CLAIMS)
         sub = claims.get("sub")
         if not isinstance(sub, str) or not sub.strip() or sub != sub.strip():
-            raise _refused("the token names no usable subject")
+            raise _refused("the token names no usable subject", REASON_EXCHANGE_CLAIMS)
         # A string, not empty, no edge whitespace, and handed on exactly as it arrived.
         # No Unicode normal form is chosen here and none is enforced: "alex" in NFD and
         # in NFC are two different values with the same appearance, and which of them

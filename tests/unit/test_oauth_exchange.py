@@ -1241,6 +1241,22 @@ def refused_call_sites() -> list[ast.Call]:
     ]
 
 
+def groups_named_by(node: ast.expr) -> set[str] | None:
+    """The constant names an argument expression can evaluate to, or ``None`` for anything.
+
+    ``None`` is the honest answer for every shape this gate cannot follow, and it is a
+    finding rather than a pass: a value the gate cannot read is a value nobody reviews.
+    """
+    if isinstance(node, ast.Name):
+        return {node.id}
+    if isinstance(node, ast.IfExp):
+        # The condition is not read on purpose: what is handed on is one of the two arms.
+        taken = groups_named_by(node.body)
+        otherwise = groups_named_by(node.orelse)
+        return None if taken is None or otherwise is None else taken | otherwise
+    return None
+
+
 def test_no_refusal_of_the_checker_can_forget_its_group() -> None:
     """T-24-16: a call site without an identifier would silently fall back to the default.
 
@@ -1267,16 +1283,24 @@ def test_every_group_handed_to_a_refusal_is_one_of_the_frozen_six() -> None:
     ``tests/unit/test_errors_reason.py`` watches ``reason=`` at an error construction. Here
     the value is the second argument of a factory, so nothing but this case keeps a made-up
     string out of the one path a stranger reaches without a key.
-    """
-    handed = [call.args[1] for call in refused_call_sites()]
-    literal = [
-        f"oauth/exchange.py:{node.lineno}" for node in handed if not isinstance(node, ast.Name)
-    ]
-    assert literal == [], f"a group is a name of errors, never a literal: {literal}"
 
-    names = {node.id for node in handed if isinstance(node, ast.Name)}
-    assert names <= EXCHANGE_REASON_NAMES
-    assert all(getattr(errors, name) in errors.REASONS for name in names)
+    Two shapes are allowed and no third: a bare name, and a choice between two names, which
+    one site needs because the decoder carries the signature check and the standard claim
+    rules in the same call. Everything else, a literal, a local variable, a function call,
+    a foreign constant, is a finding with its line.
+    """
+    findings: list[str] = []
+    for call in refused_call_sites():
+        handed = call.args[1]
+        named = groups_named_by(handed)
+        if named is None or not named <= EXCHANGE_REASON_NAMES:
+            findings.append(f"oauth/exchange.py:{handed.lineno}: {sorted(named or [])}")
+
+    assert findings == [], (
+        "a rejection group is a name of mcp_connector.errors and never anything else:\n"
+        + "\n".join(findings)
+    )
+    assert all(getattr(errors, name) in errors.REASONS for name in EXCHANGE_REASON_NAMES)
 
 
 def test_a_refusal_without_a_group_reads_as_the_unknown_case() -> None:
