@@ -189,7 +189,9 @@ async def test_a_clock_that_stepped_back_opens_a_new_window_instead_of_closing_f
     await subject.note_refusal(REASON_EXCHANGE_CLAIMS, moment=NOW)
     await subject.note_refusal(REASON_EXCHANGE_CLAIMS, moment=NOW - 86400)
 
-    assert [row.removed for row in written(path)] == [1, 2]
+    rows = written(path)
+    assert [row.at for row in rows] == [NOW, NOW - 86400], "the second one is written, not eaten"
+    assert [row.removed for row in rows] == [1, 1], "the first window had swallowed nothing"
 
 
 async def test_the_state_of_the_brake_is_bounded_by_the_number_of_reasons(

@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .. import deps
-from ..errors import REASON_UNSPECIFIED, REASONS
+from ..errors import known_reason
 from . import AUDIT_STATE_ATTR, accounts, store
 from .allowlist import PARAM_ALLOWLIST
 from .store import (
@@ -185,18 +185,6 @@ def _tool_name(ctx: Any, fallback: str) -> str:
     return fallback
 
 
-def _known_reason(reason: str | None) -> str | None:
-    """A rejection identifier out of the frozen set of D-07, or the honest "not determined".
-
-    The reason travels from an exception into a row, and an exception is not a place this
-    module controls: anything that is not one of :data:`~mcp_connector.errors.REASONS` would
-    be free text in a column that exists to have none.
-    """
-    if reason is None:
-        return None
-    return reason if reason in REASONS else REASON_UNSPECIFIED
-
-
 async def _drop_chains_without_an_account(
     audit_store: AuditStore, recorder: Recorder, *, moment: int
 ) -> None:
@@ -267,7 +255,7 @@ async def note(
                 auth_id=caller.auth_id,
                 client_name=_clamped_client_name(caller.client_name),
                 outcome=outcome,
-                reason=_known_reason(reason),
+                reason=known_reason(reason),
                 duration_ms=round(duration_s * _MILLISECONDS),
                 params=set_parameter_names(ctx, tool),
             )

@@ -73,6 +73,27 @@ REASONS: frozenset[str] = frozenset(
 )
 
 
+def known_reason(reason: str | None) -> str | None:
+    """A rejection identifier out of the frozen set above, or the honest "not determined".
+
+    The rule of D-07, and it lives here because the set it guards lives here. It used to
+    stand in ``audit/record.py`` as a private helper of the recording path; the moment a
+    second writer of a ``reason`` column arrived (``audit/refusals.py``, AUDIT-07), the
+    choice was between a second copy of four lines and one function both callers reach, and
+    R-18-06 of phase 18 is the measured answer to that question: three versions of the
+    cleaning rule for a client name ended up with two different ideas of what is printable,
+    and the narrow one let a right-to-left override into an output line.
+
+    A reason travels from an exception into a row, and an exception is not a place this
+    module controls: anything that is not one of :data:`REASONS` would be free text in a
+    column that exists in order to have none. ``None`` stays ``None``, because a row that
+    records no refusal names no reason either.
+    """
+    if reason is None:
+        return None
+    return reason if reason in REASONS else REASON_UNSPECIFIED
+
+
 class ToolError(Exception):
     """A failure a caller can act on: what went wrong plus what to do about it."""
 

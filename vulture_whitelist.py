@@ -284,3 +284,12 @@ _.create_auth_code
 # keeps the payload of one token from being base64-decoded and JSON-parsed twice, and
 # tests/unit/test_oauth_exchange.py counts the parses of exactly those bytes.
 _._decode_payload
+
+# --- The refusal writer of plan 24-03, wired in by plan 24-04 ----------------------------
+# note_refusal is the one method of audit/refusals.RefusalWriter. The writer was built and
+# tested one plan before the place that calls it: plan 24-03 owns the chain, the kind and the
+# brake, and plan 24-04 hands the writer into build_chain and calls this method from the
+# branch of oauth/chain.py that catches ExchangeRefused. The entry therefore announces its own
+# end: it leaves this file with the task that calls it, exactly as the two entries above did.
+# tests/unit/test_audit_refusals.py drives it directly until then.
+_.note_refusal
