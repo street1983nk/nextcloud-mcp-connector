@@ -62,6 +62,7 @@ from starlette.routing import Route
 
 from ..audit.store import (
     ACTOR_LIMIT,
+    CHAIN_EXCHANGE,
     CHAIN_INSTANCE,
     CLIENT_NAME_LIMIT,
     READ_LIMIT_DEFAULT,
@@ -79,6 +80,7 @@ __all__ = [
     "AUDIT_READ_PATH",
     "JSON_OPTION",
     "LIMIT_OPTION",
+    "REFUSALS_KEYWORD",
     "SINCE_OPTION",
     "USER_OPTION",
     "audit_read_routes",
@@ -90,8 +92,10 @@ __all__ = [
 #: the access control itself; see the module docstring.
 AUDIT_READ_PATH = "/audit-read"
 
-#: Which chain to read. An account name, or :data:`INSTANCE_KEYWORD` for the chain of the
-#: instance. Without it every chain is read.
+#: Which chain to read. An account name, :data:`INSTANCE_KEYWORD` for the chain of the
+#: instance, or :data:`REFUSALS_KEYWORD` for the refused attempts of the token exchange path.
+#: Without it every chain is read. The text an administrator sees for this option lives in
+#: ``exapp/occ.py`` with the rest of the command registration.
 USER_OPTION = "user"
 
 #: How many whole days back to read, counted from the moment of the call.
@@ -160,6 +164,19 @@ CHAIN_LIMIT = 80
 #: is really called ``instance`` is not addressable through this option, and its chain is read
 #: by a call without ``--user``.
 INSTANCE_KEYWORD = "instance"
+
+#: The name of the chain of refused exchange attempts as an administrator types it. The
+#: second word that is not an account, and it needs to be one for the same reason the first
+#: does: the chain is called ``x:exchange`` (AUDIT-07), it has no account behind it, and
+#: ``--user`` addresses a chain by the account it belongs to. Spelled as a word rather than
+#: as the identifier so nobody has to type an internal name of the schema to read the rows
+#: this phase exists to make visible.
+#:
+#: The price is the same one and is named rather than hidden: an account that is really
+#: called ``refusals`` is not addressable through this option, and its chain is read by a
+#: call without ``--user``. One resolution for both reserved words, because two would be a
+#: difference nobody remembers at a console.
+REFUSALS_KEYWORD = "refusals"
 
 #: How far back ``--since`` may reach, in days. Ten years is longer than this app has existed
 #: and longer than any retention window it has, so a larger number is the whole log and is read
@@ -285,6 +302,13 @@ def _line(row: tuple[Any, ...]) -> str:
     The acting party stands directly behind the client name because the two are the two
     names a call can carry, and a reader compares them: an empty client name next to a
     filled acting party is what a call over the token exchange path looks like.
+
+    The count stands last, and it is last so the ten columns that were there before it kept
+    their places. It is the one value a row of the refusal chain carries (AUDIT-07): the
+    writer of those rows is braked to one per reason and window, so the row says how many
+    attempts it stands for, and without this column that number would be readable in no shape
+    of this answer at all. A marker for a gap uses the same column for the same meaning, and
+    an ordinary call stands for itself alone and shows the placeholder.
     """
     entry = _entry_of_row(row)
     return FIELD_SEPARATOR.join(
@@ -299,6 +323,7 @@ def _line(row: tuple[Any, ...]) -> str:
             _field(entry.reason),
             _field(entry.duration_ms),
             _names(entry.params),
+            _field(entry.removed),
         )
     )
 
@@ -394,6 +419,10 @@ def _document(row: tuple[Any, ...]) -> dict[str, Any]:
         "reason": entry.reason,
         "duration_ms": entry.duration_ms,
         "params": list(entry.params),
+        # For how many events this one row stands, and ``None`` for a row that stands for
+        # itself. The column of the schema, under the meaning the schema gives it: the rows a
+        # marker replaces, or the attempts a braked refusal row was written for (AUDIT-07).
+        "removed": entry.removed,
         "prev_hash": _hex(row[-2]),
         "hash": _hex(row[-1]),
     }
@@ -409,14 +438,18 @@ def _chain_of(payload: Any) -> str | None:
 
     An account name becomes the identifier of its chain through
     :func:`mcp_connector.audit.store.user_chain`, so the prefix of a chain is built in the one
-    place that knows it. :data:`INSTANCE_KEYWORD` is the one word that is not an account, for
-    the reason that constant gives.
+    place that knows it. :data:`INSTANCE_KEYWORD` and :data:`REFUSALS_KEYWORD` are the two
+    words that are not accounts, each for the reason its constant gives, and both are matched
+    before anything is built out of the value: a reserved word wins over an account of the
+    same name, and that trade is written down at both constants rather than only here.
     """
     given = _value(payload, USER_OPTION)
     if given is None:
         return None
     if given == INSTANCE_KEYWORD:
         return CHAIN_INSTANCE
+    if given == REFUSALS_KEYWORD:
+        return CHAIN_EXCHANGE
     return user_chain(given)
 
 

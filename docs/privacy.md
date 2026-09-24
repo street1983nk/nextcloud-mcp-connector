@@ -49,7 +49,36 @@ once before. Together the two hold these personal data:
 | Outcome of the call | `audit.sqlite3`, `entries.outcome`, `entries.reason` | one of `ok`, `rejected`, `failed`, and where a call was refused a fixed identifier of the reason, never the sentence of an error |
 | How long the call took | `audit.sqlite3`, `entries.duration_ms` | milliseconds |
 | Names of the parameters | `audit.sqlite3`, `entries.params` | a sorted list of parameter names as JSON, never a value |
+| For how many events one row stands | `audit.sqlite3`, `entries.removed` | a count; a marker says how many rows it replaces, a refused attempt how many attempts it stands for |
 | What a recorded call never holds | `audit.sqlite3` | no network address, no user agent, no parameter value, no part of a result, no text of an error message |
+
+### Refused sign in attempts of a connected identity provider
+
+If the token exchange path is switched on, an assistant can present a token issued by your
+own identity provider instead of one issued by this app. A token that does not meet the
+rules is turned down before anything is looked up, so nothing of it belongs to an account of
+this instance. Those attempts are recorded all the same, because an operator who cannot see
+repeated rejections cannot tell a misconfigured client from somebody trying keys.
+
+They are kept apart from the record of accounts: they stand in a chain of their own, named
+`x:exchange`, with the row kind `refusal`, and `occ mcp_connector:audit:read --user=refusals`
+is how an administrator reads them.
+
+Such a row holds four things and nothing else: the moment, the group of the rejection reason
+(`exchange_malformed`, `exchange_key`, `exchange_issuer`, `exchange_claims`,
+`exchange_account`, `exchange_failed`), the outcome `rejected`, and the number of attempts
+that one row stands for.
+
+It holds **no part of the token**: no token, no claim of one, no subject, no issuer, no
+audience, no acting party, no key id, no network address. That is not a matter of taste. A
+token that was turned down has not passed its signature check, so every value in it is text
+somebody chose freely, and writing one into this file would let a stranger put their text in
+front of whoever reads it.
+
+One further property protects this file from the same stranger: at most one row is written
+per rejection group per 5 minutes and per worker process, and the repetitions in between are
+counted into the number that row carries. The path is reachable before anybody is signed in,
+so without that brake the size of this file would be decided from outside.
 
 The app does not store the content of your files, calendar, notes, deck cards or
 contacts. It reads them per request, under the user's identity, and returns them in
@@ -224,6 +253,12 @@ without anybody asking for it:
    row belongs to the account the call ran for, so this is one group of rows and not a
    search through the file. The app asks Nextcloud whether an account is still there
    after that account has been silent in the record for 30 days.
+
+The first two of these three take the rows of the `x:exchange` chain exactly as they take the
+rows of an account: refused attempts expire after the same window and give way to the same
+upper bound. The third does not apply to them, because there is no account behind that chain
+to ask Nextcloud about. Only one chain is spared by all three, and it is the one that records
+what happened to the record itself.
 
 In all three cases a marker stays where the rows were, and the marker says how many
 rows are missing. That is why a later check of the record reports an explained gap

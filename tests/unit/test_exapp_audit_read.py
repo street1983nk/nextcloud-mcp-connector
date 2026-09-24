@@ -864,6 +864,7 @@ def test_an_entry_of_the_document_carries_every_field_of_the_row(live: Deploymen
         "reason": None,
         "duration_ms": None,
         "params": ["dir", "query"],
+        "removed": None,
         "prev_hash": store.GENESIS.hex(),
         "hash": first["hash"],
     }
