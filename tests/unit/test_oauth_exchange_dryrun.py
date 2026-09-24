@@ -14,6 +14,7 @@ Three things this corpus measures that no other file can:
   the operating path without a step here is a finding, not a silence.
 """
 
+import ast
 import base64
 import inspect
 import json
@@ -30,7 +31,7 @@ from jwt.algorithms import RSAAlgorithm
 
 from mcp_connector import errors
 from mcp_connector.audit import store as audit_store
-from mcp_connector.oauth import chain, exchange, exchange_dryrun, mapping
+from mcp_connector.oauth import chain, exchange, exchange_dryrun, jwks, mapping
 from mcp_connector.oauth import store as oauth_store
 
 ISSUER = "https://idp.example.org/realms/f13"
@@ -707,3 +708,365 @@ def test_the_rule_reaches_for_no_identity_and_for_no_store() -> None:
         "note_refusal",
     ):
         assert forbidden not in source, forbidden
+
+
+# --- the drift gate against the running checker (T-24-24) ------------------------------------
+#
+# The refusals of this checking path live in two files, and both are scanned:
+#
+# * ``oauth/exchange.py``: 19 call sites of ``_refused(`` carrying 18 different phrases.
+#   "the token is longer than allowed" stands at two of them, the character bound and the
+#   byte bound.
+# * ``oauth/jwks.py``: 9 call sites of ``self._refuse(`` carrying 5 different phrases.
+#   ``ExchangeTokenChecker`` hands its own ``_refused`` in there as ``refuse=``, so those
+#   refusals are rules of this path like any other. "the token names an unknown or unusable
+#   key" and "the key set could not be refreshed" stand at three sites each.
+#
+# Together: 28 call sites, 23 phrases, 23 entries below. The comparison runs over the set of
+# pairs (file, phrase) and never over the count of call sites, or a gate that expected 28
+# keys would have been red on its very first run. The keys are pairs rather than bare
+# phrases so that two files which one day use the same wording cannot silently melt into one
+# entry.
+#
+# Scanning both files is a choice with a price, and the price is two lines of machinery.
+# The alternative was to keep ``key_available`` as an exception, because it has no call site
+# in ``exchange.py`` at all: its refusals arise entirely in those nine places. That would
+# have taken five real rules of the operating path out of the gate, which are exactly the
+# rules whose growth (a sixth phrase in ``jwks.py``) the gate is supposed to report.
+
+EXCHANGE_FILE = "oauth/exchange.py"
+JWKS_FILE = "oauth/jwks.py"
+
+#: (file, phrase) -> (step of the dry run, rejection group). Eighteen entries for the
+#: checker and five for the key set layer, and the five all point at ``key_available`` with
+#: :data:`errors.REASON_EXCHANGE_KEY`, because the one-argument way into ``_refused`` hands
+#: out exactly that group (plan 24-02).
+PHRASE_TO_STEP: dict[tuple[str, str], tuple[str, str]] = {
+    (EXCHANGE_FILE, "the token is empty"): (
+        "token_present",
+        errors.REASON_EXCHANGE_MALFORMED,
+    ),
+    (EXCHANGE_FILE, "the token is longer than allowed"): (
+        "token_size",
+        errors.REASON_EXCHANGE_MALFORMED,
+    ),
+    (EXCHANGE_FILE, "the token is not text"): (
+        "token_is_text",
+        errors.REASON_EXCHANGE_MALFORMED,
+    ),
+    (EXCHANGE_FILE, "the token header is unreadable"): (
+        "header_readable",
+        errors.REASON_EXCHANGE_MALFORMED,
+    ),
+    (EXCHANGE_FILE, "the token uses an algorithm that is not configured"): (
+        "algorithm_allowed",
+        errors.REASON_EXCHANGE_KEY,
+    ),
+    (EXCHANGE_FILE, "the token names no key"): (
+        "key_named",
+        errors.REASON_EXCHANGE_KEY,
+    ),
+    (EXCHANGE_FILE, "the token header names another type"): (
+        "header_type",
+        errors.REASON_EXCHANGE_MALFORMED,
+    ),
+    (EXCHANGE_FILE, "the token payload is unreadable"): (
+        "payload_readable",
+        errors.REASON_EXCHANGE_MALFORMED,
+    ),
+    (EXCHANGE_FILE, "the token comes from another issuer"): (
+        "issuer_matches",
+        errors.REASON_EXCHANGE_ISSUER,
+    ),
+    (EXCHANGE_FILE, "the token did not meet the standard claims"): (
+        "signature_and_standard_claims",
+        errors.REASON_EXCHANGE_CLAIMS,
+    ),
+    (EXCHANGE_FILE, "the token is meant for another audience"): (
+        "audience_exact",
+        errors.REASON_EXCHANGE_CLAIMS,
+    ),
+    (EXCHANGE_FILE, "the token names no acting party"): (
+        "acting_party_named",
+        errors.REASON_EXCHANGE_CLAIMS,
+    ),
+    (EXCHANGE_FILE, "the token was obtained by an unlisted acting party"): (
+        "acting_party_allowed",
+        errors.REASON_EXCHANGE_CLAIMS,
+    ),
+    (EXCHANGE_FILE, "the token is not an access token"): (
+        "token_type_bearer",
+        errors.REASON_EXCHANGE_CLAIMS,
+    ),
+    (EXCHANGE_FILE, "the token carries no numeric times"): (
+        "times_numeric",
+        errors.REASON_EXCHANGE_CLAIMS,
+    ),
+    (EXCHANGE_FILE, "the token lives longer than allowed"): (
+        "lifetime_within_bound",
+        errors.REASON_EXCHANGE_CLAIMS,
+    ),
+    (EXCHANGE_FILE, "the token is older than allowed"): (
+        "age_within_bound",
+        errors.REASON_EXCHANGE_CLAIMS,
+    ),
+    (EXCHANGE_FILE, "the token names no usable subject"): (
+        "subject_usable",
+        errors.REASON_EXCHANGE_CLAIMS,
+    ),
+    (JWKS_FILE, "the token names an unknown or unusable key"): (
+        "key_available",
+        errors.REASON_EXCHANGE_KEY,
+    ),
+    (JWKS_FILE, "the key set could not be refreshed"): (
+        "key_available",
+        errors.REASON_EXCHANGE_KEY,
+    ),
+    (JWKS_FILE, "the key is declared for another algorithm"): (
+        "key_available",
+        errors.REASON_EXCHANGE_KEY,
+    ),
+    (JWKS_FILE, "the JWKS is not a usable key list"): (
+        "key_available",
+        errors.REASON_EXCHANGE_KEY,
+    ),
+    (JWKS_FILE, "the JWKS carries no usable key"): (
+        "key_available",
+        errors.REASON_EXCHANGE_KEY,
+    ),
+}
+
+#: The three steps that have no phrase they could drift from, each with the cover that takes
+#: the place of one. A fourth entry costs a decision in this file and a line of reasoning,
+#: which is the whole point of holding the size at three.
+#:
+#: * ``token_shape``: the shape switch is ``chain.looks_like_jws`` (chain.py) and a signpost,
+#:   not a refusal. A token without two dots goes to the store branch and never reaches
+#:   ``claims_of`` at all (EXCH-04). Covered by the dry run calling that very function
+#:   instead of counting the dots itself.
+#: * ``mapping_yields_principal``: ``mapping.principal_from_claims`` answers ``None`` and the
+#:   chain turns that into ``None`` without a phrase. Covered by the dry run calling that
+#:   very function.
+#: * ``account_exists``: never executed by design, so it can have no counterpart in the
+#:   operating path of this module at all.
+STEPS_WITHOUT_A_PHRASE = frozenset({"token_shape", "mapping_yields_principal", "account_exists"})
+
+
+def calls_in(source: str, *, name: str, attribute: bool) -> list[ast.Call]:
+    """Every call of ``name`` in ``source``, counted by the AST and never by grep.
+
+    ``grep -c "_refused("`` answers one too many on ``oauth/exchange.py``, because the
+    definition line counts itself. What this gate is about is call sites.
+    """
+    key = "attr" if attribute else "id"
+    return [
+        node
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Call) and getattr(node.func, key, "") == name
+    ]
+
+
+def phrase_of(call: ast.Call) -> str:
+    first = call.args[0] if call.args else None
+    unheld = f"line {call.lineno}: a refusal without a fixed phrase cannot be held to a step"
+    assert isinstance(first, ast.Constant), unheld
+    assert isinstance(first.value, str), unheld
+    return first.value
+
+
+def refusal_sites(source: str, filename: str) -> list[tuple[tuple[str, str], ast.Call]]:
+    if filename == JWKS_FILE:
+        calls = calls_in(source, name="_refuse", attribute=True)
+    else:
+        calls = calls_in(source, name="_refused", attribute=False)
+    return [((filename, phrase_of(call)), call) for call in calls]
+
+
+def all_refusal_sites() -> list[tuple[tuple[str, str], ast.Call]]:
+    return refusal_sites(inspect.getsource(exchange), EXCHANGE_FILE) + refusal_sites(
+        inspect.getsource(jwks), JWKS_FILE
+    )
+
+
+def groups_named_by(node: ast.expr) -> set[str] | None:
+    """The constant names an argument expression can evaluate to, or ``None`` for anything.
+
+    The same reader as the ``_refused`` gate of plan 24-02, and for the same reason: one
+    call site hands a choice between two names, because the decoder carries the signature
+    check and the standard claim rules in one call.
+    """
+    if isinstance(node, ast.Name):
+        return {node.id}
+    if isinstance(node, ast.IfExp):
+        taken = groups_named_by(node.body)
+        otherwise = groups_named_by(node.orelse)
+        return None if taken is None or otherwise is None else taken | otherwise
+    return None
+
+
+def groups_allowed_for(step: str) -> set[str]:
+    """Every rejection group the operating path may book ``step`` under.
+
+    Normally that is the one group the constant names. The single exception is
+    ``signature_and_standard_claims``, whose call site names two by design: a broken
+    signature is a statement about the key that signed, everything else about the claims.
+    """
+    allowed: set[str] = set()
+    sites = all_refusal_sites()
+    for (filename, phrase), (mapped, group) in PHRASE_TO_STEP.items():
+        if mapped != step:
+            continue
+        allowed.add(group)
+        for key, call in sites:
+            if key != (filename, phrase) or len(call.args) < 2:
+                continue
+            named = groups_named_by(call.args[1]) or set()
+            allowed |= {getattr(errors, name) for name in named}
+    return allowed
+
+
+def test_the_two_scanned_files_still_carry_the_counts_this_gate_was_built_on() -> None:
+    """Twenty-eight call sites, twenty-three phrases. The numbers are measured, not assumed."""
+    from_exchange = refusal_sites(inspect.getsource(exchange), EXCHANGE_FILE)
+    from_jwks = refusal_sites(inspect.getsource(jwks), JWKS_FILE)
+    assert len(from_exchange) == 19
+    assert len({key for key, _ in from_exchange}) == 18
+    assert len(from_jwks) == 9
+    assert len({key for key, _ in from_jwks}) == 5
+    assert len(PHRASE_TO_STEP) == 23
+    assert all(isinstance(key, tuple) and len(key) == 2 for key in PHRASE_TO_STEP)
+
+
+def test_every_refusal_of_the_operating_path_has_a_step_in_the_dry_run() -> None:
+    """Completeness forwards: a rule the checker gained and the dry run never heard of.
+
+    **What this gate prevents:** the operating path getting a rule the dry run does not
+    know, so that a token reads green in an administrator's test and is refused in service.
+
+    **What it does not prevent, said out loud because a gate one expects more of than it
+    delivers is worse than none:** it does not prevent the two sides implementing the same
+    rule differently. The measured cases above are what covers that, and for the three steps
+    in :data:`STEPS_WITHOUT_A_PHRASE` it is the shared function instead. It also does not
+    watch the bare ``refuse(...)`` calls inside ``jwks.fetch_json`` (an unreachable provider,
+    a non-200 answer, an oversized body, an answer that is not JSON): those all end in
+    ``key_available`` as well, and a new wording among them would pass unnoticed. That is a
+    named limit, not an oversight.
+    """
+    found = {key for key, _ in all_refusal_sites()}
+    assert found == set(PHRASE_TO_STEP)
+
+
+def test_every_step_names_the_group_its_call_site_names() -> None:
+    """The grouping of the two sides has to agree, phrase by phrase."""
+    findings: list[str] = []
+    for (filename, phrase), call in all_refusal_sites():
+        step, group = PHRASE_TO_STEP[(filename, phrase)]
+        if filename == JWKS_FILE:
+            # One argument only: the key set layer takes the factory as a
+            # ``Callable[[str], Exception]``, so the default group of plan 24-02 applies.
+            if len(call.args) != 1 or group != errors.REASON_EXCHANGE_KEY:
+                findings.append(f"{filename}:{call.lineno}: {phrase} -> {step}/{group}")
+            continue
+        named = groups_named_by(call.args[1]) if len(call.args) > 1 else None
+        if named is None or group not in {getattr(errors, name) for name in named}:
+            findings.append(f"{filename}:{call.lineno}: {phrase} -> {step}/{group}")
+    assert findings == [], "\n".join(findings)
+
+
+def test_every_step_of_the_dry_run_is_covered_by_a_phrase_or_named_as_an_exception() -> None:
+    """Completeness backwards: 22 steps minus 3 named exceptions are 19 covered steps."""
+    covered = {step for step, _ in PHRASE_TO_STEP.values()}
+    assert len(STEPS_WITHOUT_A_PHRASE) == 3, "a fourth exception is a decision, not a diff"
+    assert set(exchange_dryrun.STEPS) >= STEPS_WITHOUT_A_PHRASE
+    assert len(set(exchange_dryrun.STEPS) - STEPS_WITHOUT_A_PHRASE) == 19
+    assert set(exchange_dryrun.STEPS) - STEPS_WITHOUT_A_PHRASE == covered
+
+
+def test_the_gate_turns_red_when_the_checker_gains_a_rule_without_a_step() -> None:
+    """The counter-proof, on an excerpt of source and not on the real file."""
+    invented = "the dry run never heard of this rule"
+    grown = inspect.getsource(exchange) + f'\n_ = _refused("{invented}", REASON_EXCHANGE_CLAIMS)\n'
+    found = {key for key, _ in refusal_sites(grown, EXCHANGE_FILE)}
+    assert found - set(PHRASE_TO_STEP) == {(EXCHANGE_FILE, invented)}
+
+
+def test_the_gate_turns_red_when_a_step_loses_its_phrase() -> None:
+    """The counter-proof in the other direction: the backwards assertion has to fail too."""
+    shrunk = dict(PHRASE_TO_STEP)
+    del shrunk[(EXCHANGE_FILE, "the token is empty")]
+    covered = {step for step, _ in shrunk.values()}
+    assert set(exchange_dryrun.STEPS) - STEPS_WITHOUT_A_PHRASE != covered
+
+
+#: One measured refusal per step that can fall, as (step, builder of token and extra
+#: arguments). The completeness of this list is held by the test below it, so a new step
+#: cannot arrive without a case.
+MEASURED_FAILURES: list[tuple[str, Any]] = [
+    ("token_present", lambda: ("", {})),
+    ("token_size", lambda: ("x" * (exchange.MAX_TOKEN_BYTES + 1), {})),
+    ("token_is_text", lambda: ("a.b.\ud800", {})),
+    ("token_shape", lambda: ("not-a-jws", {})),
+    ("header_readable", lambda: ("aaa.bbb.ccc", {})),
+    (
+        "algorithm_allowed",
+        lambda: (
+            jwt.encode(claims(), SHARED_SECRET, algorithm="HS256", headers={"kid": KID}),
+            {},
+        ),
+    ),
+    ("key_named", lambda: (token(kid=None), {})),
+    ("header_type", lambda: (token(headers={"typ": "dpop+jwt"}), {})),
+    (
+        "payload_readable",
+        lambda: (handmade({"alg": "RS256", "kid": KID, "typ": "JWT"}, b"[[[not json"), {}),
+    ),
+    ("issuer_matches", lambda: (token(iss="https://evil.example.org/realms/f13"), {})),
+    ("key_available", lambda: (token(kid="rotated-away"), {})),
+    ("signature_and_standard_claims", lambda: (token(OTHER_PRIVATE), {})),
+    ("audience_exact", lambda: (token(aud=f"{AUDIENCE}/tenant-b"), {})),
+    ("acting_party_named", lambda: (token(azp=17), {})),
+    ("acting_party_allowed", lambda: (token(azp="another-client"), {})),
+    ("token_type_bearer", lambda: (token(typ=exchange.ID_TOKEN_TYP), {})),
+    ("times_numeric", lambda: (token(iat=str(int(time.time()))), {})),
+    (
+        "lifetime_within_bound",
+        lambda: (
+            token(exp=int(time.time()) + exchange.MAX_TOKEN_LIFETIME_SECONDS + 60),
+            {},
+        ),
+    ),
+    (
+        "age_within_bound",
+        lambda: (
+            token(),
+            {"now": lambda: time.time() + exchange.MAX_TOKEN_LIFETIME_SECONDS + 60},
+        ),
+    ),
+    ("subject_usable", lambda: (token(sub=" padded"), {})),
+    ("mapping_yields_principal", lambda: (token(sub="alice/bob"), {})),
+]
+
+
+@respx.mock
+@pytest.mark.anyio
+@pytest.mark.parametrize(("expected", "build"), MEASURED_FAILURES)
+async def test_a_measured_refusal_carries_the_group_the_constant_gives_its_step(
+    expected: str, build: Any
+) -> None:
+    """The run-time half of the gate: the grouping agrees on the object, not only on the AST."""
+    serve()
+    presented, extra = build()
+    result = await exchange_dryrun.dry_run(presented, config_for(), **extra)
+    assert outcomes(result)[expected] == exchange_dryrun.OUTCOME_FAILED
+    reason = step_named(result, expected).reason
+    if expected in STEPS_WITHOUT_A_PHRASE:
+        # No phrase to agree with; what is owed here is only a frozen identifier.
+        assert reason in errors.REASONS
+    else:
+        assert reason in groups_allowed_for(expected), expected
+
+
+def test_every_step_that_can_fall_is_measured_by_the_run_time_half() -> None:
+    """The list above is complete: twenty-one steps, every one but the one never executed."""
+    measured = {step for step, _ in MEASURED_FAILURES}
+    assert measured == set(exchange_dryrun.STEPS) - {exchange_dryrun.STEP_ACCOUNT_EXISTS}
