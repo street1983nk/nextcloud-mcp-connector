@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: F13 Token Exchange Identity Mapper
-status: "Phase 24 (Audit-Anschluss und Nachweis) ist geplant: 9 Pläne in 5 Wellen, Checker nach 3 Iterationen PASSED (2 Zahlen-Blocker und das Drift-Gate-Kriterium in 24-05 behoben, Zahlen 23/22/19/3 am Code nachgemessen); Welle 5 trägt einen blockierenden Owner-Checkpoint (Rolle von occ oauth2:add-client im F13-Aufbau); bereit zur Ausführung"
-stopped_at: Phase 24 geplant, bereit für execute-phase
-last_updated: "2026-09-23T20:30:00.000Z"
-last_activity: 2026-09-23, Phase 24 geplant (Research mit Transportgrenzen-Messung, Pattern-Map, 9 Pläne, Checker-Schleife 3 Iterationen bis PASSED)
+status: "Milestone v1.6 baulich komplett: Phase 24 ausgeführt (9/9 Pläne in 5 Wellen), Code-Review resolved (CR-01 + WR-01..06 gefixt, 7 Infos offen dokumentiert), goal-backward verifiziert (24-VERIFICATION.md, passed, 5/5 Erfolgskriterien); offen nur noch Milestone-Abschluss per /gsd:complete-milestone und der Push-Hook-Entscheid"
+stopped_at: Milestone complete (Phase 24 was final phase)
+last_updated: 2026-09-24T08:00:00.000Z
+last_activity: 2026-09-24, Phase 24 ausgeführt und verifiziert; Owner-Entscheid am Checkpoint 24-09 (occ oauth2:add-client-Rolle als offene F13-Antwort markiert, Frage an F13 vertagt); Review-Fixes 8b7f6a1 bis 922e5c8, Endstand 4392 Tests grün
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 7
-  completed_plans: 7
-  percent: 60
+  completed_phases: 5
+  total_plans: 22
+  completed_plans: 22
+  percent: 100
 ---
 
 # Project State
@@ -21,21 +21,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-08-21)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** v1.6 F13 Token Exchange Identity Mapper, Phasen 20-24; Roadmap steht, als Nächstes die Planung von Phase 20 (JWKS-Schicht und PyJWT-Stand)
+**Current focus:** Milestone complete
 
 ## Current Position
 
-Phase: 24 von 24 (v1.6: Phasen 20-24), GEPLANT: 9 Pläne in 5 Wellen, Checker PASSED (Iteration 3)
-Plan: 0 von 9 ausgeführt (24-01/02/07 Welle 1, 24-03/05 Welle 2, 24-04 Welle 3, 24-06/08 Welle 4, 24-09 Welle 5 mit checkpoint:decision zu occ oauth2:add-client)
-Status: Phase 24 geplant und verifiziert (Requirements AUDIT-07/EXCH-06/07/08 abgedeckt, BL-21 als 24-07 eingeplant); als Nächstes execute-phase 24
-Progress: [████████░░] 80% (Phasen 20-23 komplett, 24 geplant)
-Last activity: 2026-09-23, Phase 24 geplant (Research inkl. Transportgrenzen-Messung gegen die NC-35-HaRP-Strecke, Pattern-Map, 9 Pläne, Checker-Schleife: 2 Zahlen-Blocker + Drift-Gate-Widerspruch behoben, dann PASSED); vormittags Phase 23 verifiziert und drei Quick-Tasks (BL-15, BL-17, BL-01) abgeschlossen
+Phase: 24 von 24 (v1.6: Phasen 20-24), ABGESCHLOSSEN und verifiziert (passed, 5/5)
+Plan: 9 von 9 ausgeführt (Wellen 1-5, ein Owner-Checkpoint in 24-09 entschieden: offen-markieren)
+Status: Milestone v1.6 baulich komplett; Review resolved, VERIFICATION passed; als Nächstes /gsd:complete-milestone (Owner-Thema) und Push-Hook-Entscheid
+Progress: [██████████] 100%
+Last activity: 2026-09-24, Phase 24 komplett (actor-Feld, Abweisungs-Kette mit Sweep-Anschluss, Trockenlauf-Kommando, Zwei-Konten-Beweis gemessen, Einrichtungsdoku mit offen markierter occ-Client-Rolle); 4392 Tests grün
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 125
+- Total plans completed: 134
 - Average duration: 35 min
 - Total execution time: 15.2 hours
 
@@ -60,6 +60,7 @@ Last activity: 2026-09-23, Phase 24 geplant (Research inkl. Transportgrenzen-Mes
 | 19 | 9 | - | - |
 | 20 | 2 | 49 min | 25 min |
 | 22 | 1 | 25 min | 25 min |
+| 24 | 9 | - | - |
 
 **Recent Trend:**
 

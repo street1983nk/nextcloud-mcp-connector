@@ -249,7 +249,7 @@ Plans:
 | 21. Exchange-Verifier | v1.6 | 2/2 | Complete   | 2026-09-19 |
 | 22. Konfiguration, Kette und Drosselung | v1.6 | 3/3 | Complete   | 2026-09-19 |
 | 23. Konto-Mapping und Credential-Wege | v1.6 | 6/6 | Complete | 2026-09-23 |
-| 24. Audit-Anschluss und Nachweis | v1.6 | 9/9 | Complete   | 2026-09-24 |
+| 24. Audit-Anschluss und Nachweis | v1.6 | 9/9 | Complete    | 2026-09-24 |
 
 ## Next
 

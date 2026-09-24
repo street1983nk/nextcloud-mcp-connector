@@ -41,13 +41,13 @@ Extern getaktet, kein Blocker für den Bau: die vier F13-Entscheidungen aus der 
 
 ### Audit
 
-- [ ] **AUDIT-07**: Ein über Exchange handelnder Werkzeugaufruf steht in der bestehenden hash-verketteten Audit-Kette samt handelnder Partei (azp), unter den bestehenden Inhaltsverboten; abgewiesene Exchange-Versuche sind für den Betreiber sichtbar (heute stünden sie in keiner Zeile), ohne Token-Inhalte zu protokollieren
+- [x] **AUDIT-07**: Ein über Exchange handelnder Werkzeugaufruf steht in der bestehenden hash-verketteten Audit-Kette samt handelnder Partei (azp), unter den bestehenden Inhaltsverboten; abgewiesene Exchange-Versuche sind für den Betreiber sichtbar (heute stünden sie in keiner Zeile), ohne Token-Inhalte zu protokollieren
 
 ### Betrieb und Nachweis (D-v1.6-02)
 
-- [ ] **EXCH-06**: Ein Trockenlauf-Kommando prüft ein vorgelegtes Token gegen die aktive Konfiguration und benennt das Ergebnis je Prüfschritt, ohne dass das Token dabei irgendetwas darf; damit lässt sich die F13-Einrichtung ohne Live-Zugriff verproben
-- [ ] **EXCH-07**: Ein Zwei-Konten-Negativbeweis liegt als Messdatei neben den bestehenden Client-Nachweisen: zwei gemappte Konten, und keines sieht die Dateien des anderen, gemessen und nicht argumentiert
-- [ ] **EXCH-08**: Eine Einrichtungsdoku (docs/) beschreibt den Pfad von der Keycloak-Seite bis zum ersten Werkzeugaufruf, einschließlich der empfohlenen Audience-Konvention, des occ-oauth2:add-client-Playbooks und einer ehrlichen Grenzbeschreibung (was der Pfad nicht leistet, was von F13s Antworten abhängt)
+- [x] **EXCH-06**: Ein Trockenlauf-Kommando prüft ein vorgelegtes Token gegen die aktive Konfiguration und benennt das Ergebnis je Prüfschritt, ohne dass das Token dabei irgendetwas darf; damit lässt sich die F13-Einrichtung ohne Live-Zugriff verproben
+- [x] **EXCH-07**: Ein Zwei-Konten-Negativbeweis liegt als Messdatei neben den bestehenden Client-Nachweisen: zwei gemappte Konten, und keines sieht die Dateien des anderen, gemessen und nicht argumentiert
+- [x] **EXCH-08**: Eine Einrichtungsdoku (docs/) beschreibt den Pfad von der Keycloak-Seite bis zum ersten Werkzeugaufruf, einschließlich der empfohlenen Audience-Konvention, des occ-oauth2:add-client-Playbooks und einer ehrlichen Grenzbeschreibung (was der Pfad nicht leistet, was von F13s Antworten abhängt)
 
 ### Abhängigkeiten
 
@@ -95,9 +95,9 @@ Anerkannt, aber nicht in diesem Milestone.
 | MAP-02 | Phase 23 | Complete |
 | CRED-01 | Phase 23 | Complete |
 | CRED-02 | Phase 23 | Complete |
-| AUDIT-07 | Phase 24 | Pending |
-| EXCH-06 | Phase 24 | Pending |
-| EXCH-07 | Phase 24 | Pending |
-| EXCH-08 | Phase 24 | Pending |
+| AUDIT-07 | Phase 24 | Complete |
+| EXCH-06 | Phase 24 | Complete |
+| EXCH-07 | Phase 24 | Complete |
+| EXCH-08 | Phase 24 | Complete |
 
 Abdeckung: 15 von 15 v1.6-Requirements genau einer Phase zugeordnet, keine Waise, keine Doppelung. Die Future Requirements (EXCH-F01..F03, CLIENT-01..03, EXAPP-12) sind bewusst ohne Phase.
