@@ -37,10 +37,13 @@ from mcp_connector import config
 from mcp_connector.audit import AUDIT_STATE_ATTR, accounts
 from mcp_connector.audit.record import Recorder
 from mcp_connector.audit.store import (
+    CHAIN_EXCHANGE,
     CHAIN_INSTANCE,
     KIND_CALL,
+    KIND_REFUSAL,
     KIND_SWITCH,
     KIND_TOMBSTONE,
+    OUTCOME_REJECTED,
     SWEEP_EVERY,
     SWEEP_USER_CHECK_EVERY,
     USER_SILENCE_DAYS,
@@ -48,6 +51,7 @@ from mcp_connector.audit.store import (
     Entry,
     user_chain,
 )
+from mcp_connector.errors import REASON_EXCHANGE_CLAIMS
 from mcp_connector.oauth.verifier import OAUTH_STATE_ATTR, OAuthIdentity
 from mcp_connector.server import graceful
 
@@ -490,3 +494,52 @@ async def test_a_failed_account_check_costs_the_call_nothing(
     logged = "\n".join(record.getMessage() for record in caplog.records)
     assert "OSError" in logged
     assert BROKEN_PATH not in logged
+
+
+# --- the chain that has no account behind it and never had one --------------------------
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_the_refusal_chain_survives_an_account_check_that_never_heard_of_it(
+    store: AuditStore, recorder: Recorder, audit_file: Path
+) -> None:
+    """Pitfall 5 of phase 24, against the real check and not against a copy of its two lines.
+
+    The refused attempts of the token exchange path stand in a chain of their own
+    (``x:exchange``, AUDIT-07). It is swept, which is the point of it, and it is silent by
+    nature: a deployment nobody attacks writes into it for weeks at a time and then not at
+    all. ``_account_of`` cuts ``u:`` off and hands whatever is left on as an account name, so
+    without the prefix filter of ``_SILENT_CHAINS`` this chain would be held against a list of
+    Nextcloud accounts it can never be in, and would be deleted with a marker over it.
+
+    The silent account beside it is what makes the case say something: it proves the list was
+    read, the check ran and did delete, and that the refusal chain was spared by the filter
+    and not by a check that did nothing at all.
+    """
+    respx.get(USERS_URL).mock(return_value=httpx.Response(200, json=envelope([CALLER])))
+    moment = int(time.time())
+    await a_silent_chain(store, moment=moment)
+    await store.append(
+        Entry(
+            chain=CHAIN_EXCHANGE,
+            kind=KIND_REFUSAL,
+            at=moment - 90 * DAY,
+            outcome=OUTCOME_REJECTED,
+            reason=REASON_EXCHANGE_CLAIMS,
+            removed=1,
+        )
+    )
+    arm_the_next_row(audit_file, CHECKING_ROW)
+
+    await probe(ctx=FakeContext(recorder=recorder, who=identity()))
+
+    left = rows(audit_file)
+    assert [row["chain"] for row in left if row["kind"] == KIND_REFUSAL] == [CHAIN_EXCHANGE]
+    assert not [row for row in left if row["chain"] == user_chain(SILENT)], (
+        "the account that really is gone still loses its chain"
+    )
+    assert [marker["gap_chain"] for marker in left if marker["kind"] == KIND_TOMBSTONE] == [
+        user_chain(SILENT)
+    ]
+    assert await store.verify_chains() == []

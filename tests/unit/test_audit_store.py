@@ -19,6 +19,7 @@ from typing import Any
 import pytest
 
 from mcp_connector.audit import store
+from mcp_connector.errors import REASON_EXCHANGE_CLAIMS
 from mcp_connector.oauth import store as oauth
 
 pytestmark = pytest.mark.anyio
@@ -1043,3 +1044,149 @@ async def test_read_entries_carries_the_number_the_canonical_fields_and_both_has
         assert digest_of(row) == row[-1], "the answer is enough to recompute the chain"
         assert store._entry_of_row(row).tool == "files_search", "and the fields read as an Entry"
     assert read[0][-2] == read[1][-1], "the younger row points at the older one"
+
+
+# --- the third kind of chain: the refused exchange attempts, AUDIT-07 -------------------
+# A row of this chain is ordered by a stranger who holds no key of this deployment, so the
+# three properties below are what make the chain a safe place for it: the retention window
+# takes such a row, the upper bound may take it, and the account check never mistakes the
+# chain for an account that stopped calling. Each of them is one case, because each of them
+# is one way the choice of D2 could be undone without anybody noticing.
+
+
+async def write_refusals(
+    subject: store.AuditStore, moments: list[int], *, removed: int = 1
+) -> None:
+    """One refusal row per moment, through the public interface, so the chain is real."""
+    for at in moments:
+        await subject.append(
+            store.Entry(
+                chain=store.CHAIN_EXCHANGE,
+                kind=store.KIND_REFUSAL,
+                at=at,
+                outcome=store.OUTCOME_REJECTED,
+                reason=REASON_EXCHANGE_CLAIMS,
+                removed=removed,
+            )
+        )
+
+
+async def test_a_refusal_row_carries_the_four_values_of_its_kind_and_nothing_else(
+    tmp_path: Path,
+) -> None:
+    """What may stand in such a row is the whole of what a stranger can cause to be written.
+
+    The positive half and the negative half in one case: the four values the kind has, and
+    every other column empty. A row that carried a value out of the token would be exactly
+    the claim leak the phase was written against (T-24-04), and the columns that could carry
+    one are named here one by one rather than counted.
+    """
+    subject = open_store(tmp_path)
+    await write_refusals(subject, [1000], removed=7)
+
+    (row,) = await subject.read_entries()
+    entry = store._entry_of_row(row)
+
+    assert entry.chain == store.CHAIN_EXCHANGE
+    assert entry.kind == store.KIND_REFUSAL
+    assert entry.at == 1000
+    assert entry.outcome == store.OUTCOME_REJECTED
+    assert entry.reason == REASON_EXCHANGE_CLAIMS
+    assert entry.removed == 7, "how many attempts this one row stands for"
+    assert entry.actor is None, "an unchecked token has no acting party that may be written"
+    assert (entry.nc_user, entry.tool, entry.client_id, entry.auth_id) == (None, None, None, None)
+    assert (entry.client_name, entry.duration_ms) == (None, None)
+    assert (entry.gap_chain, entry.gap_hash) == (None, None)
+    assert tuple(entry.params) == ()
+
+
+async def test_the_refusal_chain_is_not_the_instance_chain(tmp_path: Path) -> None:
+    """The one property the whole choice rests on: it is swept, and the instance chain is not.
+
+    Prefixed like a user chain and for the same reason, so it can never collide with an
+    account however that account is named.
+    """
+    assert store.CHAIN_EXCHANGE != store.CHAIN_INSTANCE
+    assert store.CHAIN_EXCHANGE.startswith(store.EXCHANGE_CHAIN_PREFIX)
+    assert not store.CHAIN_EXCHANGE.startswith(store.USER_CHAIN_PREFIX)
+    assert store.KIND_REFUSAL not in {store.KIND_CALL, store.KIND_TOMBSTONE, store.KIND_SWITCH}
+
+    subject = open_store(tmp_path)
+    await write_refusals(subject, [1000, 1001])
+    await subject.append(store.Entry(chain=store.CHAIN_INSTANCE, kind=store.KIND_SWITCH, at=1002))
+
+    overview = await subject.overview()
+    assert overview.entries == 3
+    assert overview.sweepable_entries == 2, "the refusal rows are the sweep's to take"
+
+
+async def test_the_retention_window_takes_the_refusal_chain_and_explains_the_gap(
+    tmp_path: Path,
+) -> None:
+    """The row of a stranger expires exactly like the row of an account, marker included."""
+    subject = open_store(tmp_path)
+    old = 1_000_000_000
+    young = old + 400 * 86400
+    await write_refusals(subject, [old, old + 1])
+    await write_refusals(subject, [young])
+
+    report = await subject.sweep(moment=young + 1)
+
+    assert report.expired == 2
+    assert [row[3] for row in rows(tmp_path) if row[2] == store.KIND_REFUSAL] == [young]
+    (marker,) = [row for row in rows(tmp_path) if row[2] == store.KIND_TOMBSTONE]
+    assert marker[1] == store.CHAIN_INSTANCE
+    assert marker[15] == store.CHAIN_EXCHANGE, "the marker names the chain that lost the rows"
+    assert marker[14] == 2
+    assert await subject.verify_chains() == []
+
+
+async def test_the_upper_bound_may_take_a_refusal_row(tmp_path: Path) -> None:
+    """The second half of the same promise (T-24-17): a flooded refusal chain gives way.
+
+    ``size_limit=0`` is the bound biting as hard as it can, and what has to be left standing
+    afterwards is the instance chain and nothing else of the two that were swept.
+    """
+    subject = open_store(tmp_path)
+    moment = 1_000_000_000
+    await subject.append(
+        store.Entry(chain=store.CHAIN_INSTANCE, kind=store.KIND_SWITCH, at=moment, outcome="on")
+    )
+    await write_refusals(subject, [moment + 1, moment + 2])
+
+    report = await subject.sweep(moment=moment + 3, retention_days=10_000, size_limit=0)
+
+    assert report.expired == 0, "nothing is old enough for the window, so this is the bound"
+    assert report.trimmed == 2
+    assert [row[2] for row in rows(tmp_path) if row[2] == store.KIND_REFUSAL] == []
+    assert store.KIND_SWITCH in [row[2] for row in rows(tmp_path)]
+    assert await subject.verify_chains() == []
+
+
+async def test_a_changed_refusal_row_is_found_like_any_other(tmp_path: Path) -> None:
+    """The check walks this chain too, or the rows of the one chain a stranger can fill
+    would be the rows nobody could hold against their own hash."""
+    subject = open_store(tmp_path)
+    await write_refusals(subject, [1000, 1001, 1002])
+
+    past_the_store(tmp_path, "UPDATE entries SET removed = ? WHERE seq = ?", (9999, 2))
+
+    (finding,) = await subject.verify_chains()
+    assert finding.chain == store.CHAIN_EXCHANGE
+    assert finding.kind == store.FINDING_MODIFIED
+    assert finding.seq == 2
+
+
+async def test_the_account_check_is_never_offered_the_refusal_chain(tmp_path: Path) -> None:
+    """Pitfall 5: ``_account_of`` cuts ``u:`` off and would hand ``x:exchange`` on as an
+    account that Nextcloud has never heard of, which ``drop_user_chain`` answers by deleting
+    the chain. The silent account beside it is what keeps this case honest: without it an
+    empty answer would also pass over a query that stopped finding anything at all.
+    """
+    subject = open_store(tmp_path)
+    moment = 1_000_000_000 + 400 * 86400
+    silent = moment - (store.USER_SILENCE_DAYS + 1) * 86400
+    await write_refusals(subject, [silent])
+    await write_calls(subject, ALICE, [silent])
+
+    assert await subject.silent_users(moment=moment) == ["alice"]
