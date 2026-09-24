@@ -38,6 +38,7 @@ from starlette.testclient import TestClient
 
 from mcp_connector import config, entry_exapp, entry_http
 from mcp_connector.audit import record as audit_record
+from mcp_connector.audit import refusals as audit_refusals
 from mcp_connector.audit import store as audit_store_module
 from mcp_connector.errors import IssuerRefused, ToolError
 from mcp_connector.exapp import config_values
@@ -2702,6 +2703,142 @@ def test_a_store_token_is_served_exactly_as_before_while_the_path_is_armed(
         served = bearer_call(client, CONNECTED_TOKEN)
 
     assert served.status_code == 200
+
+
+# --- the refusal writer of the exchange path (AUDIT-07) ------------------------------------
+
+
+def refusal_writer_of(app: Starlette) -> Any:
+    """The writer the chain of this application notes refusals with, or ``None``.
+
+    Reaches through the chain for the reason :func:`recorder_of` gives: "is a writer
+    attached" is invisible from outside, and a grep for ``refusals=`` in the source would
+    pass on an application that hands in ``None``. What comes back is the object behind the
+    bound method, because that is what carries the store this application writes into.
+    """
+    verifier = boundary_of(app)._token_verifier
+    note = getattr(verifier, "_refusals", None)
+    return None if note is None else note.__self__
+
+
+def test_the_armed_path_with_the_log_on_writes_into_the_store_of_this_application(
+    tmp_path: Path,
+) -> None:
+    """AUDIT-07: one store per application, and the refusals go into the very same one.
+
+    The opener is asserted with ``is`` against the recorder's, because that is the whole
+    statement: a second opener would be a second ``AuditStore`` on the same path, the size
+    limit of D-11 would be computed over one of them while both wrote, and an operator
+    would read one chain of a file two objects believed they owned.
+    """
+    env = {
+        **OAUTH_ENV,
+        **EXCHANGE_ENV,
+        config.ENV_APP_PERSISTENT_STORAGE: str(tmp_path),
+        config.ENV_AUDIT_LOG: "on",
+    }
+
+    app = entry_exapp.build_exapp_app(env)
+
+    writer = refusal_writer_of(app)
+    recorder = recorder_of(app)
+    assert isinstance(writer, audit_refusals.RefusalWriter)
+    assert isinstance(recorder, audit_record.Recorder)
+    assert writer.store_provider is recorder.store_provider
+
+
+def test_with_the_audit_log_off_the_armed_chain_gets_no_writer(tmp_path: Path) -> None:
+    """D-14 is the whole condition: off means no writer, not a writer nobody reads.
+
+    Without this the switch would be honoured by the store instead of by the wire, and the
+    pre-authentication path would open the audit file of an installation that asked for no
+    audit log at all.
+    """
+    env = {**OAUTH_ENV, **EXCHANGE_ENV, config.ENV_APP_PERSISTENT_STORAGE: str(tmp_path)}
+
+    assert refusal_writer_of(entry_exapp.build_exapp_app(env)) is None
+
+
+def test_without_the_exchange_namespace_no_writer_is_built_at_all(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The second half of the condition, measured the way the account source is measured.
+
+    The constructor explodes here, and the build succeeds anyway: with no exchange path
+    there is nothing that could ever be refused on it, so the writer is not built rather
+    than built and never called.
+    """
+
+    class Exploding:
+        def __init__(self, **kwargs: object) -> None:
+            raise AssertionError("a refusal writer was built although the path is off")
+
+    monkeypatch.setattr(entry_exapp.audit_refusals, "RefusalWriter", Exploding)
+    env = {
+        **OAUTH_ENV,
+        config.ENV_APP_PERSISTENT_STORAGE: str(tmp_path),
+        config.ENV_AUDIT_LOG: "on",
+    }
+
+    assert isinstance(
+        boundary_of(entry_exapp.build_exapp_app(env))._token_verifier, StoreTokenVerifier
+    )
+
+
+@respx.mock
+def test_a_refused_exchange_attempt_becomes_one_row_of_the_refusal_chain(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Success criterion 2 of this phase, end to end on the deployment F13 reaches.
+
+    An unreadable header is refused before a signature is checked, so the row is provable
+    without a single outgoing fetch. What lands is one row in ``x:exchange``, carrying the
+    group of plan 24-02 and nothing else: no ``azp``, no issuer, no piece of the token, and
+    an empty ``actor``, because the token behind a refusal did not pass its signature check
+    and every value in it is text a stranger chose (T-24-04).
+    """
+    keys = serve_the_key_set()
+    env, _ = with_a_local_store(
+        {**OAUTH_ENV, **EXCHANGE_ENV, config.ENV_AUDIT_LOG: "on"}, tmp_path, monkeypatch
+    )
+
+    with TestClient(entry_exapp.build_exapp_app(env)) as client:
+        refused = bearer_call(client, SHAPED_LIKE_A_JWS)
+
+    assert refused.status_code == 401
+    assert keys.call_count == 0
+    rows = audit_rows(tmp_path)
+    assert len(rows) == 1, "one refused attempt, one row"
+    row = rows[0]
+    assert row["chain"] == audit_store_module.CHAIN_EXCHANGE
+    assert row["kind"] == audit_store_module.KIND_REFUSAL
+    assert row["outcome"] == audit_store_module.OUTCOME_REJECTED
+    assert row["reason"] == "exchange_malformed"
+    assert row["removed"] == 1
+    assert row["actor"] is None
+    assert row["nc_user"] is None
+    written = " ".join(str(value) for value in row.values())
+    for value in (SHAPED_LIKE_A_JWS, EXCHANGE_ISSUER, EXCHANGE_AZP, EXCHANGE_CLAIM):
+        assert value not in written
+
+
+@respx.mock
+def test_with_the_audit_log_off_the_same_attempt_leaves_no_file_at_all(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The factory state of D-14, measured on the path a stranger drives.
+
+    Not "an empty chain" but no file: an ``audit.sqlite3`` that exists says something
+    happened, and on an installation that switched no log on nothing may.
+    """
+    serve_the_key_set()
+    env, _ = with_a_local_store({**OAUTH_ENV, **EXCHANGE_ENV}, tmp_path, monkeypatch)
+
+    with TestClient(entry_exapp.build_exapp_app(env)) as client:
+        refused = bearer_call(client, SHAPED_LIKE_A_JWS)
+
+    assert refused.status_code == 401, "the answer is the same 401 either way"
+    assert not (tmp_path / audit_store_module.AUDIT_FILENAME).exists()
 
 
 # --- the throttle of the exchange path hangs outside the boundary, or not at all (EXCH-05) -

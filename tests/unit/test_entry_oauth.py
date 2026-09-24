@@ -1199,6 +1199,34 @@ def test_without_the_namespace_no_account_source_exists_at_the_boundary(tmp_path
     assert not isinstance(guard._token_verifier, chain.ChainedVerifier)
 
 
+# --- the refusal writer, deliberately absent in this mode (AUDIT-07, T-24-21) --------------
+
+
+@pytest.mark.parametrize("switch", [{}, {config.ENV_AUDIT_LOG: "on"}])
+def test_the_standalone_chain_notes_no_refusal_whatever_the_audit_switch_says(
+    tmp_path: Path, switch: dict[str, str]
+) -> None:
+    """The decision of plan 24-04 for this mode, held here so it cannot happen by accident.
+
+    The ExApp mode writes a row per refused exchange attempt. This mode does not, and that
+    is decided rather than forgotten. It has no recorder, so no tool call is recorded here
+    either and the switch of D-14 means nothing in this process today; it has no sweep, so
+    the rows would sit out neither the retention window nor the size limit
+    (``audit/record.Recorder`` carries the sweep, and ``entry_exapp._audit_startup`` is the
+    other one); and it has no occ and no audit routes, so nothing could read them back.
+    Wiring the writer alone would turn one switch into two different promises in two modes
+    and leave behind a file that grows on a path a stranger drives and that nobody sweeps.
+
+    ``config.ENV_AUDIT_LOG: "on"`` is parametrised in on purpose: the absence has to hold
+    for the environment an operator would expect it to change something in.
+    """
+    guard = boundary_of(entry_oauth.build_oauth_app(base_env(tmp_path, **EXCHANGE_ENV, **switch)))
+    verifier = guard._token_verifier
+
+    assert isinstance(verifier, chain.ChainedVerifier)
+    assert verifier._refusals is None
+
+
 # --- the enrollment page of the exchange binding hangs only while the path is armed --------
 
 
