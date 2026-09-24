@@ -1,9 +1,11 @@
 """The registration of the occ commands of this app with Nextcloud.
 
-Three of them since plan 19-07: ``mcp_connector:purge`` ends every connection of this
-instance, ``mcp_connector:audit:verify`` checks the chain of the audit log, and the third
-one, whose name stands at :data:`OCC_AUDIT_READ_COMMAND_NAME`, reads the rows of that log
-out and hands them over (AUDIT-04). They are registered one by one, because
+Four of them since plan 24-06: ``mcp_connector:purge`` ends every connection of this
+instance, ``mcp_connector:audit:verify`` checks the chain of the audit log, the third one,
+whose name stands at :data:`OCC_AUDIT_READ_COMMAND_NAME`, reads the rows of that log out and
+hands them over (AUDIT-04), and the fourth holds a presented token against the configured
+token exchange path without using it for anything (EXCH-06). They are registered one by one,
+because
 ``OccCommandController::registerCommand`` takes exactly one command per ``POST`` (app_api
 v34.0.3), and each of them gets its own ``try`` for the reason ``exapp/lifecycle.py`` gives
 its second form registration: they are independent, so a failure of one may not cost the
@@ -57,10 +59,12 @@ from .audit_read import (
     INSTANCE_KEYWORD,
     LIMIT_OPTION,
     MAX_SINCE_DAYS,
+    REFUSALS_KEYWORD,
     SINCE_OPTION,
     USER_OPTION,
 )
 from .audit_verify import AUDIT_VERIFY_PATH, JSON_OPTION
+from .exchange_check import EXCHANGE_CHECK_PATH, TOKEN_OPTION
 from .purge import FORCE_OPTION, PURGE_PATH
 
 __all__ = [
@@ -75,6 +79,11 @@ __all__ = [
     "OCC_AUDIT_READ_USER_DESCRIPTION",
     "OCC_COMMAND_NAME",
     "OCC_COMMAND_PATH",
+    "OCC_EXCHANGE_CHECK_COMMAND_NAME",
+    "OCC_EXCHANGE_CHECK_DESCRIPTION",
+    "OCC_EXCHANGE_CHECK_HANDLER",
+    "OCC_EXCHANGE_CHECK_JSON_DESCRIPTION",
+    "OCC_EXCHANGE_CHECK_TOKEN_DESCRIPTION",
     "OCC_FORCE_DESCRIPTION",
     "OCC_HANDLER",
     "command_schemes",
@@ -139,10 +148,17 @@ OCC_AUDIT_READ_DESCRIPTION = (
 
 #: The three descriptions below belong to options that carry a value, which is new in this
 #: module: the two commands above have flags only.
+#: Two words of this option are not accounts, and both of them win against an account of the
+#: same name, which is the trade the two constants in ``exapp/audit_read.py`` name. They are
+#: spelled through those constants rather than as literals, so a renamed keyword moves this
+#: help text with it instead of leaving a wrong one behind. ``refusals`` arrived with the
+#: refusal chain of plan 24-03 and was handed to this plan for exactly this line: a reserved
+#: word that stands in no ``occ list`` help text is a word only the source knows about.
 OCC_AUDIT_READ_USER_DESCRIPTION = (
     "Read the entries of one Nextcloud account only, named by its user id, or of the "
-    f"instance itself with the word {INSTANCE_KEYWORD}, which is the one value here that is "
-    "not an account. Without this option every account is read."
+    f"instance itself with the word {INSTANCE_KEYWORD}, or the refused token exchange "
+    f"attempts of this instance with the word {REFUSALS_KEYWORD}. Those two words are the "
+    "ones here that are not accounts. Without this option every account is read."
 )
 
 OCC_AUDIT_READ_SINCE_DESCRIPTION = (
@@ -166,6 +182,50 @@ OCC_AUDIT_READ_JSON_DESCRIPTION = (
     "Hand the same entries over as one JSON document, in the order of the chain, for a "
     "script that keeps them or checks them. Its first key says whether the read happened, "
     "because the exit code of this command is always 0."
+)
+
+#: What an administrator types for the dry run of EXCH-06. Two levels in the namespace like
+#: the two audit commands, and for the same reason: ``mcp_connector:exchange:`` is the room a
+#: second command about this path would move into without renaming this one. The literal
+#: stands here exactly once, because AppAPI's ``insertOrUpdate`` keys a registration on the
+#: app id and the name, so a renamed command does not replace the old one, it leaves it behind
+#: as an entry in ``occ list`` that answers 404 (pitfall 5).
+OCC_EXCHANGE_CHECK_COMMAND_NAME = "mcp_connector:exchange:check"
+
+#: The route on us AppAPI calls when the dry run runs, derived exactly like :data:`OCC_HANDLER`
+#: and its two siblings, so the registration and the route cannot drift apart.
+OCC_EXCHANGE_CHECK_HANDLER = EXCHANGE_CHECK_PATH.removeprefix("/")
+
+#: What the command is for, and in its second half what it deliberately is not. The three
+#: absences are success criterion 3 of this phase and are named here rather than only in the
+#: handler, because the person deciding whether to run this against a token somebody handed
+#: them reads this text and not the source.
+OCC_EXCHANGE_CHECK_DESCRIPTION = (
+    "Hold a presented token against the token exchange path configured on this instance and "
+    "report every rule with its outcome. The check is a dry run: it makes no Nextcloud call, "
+    "it creates no session and no authorization, and it writes no row into the audit log. It "
+    "costs one outgoing key set request to the configured provider."
+)
+
+#: The description that names a price instead of hiding it, after the model of
+#: :data:`OCC_FORCE_DESCRIPTION`. There is no technical way around the cost (pitfall 6 of
+#: 24-RESEARCH.md): a ``--token-file`` would lie on the Nextcloud host while the handler reads
+#: in the ExApp container, and AppAPI hands no stdin through to an ExApp command. So the value
+#: travels as an option and the consequence is said out loud, in the one text an administrator
+#: sees before they type the command.
+OCC_EXCHANGE_CHECK_TOKEN_DESCRIPTION = (
+    "The token to check. Its value stands in the process list of the Nextcloud host while "  # noqa: S105 - a help text, not a secret
+    "the command runs, and in the shell history afterwards, so use a short lived test token "
+    "here and never a productive one. The answer never repeats the value."
+)
+
+#: Not :data:`OCC_AUDIT_JSON_DESCRIPTION` or its read counterpart a second time, and the
+#: difference is the reason: what a script watches here is the ``passed`` key, and naming that
+#: key is the whole point of the sentence. The exit code cannot carry the verdict, because
+#: AppAPI drops the body of any answer that is not a 200 and this answer is the body.
+OCC_EXCHANGE_CHECK_JSON_DESCRIPTION = (
+    "Answer with the same result as JSON, whose key passed carries the verdict. A script "
+    "watches that key and not the exit code, which is always 0."
 )
 
 logger = logging.getLogger("mcp_connector.exapp.occ")
@@ -277,6 +337,48 @@ def command_schemes() -> list[dict[str, Any]]:
                 f"{OCC_AUDIT_READ_COMMAND_NAME} --{SINCE_OPTION}=7 --{JSON_OPTION}",
             ],
             "execute_handler": OCC_AUDIT_READ_HANDLER,
+        },
+        # The dry run of EXCH-06. The comment block above holds for this entry as well and is
+        # deliberately not repeated: the modes come from the same positive list, the arguments
+        # stay empty for the same measurement, and the one value option below carries its
+        # ``default`` for the same reason AppAPI reads ``$option['default'] ?? null``.
+        #
+        # What is new here is what the value is. This option carries a bearer token of a
+        # foreign realm, so it is the first one of this module whose description has to name a
+        # cost rather than only a meaning, in the shape ``OCC_FORCE_DESCRIPTION`` set for the
+        # purge (pitfall 6).
+        {
+            "name": OCC_EXCHANGE_CHECK_COMMAND_NAME,
+            "description": OCC_EXCHANGE_CHECK_DESCRIPTION,
+            "hidden": 0,
+            "arguments": [],
+            "options": [
+                {
+                    "name": TOKEN_OPTION,
+                    "mode": "optional",
+                    "description": OCC_EXCHANGE_CHECK_TOKEN_DESCRIPTION,
+                    "default": None,
+                },
+                # ``optional`` and not ``required``, although a check without a token can
+                # check nothing: a required option is a Symfony rule, and the handler already
+                # answers a missing token with the first named step of the rule. A named
+                # outcome is what an administrator can act on; a usage error from Symfony is
+                # not, and it would arrive without any of the sentences this answer carries.
+                {
+                    "name": JSON_OPTION,
+                    "mode": "none",
+                    "description": OCC_EXCHANGE_CHECK_JSON_DESCRIPTION,
+                },
+            ],
+            # The plain form first, because that is what an administrator types, then the one
+            # a script needs to find. The token value is shown as a placeholder: a usage line
+            # is help text, and a help text that carried something token shaped would invite
+            # somebody to paste it.
+            "usages": [
+                f"{OCC_EXCHANGE_CHECK_COMMAND_NAME} --{TOKEN_OPTION}=<token>",
+                f"{OCC_EXCHANGE_CHECK_COMMAND_NAME} --{TOKEN_OPTION}=<token> --{JSON_OPTION}",
+            ],
+            "execute_handler": OCC_EXCHANGE_CHECK_HANDLER,
         },
     ]
 

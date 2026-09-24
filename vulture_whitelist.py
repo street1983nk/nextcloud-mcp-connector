@@ -293,13 +293,10 @@ _._decode_payload
 # calls it, exactly as the three entries above it did.
 
 # --- The dry run answer of plan 24-05, read by the console of plan 24-06 ----------------
-# The three fields of DryRunResult in oauth/exchange_dryrun.py. The rule half was built and
-# tested one plan before its only reader: plan 24-05 owns the steps and the two qualifying
-# sentences, plan 24-06 adds exapp/exchange_check.py, which prints exactly these three.
-# passed: the overall verdict, true only when no step fell and none stayed unreached.
-_.passed
-# limit_sentence: what a green run does not mean, after the model of audit_verify.
-_.limit_sentence
-# cost_sentence: the one outgoing key set request a run pays, named in the answer.
-_.cost_sentence
-# The entry announces its own end: it leaves this file with the task that reads the fields.
+# Empty on purpose, and that is the rule of this file at work rather than an omission. Plan
+# 24-05 parked the three fields of DryRunResult here, because the rule half was built and
+# tested one plan before its only reader. Plan 24-06 added exapp/exchange_check.py, whose two
+# answer shapes read all three: passed is the verdict a script watches, cost_sentence is the
+# one outgoing key set request a run pays, and limit_sentence is what a green run does not
+# mean. All three left the list with the plan that reads them, exactly as the entry announced
+# it would. A whitelist entry that is no longer needed is a switched off check.

@@ -36,6 +36,7 @@ from .exapp import config_values
 from .exapp.audit_read import audit_read_routes
 from .exapp.audit_verify import audit_verify_routes
 from .exapp.browser_identity import AppApiBrowserIdentitySource
+from .exapp.exchange_check import exchange_check_routes
 from .exapp.lifecycle import lifecycle_routes
 from .exapp.middleware import RequireAppApi
 from .exapp.purge import purge_routes
@@ -308,6 +309,20 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
     # stay readable, because that is what makes it auditable at all, and what a period without
     # recording holds is exactly what somebody will have to be able to look up.
     #
+    # The dry run of plan 24-06 hangs here for the same rule a seventh time, and its loss is
+    # a different one again: /exchange-check is the handler of the occ command
+    # mcp_connector:exchange:check, and what a declared route would publish is not a list but
+    # an oracle. Anyone who can reach the PHP proxy could hold any token against the
+    # configured provider of this instance and read back which single rule refused it, because
+    # that proxy attaches valid AppAPI headers itself (T-02-20, T-24-08, T-24-27). So this path
+    # is absent from appinfo/info.xml as well, named there only in the comment, and the handler
+    # carries the same double check. It gets neither store: the dry run opens nothing, creates
+    # no authorization and writes no audit row, which is the third success criterion of phase
+    # 24 made structural rather than promised. It is appended whether the exchange path is
+    # armed or not, because an instance with the path switched off is exactly the one whose
+    # administrator needs to be told that, and told it as a named result rather than as a
+    # missing command.
+    #
     # The policy read above is what the two places that answer to it read as well: the
     # discovery document stops advertising a registration endpoint when the switch is off,
     # and the routes stop containing one (AUTH-07, D-35). One store opener serves the
@@ -347,6 +362,7 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
         *purge_routes(env, nextcloud=nextcloud, store_provider=store),
         *audit_verify_routes(env, store_provider=audit_store),
         *audit_read_routes(env, store_provider=audit_store),
+        *exchange_check_routes(env),
     ):
         app.router.routes.append(route)
     return app

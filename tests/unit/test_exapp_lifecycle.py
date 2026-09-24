@@ -428,6 +428,17 @@ def sent_names(route: respx.Route) -> list[str]:
     return [json.loads(call.request.content)["name"] for call in route.calls]
 
 
+def _accepted() -> list[httpx.Response]:
+    """An accepting answer for every command but the first, derived from the schemes.
+
+    The two cases below hand a failure in as the first answer and need the rest of the loop to
+    run. Typing that rest as a list of two turned the arrival of a fourth command into a red
+    test about something else entirely, which is the maintenance trap the count rule of this
+    file already names one case further down.
+    """
+    return [httpx.Response(200, json={}) for _ in occ.command_schemes()[1:]]
+
+
 #: The only modes an option of an ExApp command may carry. Measured at the source of app_api
 #: v34.0.3, ``lib/Service/ExAppOccService.php:217-256``: that file also accepts ``array`` and
 #: ``negatable``, and both of them are refused here, because the first one alone becomes
@@ -569,28 +580,27 @@ async def test_a_refused_first_command_does_not_cost_the_second(
 ) -> None:
     """One ``try`` per command, and this is the case that makes it worth having.
 
-    ``OccCommandController::registerCommand`` takes exactly one command per POST, so three
-    commands are three requests. Without the block per command the first refusal would end the
-    loop, and an instance whose purge command could not be registered would silently lose both
-    commands of its audit log as well.
+    ``OccCommandController::registerCommand`` takes exactly one command per POST, so every
+    command is a request of its own. Without the block per command the first refusal would end
+    the loop, and an instance whose purge command could not be registered would silently lose
+    every command behind it as well.
+
+    The number of answers is read from the schemes rather than typed, the rule
+    :func:`test_every_command_failing_is_one_log_line_each_and_no_exception` already states:
+    a typed count turns a new command into a failure of a test about something else.
     """
-    route = respx.post(OCC_URL).mock(
-        side_effect=[
-            httpx.Response(500, json={}),
-            httpx.Response(200, json={}),
-            httpx.Response(200, json={}),
-        ]
-    )
+    route = respx.post(OCC_URL).mock(side_effect=[httpx.Response(500, json={}), *_accepted()])
 
     with caplog.at_level(logging.DEBUG):
         await occ.register_occ_commands(env=ENV)
 
-    assert route.call_count == 3
+    assert route.call_count == len(occ.command_schemes())
     assert sent_names(route) == [scheme["name"] for scheme in occ.command_schemes()]
     logged = "\n".join(record.getMessage() for record in caplog.records)
     assert occ.OCC_COMMAND_NAME in logged, "the failure names the command it happened to"
     assert occ.OCC_AUDIT_COMMAND_NAME not in logged, "the ones that worked stay quiet"
     assert occ.OCC_AUDIT_READ_COMMAND_NAME not in logged
+    assert occ.OCC_EXCHANGE_CHECK_COMMAND_NAME not in logged
     assert APP_SECRET not in logged
 
 
@@ -601,17 +611,13 @@ async def test_a_first_command_that_never_arrives_does_not_cost_the_second(
 ) -> None:
     """The other half of the same rule: a transport failure is caught per command too."""
     route = respx.post(OCC_URL).mock(
-        side_effect=[
-            httpx.ConnectError("no route to nextcloud"),
-            httpx.Response(200, json={}),
-            httpx.Response(200, json={}),
-        ]
+        side_effect=[httpx.ConnectError("no route to nextcloud"), *_accepted()]
     )
 
     with caplog.at_level(logging.DEBUG):
         await occ.register_occ_commands(env=ENV)
 
-    assert route.call_count == 3
+    assert route.call_count == len(occ.command_schemes())
     assert sent_names(route) == [scheme["name"] for scheme in occ.command_schemes()]
     assert [record for record in caplog.records if record.levelno >= logging.ERROR]
 
