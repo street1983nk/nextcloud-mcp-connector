@@ -30,10 +30,15 @@ import pytest
 from mcp_connector.audit import refusals
 from mcp_connector.audit.store import (
     CHAIN_EXCHANGE,
+    KIND_CALL,
     KIND_REFUSAL,
+    KIND_TOMBSTONE,
     OUTCOME_REJECTED,
+    SWEEP_EVERY,
     AuditStore,
+    Entry,
     _entry_of_row,
+    user_chain,
 )
 from mcp_connector.errors import (
     REASON_EXCHANGE_CLAIMS,
@@ -50,6 +55,20 @@ NOW = 1_700_000_000
 #: A path in the message of a store failure, the value the fail-open case must not find in a
 #: log line: the type of the failure may be written down, its sentence may not (D-13).
 BROKEN_PATH = "/var/lib/mcp_connector/audit.sqlite3"
+
+#: Seconds in a day, so a retention window is written as days at every call site.
+DAY = 86400
+
+#: The window the sweep cases configure. Short and not the shipped one hundred and eighty,
+#: so a case can put a row on either side of it without inventing a year.
+RETENTION = 30
+
+#: An account with a row of its own, so the cases about the shared counter can watch what
+#: happens to a chain that has nothing to do with the exchange path.
+ALICE = "alice"
+
+#: A real tool of the allowlist, so a seeded call row is the row the recording path writes.
+TOOL = "files_list"
 
 
 def writer(tmp_path: Path) -> tuple[refusals.RefusalWriter, Path]:
@@ -73,6 +92,51 @@ class ExplodingStore:
     async def append(self, *_: Any, **__: Any) -> int:
         self.calls += 1
         raise sqlite3.OperationalError(f"database or disk is full: {self.path}")
+
+
+class SweepingStore:
+    """A store that appends the five hundredth row and then fails to sweep it.
+
+    The shape of a full volume: the row still fits, the vacuum behind it does not. It is a
+    double and not a file because a store that raises on a sweep is a broken store.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.sweeps = 0
+
+    async def append(self, *_: Any, **__: Any) -> int:
+        return SWEEP_EVERY
+
+    async def sweep(self, *_: Any, **__: Any) -> None:
+        self.sweeps += 1
+        raise sqlite3.OperationalError(f"database or disk is full: {self.path}")
+
+
+def writer_over(store: AuditStore, *, retention_days: int = RETENTION) -> refusals.RefusalWriter:
+    """A writer over a store a case opened itself, so the case can seed rows beside it."""
+
+    async def provider() -> AuditStore:
+        return store
+
+    return refusals.RefusalWriter(store_provider=provider, retention_days=retention_days)
+
+
+def arm_the_next_row(path: Path, number: int) -> None:
+    """Make the next appended row carry ``number``, through the counter AUTOINCREMENT keeps.
+
+    The same helper ``tests/unit/test_audit_accounts.py`` uses, and for the same reason: the
+    schedule of D-11 hangs on that number, and this is how a case reaches the five hundredth
+    row without writing five hundred of them.
+    """
+    connection = sqlite3.connect(path)
+    try:
+        connection.execute(
+            "UPDATE sqlite_sequence SET seq = ? WHERE name = 'entries'", (number - 1,)
+        )
+        connection.commit()
+    finally:
+        connection.close()
 
 
 def broken_writer() -> tuple[refusals.RefusalWriter, ExplodingStore]:
@@ -270,6 +334,149 @@ async def test_a_store_that_throws_ends_no_call_and_the_line_names_only_the_type
     assert "OperationalError" in logged
     assert BROKEN_PATH not in logged
     assert "database or disk is full" not in logged
+
+
+async def test_a_sweep_that_throws_ends_no_call_either(caplog: pytest.LogCaptureFixture) -> None:
+    """The sweep runs inside the same bracket as the write, not after it.
+
+    A store that appends and then fails to sweep is the ordinary shape of a full volume, and
+    on a path that runs before any authentication that must be a line in the log and never a
+    500 a stranger can order.
+    """
+    sweeping = SweepingStore(Path(BROKEN_PATH))
+
+    async def provider() -> AuditStore:
+        return cast(AuditStore, sweeping)
+
+    subject = refusals.RefusalWriter(store_provider=provider)
+
+    with caplog.at_level(logging.DEBUG):
+        await subject.note_refusal(REASON_EXCHANGE_CLAIMS, moment=NOW)
+
+    assert sweeping.sweeps == 1
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert "OperationalError" in logged
+    assert BROKEN_PATH not in logged
+
+
+# --- the schedule of the sweep hangs on the number this path consumes (CR-24-01) ----------
+
+
+async def test_the_refusals_of_this_chain_expire_when_nothing_else_ever_writes(
+    tmp_path: Path,
+) -> None:
+    """Consequence one of the dropped sequence number.
+
+    An instance with the log on and the exchange path armed, whose traffic is somebody
+    else's attempts and not tool calls, has exactly one writer: this one. If it drops the
+    number the store hands back, nothing in the process ever sweeps, and what
+    ``docs/privacy.md`` promises about the ``x:exchange`` chain holds in SQL and not in
+    operation: the rows lie there until the next container start.
+    """
+    path = tmp_path / "audit.sqlite3"
+    store = AuditStore(path)
+    subject = writer_over(store)
+
+    await subject.note_refusal(REASON_EXCHANGE_CLAIMS, moment=NOW)
+    arm_the_next_row(path, SWEEP_EVERY)
+    await subject.note_refusal(REASON_EXCHANGE_ISSUER, moment=NOW + RETENTION * DAY + 1)
+
+    rows = written(path)
+    assert [row.reason for row in rows if row.kind == KIND_REFUSAL] == [REASON_EXCHANGE_ISSUER], (
+        "the refusal older than the window is gone, the one that swept stands"
+    )
+    assert [row.kind for row in rows].count(KIND_TOMBSTONE) == 1, "and the gap is explained"
+
+
+async def test_a_refusal_on_the_sweep_number_sweeps_the_whole_trail_and_not_only_its_own_chain(
+    tmp_path: Path,
+) -> None:
+    """Consequence two, and the worse one.
+
+    The numbers come out of one ``AUTOINCREMENT``. A refusal that consumes a multiple of
+    :data:`SWEEP_EVERY` without asking would make that sweep happen never rather than late,
+    and the rows it would have taken are in the user chains, whose window
+    ``docs/privacy.md`` promises to a person. How often it happens is ordered from outside.
+    """
+    path = tmp_path / "audit.sqlite3"
+    store = AuditStore(path)
+    await store.append(
+        Entry(
+            chain=user_chain(ALICE),
+            kind=KIND_CALL,
+            at=NOW,
+            nc_user=ALICE,
+            tool=TOOL,
+            outcome="ok",
+        )
+    )
+    subject = writer_over(store)
+
+    arm_the_next_row(path, SWEEP_EVERY)
+    await subject.note_refusal(REASON_EXCHANGE_CLAIMS, moment=NOW + RETENTION * DAY + 1)
+
+    kinds = [row.kind for row in written(path)]
+    assert KIND_CALL not in kinds, "the expired row of a person went with this sweep"
+    assert kinds.count(KIND_TOMBSTONE) == 1
+    assert kinds.count(KIND_REFUSAL) == 1
+
+
+async def test_a_refusal_that_is_not_the_five_hundredth_row_sweeps_nothing(
+    tmp_path: Path,
+) -> None:
+    """The other side of the schedule: every row would be a sweep per refused attempt, which
+    is a load a stranger orders. Only the number decides, exactly as on the recording path."""
+    path = tmp_path / "audit.sqlite3"
+    store = AuditStore(path)
+    await store.append(
+        Entry(
+            chain=user_chain(ALICE),
+            kind=KIND_CALL,
+            at=NOW,
+            nc_user=ALICE,
+            tool=TOOL,
+            outcome="ok",
+        )
+    )
+    subject = writer_over(store)
+
+    await subject.note_refusal(REASON_EXCHANGE_CLAIMS, moment=NOW + RETENTION * DAY + 1)
+
+    kinds = [row.kind for row in written(path)]
+    assert kinds == [KIND_CALL, KIND_REFUSAL], "row two of the file is not row five hundred"
+
+
+async def test_the_sweep_of_this_writer_runs_the_window_it_was_configured_with(
+    tmp_path: Path,
+) -> None:
+    """The other half of the configured window, the one the case above cannot see.
+
+    That case proves the window is the short one an administrator set, because the row it
+    removes would have survived the shipped one hundred and eighty days. This one proves the
+    sweep is a window and not a broom: a row inside it stays, so a refusal landing on the
+    five hundredth number cannot cost an instance the history it is still entitled to.
+    """
+    path = tmp_path / "audit.sqlite3"
+    store = AuditStore(path)
+    await store.append(
+        Entry(
+            chain=user_chain(ALICE),
+            kind=KIND_CALL,
+            at=NOW,
+            nc_user=ALICE,
+            tool=TOOL,
+            outcome="ok",
+        )
+    )
+    subject = writer_over(store, retention_days=RETENTION)
+
+    arm_the_next_row(path, SWEEP_EVERY)
+    # One day short of the configured window, and far inside the shipped one hundred and
+    # eighty days, so only a sweep that used the configured number leaves this row standing.
+    await subject.note_refusal(REASON_EXCHANGE_CLAIMS, moment=NOW + (RETENTION - 1) * DAY)
+
+    kinds = [row.kind for row in written(path)]
+    assert kinds == [KIND_CALL, KIND_REFUSAL], "nothing was expired, and no marker was needed"
 
 
 async def test_a_store_that_keeps_throwing_is_asked_once_per_window_and_no_more() -> None:

@@ -41,6 +41,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 
 from ..errors import REASON_UNSPECIFIED, known_reason
+from . import store
 from .store import CHAIN_EXCHANGE, KIND_REFUSAL, OUTCOME_REJECTED, AuditStore, Entry
 
 __all__ = ["REFUSAL_WINDOW_SECONDS", "RefusalWriter"]
@@ -84,6 +85,12 @@ class RefusalWriter:
     """
 
     store_provider: StoreProvider
+    #: The two bounds of the sweep, handed in the way ``record.Recorder`` receives them, and
+    #: here for the same reason: this writer is a second caller of :meth:`AuditStore.sweep`
+    #: (see :meth:`note_refusal`), and a caller that swept against the defaults would run a
+    #: retention window an administrator did not configure.
+    retention_days: int = store.RETENTION_DAYS
+    size_limit: int = store.SIZE_LIMIT_BYTES
     #: Not an argument of the constructor: two writers sharing one window would be two brakes
     #: that are one, and a caller handing in a prepared state would be a caller deciding when
     #: the next row is written.
@@ -108,6 +115,26 @@ class RefusalWriter:
         store is exactly when that matters. The price is named rather than hidden: a write
         that fails loses the attempts its row would have stood for, and the log line is what
         says so.
+
+        The sweep of D-11 runs from here as well, on the number this store hands back, and
+        that is not an extra: the schedule **is** that number. A writer that dropped it would
+        take two things out of the retention window at once. Its own rows, because on an
+        instance whose traffic is somebody else's attempts and not tool calls nothing else
+        ever writes, so nothing would ever sweep and the promise of ``docs/privacy.md`` about
+        the ``x:exchange`` chain would hold in SQL and not in operation. And every other
+        chain, because the numbers come out of one ``AUTOINCREMENT``: a refusal landing on a
+        multiple of :data:`~mcp_connector.audit.store.SWEEP_EVERY` would make that sweep of
+        the whole trail happen never instead of late, and how often that happens is ordered
+        from the outside.
+
+        No new lever for a stranger comes with it. The brake above decides how many rows this
+        path writes at all, so it decides how many numbers it can consume, and only every five
+        hundredth row sweeps.
+
+        The one step of the sweep that stays behind is the account check of D-12: it costs a
+        call to Nextcloud, and this path runs before any authentication. A check that falls on
+        a refusal row therefore waits for the next one, a magnitude rarer schedule where being
+        late is what it already is by design.
         """
         at = int(time.time()) if moment is None else moment
         identifier = known_reason(reason) or REASON_UNSPECIFIED
@@ -121,7 +148,7 @@ class RefusalWriter:
         self._windows[identifier] = (at, 0)
         try:
             audit_store = await self.store_provider()
-            await audit_store.append(
+            seq = await audit_store.append(
                 # Six values and no seventh. Never an ``azp``, never an issuer, never an
                 # audience, never a ``sub``, never a piece of the token and never a key id:
                 # the token behind a refusal did not pass its signature check, so every value
@@ -137,6 +164,19 @@ class RefusalWriter:
                     removed=stands_for,
                 )
             )
+            if store.should_sweep(seq):
+                # The same fail-open bracket as the write itself, and on purpose inside it:
+                # a sweep that throws must not turn a refusal into a 500 either.
+                await audit_store.sweep(
+                    moment=at,
+                    retention_days=self.retention_days,
+                    size_limit=self.size_limit,
+                )
         except Exception as exc:
-            # The type only, never the message: a store error can carry a path (D-13).
-            logger.error("a refused exchange attempt was not recorded: %s", type(exc).__name__)
+            # The type only, never the message: a store error can carry a path (D-13). One
+            # line for both halves, because from the outside they are one step: the row is
+            # missing, or the sweep that its number was the turn of did not run.
+            logger.error(
+                "a refused exchange attempt was not recorded or not swept: %s",
+                type(exc).__name__,
+            )

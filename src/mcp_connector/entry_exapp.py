@@ -155,8 +155,16 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
     # never a second one: two openers would be two ``AuditStore`` objects on one file, the
     # size limit of D-11 would be computed over one of them while both wrote, and an operator
     # would read one chain of a file two objects believed they owned.
+    # The two bounds go with it, out of the same reader the recorder below uses. The writer
+    # sweeps on the number its own row was given, because the schedule of D-11 hangs on that
+    # number and a writer that dropped it would take its own chain and, through the shared
+    # counter, every other one out of the retention window (CR-24-01).
     refusals = (
-        audit_refusals.RefusalWriter(store_provider=audit_store)
+        audit_refusals.RefusalWriter(
+            store_provider=audit_store,
+            retention_days=config.audit_retention_days(env),
+            size_limit=config.audit_size_limit(env),
+        )
         if exchange_config is not None and config.audit_log_enabled(env)
         else None
     )
