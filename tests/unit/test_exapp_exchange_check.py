@@ -248,6 +248,55 @@ def test_every_step_identifier_of_the_rule_has_a_name_an_administrator_reads() -
         assert name.strip(), "a step without a name reads as a step without a rule"
 
 
+def test_a_step_the_name_table_does_not_know_still_answers_200_with_a_body(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """WR-24-05: the drift the gate above catches may not cost the answer at run time.
+
+    A step that arrives in the rule without an entry here reached the dictionary directly and
+    raised a ``KeyError`` inside the handler, which is a 500, and AppAPI drops the body of
+    anything that is not a 200: the administrator read ``command executeHandler failed`` and
+    nothing else, in the one case the gate exists for. The identifier is a worse name than a
+    sentence and a far better one than no answer.
+    """
+    names = dict(exchange_check.STEP_NAMES)
+    del names[exchange_dryrun.STEP_TOKEN_SHAPE]
+    monkeypatch.setattr(exchange_check, "STEP_NAMES", names)
+
+    response = call(client_for(), token=opaque(64))
+    payload = call(client_for(), token=opaque(64), as_json=True).json()
+
+    assert response.status_code == 200
+    assert exchange_dryrun.STEP_TOKEN_SHAPE in response.text
+    entry = next(
+        item for item in payload["steps"] if item["step"] == exchange_dryrun.STEP_TOKEN_SHAPE
+    )
+    assert entry["name"] == exchange_dryrun.STEP_TOKEN_SHAPE
+
+
+def test_a_failure_while_the_answer_is_built_is_answered_and_not_raised(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The bracket reaches the finished answer, not only the run.
+
+    Whatever else can go wrong between the result and the response belongs to the same
+    promise as the run itself: always a 200, always a body, and the line names the type of
+    the failure and nothing else.
+    """
+
+    def explode(_: Any) -> str:
+        raise KeyError("a step nobody named")
+
+    monkeypatch.setattr(exchange_check, "_report", explode)
+
+    response = call(client_for(), token=opaque(64))
+
+    assert response.status_code == 200
+    assert "could not be checked" in response.text
+    assert "KeyError" in response.text
+    assert MARKER not in response.text
+
+
 def test_the_step_that_is_never_executed_says_so_in_both_shapes() -> None:
     """Pitfall 8: an absent step reads as a passed one, so it is named and carries its note."""
     text = call(client_for(), token=opaque(64)).text

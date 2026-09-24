@@ -280,6 +280,21 @@ def exchange_check_routes(env: Mapping[str, str] | None = None) -> list[Route]:
             # an error of this handler: the rule has a first step for exactly that case, and a
             # named outcome is a better answer than an exception (pitfall 8).
             result = await dry_run(_value(payload, TOKEN_OPTION) or "", config)
+            # The verdict and the first step that fell, and nothing else: both are constants
+            # of this application, while everything the token said is not.
+            logger.info(
+                "a presented token was checked: passed=%s, first fallen step=%s",
+                result.passed,
+                _first_fallen(result),
+            )
+            # Inside the bracket and not after it (WR-24-05). Building the answer is the
+            # second half of this handler's work and it can fail for the same kind of reason
+            # the run can: a step that arrives in the rule without a name here used to be a
+            # ``KeyError``, and AppAPI drops the body of anything that is not a 200, so the
+            # administrator saw ``command executeHandler failed`` and nothing else. A gate in
+            # the test run is not a fail-open bracket at run time, and this module argues that
+            # way about everything else it does.
+            answer = json_response(_machine_readable(result)) if as_json else _text(_report(result))
         except Exception as exc:
             # The type only, never the message: a failure of the run can carry a URL of the
             # provider or a value it was handed.
@@ -290,16 +305,7 @@ def exchange_check_routes(env: Mapping[str, str] | None = None) -> list[Route]:
                 )
             return _text(f"the presented token could not be checked: {type(exc).__name__}\n")
 
-        # The verdict and the first step that fell, and nothing else: both are constants of
-        # this application, while everything the token said is not.
-        logger.info(
-            "a presented token was checked: passed=%s, first fallen step=%s",
-            result.passed,
-            _first_fallen(result),
-        )
-        if as_json:
-            return json_response(_machine_readable(result))
-        return _text(_report(result))
+        return answer
 
     return [Route(EXCHANGE_CHECK_PATH, exchange_check, methods=["POST"])]
 
@@ -333,7 +339,7 @@ def _line(step: DryRunStep) -> str:
     the operating path would have booked this refusal under, because an administrator who
     reads a container log of that path has to be able to find the same word there.
     """
-    line = f"{step.outcome:<{OUTCOME_WIDTH}} {STEP_NAMES[step.step]}"
+    line = f"{step.outcome:<{OUTCOME_WIDTH}} {_name(step.step)}"
     if step.reason is not None:
         line += f" (refused in operation as: {step.reason})"
     if step.note is not None:
@@ -360,7 +366,7 @@ def _machine_readable(result: DryRunResult) -> dict[str, Any]:
         "steps": [
             {
                 "step": step.step,
-                "name": STEP_NAMES[step.step],
+                "name": _name(step.step),
                 "outcome": step.outcome,
                 "reason": step.reason,
                 "note": step.note,
@@ -370,6 +376,18 @@ def _machine_readable(result: DryRunResult) -> dict[str, Any]:
         "cost": result.cost_sentence,
         "limit": result.limit_sentence,
     }
+
+
+def _name(step: str) -> str:
+    """The name an administrator reads for one step, and the identifier when there is none.
+
+    Total on purpose (WR-24-05). A step of the rule without an entry in :data:`STEP_NAMES` is
+    a fault of this module, and the answer is the wrong thing to spend it on: the gate in
+    ``tests/unit/test_exapp_exchange_check.py`` holds the two sets together, so the drift is
+    caught where it is cheap, and here the identifier is a worse name than a sentence and a
+    far better one than no answer at all.
+    """
+    return STEP_NAMES.get(step, step)
 
 
 def _first_fallen(result: DryRunResult) -> str | None:
