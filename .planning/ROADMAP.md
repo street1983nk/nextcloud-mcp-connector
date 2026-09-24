@@ -91,7 +91,7 @@ Kein Milestone-Audit: `/gsd:complete-milestone` lief erst am 2026-09-18 nach, da
 - [x] **Phase 21: Exchange-Verifier** - Ein Keycloak-JWS wird vollständig geprüft, bevor irgendetwas davon den Server erreicht, gegen selbst erzeugte Schlüssel und ohne eine Antwort von F13 (completed 2026-09-19)
 - [x] **Phase 22: Konfiguration, Kette und Drosselung** - Eigener Namensraum, ab Werk aus, Prüferkette mit formbasierter Weiche, und der neue Pfad ist vor-authentisch drosselbar (completed 2026-09-19)
 - [x] **Phase 23: Konto-Mapping und Credential-Wege** - Ein getauschtes Token handelt unter einem existierenden Konto, in beiden Betriebsarten, ohne neue Vollmacht und ohne stille Kontoanlage
-- [ ] **Phase 24: Audit-Anschluss und Nachweis** - Ein über Exchange handelnder Aufruf ist so nachvollziehbar wie jeder andere, und die Einrichtung ist ohne Live-Zugriff verprobbar und belegt
+- [x] **Phase 24: Audit-Anschluss und Nachweis** - Ein über Exchange handelnder Aufruf ist so nachvollziehbar wie jeder andere, und die Einrichtung ist ohne Live-Zugriff verprobbar und belegt (completed 2026-09-24)
 
 ## Phase Details (v1.6)
 
@@ -218,7 +218,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 24-09-PLAN.md: Die Einrichtungsdoku `docs/token-exchange.md` von der Keycloak-Seite bis zum ersten Werkzeugaufruf (EXCH-08)
+- [x] 24-09-PLAN.md: Die Einrichtungsdoku `docs/token-exchange.md` von der Keycloak-Seite bis zum ersten Werkzeugaufruf (EXCH-08)
 
 **Reihenfolge-Begründung**: Die Serialisierung folgt drei unabhängig belegten Punkten aus `research/SUMMARY.md`. Phase 20 steht zuerst, weil eine zweite Schlüsselsatz-Implementierung die Sorte Doppelpflege erzeugt, bei der eine Lücke später nur in einer der zwei Kopien geschlossen wird. Phase 21 baut den Prüfer als freistehende Funktionen, weil vier der zwölf kritischen Pitfalls dort vollständig gegen selbst erzeugte Schlüssel verifizierbar sind, ohne auf F13 zu warten. Phase 22 fasst Konfiguration und Kette zusammen, weil die Kette die Feldnamen der Konfiguration ohnehin kennen muss und beide denselben Aus-Zustand beweisen. Phase 23 kommt nach der Kette, weil die Vollmachtsfrage mit D-v1.6-01 entschieden ist und nur noch umgesetzt wird, und Phase 24 zuletzt, weil Audit-Zeile, Lasttest und Zwei-Konten-Beweis einen betriebsfähigen Pfad voraussetzen.
 
@@ -249,7 +249,7 @@ Plans:
 | 21. Exchange-Verifier | v1.6 | 2/2 | Complete   | 2026-09-19 |
 | 22. Konfiguration, Kette und Drosselung | v1.6 | 3/3 | Complete   | 2026-09-19 |
 | 23. Konto-Mapping und Credential-Wege | v1.6 | 6/6 | Complete | 2026-09-23 |
-| 24. Audit-Anschluss und Nachweis | v1.6 | 8/9 | In Progress|  |
+| 24. Audit-Anschluss und Nachweis | v1.6 | 9/9 | Complete   | 2026-09-24 |
 
 ## Next
 
