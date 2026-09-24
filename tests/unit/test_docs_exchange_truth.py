@@ -33,7 +33,9 @@ import re
 from pathlib import Path
 
 from mcp_connector import config
-from mcp_connector.exapp import occ
+from mcp_connector.audit import store
+from mcp_connector.errors import REASON_EXCHANGE_ISSUER
+from mcp_connector.exapp import audit_read, occ
 from mcp_connector.exapp.exchange_check import MAX_BODY_BYTES
 from mcp_connector.oauth import mapping
 from mcp_connector.oauth.chain import DEFAULT_JWKS_PATH
@@ -46,6 +48,11 @@ from mcp_connector.oauth.exchange_accounts import EXCHANGE_CLIENT_ID
 
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "docs" / "token-exchange.md"
+
+#: The measurement beside the setup page. Until WR-01 of the phase 24 review no gate read it
+#: at all, which is how eight quoted lines of a document that calls itself raw output came to
+#: carry a column layout the code cannot produce.
+EVIDENCE = ROOT / "docs" / "exchange-evidence.md"
 
 #: Every mention of a variable of the namespace. The trailing character class demands at least
 #: one letter after the prefix, so the two places that name the namespace itself
@@ -302,3 +309,136 @@ def test_the_open_answers_section_says_which_of_the_two_lists_it_is() -> None:
     assert "Two lists, and which is which." in section[1], (
         "the section has to say which of the two lists of four it is naming"
     )
+
+
+# --- the measuring document: its quoted lines against the function that prints them --------
+
+
+def evidence() -> str:
+    """The measurement document, read the way this module reads the setup page."""
+    return EVIDENCE.read_text(encoding="utf-8")
+
+
+def row(
+    seq: int,
+    chain: str,
+    kind: str,
+    at: int,
+    **columns: object,
+) -> tuple[object, ...]:
+    """One row in the column order ``audit/store._entry_of_row`` reads.
+
+    Written out as a tuple rather than built from an ``Entry``, because what is under test is
+    the printed form of a row of the file and not the round trip of a dataclass.
+    """
+    named = {
+        "actor": None,
+        "nc_user": None,
+        "tool": None,
+        "client_id": None,
+        "auth_id": None,
+        "client_name": None,
+        "outcome": None,
+        "reason": None,
+        "duration_ms": None,
+        "params": "[]",
+        "removed": None,
+        "gap_chain": None,
+        "gap_hash": None,
+        **columns,
+    }
+    return (seq, chain, kind, at, *named.values())
+
+
+#: The six refusal rows of the measured run, as values: the sequence number, the moment, and
+#: the two things such a row carries. Everything else of them is empty, which is the property
+#: the document is quoted for, and empty columns are exactly what the quoted lines got wrong.
+MEASURED_REFUSALS = (
+    (493, 1_790_230_457),
+    (474, 1_790_230_385),
+    (456, 1_790_230_291),
+    (438, 1_790_230_244),
+    (423, 1_790_230_188),
+    (408, 1_790_230_055),
+)
+
+#: The two ``u:alice`` rows of the mixed run, taken from the ``--json`` block that stands in
+#: the same document and was never touched. Row 494 is the own token, row 495 the exchanged
+#: one, which is why the acting party stands on one of them and the client name on the other.
+MEASURED_CALLS = (
+    row(
+        494,
+        "u:alice",
+        store.KIND_CALL,
+        1_790_230_459,
+        nc_user="alice",
+        tool="files_read",
+        client_id="bc6b83e8-9c90-4382-be3d-e087ca300871",
+        auth_id="A4RV9s7-IoKoCfL1HMaVNK1l5rTgNjwtsQZPfqyzMJY",
+        client_name="exchange evidence",
+        outcome=store.OUTCOME_OK,
+        duration_ms=93,
+        params='["path"]',
+    ),
+    row(
+        495,
+        "u:alice",
+        store.KIND_CALL,
+        1_790_230_460,
+        actor="mcp-evidence-orchestrator",
+        nc_user="alice",
+        tool="files_read",
+        client_id=EXCHANGE_CLIENT_ID,
+        auth_id="",
+        outcome=store.OUTCOME_OK,
+        duration_ms=78,
+        params='["path"]',
+    ),
+)
+
+
+def test_the_quoted_refusal_lines_are_the_lines_this_code_prints() -> None:
+    """WR-01 of the phase 24 review, and the reason this gate exists at all.
+
+    ``docs/exchange-evidence.md`` says its blocks are the raw output of the measuring
+    script, and these six lines were not: every run of empty columns had a separator too
+    few. A proof that was retyped is no longer a measurement, and this phase lives on
+    "measured rather than claimed", so the document needs the same kind of gate the setup
+    page has. Nothing here retypes the format; the function that prints it is asked.
+    """
+    text = evidence()
+    for seq, at in MEASURED_REFUSALS:
+        line = audit_read._line(
+            row(
+                seq,
+                store.CHAIN_EXCHANGE,
+                store.KIND_REFUSAL,
+                at,
+                outcome=store.OUTCOME_REJECTED,
+                reason=REASON_EXCHANGE_ISSUER,
+                removed=1,
+            )
+        )
+        assert line in text, f"docs/exchange-evidence.md no longer quotes row {seq} as printed"
+
+
+def test_the_quoted_call_lines_are_the_lines_this_code_prints() -> None:
+    """The same for the two rows of the mixed run, and these are the ones that carry values.
+
+    Their columns are the ones that moved when the acting party took its place in the line
+    (AUDIT-07), so a reader counting positions in this document is reading the very change
+    that made the quoted lines wrong.
+    """
+    text = evidence()
+    for measured in MEASURED_CALLS:
+        line = audit_read._line(measured)
+        assert line in text, f"docs/exchange-evidence.md no longer quotes row {measured[0]}"
+
+
+def test_the_measuring_document_says_which_of_its_lines_were_recomputed() -> None:
+    """The honesty half. The eight lines above are the printed form of measured values, not
+    bytes copied out of a terminal, and a document claiming raw output has to say so."""
+    text = evidence()
+
+    assert "WR-01 of the phase 24 review" in text
+    assert "No measured value changed; only the number of separators did." in text

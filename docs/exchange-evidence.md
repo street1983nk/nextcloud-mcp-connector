@@ -22,6 +22,16 @@ Everything below is the raw output of `scripts/exchange_evidence.py`, which is t
 form of this run. The signing key of the test issuer lives in that process and is never
 written down; the two tokens live five minutes and are never written down either.
 
+One exception, and it is written here rather than left to be found: the eight text lines of
+`occ mcp_connector:audit:read` in the two sections below lost empty columns on their way into
+this file, so they were not the raw form they claimed to be (WR-01 of the phase 24 review).
+They now stand as `exapp/audit_read._line` prints them, recomputed from the values of the
+same run: the six refusal lines from the measured sequence numbers, moments, group and count,
+and the two `u:alice` lines from the `--json` block that stands beside them in this document
+and was never touched. No measured value changed; only the number of separators did.
+`tests/unit/test_docs_exchange_truth.py` now holds those lines against that function, so a
+column that moves in the code makes this document fail rather than age.
+
 ## The armed configuration, and the trace that makes this an exchange proof
 
 The run registers the deployed ExApp with the bootstrap payload plus four variables, and puts
@@ -252,8 +262,8 @@ canonical principal and never a login name (MAP-01):
 ```
 == occ mcp_connector:audit:read --user=alice --limit=2 ==
 2 entries, newest first, at most 2 per read
-495 - 2026-09-24T06:14:20Z - u:alice - files_read - - mcp-evidence-orchestrator - ok - - 78 - path - -
-494 - 2026-09-24T06:14:19Z - u:alice - files_read - exchange evidence - - ok - - 93 - path - -
+495 - 2026-09-24T06:14:20Z - u:alice - files_read - - - mcp-evidence-orchestrator - ok - - - 78 - path - -
+494 - 2026-09-24T06:14:19Z - u:alice - files_read - exchange evidence - - - ok - - - 93 - path - -
 ```
 
 The same two rows as data, which is where the reserved client id of the exchange path is
@@ -285,12 +295,12 @@ POST /mcp with a token of a foreign issuer -> HTTP 401
 
 == occ mcp_connector:audit:read --user=refusals ==
 6 entries, newest first, at most 200 per read
-493 - 2026-09-24T06:14:17Z - x:exchange - - - - - rejected - exchange_issuer - - - - 1
-474 - 2026-09-24T06:13:05Z - x:exchange - - - - - rejected - exchange_issuer - - - - 1
-456 - 2026-09-24T06:11:31Z - x:exchange - - - - - rejected - exchange_issuer - - - - 1
-438 - 2026-09-24T06:10:44Z - x:exchange - - - - - rejected - exchange_issuer - - - - 1
-423 - 2026-09-24T06:09:48Z - x:exchange - - - - - rejected - exchange_issuer - - - - 1
-408 - 2026-09-24T06:07:35Z - x:exchange - - - - - rejected - exchange_issuer - - - - 1
+493 - 2026-09-24T06:14:17Z - x:exchange - - - - - - - rejected - exchange_issuer - - - - - 1
+474 - 2026-09-24T06:13:05Z - x:exchange - - - - - - - rejected - exchange_issuer - - - - - 1
+456 - 2026-09-24T06:11:31Z - x:exchange - - - - - - - rejected - exchange_issuer - - - - - 1
+438 - 2026-09-24T06:10:44Z - x:exchange - - - - - - - rejected - exchange_issuer - - - - - 1
+423 - 2026-09-24T06:09:48Z - x:exchange - - - - - - - rejected - exchange_issuer - - - - - 1
+408 - 2026-09-24T06:07:35Z - x:exchange - - - - - - - rejected - exchange_issuer - - - - - 1
 ```
 
 The row carries the rejection identifier `exchange_issuer`, the number of attempts it stands
