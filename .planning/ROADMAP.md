@@ -213,8 +213,8 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 24-06-PLAN.md: `occ mcp_connector:exchange:check` als viertes Kommando, mit gemessener Bodygrenze (EXCH-06)
-- [ ] 24-08-PLAN.md: Der Zwei-Konten-Negativbeweis als Messdatei `docs/exchange-evidence.md` (EXCH-07)
+- [x] 24-06-PLAN.md: `occ mcp_connector:exchange:check` als viertes Kommando, mit gemessener Bodygrenze (EXCH-06)
+- [x] 24-08-PLAN.md: Der Zwei-Konten-Negativbeweis als Messdatei `docs/exchange-evidence.md` (EXCH-07)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
@@ -249,7 +249,7 @@ Plans:
 | 21. Exchange-Verifier | v1.6 | 2/2 | Complete   | 2026-09-19 |
 | 22. Konfiguration, Kette und Drosselung | v1.6 | 3/3 | Complete   | 2026-09-19 |
 | 23. Konto-Mapping und Credential-Wege | v1.6 | 6/6 | Complete | 2026-09-23 |
-| 24. Audit-Anschluss und Nachweis | v1.6 | 6/9 | In Progress|  |
+| 24. Audit-Anschluss und Nachweis | v1.6 | 8/9 | In Progress|  |
 
 ## Next
 
