@@ -168,6 +168,24 @@ NOT_CONFIGURED_SENTENCE = (
     "a token against. Nothing was checked and nothing about the token follows from that."
 )
 
+#: The named result of an invocation whose body never reached this handler, after the shape of
+#: :data:`OUTCOME_NOT_CONFIGURED` and for the same reason (WR-24-03 of the phase 24 review).
+#:
+#: Without it the four refusals of :func:`_payload` fell together into "no body", the rule was
+#: run against the empty string, and the answer said ``a token was presented`` had failed. That
+#: is worse than a form error: it is a sentence about the token, it is false, and it is the one
+#: answer a dry run exists to avoid. It bites exactly where :data:`MAX_BODY_BYTES` was chosen
+#: to not bite, at a token between the hard bound of this app and twice that bound, or at one
+#: that arrives with a second option beside it.
+OUTCOME_BODY_NOT_READ = "request_body_not_read"
+
+BODY_NOT_READ_SENTENCE = (
+    "the body of this invocation was not read, so no token reached the rule. Nothing was "
+    "checked and nothing about the token follows from that. The body was either larger than "
+    "this handler reads, unreadable, or not JSON; the container log of this app names which "
+    "of the three, without naming the body."
+)
+
 #: The first line of every answer that ran the rule. Deliberately not a step line: the count
 #: of step lines is what a test holds against ``len(STEPS)``.
 HEAD_LINE = "checked one presented token against the configured token exchange path"
@@ -236,8 +254,14 @@ def exchange_check_routes(env: Mapping[str, str] | None = None) -> list[Route]:
         if isinstance(guarded, Response):
             return guarded
 
-        payload = await _payload(request)
+        payload, unread = await _payload(request)
         as_json = _set_in(payload)
+        if unread is not None:
+            # Always the reading shape, and that is not an oversight: the shape option travels
+            # in the very body that was not read, so there is no answer here about what was
+            # asked for. The named outcome is in the sentence, so a script that parses this
+            # can still tell this case from a checked one.
+            return _text(f"{unread}: {BODY_NOT_READ_SENTENCE}\n")
         if config is None:
             logger.info("a dry run was asked for on an instance without a configured exchange path")
             if as_json:
@@ -444,8 +468,16 @@ def _given(value: object) -> str | None:
     return value.strip() or None
 
 
-async def _payload(request: Request) -> Any:
-    """The JSON body, or ``None`` when there is none this handler is willing to read.
+async def _payload(request: Request) -> tuple[Any, str | None]:
+    """The JSON body, and the named outcome when there is none this handler could read.
+
+    The second half of the pair is :data:`OUTCOME_BODY_NOT_READ` for every refusal below and
+    ``None`` for an invocation that carried no body at all. The two are not the same thing and
+    must not answer the same way: an empty body is an administrator who set no option, which
+    the rule has a first step for, while a refused body is an administrator who set one this
+    handler never saw. Letting both fall into ``None`` made the second answer "a token was
+    presented" had failed, which is a statement about a token nobody here ever read
+    (WR-24-04).
 
     Bounded and never logged, the shape of ``exapp/audit_verify._payload``: the announced
     length is read first because refusing before a byte is on the wire is cheaper than
@@ -467,22 +499,22 @@ async def _payload(request: Request) -> Any:
     plain_number = announced.isascii() and announced.isdigit()
     if plain_number and _above_the_body_bound(announced):
         logger.warning("a dry run call announced a body this handler does not read")
-        return None
+        return None, OUTCOME_BODY_NOT_READ
     try:
         raw = await bounded_body(request, MAX_BODY_BYTES)
     except BodyTooLarge:
         logger.warning("a dry run call sent a body this handler does not read")
-        return None
+        return None, OUTCOME_BODY_NOT_READ
     except BodyUnreadable:
         logger.warning("the body of a dry run call could not be read")
-        return None
+        return None, OUTCOME_BODY_NOT_READ
     if not raw:
-        return None
+        return None, None
     try:
-        return json.loads(raw)
+        return json.loads(raw), None
     except ValueError:
         logger.warning("the body of a dry run call is not JSON")
-        return None
+        return None, OUTCOME_BODY_NOT_READ
 
 
 def _above_the_body_bound(announced: str) -> bool:

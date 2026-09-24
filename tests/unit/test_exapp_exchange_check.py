@@ -291,8 +291,14 @@ def test_the_body_bound_is_a_calculation_over_the_token_bound() -> None:
     assert str(exchange_check.MAX_BODY_BYTES) not in source
 
 
-def test_a_body_above_the_bound_is_not_parsed_and_still_answers_200() -> None:
-    """Over the bound the handler decides nothing, so the run starts without a token."""
+def test_a_body_above_the_bound_names_the_body_and_never_the_token() -> None:
+    """WR-24-04: over the bound the handler read nothing, and it has to say that.
+
+    The wrong answer this replaces was ``failed  a token was presented``, which reads as
+    "you did not hand one over" to the one administrator who did, and it lands exactly where
+    ``MAX_BODY_BYTES`` was chosen so it would not: on a token that is merely large. A
+    sentence about a token nobody read is worse than a form error.
+    """
     response = call(
         client_for(),
         body={"occ": {"options": {"token": "a" * (exchange_check.MAX_BODY_BYTES + 1)}}},
@@ -300,6 +306,54 @@ def test_a_body_above_the_bound_is_not_parsed_and_still_answers_200() -> None:
     )
 
     assert response.status_code == 200
+    assert exchange_check.OUTCOME_BODY_NOT_READ in response.text
+    assert exchange_check.BODY_NOT_READ_SENTENCE in response.text
+    assert exchange_check.STEP_NAMES[exchange_dryrun.STEP_TOKEN_PRESENT] not in response.text
+
+
+def test_an_announced_body_above_the_bound_is_refused_the_same_way() -> None:
+    """The half that is decided before a byte is on the wire takes the same named outcome."""
+    response = call(
+        client_for(),
+        body={"occ": {"options": {"token": "a"}}},
+        headers={
+            **appapi_headers(),
+            "content-type": "application/json",
+            "content-length": str(exchange_check.MAX_BODY_BYTES + 1),
+        },
+    )
+
+    assert response.status_code == 200
+    assert exchange_check.OUTCOME_BODY_NOT_READ in response.text
+
+
+def test_a_body_that_is_not_json_is_refused_the_same_way() -> None:
+    """The third of the four, and the same reasoning: the option was set and never seen."""
+    response = client_for().post(
+        exchange_check.EXCHANGE_CHECK_PATH,
+        content=b"{not json at all",
+        headers={**appapi_headers(), "content-type": "application/json"},
+    )
+
+    assert response.status_code == 200
+    assert exchange_check.OUTCOME_BODY_NOT_READ in response.text
+
+
+def test_an_invocation_without_a_body_still_runs_the_rule() -> None:
+    """The other side of the same distinction, and the reason it had to be made.
+
+    An empty body is an administrator who set no option, which the rule has a first step
+    for. It must keep answering with that step and never with the named refusal, or the fix
+    above would have traded one wrong sentence for another.
+    """
+    response = client_for().post(
+        exchange_check.EXCHANGE_CHECK_PATH,
+        headers={**appapi_headers(), "content-type": "application/json"},
+    )
+
+    assert response.status_code == 200
+    assert exchange_check.OUTCOME_BODY_NOT_READ not in response.text
+    assert exchange_check.STEP_NAMES[exchange_dryrun.STEP_TOKEN_PRESENT] in response.text
 
 
 # --- the token never comes back out: T-24-09 -------------------------------------------
