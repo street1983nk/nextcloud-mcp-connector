@@ -162,7 +162,9 @@ CLIENT_NAME_LIMIT = 80
 #: (AUDIT-07). The same number as ``oauth.exchange_accounts.MAX_ACTING_PARTY_LENGTH`` and
 #: named a second time here rather than imported: ``audit`` may not import from ``oauth``
 #: (the layering rule of ``audit/record.py``), and a bound this module applies has to stand
-#: in this module. Below :data:`CLIENT_NAME_LIMIT` on purpose, for the reason the other
+#: in this module. ``tests/unit/test_audit_store.py`` holds the two numbers together, which
+#: is a line a test may cross where this module may not.
+#: Below :data:`CLIENT_NAME_LIMIT` on purpose, for the reason the other
 #: constant gives as well: the value is never looked up, only printed, and it shares an
 #: output line with a client name that may want the eighty.
 ACTOR_LIMIT = 64

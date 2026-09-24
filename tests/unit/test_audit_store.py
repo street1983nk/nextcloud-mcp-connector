@@ -20,6 +20,7 @@ import pytest
 
 from mcp_connector.audit import store
 from mcp_connector.errors import REASON_EXCHANGE_CLAIMS
+from mcp_connector.oauth import exchange_accounts
 from mcp_connector.oauth import store as oauth
 
 pytestmark = pytest.mark.anyio
@@ -380,6 +381,19 @@ async def test_an_acting_party_is_cleaned_on_the_same_rule_as_a_client_name(
     assert "‮" not in actor
     assert len(actor) <= store.ACTOR_LIMIT
     assert actor == client_name[: store.ACTOR_LIMIT], "one rule, applied twice, not two rules"
+
+
+def test_the_actor_bound_is_the_bound_of_the_acting_party_one_layer_up() -> None:
+    """WR-24-03: the comment beside ``ACTOR_LIMIT`` names the number it copies, and until
+    now nothing held the two together.
+
+    ``audit`` may not import ``oauth`` (the layering rule of ``audit/record.py``), so the
+    bound is written out a second time on purpose. A test may cross that line where the
+    module may not, and this is the only place the decision can be made safe: if the acting
+    party is cut shorter one layer up, a row here would silently keep room nothing fills;
+    if it grows, the value an operator reads is cut by a rule nobody changed.
+    """
+    assert store.ACTOR_LIMIT == exchange_accounts.MAX_ACTING_PARTY_LENGTH
 
 
 async def test_the_canonical_field_list_is_the_seventeen_of_phase_eighteen(

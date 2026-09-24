@@ -34,7 +34,7 @@ from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
 from mcp_connector import config
-from mcp_connector.exapp import exchange_check
+from mcp_connector.exapp import audit_verify, exchange_check
 from mcp_connector.nextcloud.clients.xml import hardened_parser
 from mcp_connector.oauth import exchange_dryrun
 
@@ -222,6 +222,23 @@ def test_the_machine_readable_answer_carries_one_entry_per_step_of_the_rule() ->
     payload = call(client_for(), token=opaque(64), as_json=True).json()
 
     assert [entry["step"] for entry in payload["steps"]] == list(exchange_dryrun.STEPS)
+
+
+def test_the_spellings_this_module_copies_stay_equal_to_the_ones_it_copied() -> None:
+    """WR-24-03: two constants of this module said a test held them, and none did.
+
+    ``lifecycle`` imports ``occ`` and ``occ`` imports this module, so the header name and the
+    positive list are written out a fifth and a fourth time rather than imported, which is a
+    decision the comments beside them state. The decision is only safe with this assertion
+    under it: without one, a change made for the audit commands drifts away from the command
+    that reads its input the same way, and the comment sends the next reader past the gap
+    instead of into it.
+    """
+    assert exchange_check.HEADER_ORIGIN_IP == audit_verify.HEADER_ORIGIN_IP
+    assert exchange_check.TRUE_WORDS == audit_verify.TRUE_WORDS
+    assert exchange_check.JSON_OPTION == audit_verify.JSON_OPTION
+    assert exchange_check.OCC_ENVELOPE == audit_verify.OCC_ENVELOPE
+    assert exchange_check.MAX_ANNOUNCED_DIGITS == audit_verify.MAX_ANNOUNCED_DIGITS
 
 
 def test_every_step_identifier_of_the_rule_has_a_name_an_administrator_reads() -> None:

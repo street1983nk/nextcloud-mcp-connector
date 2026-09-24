@@ -114,7 +114,8 @@ OCC_ENVELOPE = "occ"
 #: ``exapp/lifecycle.py``, ``exapp/purge.py``, ``exapp/audit_verify.py`` and
 #: ``exapp/audit_read.py`` refuse, spelled a fifth time rather than imported, for the import
 #: cycle those modules describe: ``lifecycle`` imports ``occ``, and ``occ`` imports this
-#: module. A test holds the spellings equal.
+#: module. ``tests/unit/test_exapp_exchange_check.py`` holds this spelling against the one of
+#: ``exapp/audit_verify.py``.
 HEADER_ORIGIN_IP = "x-origin-ip"
 
 #: The largest body this handler reads before deciding it is not an occ invocation, and the
@@ -150,8 +151,9 @@ MAX_ANNOUNCED_DIGITS = 10
 
 #: The words that mean "yes" when the shape option arrives with a value. Written here rather
 #: than imported from ``exapp/audit_verify.py``, the rule that module states for its own copy:
-#: a change made for one command must not silently change how another one reads its input. A
-#: test holds the lists equal.
+#: a change made for one command must not silently change how another one reads its input.
+#: ``tests/unit/test_exapp_exchange_check.py`` holds this list against the one of
+#: ``exapp/audit_verify.py``.
 TRUE_WORDS = frozenset({"1", "true", "yes", "on"})
 
 #: The named result of an instance that has no exchange path at all, and the reason it is a
