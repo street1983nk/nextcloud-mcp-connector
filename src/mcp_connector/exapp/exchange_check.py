@@ -128,9 +128,18 @@ HEADER_ORIGIN_IP = "x-origin-ip"
 #: leaves the JSON envelope, the second option and the quoting of the value the same room
 #: again that the token itself takes.
 #:
-#: What this bound assumes about the way in front of it is assumption A5 of
-#: ``24-RESEARCH.md``: that AppAPI hands an option value of several kilobytes through
-#: unchanged. Task 3 of plan 24-06 measures it and writes the measurement here.
+#: **The way in front of this bound is measured and not assumed** (assumption A5 of
+#: ``24-RESEARCH.md``). 2026-09-24, against the running NC 35 HaRP topology: Nextcloud
+#: 35.0.0 (``nc35-nc``), AppAPI 35.0.0, ``ghcr.io/nextcloud/nextcloud-appapi-harp:release``
+#: (``nc35-harp``), ``caddy:2`` (``nc35-caddy``), this app as ``nc_app_mcp_connector`` at
+#: version 0.2.1. ``occ mcp_connector:exchange:check --token=<n bytes> --json`` was run at
+#: 1 000, 4 000, 8 000, 8 192 and 8 193 bytes. The first four answered with ``token_size``
+#: held and fell at ``token_shape``; the run at 8 193 bytes fell at ``token_size``. The
+#: second reading is the one that proves it: a value that reaches the rule with more than
+#: :data:`~mcp_connector.oauth.exchange.MAX_TOKEN_BYTES` bytes can only do so if nothing on
+#: the way shortened it, so ``ExAppOccService::buildCommand`` hands an option value of these
+#: sizes through unchanged. Every one of the five answered ``checked: true``, so this bound
+#: judged none of them a form error. A5 holds.
 MAX_BODY_BYTES: Final[int] = 2 * MAX_TOKEN_BYTES
 
 #: How many digits an announced length may carry before it is refused unread. Ten digits are
