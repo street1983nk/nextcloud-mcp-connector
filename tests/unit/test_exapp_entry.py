@@ -41,7 +41,7 @@ from mcp_connector.audit import record as audit_record
 from mcp_connector.audit import refusals as audit_refusals
 from mcp_connector.audit import store as audit_store_module
 from mcp_connector.errors import IssuerRefused, ToolError
-from mcp_connector.exapp import config_values
+from mcp_connector.exapp import config_values, exchange_check
 from mcp_connector.exapp.middleware import RequireAppApi
 from mcp_connector.exapp.ui import connections as ui_connections
 from mcp_connector.exapp.ui import strings
@@ -306,6 +306,46 @@ def test_the_standalone_http_app_has_no_lifecycle_route() -> None:
 
 def test_the_exapp_app_still_serves_mcp() -> None:
     assert "/mcp" in paths(entry_exapp.build_exapp_app(EXAPP_ENV))
+
+
+def test_the_exapp_app_carries_the_dry_run_route_of_the_occ_command() -> None:
+    """EXCH-06: a registered command whose handler is missing answers 404 on the one day
+    somebody needs it, so the route is held against the path constant here as well."""
+    assert exchange_check.EXCHANGE_CHECK_PATH in paths(entry_exapp.build_exapp_app(EXAPP_ENV))
+
+
+def test_the_dry_run_route_answers_200_through_the_built_application() -> None:
+    """Reached the way AppAPI reaches it, and answered the way AppAPI needs it answered.
+
+    Without a configured exchange path this deployment has nothing to hold a token against,
+    and that is its own named result rather than a list of fallen rules: an answer built out
+    of fallen rules would send an administrator to the token they were handed instead of to
+    the configuration of this instance. The status stays 200 either way, because
+    ``ExAppOccService::buildCommand`` drops the body of anything else and the body is the
+    whole answer.
+    """
+    with TestClient(entry_exapp.build_exapp_app(SERVED_ENV)) as client:
+        response = client.post(
+            exchange_check.EXCHANGE_CHECK_PATH,
+            json={"occ": {"arguments": None, "options": {"json": True}}},
+            headers=appapi_headers(),
+        )
+
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["outcome"] == exchange_check.OUTCOME_NOT_CONFIGURED
+
+
+def test_the_dry_run_route_is_refused_on_the_php_proxy_path() -> None:
+    """T-24-08: the proxy attaches valid AppAPI headers itself, so the header decides."""
+    with TestClient(entry_exapp.build_exapp_app(SERVED_ENV)) as client:
+        response = client.post(
+            exchange_check.EXCHANGE_CHECK_PATH,
+            json={"occ": {"arguments": None, "options": {}}},
+            headers={**appapi_headers(), "x-origin-ip": "203.0.113.7"},
+        )
+
+    assert response.status_code == 404
 
 
 # --- the transport boundary (CR-01) ----------------------------------------------

@@ -21,7 +21,14 @@ from starlette.applications import Starlette
 from starlette.testclient import TestClient
 
 from mcp_connector import config
-from mcp_connector.exapp import audit_read, lifecycle, occ, settings_form, status
+from mcp_connector.exapp import (
+    audit_read,
+    exchange_check,
+    lifecycle,
+    occ,
+    settings_form,
+    status,
+)
 from mcp_connector.exapp.ui import strings
 
 APP_ID = "mcp_connector"
@@ -491,6 +498,68 @@ def test_the_read_command_is_the_one_plan_19_06_reserved_its_constants_for() -> 
         (audit_read.JSON_OPTION, "none"),
     ]
     assert scheme["usages"][0] == occ.OCC_AUDIT_READ_COMMAND_NAME
+
+
+def test_the_read_command_names_both_reserved_words_of_its_user_option() -> None:
+    """The handover of plan 24-03: ``refusals`` existed and stood in no help text (AUDIT-07).
+
+    Both words are matched before anything is built out of the value, so both of them are
+    words an administrator has to be able to find without reading the source. The check is on
+    the constants rather than on the literals, so a renamed keyword moves the help text with
+    it instead of leaving a wrong one behind.
+    """
+    assert audit_read.INSTANCE_KEYWORD in occ.OCC_AUDIT_READ_USER_DESCRIPTION
+    assert audit_read.REFUSALS_KEYWORD in occ.OCC_AUDIT_READ_USER_DESCRIPTION
+
+
+def test_the_dry_run_command_is_the_fourth_scheme_and_derives_its_handler() -> None:
+    """The command of EXCH-06, held against the handler module it belongs to (T-24-26).
+
+    The same two rules the three commands before it follow: the name is a literal exactly
+    once, because AppAPI keys its ``insertOrUpdate`` on the app id and the name, and the
+    handler is derived from the path constant rather than written a second time.
+    """
+    schemes = occ.command_schemes()
+
+    assert len(schemes) == 4
+    scheme = schemes[3]
+    assert occ.OCC_EXCHANGE_CHECK_COMMAND_NAME == "mcp_connector:exchange:check"
+    assert scheme["name"] == occ.OCC_EXCHANGE_CHECK_COMMAND_NAME
+    assert exchange_check.EXCHANGE_CHECK_PATH.removeprefix("/") == occ.OCC_EXCHANGE_CHECK_HANDLER
+    assert scheme["execute_handler"] == occ.OCC_EXCHANGE_CHECK_HANDLER
+    assert f"/{scheme['execute_handler']}" == exchange_check.EXCHANGE_CHECK_PATH
+    assert scheme["arguments"] == []
+    assert [(option["name"], option["mode"]) for option in scheme["options"]] == [
+        (exchange_check.TOKEN_OPTION, "optional"),
+        (exchange_check.JSON_OPTION, "none"),
+    ]
+    # AppAPI reads ``$option['default'] ?? null``, but the key is written out for every value
+    # option of this module, which is what the positive list check above holds every scheme to.
+    assert scheme["options"][0]["default"] is None
+    assert scheme["usages"][0].startswith(occ.OCC_EXCHANGE_CHECK_COMMAND_NAME)
+
+
+def test_the_token_option_says_that_the_value_stands_in_the_process_list() -> None:
+    """Pitfall 6: the way is taken and the price is named rather than left silent.
+
+    There is no technical way out of it: a ``--token-file`` would lie on the Nextcloud host
+    while the handler reads in the ExApp container, and AppAPI hands no stdin through. So the
+    consequence belongs in the one text an administrator sees before they type the command,
+    and this check holds it there against a rewrite that tidies it away.
+    """
+    description = occ.OCC_EXCHANGE_CHECK_TOKEN_DESCRIPTION.lower()
+
+    assert "process list" in description
+    assert "history" in description
+    assert "short lived" in description or "short-lived" in description
+
+
+def test_the_dry_run_command_says_what_it_does_not_do() -> None:
+    """Success criterion 3: no Nextcloud call, no session, no row in the audit chain."""
+    description = occ.OCC_EXCHANGE_CHECK_DESCRIPTION.lower()
+
+    for promise in ("nextcloud", "session", "audit"):
+        assert promise in description, f"the description never mentions {promise}"
 
 
 @pytest.mark.anyio
