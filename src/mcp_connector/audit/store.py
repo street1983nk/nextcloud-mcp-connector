@@ -52,12 +52,15 @@ __all__ = [
     "ACTOR_UNKNOWN",
     "AUDIT_FILENAME",
     "CANONICAL_FIELDS",
+    "CHAIN_EXCHANGE",
     "CHAIN_INSTANCE",
     "CLIENT_NAME_LIMIT",
+    "EXCHANGE_CHAIN_PREFIX",
     "FINDING_MISSING",
     "FINDING_MODIFIED",
     "GENESIS",
     "KIND_CALL",
+    "KIND_REFUSAL",
     "KIND_SWITCH",
     "KIND_TOMBSTONE",
     "OUTCOME_FAILED",
@@ -72,6 +75,7 @@ __all__ = [
     "SWEEP_MAX_ROUNDS",
     "SWEEP_USER_CHECK_EVERY",
     "SWEEP_VACUUM_PAGES",
+    "USER_CHAIN_PREFIX",
     "USER_SILENCE_DAYS",
     "AuditStore",
     "ChainFinding",
@@ -179,9 +183,10 @@ GENESIS = b"\x00" * 32
 ACTOR_UNKNOWN = "unknown"
 
 # --- chains ------------------------------------------------------------------------------
-# One table, two kinds of chain, told apart by the identifier in the ``chain`` column. A
+# One table, three kinds of chain, told apart by the identifier in the ``chain`` column. A
 # chain per user (D-02) so that removing one account removes one whole chain instead of
-# breaking everybody else's, and one chain for what happens to the instance (D-03).
+# breaking everybody else's, one chain for what happens to the instance (D-03), and one for
+# the attempts that were turned down before anybody was authenticated (AUDIT-07).
 
 #: The chain of instance events: the switch of D-15, and the markers for user chains that
 #: are gone (a marker for a removed chain has nobody left to attach to in that chain).
@@ -190,6 +195,23 @@ CHAIN_INSTANCE = "i:instance"
 #: The prefix of a user chain, named because two functions below have to agree on it: one
 #: builds an identifier out of an account and the other reads the account back out of it.
 USER_CHAIN_PREFIX = "u:"
+
+#: The prefix of the third kind, so the identifier below can never collide with an account
+#: however that account is named, exactly like :data:`USER_CHAIN_PREFIX` promises for its own.
+EXCHANGE_CHAIN_PREFIX = "x:"
+
+#: The refused attempts of the token exchange path (AUDIT-07), and deliberately **not** a
+#: part of :data:`CHAIN_INSTANCE`. The instance chain is spared by every statement of the
+#: sweep below, so a row put there never expires, and these rows are ordered from outside: the
+#: exchange path runs before any authentication, so a stranger who holds no key of this
+#: deployment decides how many of them are written. They have to fall under the retention
+#: window and under the upper bound like the row of an account, and a chain outside the
+#: instance chain is what makes them do so without a single statement changing.
+#:
+#: One chain and not one per issuer or per acting party: the identifier of a chain would then
+#: be a value out of a token nobody checked, which is the claim leak this phase exists to keep
+#: out of the file (T-24-04).
+CHAIN_EXCHANGE = f"{EXCHANGE_CHAIN_PREFIX}exchange"
 
 
 def user_chain(nc_user: str) -> str:
@@ -221,6 +243,13 @@ KIND_TOMBSTONE = "tombstone"
 #: The log being switched on or off, which is itself logged (D-15).
 KIND_SWITCH = "switch"
 
+#: An attempt over the token exchange path that was turned down, standing for as many of them
+#: as ``removed`` says (AUDIT-07). A fourth value in this column and not an eighteenth column:
+#: ``kind`` is already a text column of the schema, so a new value in it changes no hash, needs
+#: no migration and leaves :data:`CANONICAL_FIELDS` exactly as it was. A column would have
+#: done all three.
+KIND_REFUSAL = "refusal"
+
 # --- outcome classes (D-07) ---------------------------------------------------------------
 # A class, never the sentence of an error: an error message of this server is written for
 # the model and therefore carries paths and names, which would be result content.
@@ -250,10 +279,10 @@ CREATE TABLE IF NOT EXISTS entries (
   -- a sweep that removed the newest rows would make one number appear twice. A number that
   -- is reused is a chain that cannot be checked, because the number is hashed with the row.
   seq         INTEGER PRIMARY KEY AUTOINCREMENT,
-  -- 'u:<nc_user>' or 'i:instance' (D-02, D-03). Two kinds of chain in one table, told apart
-  -- here and nowhere else.
+  -- 'u:<nc_user>', 'i:instance' or 'x:exchange' (D-02, D-03, AUDIT-07). Three kinds of chain
+  -- in one table, told apart here and nowhere else.
   chain       TEXT NOT NULL,
-  -- 'call' | 'tombstone' | 'switch'
+  -- 'call' | 'tombstone' | 'switch' | 'refusal'
   kind        TEXT NOT NULL,
   -- Unix seconds. The moment the row was written, never a moment from a request.
   at          INTEGER NOT NULL,
@@ -276,7 +305,12 @@ CREATE TABLE IF NOT EXISTS entries (
   duration_ms INTEGER,
   -- A sorted JSON list of parameter names, never a value (D-06, AUDIT-01).
   params      TEXT NOT NULL,
-  -- How many rows a marker replaces.
+  -- For how many events this one row stands, which is the same meaning twice and is written
+  -- out because the second reading arrived later: in a 'tombstone' row it is how many rows
+  -- gave way to this marker, in a 'refusal' row how many turned down attempts this line
+  -- stands for, because the writer of those is braked and only writes one per reason and
+  -- window (AUDIT-07). Without this sentence the second reading would be a silent
+  -- reinterpretation of a column.
   removed     INTEGER,
   -- Which chain the gap belongs to, for a marker that stands in the instance chain because
   -- the chain it explains is gone (D-12).
@@ -401,15 +435,27 @@ _INSTANCE_TAIL = (
 )
 _DROP_SUPERSEDED = "DELETE FROM entries WHERE chain = ? AND seq = ?"
 
-# The three statements of the account check (D-12). ``chain <> ?`` spares the instance chain
-# here for a second reason on top of the one above: it has no account behind it, so it can
-# never be silent and must never be offered as one.
+# The three statements of the account check (D-12). The filter is positive and names the
+# prefix of a user chain, where it used to be negative and only spared the instance chain.
+# That was the same set while there were two kinds of chain and stopped being it with the
+# third: the refused attempts of the token exchange path stand in ``x:exchange`` (AUDIT-07),
+# that chain is silent by nature, and it has no account behind it any more than the instance
+# chain has. Offered as one it would be held against a list of Nextcloud accounts it can never
+# be in and deleted by ``drop_user_chain``, which is a marker over a record that was never a
+# person's. So the rule of this statement is what the check really asks about: the chains of
+# accounts, and no other kind, whatever kinds arrive after this one.
+#
+# ``substr`` and not ``LIKE``: SQLite folds ASCII case in ``LIKE``, so a chain spelled with a
+# capital letter in front of the colon would pass a pattern built from the lower case prefix.
+# And the prefix travels as a placeholder out of :data:`USER_CHAIN_PREFIX` rather than being
+# spelled into this text a second time, so the two cannot drift apart.
 #
 # The grouping is by chain and not by ``nc_user``, because the chain is what is dropped and
 # what a marker for a gap names, and a row of a chain whose ``nc_user`` column were ever
 # ``NULL`` would otherwise fall out of the question entirely.
 _SILENT_CHAINS = (
-    "SELECT chain FROM entries WHERE chain <> ? GROUP BY chain HAVING MAX(at) <= ? ORDER BY chain"
+    "SELECT chain FROM entries WHERE substr(chain, 1, ?) = ? "
+    "GROUP BY chain HAVING MAX(at) <= ? ORDER BY chain"
 )
 _COUNT_OF_CHAIN = "SELECT COUNT(*) FROM entries WHERE chain = ?"
 _DROP_CHAIN = "DELETE FROM entries WHERE chain = ?"
@@ -984,8 +1030,13 @@ class AuditStore:
         than a holiday and far short of the retention window, which is what makes the check
         bite long before the entries would have expired anyway.
 
-        The instance chain is never named: it has no account behind it, and an answer that
-        offered it would offer the one chain that explains every gap of every other one.
+        Only the chains of accounts are named, because only they have an account to ask about.
+        The instance chain is left out because it explains the gaps of every other one, and the
+        chain of refused exchange attempts because it belongs to nobody: it is written on a
+        path that runs before any authentication, so the name it would be asked about is not an
+        account name at all (AUDIT-07, T-24-18). The statement says so with a positive filter
+        on :data:`USER_CHAIN_PREFIX`, so a fourth kind of chain is left out by default rather
+        than by somebody remembering to.
 
         The edge is inclusive, the same way the retention window of :meth:`sweep` is: an entry
         exactly ``silence_days`` old is past the threshold, one second younger is not.
@@ -995,7 +1046,9 @@ class AuditStore:
             cutoff = moment - silence_days * _DAY_SECONDS
             return [
                 _account_of(chain)
-                for (chain,) in conn.execute(_SILENT_CHAINS, (CHAIN_INSTANCE, cutoff))
+                for (chain,) in conn.execute(
+                    _SILENT_CHAINS, (len(USER_CHAIN_PREFIX), USER_CHAIN_PREFIX, cutoff)
+                )
             ]
 
         return await self._read(work)
