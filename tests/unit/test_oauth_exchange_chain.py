@@ -19,6 +19,7 @@ other branch" is a failing test and not a sentence (T-22-06, pitfall 1 of the re
 import json
 import logging
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -820,6 +821,238 @@ async def test_a_broken_exchange_branch_does_not_end_a_call_of_the_existing_path
     assert await verifier.verify_token(SHAPED_LIKE_A_STORE_TOKEN) is not None
 
 
+# --- the refused attempt, handed to a writer the chain knows nothing about (AUDIT-07) -----
+#
+# The chain reports a refusal and never learns where the report goes: the writer is a handed
+# in asynchronous function, the same shape ``accounts`` travels in since phase 23, and
+# ``audit/`` stays a package ``oauth/`` does not import. What is measured below is the pair
+# of promises around it: exactly one note per refused attempt, and never a changed answer.
+
+
+class RecordingRefusals:
+    """The refusal writer as far as the chain can see it: one call with one identifier.
+
+    ``error`` is what makes "bookkeeping never changes an answer" a measurement: a writer
+    that fails has to leave a refusal a refusal, and its failure must not travel out of
+    ``verify_token`` into the transport boundary, where it would be a 500 where a 401
+    belongs.
+    """
+
+    def __init__(self, *, error: Exception | None = None) -> None:
+        self.noted: list[str] = []
+        self._error = error
+
+    async def note(self, reason: str) -> None:
+        self.noted.append(reason)
+        if self._error is not None:
+            raise self._error
+
+
+class RecordingAccounts:
+    """An account source that knows one principal, answers nothing about any other, or fails.
+
+    The three ways ``resolve_identity`` turns a checked token down are exactly the three
+    states of this class plus its absence, which is why one stand-in covers all of them.
+    """
+
+    def __init__(self, *, known: str | None = None, error: Exception | None = None) -> None:
+        self.seen: list[str] = []
+        self._known = known
+        self._error = error
+
+    async def identity_for(self, principal: str, claims: Mapping[str, Any]) -> OAuthIdentity | None:
+        del claims
+        self.seen.append(principal)
+        if self._error is not None:
+            raise self._error
+        return identity() if principal == self._known else None
+
+
+def noting(
+    store: chain.StoreBranch,
+    checker: chain.ExchangeBranch,
+    writer: RecordingRefusals,
+    *,
+    accounts: Any = None,
+) -> chain.ChainedVerifier:
+    """The armed chain of the cases below, with a writer and whatever account source fits."""
+    return chain.ChainedVerifier(
+        store=store,
+        checker=checker,
+        config=configuration(),
+        accounts=accounts,
+        refusals=writer.note,
+    )
+
+
+@pytest.mark.anyio
+async def test_an_armed_chain_without_a_writer_notes_nothing_and_answers_the_same() -> None:
+    """The factory state of AUDIT-07: without a writer the refusal is exactly what it was.
+
+    ``None`` is what every deployment with the audit log switched off hands in (D-14), so
+    this is the state the overwhelming majority of installations run in, and it has to be
+    the branch that does nothing at all rather than the branch that writes nowhere.
+    """
+    checker = RecordingChecker(error=exchange.ExchangeRefused(errors.REASON_EXCHANGE_ISSUER))
+    verifier = chain.ChainedVerifier(
+        store=RecordingStore(), checker=checker, config=configuration()
+    )
+
+    assert await verifier.verify_token(SHAPED_LIKE_A_JWS) is None
+
+
+@pytest.mark.anyio
+async def test_a_refused_exchange_token_is_noted_once_with_the_identifier_of_its_group() -> None:
+    """The one value of plan 24-02 that may leave this process, on its one way out."""
+    writer = RecordingRefusals()
+    checker = RecordingChecker(error=exchange.ExchangeRefused(errors.REASON_EXCHANGE_ISSUER))
+    verifier = noting(RecordingStore(), checker, writer)
+
+    assert await verifier.verify_token(SHAPED_LIKE_A_JWS) is None
+    assert writer.noted == [errors.REASON_EXCHANGE_ISSUER]
+
+
+@pytest.mark.anyio
+async def test_an_unexpected_failure_of_the_checker_is_noted_as_the_unknown_reason(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The case where the reason is genuinely unknown gets the identifier that says so.
+
+    The ERROR line of T-22-09 stays next to it: the line names the type of the failure for
+    whoever reads container logs, and the audit row names the group for whoever reads the
+    trail. Neither carries the other's content.
+    """
+    writer = RecordingRefusals()
+    checker = RecordingChecker(error=RuntimeError("a value nobody may read in a log"))
+    verifier = noting(RecordingStore(), checker, writer)
+
+    with caplog.at_level(logging.ERROR, logger="mcp_connector.oauth.chain"):
+        assert await verifier.verify_token(SHAPED_LIKE_A_JWS) is None
+
+    assert writer.noted == [errors.REASON_EXCHANGE_FAILED]
+    lines = [record.getMessage() for record in caplog.records]
+    assert len(lines) == 1
+    assert "RuntimeError" in lines[0]
+    assert errors.REASON_EXCHANGE_FAILED not in lines[0], "the group belongs in the row, not here"
+
+
+@pytest.mark.anyio
+async def test_a_token_without_an_account_source_is_noted_as_an_account_refusal() -> None:
+    """The state after phase 22: an armed chain without a source refuses at the identity."""
+    writer = RecordingRefusals()
+    verifier = noting(RecordingStore(), RecordingChecker(), writer)
+    access = await verifier.verify_token(SHAPED_LIKE_A_JWS)
+
+    assert access is not None
+    assert await verifier.resolve_identity(access) is None
+    assert writer.noted == [errors.REASON_EXCHANGE_ACCOUNT]
+
+
+@pytest.mark.anyio
+async def test_a_claim_set_the_mapping_finds_no_principal_in_is_noted_the_same_way() -> None:
+    """The second of the three account refusals, and the account source is never asked."""
+    writer = RecordingRefusals()
+    claims = exchange_claims()
+    del claims["sub"]
+    accounts = RecordingAccounts(known="somebody")
+    verifier = noting(RecordingStore(), RecordingChecker(claims=claims), writer, accounts=accounts)
+    access = await verifier.verify_token(SHAPED_LIKE_A_JWS)
+
+    assert access is not None
+    assert await verifier.resolve_identity(access) is None
+    assert writer.noted == [errors.REASON_EXCHANGE_ACCOUNT]
+    assert accounts.seen == [], "nothing was mapped, so nobody was asked about an account"
+
+
+@pytest.mark.anyio
+async def test_an_account_source_that_says_no_is_noted_as_an_account_refusal() -> None:
+    writer = RecordingRefusals()
+    accounts = RecordingAccounts(known="somebody-else")
+    verifier = noting(RecordingStore(), RecordingChecker(), writer, accounts=accounts)
+    access = await verifier.verify_token(SHAPED_LIKE_A_JWS)
+
+    assert access is not None
+    assert await verifier.resolve_identity(access) is None
+    assert writer.noted == [errors.REASON_EXCHANGE_ACCOUNT]
+    assert accounts.seen == [SUB]
+
+
+@pytest.mark.anyio
+async def test_an_account_source_that_throws_is_noted_as_an_account_refusal(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The third of them, and the ERROR line of T-23-08 stays exactly as it was."""
+    writer = RecordingRefusals()
+    accounts = RecordingAccounts(error=RuntimeError("a value nobody may read in a log"))
+    verifier = noting(RecordingStore(), RecordingChecker(), writer, accounts=accounts)
+    access = await verifier.verify_token(SHAPED_LIKE_A_JWS)
+
+    assert access is not None
+    with caplog.at_level(logging.ERROR, logger="mcp_connector.oauth.chain"):
+        assert await verifier.resolve_identity(access) is None
+
+    assert writer.noted == [errors.REASON_EXCHANGE_ACCOUNT]
+    lines = [record.getMessage() for record in caplog.records]
+    assert len(lines) == 1
+    assert "RuntimeError" in lines[0]
+
+
+@pytest.mark.anyio
+async def test_a_served_call_is_never_noted() -> None:
+    """The other half of "one row per refused attempt": no row for an attempt that passed.
+
+    Without this case the writer could be called on every call of the path and the rows
+    would still look right to a reader who only ever saw refusals.
+    """
+    writer = RecordingRefusals()
+    accounts = RecordingAccounts(known=SUB)
+    verifier = noting(RecordingStore(), RecordingChecker(), writer, accounts=accounts)
+
+    access = await verifier.verify_token(SHAPED_LIKE_A_JWS)
+    assert access is not None
+    assert await verifier.resolve_identity(access) is not None
+    assert writer.noted == []
+
+
+@pytest.mark.anyio
+async def test_a_store_token_is_never_noted_by_the_exchange_path() -> None:
+    """A dotless token that the store branch turns down is no exchange attempt.
+
+    It goes to the branch this deployment has always had, and a row about it would be a
+    refusal booked against a path the caller never reached: a false attribution in the one
+    place that exists in order to be read literally.
+    """
+    writer = RecordingRefusals()
+    verifier = noting(RecordingStore(access=None), ExplodingChecker(), writer)
+
+    assert await verifier.verify_token(SHAPED_LIKE_A_STORE_TOKEN) is None
+    assert writer.noted == []
+
+
+@pytest.mark.anyio
+async def test_a_writer_that_throws_leaves_the_answer_and_the_request_untouched(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """T-24-19: bookkeeping may never end a call, and the line names the type and nothing else.
+
+    The same rule ``audit/record.note`` follows on the tool path. A writer that could end a
+    request would hand a stranger a way to produce a 500 with one pre-authentication call,
+    on the very path a stranger drives.
+    """
+    writer = RecordingRefusals(error=OSError("no space left on device: /var/lib/audit.sqlite3"))
+    checker = RecordingChecker(error=exchange.ExchangeRefused(errors.REASON_EXCHANGE_KEY))
+    verifier = noting(RecordingStore(), checker, writer)
+
+    with caplog.at_level(logging.ERROR, logger="mcp_connector.oauth.chain"):
+        assert await verifier.verify_token(SHAPED_LIKE_A_JWS) is None
+
+    assert writer.noted == [errors.REASON_EXCHANGE_KEY]
+    lines = [record.getMessage() for record in caplog.records]
+    assert len(lines) == 1
+    assert "OSError" in lines[0]
+    assert "no space left" not in lines[0], "the message of a store error carries a path (D-13)"
+
+
 # --- one revocation, both layers ----------------------------------------------------------
 
 
@@ -887,6 +1120,37 @@ def test_a_configuration_that_was_already_read_is_not_read_again() -> None:
     built = chain.build_chain(store, env={}, config=configuration())
 
     assert isinstance(built, chain.ChainedVerifier)
+
+
+def test_the_off_state_hands_back_the_very_same_verifier_even_with_a_writer() -> None:
+    """A writer changes nothing about the one promise of the off state (AUDIT-07, D-14).
+
+    An installation that never configured the exchange path has no chain to write from, so
+    the writer is dropped on the floor here rather than hung into a wrapper that would then
+    be the object at the transport boundary.
+    """
+    store = RecordingStore()
+    writer = RecordingRefusals()
+
+    assert chain.build_chain(store, env={}, refusals=writer.note) is store
+
+
+def test_a_handed_in_writer_reaches_the_chain_it_was_built_for() -> None:
+    """The wire itself: what an entry point hands in is what the refusal branch calls."""
+    writer = RecordingRefusals()
+
+    built = chain.build_chain(RecordingStore(), env=armed(), refusals=writer.note)
+
+    assert isinstance(built, chain.ChainedVerifier)
+    assert built._refusals == writer.note
+
+
+def test_an_armed_chain_without_a_writer_carries_none() -> None:
+    """The default of the parameter is the factory state and not an empty stand-in."""
+    built = chain.build_chain(RecordingStore(), env=armed())
+
+    assert isinstance(built, chain.ChainedVerifier)
+    assert built._refusals is None
 
 
 def test_a_half_configured_environment_refuses_at_the_chain_as_well() -> None:
