@@ -198,9 +198,9 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 24-01-PLAN.md: Die handelnde Partei (azp) als eigenes Feld in der Audit-Zeile, ueber die bestehende Spalte `actor` (AUDIT-07)
-- [ ] 24-02-PLAN.md: Der Ablehnungsbezeichner an `ExchangeRefused`, sechs gruppierte Gruende, und das Antwort-Gate gegen ein Orakel (AUDIT-07)
-- [ ] 24-07-PLAN.md: BL-21: der gemessene 429-Lauf gegen die gebaute ExApp (IN-04) und die nachgemessene JWKS-Abrufgrenze (IN-05)
+- [x] 24-01-PLAN.md: Die handelnde Partei (azp) als eigenes Feld in der Audit-Zeile, ueber die bestehende Spalte `actor` (AUDIT-07)
+- [x] 24-02-PLAN.md: Der Ablehnungsbezeichner an `ExchangeRefused`, sechs gruppierte Gruende, und das Antwort-Gate gegen ein Orakel (AUDIT-07)
+- [x] 24-07-PLAN.md: BL-21: der gemessene 429-Lauf gegen die gebaute ExApp (IN-04) und die nachgemessene JWKS-Abrufgrenze (IN-05)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -249,7 +249,7 @@ Plans:
 | 21. Exchange-Verifier | v1.6 | 2/2 | Complete   | 2026-09-19 |
 | 22. Konfiguration, Kette und Drosselung | v1.6 | 3/3 | Complete   | 2026-09-19 |
 | 23. Konto-Mapping und Credential-Wege | v1.6 | 6/6 | Complete | 2026-09-23 |
-| 24. Audit-Anschluss und Nachweis | v1.6 | 0/9 | Planned | - |
+| 24. Audit-Anschluss und Nachweis | v1.6 | 3/9 | In Progress|  |
 
 ## Next
 
