@@ -209,7 +209,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 24-04-PLAN.md: Der Ablehnungsschreiber an der Kette, an beiden Einstiegspunkten, plus das Gate gegen Claim-Leaks (AUDIT-07)
+- [x] 24-04-PLAN.md: Der Ablehnungsschreiber an der Kette, an beiden Einstiegspunkten, plus das Gate gegen Claim-Leaks (AUDIT-07)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -249,7 +249,7 @@ Plans:
 | 21. Exchange-Verifier | v1.6 | 2/2 | Complete   | 2026-09-19 |
 | 22. Konfiguration, Kette und Drosselung | v1.6 | 3/3 | Complete   | 2026-09-19 |
 | 23. Konto-Mapping und Credential-Wege | v1.6 | 6/6 | Complete | 2026-09-23 |
-| 24. Audit-Anschluss und Nachweis | v1.6 | 5/9 | In Progress|  |
+| 24. Audit-Anschluss und Nachweis | v1.6 | 6/9 | In Progress|  |
 
 ## Next
 
