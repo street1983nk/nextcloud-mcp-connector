@@ -2741,7 +2741,10 @@ def test_the_armed_path_with_the_log_on_writes_into_the_store_of_this_applicatio
     app = entry_exapp.build_exapp_app(env)
 
     writer = refusal_writer_of(app)
-    recorder = recorder_of(app)
+    # Through the boundary and not through :func:`recorder_of`: an armed path wraps the
+    # route in the throttle of EXCH-05, so the outermost object of ``/mcp`` is not the
+    # boundary that carries the recorder.
+    recorder = boundary_of(app)._audit_recorder
     assert isinstance(writer, audit_refusals.RefusalWriter)
     assert isinstance(recorder, audit_record.Recorder)
     assert writer.store_provider is recorder.store_provider

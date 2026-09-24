@@ -29,6 +29,7 @@ from starlette.routing import Route
 from . import config
 from .audit import CHAIN_INSTANCE, KIND_SWITCH, AuditStore, audit_opener
 from .audit import record as audit_record
+from .audit import refusals as audit_refusals
 from .audit.store import AUDIT_FILENAME
 from .errors import IssuerRefused, ToolError
 from .exapp import config_values
@@ -134,12 +135,44 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
     # same exchange_config answer that produced the INFO line above, so the off state has no
     # object, no cache and no code path where none belongs.
     accounts = exchange_appapi.AppApiAccounts(env=env) if exchange_config is not None else None
+    # One audit store per application, built exactly where the OAuth one is built and for
+    # the same reason: the file cannot be opened while the routes are, because the path comes
+    # from a volume that a deployment may not have mounted yet, so both sides get an opener
+    # and the first row that needs the file pays for opening it. No module global either
+    # (D-20), which is why this is a local of the function that builds one application.
+    #
+    # It stands here, above the chain, since AUDIT-07: the refusal writer below is handed
+    # into ``build_chain``, and what it receives is this opener and never an opened store.
+    # That is the shape ``audit/refusals.StoreProvider`` asks for, so the order costs
+    # nothing: no file is touched here, and the first refused attempt of a process pays for
+    # opening it, exactly as the first recorded tool call does.
+    audit_store = audit_opener(env)
+    # Where a refused exchange attempt is written down (AUDIT-07), and the two conditions of
+    # it. The switch of D-14, because a log that is off writes nothing and opens nothing; and
+    # a configured exchange path, because without one nothing can be refused on it and a
+    # writer would be an object nobody ever calls. The same opener the recorder below gets,
+    # never a second one: two openers would be two ``AuditStore`` objects on one file, the
+    # size limit of D-11 would be computed over one of them while both wrote, and an operator
+    # would read one chain of a file two objects believed they owned.
+    refusals = (
+        audit_refusals.RefusalWriter(store_provider=audit_store)
+        if exchange_config is not None and config.audit_log_enabled(env)
+        else None
+    )
     # The chain of milestone v1.6, and the one place it is hung in. Without a configured
     # exchange path this is the very object above and not a wrapper around it, which is what
     # keeps an installation that never heard of this milestone byte for byte what it was.
     # The configuration read at the top of this function is handed in, so the environment is
-    # read once per application.
-    boundary = chain.build_chain(verifier, env=env, config=exchange_config, accounts=accounts)
+    # read once per application. The writer travels as a bound method and not as an object,
+    # so ``oauth/`` learns nothing about ``audit/``: the chain knows it may call an
+    # asynchronous function with one rejection identifier, and nothing beyond that.
+    boundary = chain.build_chain(
+        verifier,
+        env=env,
+        config=exchange_config,
+        accounts=accounts,
+        refusals=None if refusals is None else refusals.note_refusal,
+    )
     # The last wire of the pair, and the one that makes "revoked" mean "now": the verifier
     # answers from a five second process cache, and a revocation, whether it comes from the
     # user through /revoke or from the reuse detection of the rotation, empties it in the
@@ -154,12 +187,6 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
     # a tool call arrives with a verified bearer and is answered from the process cache,
     # and rate limiting the actual work of this server would be our own denial of service.
     counters = throttle.Throttle()
-    # One audit store per application, built exactly where the OAuth one is built and for
-    # the same reason: the file cannot be opened while the routes are, because the path comes
-    # from a volume that a deployment may not have mounted yet, so both sides get an opener
-    # and the first row that needs the file pays for opening it. No module global either
-    # (D-20), which is why this is a local of the function that builds one application.
-    audit_store = audit_opener(env)
     # D-14 in one line: without the switch there is no recorder, without a recorder the
     # transport boundary deposits nothing, and without a deposit the recording path in
     # ``graceful`` returns before it has written anything. The known 401 of the first start

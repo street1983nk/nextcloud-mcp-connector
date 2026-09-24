@@ -274,7 +274,23 @@ def build_oauth_app(
     # object above rather than a wrapper around it. The revocation goes to the chain, not to
     # the verifier inside it: the exchange half caches signature keys for five minutes, and a
     # rotated key must not outlive the revocation that emptied the other half.
-    boundary = chain.build_chain(verifier, env=env, config=exchange_config, accounts=accounts)
+    #
+    # ``refusals=None``, and that is a decision of plan 24-04 rather than an omission
+    # (AUDIT-07, T-24-21). The ExApp mode writes one row per refused exchange attempt; this
+    # mode writes none, because it has none of the three things that make such a row worth
+    # anything. It builds no ``audit/record.Recorder``, so no tool call of this process is
+    # recorded either and the switch of D-14 decides nothing here today: a wire that made it
+    # decide refusals alone would give one variable two different meanings in two modes. It
+    # runs no sweep, because the expiry of D-11 rides on the recorder's write path and the
+    # other sweep is ``entry_exapp._audit_startup``, so the rows would sit out neither the
+    # retention window nor the size limit that ``docs/privacy.md`` promises them. And it has
+    # no occ and none of the audit routes, so nothing in this mode could read them back.
+    # Together that would be a file that grows on a path a stranger drives, that nobody
+    # sweeps and that nobody reads. What would change this is an audit path for the fifth
+    # operating mode, and that is a phase of its own, not a keyword argument here.
+    boundary = chain.build_chain(
+        verifier, env=env, config=exchange_config, accounts=accounts, refusals=None
+    )
     provider.on_revocation(boundary.invalidate)
 
     counters = throttle.Throttle()

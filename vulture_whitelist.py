@@ -286,13 +286,11 @@ _.create_auth_code
 _._decode_payload
 
 # --- The refusal writer of plan 24-03, wired in by plan 24-04 ----------------------------
-# note_refusal is the one method of audit/refusals.RefusalWriter. The writer was built and
-# tested one plan before the place that calls it: plan 24-03 owns the chain, the kind and the
-# brake, and plan 24-04 hands the writer into build_chain and calls this method from the
-# branch of oauth/chain.py that catches ExchangeRefused. The entry therefore announces its own
-# end: it leaves this file with the task that calls it, exactly as the two entries above did.
-# tests/unit/test_audit_refusals.py drives it directly until then.
-_.note_refusal
+# Empty on purpose, and that is the rule of this file at work rather than an omission. Plan
+# 24-03 parked note_refusal here, because the braked writer was built and tested one plan
+# before the place that calls it. Task 2 of plan 24-04 builds the writer in entry_exapp.py
+# and hands this very method into build_chain, so the name left the list with the task that
+# calls it, exactly as the three entries above it did.
 
 # --- The dry run answer of plan 24-05, read by the console of plan 24-06 ----------------
 # The three fields of DryRunResult in oauth/exchange_dryrun.py. The rule half was built and
