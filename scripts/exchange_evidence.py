@@ -725,28 +725,34 @@ def main(argv: Sequence[str] | None = None) -> int:
             for name, entry in sorted(armed["external-app"]["environment-variables"].items())
         )
     )
+    # The registration that arms the path, and from here on every way out of this function
+    # runs through the ``finally`` below (WR-24-06). Everything between the two used to stand
+    # outside it: probing the issuer, trusting it, and two ``mint`` calls that read a key of
+    # the environment file. A missing container, a failing ``occ`` or a missing
+    # ``NC_MCP_TEST_USER2`` left the development instance armed against a test issuer whose
+    # private key died with the aborted process, which is the state ``--keep-armed`` marks as
+    # the exception, reached without anybody asking for it.
     register(armed)
-
-    section("assumption A6: the key set over HTTPS, from inside the ExApp container")
-    probe_the_issuer()
-    trust_the_issuer()
-
-    marker = uuid.uuid4().hex[:10]
-    alice = Account(
-        user=env["NC_MCP_TEST_USER"],
-        token=mint(private_pem, kid, env["NC_MCP_TEST_USER"]),
-        path=f"/exchange-alice-{marker}.md",
-        marker=f"exchange-alice-{marker}",
-    )
-    bob = Account(
-        user=env["NC_MCP_TEST_USER2"],
-        token=mint(private_pem, kid, env["NC_MCP_TEST_USER2"]),
-        path=f"/exchange-bob-{marker}.md",
-        marker=f"exchange-bob-{marker}",
-    )
-
-    started = now_stamp()
     try:
+        section("assumption A6: the key set over HTTPS, from inside the ExApp container")
+        probe_the_issuer()
+        trust_the_issuer()
+
+        marker = uuid.uuid4().hex[:10]
+        alice = Account(
+            user=env["NC_MCP_TEST_USER"],
+            token=mint(private_pem, kid, env["NC_MCP_TEST_USER"]),
+            path=f"/exchange-alice-{marker}.md",
+            marker=f"exchange-alice-{marker}",
+        )
+        bob = Account(
+            user=env["NC_MCP_TEST_USER2"],
+            token=mint(private_pem, kid, env["NC_MCP_TEST_USER2"]),
+            path=f"/exchange-bob-{marker}.md",
+            marker=f"exchange-bob-{marker}",
+        )
+
+        started = now_stamp()
         asyncio.run(measure((alice, bob), env, (private_pem, kid)))
 
         section("Nextcloud access log, the status code behind every answer")
