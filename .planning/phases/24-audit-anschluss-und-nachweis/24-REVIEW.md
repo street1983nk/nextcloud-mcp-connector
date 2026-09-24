@@ -31,7 +31,30 @@ findings:
   warning: 6
   info: 7
   total: 14
-status: issues_found
+status: resolved
+resolved: 2026-09-24
+resolution:
+  critical_fixed: 1
+  warning_fixed: 6
+  info_open: 7
+  note: >-
+    Alle Critical- und Warning-Befunde sind behoben, je Befund ein eigener Commit.
+    Die sieben Info-Befunde bleiben bewusst offen und dokumentiert; sie waren nicht
+    im Auftrag dieser Runde.
+fixes:
+  CR-01: 8b7f6a1
+  WR-01: 2568be5
+  WR-02: 11ca3ce
+  WR-03: 30e4e5a
+  WR-04: be60861
+  WR-05: 301109c
+  WR-06: 922e5c8
+gates_after_fixes:
+  ruff_check: pass
+  ruff_format: pass
+  pyright: "0 errors, 0 warnings"
+  vulture: pass
+  pytest: "4392 passed, 33 skipped, 168 deselected"
 ---
 
 # Phase 24: Code Review Report
@@ -39,7 +62,26 @@ status: issues_found
 **Reviewed:** 2026-09-24
 **Depth:** standard (Datei fuer Datei, sprachspezifische Pruefungen, Quervergleich Code gegen Doku)
 **Files Reviewed:** 22
-**Status:** issues_found
+**Status:** resolved (1 Critical und 6 Warnings behoben am 2026-09-24, 7 Info offen)
+
+## Stand der Behebung
+
+Je Befund ein eigener Commit. Die Gates liefen vor jedem Commit lokal gruen; der volle
+Testlauf am Ende steht bei 4392 passed, 33 skipped, 168 deselected.
+
+| Befund | Outcome | Commit |
+|--------|---------|--------|
+| CR-01 | fixed | `8b7f6a1` |
+| WR-01 | fixed | `2568be5` |
+| WR-02 | fixed | `11ca3ce` |
+| WR-03 | fixed | `30e4e5a` |
+| WR-04 | fixed | `be60861` |
+| WR-05 | fixed | `301109c` |
+| WR-06 | fixed | `922e5c8` |
+| IN-01 bis IN-07 | open | - |
+
+Die sieben Info-Befunde bleiben unveraendert dokumentiert. Sie waren nicht Teil dieser
+Runde und sind damit weiterhin offene, benannte Punkte.
 
 ## Summary
 
@@ -72,6 +114,17 @@ kann. Das habe ich gegen die echte Funktion nachgerechnet, nicht vermutet.
 ## Critical Issues
 
 ### CR-01: Abweisungszeilen loesen den Sweep nie aus und koennen ihn fuer das ganze Protokoll ueberspringen
+
+**Outcome:** fixed (`8b7f6a1`). `RefusalWriter.note_refusal` haelt die von `append`
+zurueckgegebene Sequenznummer, fragt `store.should_sweep(seq)` und fegt in derselben
+Fail-open-Klammer; die beiden Grenzwerte kommen wie beim Recorder aus
+`config.audit_retention_days` / `config.audit_size_limit` in `entry_exapp.build_exapp_app`.
+Damit sind beide Folgen geschlossen: die Abweisungskette verfaellt auch ohne anderen
+Schreiber, und ein 500er-Vielfaches auf einer Abweisungszeile fegt das Gesamtprotokoll statt
+es zu ueberspringen. Vier Faelle in `tests/unit/test_audit_refusals.py`, jeder vor dem Fix
+rot (Zeilenart `call` blieb stehen). Bewusst nicht mitgenommen und im Docstring benannt: der
+Kontocheck von D-12 laeuft auf diesem Vor-Authentisierungs-Pfad nicht mit, weil er einen
+Nextcloud-Aufruf kostet.
 
 **File:** `src/mcp_connector/audit/refusals.py:122-139`, `src/mcp_connector/audit/record.py:263`, `src/mcp_connector/audit/store.py:561-569`, `docs/privacy.md:257-262`
 
@@ -137,6 +190,15 @@ abschwaechen, was wirklich gilt. Der Satz darf nicht stehen bleiben, wie er ist.
 
 ### WR-01: Die Rohausgabe in der Messdatei kann so nicht aus dem Code stammen
 
+**Outcome:** fixed (`2568be5`). Die acht Zeilen stehen jetzt so, wie `audit_read._line` sie
+druckt, gegen die echte Funktion nachgerechnet und nicht von Hand gezaehlt: die sechs
+Abweisungszeilen aus den gemessenen Sequenznummern, Momenten, Gruppe und Zahl, die beiden
+`u:alice`-Zeilen aus dem unberuehrten `--json`-Block derselben Datei. Kein Messwert wurde
+veraendert, nur die Zahl der Trennzeichen. Weil die Zeilen nicht aus dem Terminal kopiert,
+sondern aus gemessenen Werten neu formatiert sind, sagt die Datei das jetzt ausdruecklich
+statt Rohheit zu behaupten. Drei Gates in `tests/unit/test_docs_exchange_truth.py` halten sie
+gegen die Funktion, vor dem Fix rot.
+
 **File:** `docs/exchange-evidence.md:254-256`, `docs/exchange-evidence.md:287-293`
 
 **Issue:**
@@ -173,6 +235,11 @@ def test_the_quoted_audit_lines_are_the_lines_this_code_prints() -> None:
 
 ### WR-02: Ein Ausfall der Kontoquelle wird als Kontoabweisung protokolliert
 
+**Outcome:** fixed (`11ca3ce`). `_exchange_identity` liefert jetzt das Paar aus Identitaet und
+Gruppe; der Ausnahmezweig meldet `REASON_EXCHANGE_FAILED`, die drei echten Kontofaelle
+weiterhin `REASON_EXCHANGE_ACCOUNT`. Die HTTP-Antwort ist unveraendert.
+`test_an_account_source_that_throws_is_noted_as_a_failure_and_not_as_a_refusal` haelt es.
+
 **File:** `src/mcp_connector/oauth/chain.py:606-609`, `src/mcp_connector/oauth/chain.py:641-650`, `src/mcp_connector/errors.py:50-53`
 
 **Issue:**
@@ -208,6 +275,15 @@ if identity is None:
 ```
 
 ### WR-03: Drei Konstanten behaupten ein Gate, das es nicht gibt
+
+**Outcome:** fixed (`30e4e5a`). Die Gates sind angelegt statt die Kommentare zu streichen:
+`test_the_spellings_this_module_copies_stay_equal_to_the_ones_it_copied` haelt
+`exchange_check.HEADER_ORIGIN_IP`, `TRUE_WORDS`, `JSON_OPTION`, `OCC_ENVELOPE` und
+`MAX_ANNOUNCED_DIGITS` gegen `audit_verify`, und
+`test_the_actor_bound_is_the_bound_of_the_acting_party_one_layer_up` haelt
+`store.ACTOR_LIMIT` gegen `exchange_accounts.MAX_ACTING_PARTY_LENGTH` (ein Test darf die
+Schichtgrenze ueberqueren, die das Modul nicht ueberqueren darf). Die drei Kommentare nennen
+jetzt die Datei, in der ihr Gate steht.
 
 **File:** `src/mcp_connector/exapp/exchange_check.py:113-118`, `src/mcp_connector/exapp/exchange_check.py:150-155`, `src/mcp_connector/audit/store.py:161-167`
 
@@ -247,6 +323,13 @@ def test_the_actor_bound_is_the_bound_of_the_acting_party() -> None:
 
 ### WR-04: Ein zu grosser Body meldet "kein Token vorgelegt"
 
+**Outcome:** fixed (`be60861`). `_payload` gibt jetzt das Paar aus Body und benanntem Ergebnis
+zurueck; die vier Abweisungen tragen `OUTCOME_BODY_NOT_READ` nach dem Muster von
+`OUTCOME_NOT_CONFIGURED`, ein leerer Body bleibt der gewoehnliche Fall und laeuft weiter durch
+die Regel. Vier Faelle in `tests/unit/test_exapp_exchange_check.py`, darunter der Gegenfall
+ohne Body. Ausdruecklich benannt: die Antwort kommt immer in Textform, weil der
+Formschalter in genau dem Body steckt, der nicht gelesen wurde.
+
 **File:** `src/mcp_connector/exapp/exchange_check.py:445-483`, `src/mcp_connector/exapp/exchange_check.py:252-256`
 
 **Issue:**
@@ -280,6 +363,12 @@ mit einem eigenen benannten Ergebnis (etwa `OUTCOME_BODY_NOT_READ`), nach dem Mu
 
 ### WR-05: Die Antwortbildung liegt ausserhalb der Fehlerklammer und kann die 200-Zusage brechen
 
+**Outcome:** fixed (`301109c`). `_report` und `_machine_readable` liegen jetzt im selben
+`try`-Block wie `dry_run`, und `_name(step)` macht den Namen total
+(`STEP_NAMES.get(step, step)`). Zwei Faelle halten beide Haelften: ein Schritt ohne Namen
+antwortet 200 mit dem Bezeichner statt 500, und ein Fehler beim Bauen der Antwort wird
+beantwortet statt geworfen.
+
 **File:** `src/mcp_connector/exapp/exchange_check.py:252-276`, `src/mcp_connector/exapp/exchange_check.py:310`, `src/mcp_connector/exapp/exchange_check.py:331-346`
 
 **Issue:**
@@ -305,6 +394,11 @@ und zusaetzlich `result = await dry_run(...)`, `_report`/`_machine_readable` in 
 `try`-Block legen.
 
 ### WR-06: Das Messskript bewaffnet den Exchange-Pfad ausserhalb seiner try/finally-Klammer
+
+**Outcome:** fixed (`922e5c8`). `register(armed)` steht unmittelbar vor dem `try`; alles
+danach, also `probe_the_issuer()`, `trust_the_issuer()`, die beiden `mint(...)`-Aufrufe und
+die Messungen, liegt darin. Kein Pfad laesst die Instanz mehr bewaffnet zurueck, ausser dem
+ausdruecklichen `--keep-armed`.
 
 **File:** `scripts/exchange_evidence.py:712-765`
 
@@ -334,6 +428,9 @@ finally:
 ```
 
 ## Info
+
+Die sieben folgenden Befunde sind **offen** und bleiben bewusst dokumentiert. Sie waren nicht
+Teil der Behebungsrunde vom 2026-09-24.
 
 ### IN-01: Frozen dataclass mit veraenderlichem Zustand erzeugt ein unbrauchbares `__hash__`
 
@@ -441,3 +538,5 @@ def test_the_refusal_writer_imports_nothing_out_of_oauth() -> None:
 _Reviewed: 2026-09-24_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+_Resolved: 2026-09-24 (1 Critical und 6 Warnings behoben, 7 Info offen)_
+_Fixer: Claude (gsd-code-fixer)_
