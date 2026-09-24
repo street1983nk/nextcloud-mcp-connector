@@ -602,21 +602,34 @@ class ChainedVerifier:
         before.
 
         The four ways of saying no live in :meth:`_exchange_identity` and are written down
-        here, in one place and with one identifier (AUDIT-07). One place, because that is
-        what makes "one row per refused attempt" a property of the structure instead of a
-        habit four branches have to keep: a fifth way to refuse inside that method is
-        recorded without anybody remembering this line.
+        here, in one place (AUDIT-07). One place, because that is what makes "one row per
+        refused attempt" a property of the structure instead of a habit four branches have
+        to keep: a fifth way to refuse inside that method is recorded without anybody
+        remembering this line.
+
+        One place, but not one identifier. Three of the four are the account saying no and
+        carry :data:`~mcp_connector.errors.REASON_EXCHANGE_ACCOUNT`; the fourth is an
+        exception out of the source, which is Nextcloud or AppAPI faltering and not a
+        decision about an account, so it carries
+        :data:`~mcp_connector.errors.REASON_EXCHANGE_FAILED`, exactly as the same shape of
+        catch does in :meth:`verify_token`. The HTTP answer stays one answer for all four
+        (T-24-03); this is the trail, where an operator has to be able to tell a refused
+        delegation from an outage, and the brake makes the difference worse if it is wrong:
+        during an outage the window of one group is held open and the real refusals of the
+        same minutes are only counted.
         """
         claims = access.claims or {}
         if EXCHANGE_CLAIM not in claims:
             return await self._store.resolve_identity(access)
-        identity = await self._exchange_identity(claims[EXCHANGE_CLAIM])
+        identity, reason = await self._exchange_identity(claims[EXCHANGE_CLAIM])
         if identity is None:
-            await self._note(REASON_EXCHANGE_ACCOUNT)
+            await self._note(reason or REASON_EXCHANGE_ACCOUNT)
         return identity
 
-    async def _exchange_identity(self, claims: Mapping[str, Any]) -> OAuthIdentity | None:
-        """The identity behind a checked claim set, or ``None`` for every kind of no.
+    async def _exchange_identity(
+        self, claims: Mapping[str, Any]
+    ) -> tuple[OAuthIdentity | None, str | None]:
+        """The identity behind a checked claim set, and the group of every kind of no.
 
         Split off from :meth:`resolve_identity` so that the four refusals of this branch
         have one answer and therefore one row. What they are is unchanged: the state after
@@ -624,29 +637,37 @@ class ChainedVerifier:
         says no, and an account source that fails. From outside they are one answer, for
         the reason ``oauth/verifier.py`` gives for its own refusals and
         ``oauth/exchange_accounts.py`` repeats for this seam.
+
+        The second half of the pair is the identifier that answer is written down under,
+        and ``None`` when there is nothing to write down. It travels beside the identity
+        rather than being decided by the caller, because only this method knows which of
+        the four ways it took.
         """
         if self._accounts is None:
             # The state after phase 22: an armed chain without an account source refuses.
-            return None
+            return None, REASON_EXCHANGE_ACCOUNT
         # The principal comes out of the mapping and never out of ``sub`` directly: a raw
         # claim in this place would be a login name of a foreign realm posing as the
         # principal of this server (T-23-06, pitfall 5 of the research).
         principal = principal_from_claims(claims, self._config.mapping)
         if principal is None:
-            return None
+            return None, REASON_EXCHANGE_ACCOUNT
         try:
             # ``subject`` of the AccessToken stays empty on purpose: this chain writes the
             # identity into the request state of the transport boundary, never back into
             # the SDK token model. And the way from here to the pause switch runs without a
             # single change to ``exapp/middleware.py``, because that boundary reads
             # ``identity.principal`` and nothing else.
-            return await self._accounts.identity_for(principal, claims)
+            identity = await self._accounts.identity_for(principal, claims)
         except Exception as exc:
             # The exact shape of the catch in ``verify_token`` (T-23-08, T-23-09): one
             # refusal for this one call, one line naming the type of the failure and
-            # nothing else. No principal, no claim, no token.
+            # nothing else. No principal, no claim, no token. And the same identifier as
+            # there, because this is the same event: the checking branch fell over, which
+            # is not the account having said no (WR-24-02).
             logger.error("an exchange identity could not be resolved: %s", type(exc).__name__)
-            return None
+            return None, REASON_EXCHANGE_FAILED
+        return identity, None if identity is not None else REASON_EXCHANGE_ACCOUNT
 
     def invalidate(self) -> None:
         """One call, both layers: the answers of the store branch and the cached key set.

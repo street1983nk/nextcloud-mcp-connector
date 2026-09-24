@@ -978,10 +978,19 @@ async def test_an_account_source_that_says_no_is_noted_as_an_account_refusal() -
 
 
 @pytest.mark.anyio
-async def test_an_account_source_that_throws_is_noted_as_an_account_refusal(
+async def test_an_account_source_that_throws_is_noted_as_a_failure_and_not_as_a_refusal(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """The third of them, and the ERROR line of T-23-08 stays exactly as it was."""
+    """WR-24-02, and the ERROR line of T-23-08 stays exactly as it was.
+
+    An exception out of the source is Nextcloud or AppAPI faltering, not the account having
+    said no, and ``errors.py`` keeps an identifier for exactly that. Writing the account
+    group here would send the operator AUDIT-07 was built for to the wrong place during an
+    outage, and the brake makes it worse: the window of ``exchange_account`` is then held
+    open for the whole disturbance and the genuine account refusals of the same minutes are
+    only counted in ``removed``. ``verify_token`` has told these two apart since phase 22;
+    this is the same distinction one layer down.
+    """
     writer = RecordingRefusals()
     accounts = RecordingAccounts(error=RuntimeError("a value nobody may read in a log"))
     verifier = noting(RecordingStore(), RecordingChecker(), writer, accounts=accounts)
@@ -991,10 +1000,12 @@ async def test_an_account_source_that_throws_is_noted_as_an_account_refusal(
     with caplog.at_level(logging.ERROR, logger="mcp_connector.oauth.chain"):
         assert await verifier.resolve_identity(access) is None
 
-    assert writer.noted == [errors.REASON_EXCHANGE_ACCOUNT]
+    assert writer.noted == [errors.REASON_EXCHANGE_FAILED]
+    assert errors.REASON_EXCHANGE_ACCOUNT not in writer.noted
     lines = [record.getMessage() for record in caplog.records]
     assert len(lines) == 1
     assert "RuntimeError" in lines[0]
+    assert errors.REASON_EXCHANGE_FAILED not in lines[0], "the group belongs in the row, not here"
 
 
 @pytest.mark.anyio
