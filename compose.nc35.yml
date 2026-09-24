@@ -6,7 +6,7 @@
 #   bash scripts/bootstrap_exapp.sh --nc35
 #   docker compose -f compose.nc35.yml down -v
 #
-# It is a copy of compose.exapp.yml with four differences and nothing else:
+# It is a copy of compose.exapp.yml with five differences and nothing else:
 #
 #   1. The Nextcloud image is a 35.0.0, not a 34. Docker Hub carried no pullable
 #      35 image when this was written: the tags exist since 2026-09-16, but
@@ -24,6 +24,13 @@
 #      bootstrap into the registry the 34 topology publishes on the host, and the
 #      deploy daemon pulls it through the host's Docker, so a second registry
 #      would be a second copy of the same thing.
+#   5. A test issuer (service `test-issuer`), added for the two account proof of
+#      docs/exchange-evidence.md. The exchange path only accepts an HTTPS issuer
+#      and only fetches a key set on the origin of that issuer, so the proof needs
+#      a TLS terminated key set endpoint inside this network. It serves two static
+#      documents and nothing else, it signs nothing, and it is not a Keycloak: the
+#      tokens of a measuring run are signed by the run itself, against the key set
+#      it publishes here. Nothing outside a measuring run reads it.
 #
 # The throwaway credentials of compose.exapp.yml apply here word for word: this
 # instance listens on loopback only and its bruteforce guard is switched off.
@@ -80,6 +87,39 @@ services:
     depends_on:
       nextcloud:
         condition: service_healthy
+    restart: unless-stopped
+
+  # The test issuer of docs/exchange-evidence.md. Caddy serves two files over HTTPS with a
+  # certificate from its own internal CA; scripts/exchange_evidence.py copies the documents
+  # in and copies the root of that CA out into the ExApp container, where SSL_CERT_FILE
+  # points httpx at it. The configuration is written by the command instead of being mounted,
+  # so this service carries no host path and works from a checkout at any location.
+  #
+  # No volume on /data on purpose: the internal CA is regenerated whenever this container is
+  # recreated, and a measuring run fetches the root out of the running container every time.
+  # A CA that outlived the run it belongs to would be a trust anchor nobody asked for.
+  test-issuer:
+    image: caddy:2
+    container_name: nc35-test-issuer
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        mkdir -p /srv/realms/evidence/.well-known /srv/realms/evidence/protocol/openid-connect
+        cat > /etc/caddy/Caddyfile <<'CADDY'
+        {
+          admin off
+          auto_https disable_redirects
+        }
+        https://test-issuer {
+          tls internal
+          root * /srv
+          header Content-Type application/json
+          file_server
+        }
+        CADDY
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     restart: unless-stopped
 
   greenmail:
