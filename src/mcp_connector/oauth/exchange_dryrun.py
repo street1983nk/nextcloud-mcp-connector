@@ -29,6 +29,8 @@ from a foreign realm and an answer that echoed it would print that realm's text 
 administrator's terminal.
 """
 
+import secrets
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Final
@@ -36,12 +38,31 @@ from typing import Final
 import jwt
 
 from ..errors import (
+    REASON_EXCHANGE_ACCOUNT,
+    REASON_EXCHANGE_CLAIMS,
     REASON_EXCHANGE_ISSUER,
     REASON_EXCHANGE_KEY,
     REASON_EXCHANGE_MALFORMED,
 )
 from .chain import ExchangeConfig, looks_like_jws
-from .exchange import ACCEPTED_TYP_HEADERS, MAX_TOKEN_BYTES
+
+# ``_refused`` and ``_number`` travel across the module border on purpose. The first is the
+# refusal factory the running checker hands to its own key set, so handing the same one here
+# keeps the grouping and the DEBUG phrase of a key problem identical on both sides; the
+# second is the numeric guard of the two lifetime rules. Copying either would be two more
+# places that can drift from the checker, which is the one thing this plan exists to rule
+# out; importing them is what makes the two sides provably the same rule.
+from .exchange import (
+    ACCEPTED_TYP_HEADERS,
+    MAX_TOKEN_BYTES,
+    REQUIRED_CLAIMS,
+    ExchangeRefused,
+    _number,
+    _refused,
+    audience_holds,
+)
+from .jwks import KeySet
+from .mapping import principal_from_claims
 
 __all__ = [
     "COST_SENTENCE",
@@ -356,9 +377,123 @@ async def dry_run(
         return run.fell(STEP_ISSUER_MATCHES, REASON_EXCHANGE_ISSUER)
     run.held(STEP_ISSUER_MATCHES)
 
-    # The signature-covered half is task 2 of plan 24-05. Until it stands, everything behind
-    # the issuer filter is unreached rather than passed, and ``finish`` marks it skipped: a
-    # skipped step keeps the verdict false, so no half built run can read as green.
-    _parked = (clock, now, kid, algorithm)
-    assert _parked is not None  # noqa: S101 - the seam of task 2, named instead of dropped
+    # A key set of this run alone, built after the pattern of ``ExchangeTokenChecker``:
+    # the same five arguments, the same source for the origin and the address, and the same
+    # refusal factory, so a key problem here is grouped exactly as it is in operation. What
+    # it must not be is the key set of the running checker (pitfall 7, T-24-07): an
+    # administrator's dry run against a rotated key id would otherwise arm the sixty second
+    # miss cooldown of the hot path, or fall into its ten second failure pause and report
+    # "provider unreachable" while nothing but that pause was running. The price is one
+    # outgoing request per run, and :data:`COST_SENTENCE` says so in the answer.
+    #
+    # The nine ``self._refuse`` call sites of ``oauth/jwks.py`` all end in this one step.
+    # They are rules of the operating path like any other, which is why the drift gate scans
+    # that file too instead of keeping this step as an exception.
+    async def jwks_uri() -> str:
+        return settings.jwks_uri
+
+    keys = KeySet(
+        origin=settings.jwks_origin or settings.issuer,
+        jwks_uri=jwks_uri,
+        algorithms=settings.algorithms,
+        refuse=_refused,
+        clock=clock or time.monotonic,
+    )
+    try:
+        key = await keys.key(kid, algorithm)
+    except ExchangeRefused as refusal:
+        return run.fell(STEP_KEY_AVAILABLE, refusal.reason)
+    run.held(STEP_KEY_AVAILABLE)
+
+    try:
+        # The plain decoder and not the checker's ``_PreparsedJWT``: that subclass exists to
+        # keep the hot path from base64-decoding and JSON-parsing the same payload twice,
+        # and a dry run runs once per administrator's command. Everything that decides an
+        # outcome is the same: the same algorithms, the same issuer, the same leeway, the
+        # same require list, and the audience comparison switched off here and ours below.
+        claims = jwt.decode(
+            token,
+            key,
+            algorithms=list(settings.algorithms),
+            issuer=settings.issuer,
+            leeway=settings.leeway_seconds,
+            options={"require": list(REQUIRED_CLAIMS), "verify_aud": False},
+        )
+    except (jwt.PyJWTError, TypeError, OverflowError) as failure:
+        # One call site, two groups, read off the failure exactly as the checker reads it:
+        # this single decoder call carries the signature check and the standard claim rules
+        # together, and a broken signature is a statement about the key that signed.
+        return run.fell(
+            STEP_SIGNATURE_AND_STANDARD_CLAIMS,
+            REASON_EXCHANGE_KEY
+            if isinstance(failure, jwt.InvalidSignatureError)
+            else REASON_EXCHANGE_CLAIMS,
+        )
+    run.held(STEP_SIGNATURE_AND_STANDARD_CLAIMS)
+
+    # Called, never re-implemented: neither of PyJWT's two audience modes says "exactly the
+    # one configured value, alone or as an exact list member", and a prefix match would be
+    # the tenant boundary gone.
+    if not audience_holds(claims.get("aud"), settings.audience):
+        return run.fell(STEP_AUDIENCE_EXACT, REASON_EXCHANGE_CLAIMS)
+    run.held(STEP_AUDIENCE_EXACT)
+
+    azp = claims.get("azp")
+    if not isinstance(azp, str):
+        return run.fell(STEP_ACTING_PARTY_NAMED, REASON_EXCHANGE_CLAIMS)
+    run.held(STEP_ACTING_PARTY_NAMED)
+
+    # Membership over every entry without an early break and in constant time per entry, the
+    # shape of the checker: the position of a hit teaches nothing. The claim reads as
+    # "allowed acting party" rather than "allowed azp", because Keycloak's Standard Token
+    # Exchange V2 writes no ``act`` claim and ``azp`` is the only trace of who acted.
+    acting_party_allowed = False
+    for party in settings.azp_allowed:
+        if secrets.compare_digest(azp.encode("utf-8"), party.encode("utf-8")):
+            acting_party_allowed = True
+    if not acting_party_allowed:
+        return run.fell(STEP_ACTING_PARTY_ALLOWED, REASON_EXCHANGE_CLAIMS)
+    run.held(STEP_ACTING_PARTY_ALLOWED)
+
+    if claims.get("typ") != settings.typ_expected:
+        # The type lives in the payload: an ID token of the same realm, signed by the same
+        # keys and carrying the same issuer, falls exactly here.
+        return run.fell(STEP_TOKEN_TYPE_BEARER, REASON_EXCHANGE_CLAIMS)
+    run.held(STEP_TOKEN_TYPE_BEARER)
+
+    iat = _number(claims.get("iat"))
+    exp = _number(claims.get("exp"))
+    if iat is None or exp is None:
+        return run.fell(STEP_TIMES_NUMERIC, REASON_EXCHANGE_CLAIMS)
+    run.held(STEP_TIMES_NUMERIC)
+
+    # Two rules the decoder does not bring, both refusals and never a shortening. They run
+    # on the wall clock, never on the monotonic one the key set layer uses.
+    if exp - iat > settings.max_lifetime_seconds:
+        return run.fell(STEP_LIFETIME_WITHIN_BOUND, REASON_EXCHANGE_CLAIMS)
+    run.held(STEP_LIFETIME_WITHIN_BOUND)
+
+    if (now or time.time)() - iat > settings.max_lifetime_seconds:
+        return run.fell(STEP_AGE_WITHIN_BOUND, REASON_EXCHANGE_CLAIMS)
+    run.held(STEP_AGE_WITHIN_BOUND)
+
+    sub = claims.get("sub")
+    if not isinstance(sub, str) or not sub.strip() or sub != sub.strip():
+        return run.fell(STEP_SUBJECT_USABLE, REASON_EXCHANGE_CLAIMS)
+    run.held(STEP_SUBJECT_USABLE)
+
+    # The same function the operating path calls, and that is the whole cover of this step:
+    # it has no rejection phrase it could drift from, because ``principal_from_claims``
+    # answers with nothing at all and the chain turns that into a refusal without a word.
+    # The principal itself is deliberately not kept: it is derived from a claim of the
+    # presented token and no field of an answer carries a token value (T-24-09).
+    if principal_from_claims(claims, config.mapping) is None:
+        return run.fell(STEP_MAPPING_YIELDS_PRINCIPAL, REASON_EXCHANGE_ACCOUNT)
+    run.held(STEP_MAPPING_YIELDS_PRINCIPAL)
+
+    # ``account_exists`` is never executed and is filled in by ``finish``: the existence of
+    # the account runs over the account source seam of ``oauth/exchange_accounts.py`` and
+    # would be a Nextcloud call, which the third success criterion of this phase rules out.
+    # It is named rather than dropped, because a dropped step reads as a passed one
+    # (pitfall 8).
     return run.finish()

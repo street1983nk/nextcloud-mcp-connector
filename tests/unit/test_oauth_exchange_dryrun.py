@@ -464,7 +464,9 @@ async def test_a_signature_by_a_key_outside_the_key_set_falls_in_the_signature_s
 async def test_a_missing_required_claim_falls_in_the_signature_step(missing: str) -> None:
     """The require list of the decoder, and its refusal is a statement about the claims."""
     serve()
-    result = await exchange_dryrun.dry_run(token(**{missing: None}), config_for())
+    # ``None`` is what the claim builder drops, so the claim is absent rather than empty.
+    dropped: dict[str, Any] = {missing: None}
+    result = await exchange_dryrun.dry_run(token(**dropped), config_for())
     assert_fell_at(result, "signature_and_standard_claims", errors.REASON_EXCHANGE_CLAIMS)
 
 
@@ -553,14 +555,15 @@ async def test_a_token_older_than_allowed_falls_in_the_age_step() -> None:
 @pytest.mark.anyio
 @pytest.mark.parametrize("unusable", [" padded", "padded ", "   ", ""])
 async def test_a_subject_the_checker_refuses_falls_in_the_subject_step(unusable: str) -> None:
+    """A string, not empty, no edge whitespace, and handed on exactly as it arrived.
+
+    The empty string belongs in this list and not one step earlier: the require list of the
+    decoder asks whether the claim is present, and ``""`` is present. The checker measures
+    the same thing in ``test_an_empty_sub_is_refused``, which is the claim group as well.
+    """
     serve()
     result = await exchange_dryrun.dry_run(token(sub=unusable), config_for())
-    if unusable == "":
-        # An empty ``sub`` never reaches our own rule: the require list of the decoder drops
-        # it one step earlier, exactly as it does in the checker.
-        assert_fell_at(result, "signature_and_standard_claims", errors.REASON_EXCHANGE_CLAIMS)
-    else:
-        assert_fell_at(result, "subject_usable", errors.REASON_EXCHANGE_CLAIMS)
+    assert_fell_at(result, "subject_usable", errors.REASON_EXCHANGE_CLAIMS)
 
 
 @respx.mock
