@@ -168,7 +168,10 @@ broken.
 
 Sign in through the identity provider your organisation already runs arrived with 0.2.0, in
 the deployment without AppAPI: the consent decision is confirmed by the OIDC single sign-on
-Nextcloud already trusts through `user_oidc`. Still planned on that road are group
+Nextcloud already trusts through `user_oidc`. A service of the organisation can also act in a
+user's name with a token it exchanged at that provider, and the setup, the measured limits of
+the route and what is still open about it are in
+[docs/token-exchange.md](docs/token-exchange.md). Still planned on that road are group
 policies.
 
 Request a quote: admin@infranode.dev
