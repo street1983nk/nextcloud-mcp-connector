@@ -16,7 +16,7 @@ forbidden claims. This module checks whether the pages are true, not how they ar
 
 from pathlib import Path
 
-from mcp_connector.audit import store
+from mcp_connector.audit import refusals, store
 
 ROOT = Path(__file__).resolve().parents[2]
 PRIVACY = ROOT / "docs" / "privacy.md"
@@ -105,6 +105,42 @@ def test_the_privacy_page_names_all_three_deletion_paths_together() -> None:
         f"{store.USER_SILENCE_DAYS} days",
     ):
         assert expected in retention, f"the Retention section has to name {expected!r}"
+
+
+# --- the third kind of chain, and the one number its page may name ------------------------
+
+
+def test_the_privacy_page_names_the_chain_of_the_refused_attempts() -> None:
+    """AUDIT-07 on the page a data protection officer reads: the app writes rows that belong
+    to no account of this instance, and a storage table that did not say so would be exactly
+    the kind of document this module exists to prevent."""
+    text = page(PRIVACY)
+
+    assert store.CHAIN_EXCHANGE in text, (
+        f"docs/privacy.md has to name the chain as {store.CHAIN_EXCHANGE!r}, "
+        f"because store.CHAIN_EXCHANGE says so"
+    )
+    assert store.KIND_REFUSAL in text
+
+
+def test_the_privacy_page_names_the_window_of_the_write_brake_of_the_code() -> None:
+    """The one number of the new paragraph, and it is not typed twice. The page says minutes
+    because a reader reads minutes, while the constant counts seconds."""
+    expected = f"{refusals.REFUSAL_WINDOW_SECONDS // 60} minutes"
+
+    assert expected in page(PRIVACY), (
+        f"docs/privacy.md has to name the window of the write brake as {expected!r}, "
+        f"because refusals.REFUSAL_WINDOW_SECONDS says so"
+    )
+
+
+def test_the_retention_section_says_the_refusal_chain_falls_under_both_bounds() -> None:
+    """The claim that makes the third chain harmless is that it is swept like any other, so
+    it belongs in the section that describes the sweeping and not only in the table."""
+    section = page(PRIVACY).split("## Retention", maxsplit=1)
+    assert len(section) == 2, "docs/privacy.md has a Retention section"
+
+    assert store.CHAIN_EXCHANGE in section[1]
 
 
 # --- the file both pages have to name -----------------------------------------------------

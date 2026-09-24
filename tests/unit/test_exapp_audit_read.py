@@ -40,6 +40,7 @@ from starlette.types import Message
 
 from mcp_connector import config
 from mcp_connector.audit import store
+from mcp_connector.errors import REASON_EXCHANGE_CLAIMS
 from mcp_connector.exapp import audit_read, audit_verify
 from mcp_connector.nextcloud.clients.xml import hardened_parser
 
@@ -139,6 +140,22 @@ class Deployment:
                 at=at,
                 actor=store.ACTOR_UNKNOWN,
                 outcome="on",
+            )
+        )
+
+    def write_refusal(self, *, at: int, removed: int = 1) -> None:
+        """A row of the third chain (AUDIT-07): an attempt that never reached an account."""
+        asyncio.run(self._write_refusal(at, removed))
+
+    async def _write_refusal(self, at: int, removed: int) -> None:
+        await self.store.append(
+            store.Entry(
+                chain=store.CHAIN_EXCHANGE,
+                kind=store.KIND_REFUSAL,
+                at=at,
+                outcome=store.OUTCOME_REJECTED,
+                reason=REASON_EXCHANGE_CLAIMS,
+                removed=removed,
             )
         )
 
@@ -709,10 +726,15 @@ def test_a_column_that_holds_nothing_is_a_dash_and_never_the_word_none(live: Dep
 #: names of a call are read next to each other and never mistaken for one another.
 ACTOR_COLUMN = 5
 
+#: Where the count of a row stands: last, behind the parameter names, so the ten columns that
+#: were there before AUDIT-07 kept their places and no case had to be renumbered.
+REMOVED_COLUMN = 10
+
 #: How many columns a line of this answer has. Written down here because the whole point of
 #: the case below is that the number moved, and a case that counts what it found proves
-#: nothing about what it should have found.
-LINE_COLUMNS = 10
+#: nothing about what it should have found. It moved twice for AUDIT-07: once for the acting
+#: party of a delegated call and once for the number of attempts a refusal row stands for.
+LINE_COLUMNS = 11
 
 
 def test_a_line_carries_the_acting_party_behind_the_client_name(tmp_path: Path) -> None:
@@ -908,3 +930,93 @@ def test_the_failure_is_logged_with_the_type_and_without_the_path(
     assert "DatabaseError" in logged
     assert str(tmp_path) not in logged
     assert "malformed" not in logged
+
+
+# --- the chain of the refused exchange attempts (AUDIT-07) ----------------------------
+# The rows an operator was promised in success criterion 2 of this phase. They stand in a
+# chain of their own, that chain has no account behind it, and ``--user`` addresses a chain
+# by an account name: so this needs a word of its own for exactly the reason the instance
+# chain needed one.
+
+
+def test_the_refusals_keyword_reads_the_chain_of_the_turned_down_attempts(
+    tmp_path: Path,
+) -> None:
+    """The whole of success criterion 2 in one case: the operator can read them, in both
+    shapes, and the chain of an account is not mixed into the answer."""
+    deployment = Deployment(tmp_path)
+    deployment.write_calls(ALICE, [1000])
+    deployment.write_refusal(at=1001, removed=23)
+
+    text = call(deployment, options={audit_read.USER_OPTION: audit_read.REFUSALS_KEYWORD}).text
+    document = call(
+        deployment,
+        options={
+            audit_read.USER_OPTION: audit_read.REFUSALS_KEYWORD,
+            audit_read.JSON_OPTION: True,
+        },
+    ).json()
+
+    assert store.CHAIN_EXCHANGE in text
+    assert ALICE not in text
+    assert [entry["chain"] for entry in document["entries"]] == [store.CHAIN_EXCHANGE]
+    assert document["entries"][0]["kind"] == store.KIND_REFUSAL
+    assert document["entries"][0]["reason"] == REASON_EXCHANGE_CLAIMS
+    assert document["entries"][0]["removed"] == 23
+
+
+def test_an_account_named_like_the_keyword_is_read_as_the_keyword(tmp_path: Path) -> None:
+    """The price of the second reserved word, measured rather than assumed.
+
+    The same resolution :data:`~mcp_connector.exapp.audit_read.INSTANCE_KEYWORD` has had
+    since plan 19-06 and the same trade behind it: the word wins, an account that is really
+    called ``refusals`` is not addressable through this option, and its chain is read by a
+    call without ``--user``. One rule for both reserved words, because two rules would be the
+    kind of difference nobody remembers at the console.
+    """
+    deployment = Deployment(tmp_path)
+    deployment.write_calls(store.user_chain(audit_read.REFUSALS_KEYWORD), [1000])
+    deployment.write_refusal(at=1001)
+
+    named = call(deployment, options={audit_read.USER_OPTION: audit_read.REFUSALS_KEYWORD}).text
+    everything = call(deployment).text
+
+    assert store.CHAIN_EXCHANGE in named
+    assert store.user_chain(audit_read.REFUSALS_KEYWORD) not in named
+    assert store.user_chain(audit_read.REFUSALS_KEYWORD) in everything, (
+        "the account is not lost, it is read by the call that filters nothing"
+    )
+
+
+def test_a_refusal_line_shows_the_count_and_a_dash_where_it_has_no_value(
+    tmp_path: Path,
+) -> None:
+    """What such a row is worth reading for is the identifier and the number of attempts it
+    stands for, and the number is the reason the line grew a column: without it the one value
+    a refusal row carries would be readable in no shape of this answer at all.
+    """
+    deployment = Deployment(tmp_path)
+    deployment.write_refusal(at=1000, removed=17)
+
+    _, lines, _ = parts(call(deployment).text)
+    columns = lines[0].split(audit_read.FIELD_SEPARATOR)
+
+    assert len(columns) == LINE_COLUMNS
+    assert columns[2] == store.CHAIN_EXCHANGE
+    assert columns[3] == audit_read.NULL_FIELD, "a refusal calls no tool"
+    assert columns[4] == audit_read.NULL_FIELD, "and registers no client"
+    assert columns[ACTOR_COLUMN] == audit_read.NULL_FIELD, "and has no acting party (T-24-04)"
+    assert columns[6] == store.OUTCOME_REJECTED
+    assert columns[7] == REASON_EXCHANGE_CLAIMS
+    assert columns[8] == audit_read.NULL_FIELD, "nothing was carried out, so nothing took time"
+    assert columns[9] == audit_read.NULL_FIELD, "and no parameter was ever read"
+    assert columns[REMOVED_COLUMN] == "17"
+
+
+def test_an_ordinary_call_shows_a_dash_in_the_count_column(live: Deployment) -> None:
+    """The new column is a column of every line, and a call stands for itself alone."""
+    _, lines, _ = parts(call(live).text)
+    columns = lines[0].split(audit_read.FIELD_SEPARATOR)
+
+    assert len(columns) == LINE_COLUMNS
+    assert columns[REMOVED_COLUMN] == audit_read.NULL_FIELD
