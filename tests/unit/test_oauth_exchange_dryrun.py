@@ -15,17 +15,23 @@ Three things this corpus measures that no other file can:
 """
 
 import base64
+import inspect
 import json
+import sqlite3
 import time
 from typing import Any
 
+import httpx
 import jwt
 import pytest
+import respx
 from cryptography.hazmat.primitives.asymmetric import rsa
 from jwt.algorithms import RSAAlgorithm
 
 from mcp_connector import errors
+from mcp_connector.audit import store as audit_store
 from mcp_connector.oauth import chain, exchange, exchange_dryrun, mapping
+from mcp_connector.oauth import store as oauth_store
 
 ISSUER = "https://idp.example.org/realms/f13"
 JWKS_URL = f"{ISSUER}/protocol/openid-connect/certs"
@@ -56,6 +62,11 @@ def jwk_of(private: rsa.RSAPrivateKey, kid: str = KID, **extra: Any) -> dict[str
     entry = json.loads(RSAAlgorithm.to_jwk(private.public_key()))
     entry.update({"kid": kid, "use": "sig", "alg": "RS256"}, **extra)
     return entry
+
+
+def serve(url: str = JWKS_URL, keys: list[dict[str, Any]] | None = None) -> respx.Route:
+    payload = {"keys": keys if keys is not None else [jwk_of(PRIVATE)]}
+    return respx.get(url).mock(return_value=httpx.Response(200, json=payload))
 
 
 def settings_for(**overrides: Any) -> exchange.ExchangeSettings:
@@ -368,3 +379,328 @@ async def test_a_result_is_data_and_not_a_finished_sentence() -> None:
         result.passed = True  # type: ignore[misc]
     with pytest.raises(AttributeError):
         result.steps[0].outcome = "passed"  # type: ignore[misc]
+
+
+# --- the key set of the run is its own (pitfall 7, T-24-07) ----------------------------------
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_run_that_falls_at_the_issuer_filter_costs_no_outgoing_call() -> None:
+    """The pre-authentication cost guard of the checker, kept in the dry run."""
+    keys = serve()
+    result = await exchange_dryrun.dry_run(
+        token(iss="https://evil.example.org/realms/f13"), config_for()
+    )
+    assert_fell_at(result, "issuer_matches", errors.REASON_EXCHANGE_ISSUER)
+    assert keys.call_count == 0
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_run_past_the_issuer_filter_costs_exactly_one_outgoing_call() -> None:
+    keys = serve()
+    result = await exchange_dryrun.dry_run(token(), config_for())
+    assert result.passed is True
+    assert keys.call_count == 1
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_the_dry_run_does_not_spend_the_brakes_of_the_running_checker() -> None:
+    """Two objects, two counters: an administrator's test may not brake the hot path.
+
+    The measurement is built so that a shared key set would be visible. Two dry runs against
+    an unknown key id would arm the miss cooldown of a shared instance, and the running
+    checker behind them would then be refused without a fetch, so the count would stop at
+    two. It reaches three, which is the proof that the running checker still ordered its own
+    fetch and that the sixty second cooldown of the hot path was never spent here.
+    """
+    keys = serve()
+    clock = Clock()
+    checker = exchange.ExchangeTokenChecker(settings_for(), clock=clock)
+    unknown = token(kid="rotated-away")
+
+    for _ in range(2):
+        result = await exchange_dryrun.dry_run(unknown, config_for(), clock=clock)
+        assert_fell_at(result, "key_available", errors.REASON_EXCHANGE_KEY)
+    assert keys.call_count == 2, "one fetch per run, and every run brings its own key set"
+
+    with pytest.raises(exchange.ExchangeRefused):
+        await checker.claims_of(unknown)
+    assert keys.call_count == 3, "the running checker still ordered a fetch of its own"
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_key_set_that_cannot_be_reached_falls_in_the_key_step() -> None:
+    respx.get(JWKS_URL).mock(side_effect=httpx.ConnectError("down"))
+    result = await exchange_dryrun.dry_run(token(), config_for())
+    assert_fell_at(result, "key_available", errors.REASON_EXCHANGE_KEY)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_jwks_carrying_only_a_symmetric_key_falls_in_the_key_step() -> None:
+    serve(keys=[{"kty": "oct", "kid": KID, "k": "c2VjcmV0"}])
+    result = await exchange_dryrun.dry_run(token(), config_for())
+    assert_fell_at(result, "key_available", errors.REASON_EXCHANGE_KEY)
+
+
+# --- the signature-covered steps ------------------------------------------------------------
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_signature_by_a_key_outside_the_key_set_falls_in_the_signature_step() -> None:
+    serve()
+    result = await exchange_dryrun.dry_run(token(OTHER_PRIVATE), config_for())
+    assert_fell_at(result, "signature_and_standard_claims", errors.REASON_EXCHANGE_KEY)
+
+
+@respx.mock
+@pytest.mark.anyio
+@pytest.mark.parametrize("missing", ["azp", "sub", "exp", "iat", "aud"])
+async def test_a_missing_required_claim_falls_in_the_signature_step(missing: str) -> None:
+    """The require list of the decoder, and its refusal is a statement about the claims."""
+    serve()
+    result = await exchange_dryrun.dry_run(token(**{missing: None}), config_for())
+    assert_fell_at(result, "signature_and_standard_claims", errors.REASON_EXCHANGE_CLAIMS)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_an_expired_token_falls_in_the_signature_step() -> None:
+    serve()
+    now = int(time.time())
+    result = await exchange_dryrun.dry_run(token(iat=now - 400, exp=now - 100), config_for())
+    assert_fell_at(result, "signature_and_standard_claims", errors.REASON_EXCHANGE_CLAIMS)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_an_audience_missing_the_last_path_segment_falls_in_the_audience_step() -> None:
+    """``audience_holds`` is called, never re-implemented: a prefix is not the audience."""
+    serve()
+    result = await exchange_dryrun.dry_run(token(aud=f"{AUDIENCE}/tenant-b"), config_for())
+    assert_fell_at(result, "audience_exact", errors.REASON_EXCHANGE_CLAIMS)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_an_audience_list_holding_the_value_exactly_passes_that_step() -> None:
+    serve()
+    result = await exchange_dryrun.dry_run(token(aud=["account", AUDIENCE]), config_for())
+    assert result.passed is True
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_an_acting_party_that_is_not_text_falls_in_the_named_step() -> None:
+    serve()
+    result = await exchange_dryrun.dry_run(token(azp=17), config_for())
+    assert_fell_at(result, "acting_party_named", errors.REASON_EXCHANGE_CLAIMS)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_an_unlisted_acting_party_falls_in_the_allowed_step() -> None:
+    serve()
+    result = await exchange_dryrun.dry_run(token(azp="another-client"), config_for())
+    assert_fell_at(result, "acting_party_allowed", errors.REASON_EXCHANGE_CLAIMS)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_an_id_token_of_the_same_realm_falls_in_the_token_type_step() -> None:
+    """Same keys, same issuer, same audience: the payload ``typ`` is what tells them apart."""
+    serve()
+    result = await exchange_dryrun.dry_run(token(typ=exchange.ID_TOKEN_TYP), config_for())
+    assert_fell_at(result, "token_type_bearer", errors.REASON_EXCHANGE_CLAIMS)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_numeric_string_time_falls_in_the_times_step() -> None:
+    """What actually reaches this rule: the decoder lets a numeric string through its int()."""
+    serve()
+    result = await exchange_dryrun.dry_run(token(iat=str(int(time.time()))), config_for())
+    assert_fell_at(result, "times_numeric", errors.REASON_EXCHANGE_CLAIMS)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_token_living_longer_than_allowed_falls_in_the_lifetime_step() -> None:
+    serve()
+    now = int(time.time())
+    bound = exchange.MAX_TOKEN_LIFETIME_SECONDS
+    result = await exchange_dryrun.dry_run(token(iat=now, exp=now + bound + 60), config_for())
+    assert_fell_at(result, "lifetime_within_bound", errors.REASON_EXCHANGE_CLAIMS)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_token_older_than_allowed_falls_in_the_age_step() -> None:
+    """Measured against the injected wall clock, the one the age rule is ours alone on."""
+    serve()
+    real = time.time()
+    bound = exchange.MAX_TOKEN_LIFETIME_SECONDS
+    result = await exchange_dryrun.dry_run(token(), config_for(), now=lambda: real + bound + 60)
+    assert_fell_at(result, "age_within_bound", errors.REASON_EXCHANGE_CLAIMS)
+
+
+@respx.mock
+@pytest.mark.anyio
+@pytest.mark.parametrize("unusable", [" padded", "padded ", "   ", ""])
+async def test_a_subject_the_checker_refuses_falls_in_the_subject_step(unusable: str) -> None:
+    serve()
+    result = await exchange_dryrun.dry_run(token(sub=unusable), config_for())
+    if unusable == "":
+        # An empty ``sub`` never reaches our own rule: the require list of the decoder drops
+        # it one step earlier, exactly as it does in the checker.
+        assert_fell_at(result, "signature_and_standard_claims", errors.REASON_EXCHANGE_CLAIMS)
+    else:
+        assert_fell_at(result, "subject_usable", errors.REASON_EXCHANGE_CLAIMS)
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_subject_the_mapping_refuses_falls_in_the_mapping_step() -> None:
+    """The step calls ``principal_from_claims`` itself, so it cannot drift from operation.
+
+    A forward slash is one of the characters Nextcloud refuses in a user id. The checker has
+    no rule against it (it is a non-empty string without edge whitespace), the mapping has,
+    and the operating path answers such a token with no principal at all.
+    """
+    serve()
+    result = await exchange_dryrun.dry_run(token(sub="alice/bob"), config_for())
+    assert_fell_at(result, "mapping_yields_principal", errors.REASON_EXCHANGE_ACCOUNT)
+    assert (
+        mapping.principal_from_claims(
+            {"sub": "alice/bob"},
+            mapping.MappingSettings(strategy=mapping.MAPPING_ACCOUNT_ID_V1, account_claim="sub"),
+        )
+        is None
+    )
+
+
+# --- the step that is never executed (pitfall 8, T-24-23) ------------------------------------
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_green_run_passes_and_still_says_the_account_was_not_checked() -> None:
+    serve()
+    result = await exchange_dryrun.dry_run(token(), config_for())
+    assert result.passed is True
+    for step in result.steps:
+        if step.step == exchange_dryrun.STEP_ACCOUNT_EXISTS:
+            assert step.outcome == exchange_dryrun.OUTCOME_NOT_CHECKED
+            assert step.note == exchange_dryrun.NOTE_WOULD_CALL_NEXTCLOUD
+        else:
+            assert step.outcome == exchange_dryrun.OUTCOME_PASSED
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_the_account_step_stands_in_the_answer_in_all_three_shapes() -> None:
+    """Early failure, late failure, green run: never absent, because absence reads green."""
+    serve()
+    runs = [
+        await exchange_dryrun.dry_run("", config_for()),
+        await exchange_dryrun.dry_run(token(azp="another-client"), config_for()),
+        await exchange_dryrun.dry_run(token(), config_for()),
+    ]
+    for result in runs:
+        step = step_named(result, exchange_dryrun.STEP_ACCOUNT_EXISTS)
+        assert step.note == exchange_dryrun.NOTE_WOULD_CALL_NEXTCLOUD
+        assert step.outcome in (
+            exchange_dryrun.OUTCOME_SKIPPED,
+            exchange_dryrun.OUTCOME_NOT_CHECKED,
+        )
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_green_answer_carries_both_qualifying_sentences() -> None:
+    """Honesty belongs in the answer, not only in a docstring (the rule of LIMIT_SENTENCE)."""
+    serve()
+    result = await exchange_dryrun.dry_run(token(), config_for())
+    assert result.limit_sentence == exchange_dryrun.LIMIT_SENTENCE
+    assert result.cost_sentence == exchange_dryrun.COST_SENTENCE
+    assert "account" in result.limit_sentence
+    assert "clock" in result.limit_sentence
+    assert "one outgoing key set request" in result.cost_sentence
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_no_field_of_a_green_answer_carries_a_value_out_of_the_token() -> None:
+    """The same marker test as on a refusal, now on the path where every rule held."""
+    issuer = f"https://{MARKER}.example.org/realms/f13"
+    jwks_url = f"{issuer}/protocol/openid-connect/certs"
+    marked_kid = f"{MARKER}-kid"
+    marked_audience = f"https://cloud.example.org/{MARKER}"
+    serve(jwks_url, [jwk_of(PRIVATE, kid=marked_kid)])
+    config = config_for(
+        issuer=issuer,
+        jwks_uri=jwks_url,
+        audience=marked_audience,
+        azp_allowed=(f"{MARKER}-azp",),
+    )
+    marked = token(
+        kid=marked_kid,
+        iss=issuer,
+        aud=marked_audience,
+        azp=f"{MARKER}-azp",
+        sub=f"{MARKER}-sub",
+    )
+    result = await exchange_dryrun.dry_run(marked, config)
+    assert result.passed is True
+    assert MARKER not in serialized(result)
+    assert marked[:32] not in serialized(result)
+
+
+# --- no session, no store, no audit line (T-24-22) -------------------------------------------
+
+
+class Exploding:
+    """Anything a dry run must not touch. Every contact ends the test."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        raise AssertionError("the dry run opened something it must never open")
+
+    def __getattr__(self, name: str) -> Any:
+        raise AssertionError(f"the dry run reached for {name}")
+
+
+@respx.mock
+@pytest.mark.anyio
+async def test_a_full_run_opens_no_store_and_writes_no_audit_line(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Both stores and the database driver below them are poisoned; the run still completes."""
+
+    def never(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError("the dry run opened a database")
+
+    monkeypatch.setattr(oauth_store, "OAuthStore", Exploding)
+    monkeypatch.setattr(audit_store, "AuditStore", Exploding)
+    monkeypatch.setattr(sqlite3, "connect", never)
+    serve()
+    result = await exchange_dryrun.dry_run(token(), config_for())
+    assert result.passed is True
+
+
+def test_the_rule_reaches_for_no_identity_and_for_no_store() -> None:
+    """Measured on the source, so the absence cannot be undone by a helpful later hand."""
+    source = inspect.getsource(exchange_dryrun)
+    for forbidden in (
+        "resolve_identity",
+        "identity_for",
+        "ExchangeAccounts",
+        "OAuthStore",
+        "AuditStore",
+        "note_refusal",
+    ):
+        assert forbidden not in source, forbidden
