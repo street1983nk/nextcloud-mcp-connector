@@ -62,7 +62,10 @@ value are indistinguishable from the outside.
 The connections page is still not attached; `/exchange` shows only the one exchange
 permission of the account in front of it and nothing else. How the token exchange path is
 configured end to end, on this side and at the identity provider, gets its own setup
-document; here the page is named so that the list above stays true.
+document; here the page is named so that the list above stays true. What the path does to
+the boundary between two accounts is not a promise of this page either: it is measured in
+[exchange-evidence.md](exchange-evidence.md), against a running Nextcloud, with the raw
+output of every run in it.
 
 ## Requirements
 
