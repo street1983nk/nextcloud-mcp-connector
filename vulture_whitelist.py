@@ -293,3 +293,15 @@ _._decode_payload
 # end: it leaves this file with the task that calls it, exactly as the two entries above did.
 # tests/unit/test_audit_refusals.py drives it directly until then.
 _.note_refusal
+
+# --- The dry run answer of plan 24-05, read by the console of plan 24-06 ----------------
+# The three fields of DryRunResult in oauth/exchange_dryrun.py. The rule half was built and
+# tested one plan before its only reader: plan 24-05 owns the steps and the two qualifying
+# sentences, plan 24-06 adds exapp/exchange_check.py, which prints exactly these three.
+# passed: the overall verdict, true only when no step fell and none stayed unreached.
+_.passed
+# limit_sentence: what a green run does not mean, after the model of audit_verify.
+_.limit_sentence
+# cost_sentence: the one outgoing key set request a run pays, named in the answer.
+_.cost_sentence
+# The entry announces its own end: it leaves this file with the task that reads the fields.

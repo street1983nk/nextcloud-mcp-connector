@@ -109,13 +109,22 @@ def token(
     return jwt.encode(claims(**overrides), private, algorithm=algorithm, headers=header)
 
 
+def encoded(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
 def segment(value: dict[str, Any]) -> str:
-    return base64.urlsafe_b64encode(json.dumps(value).encode()).rstrip(b"=").decode()
+    return encoded(json.dumps(value).encode())
 
 
-def handmade(header: dict[str, Any], payload: str) -> str:
-    """A token whose payload segment is whatever the test wants, header still readable."""
-    return f"{segment(header)}.{payload}.c2lnbmF0dXJl"
+def handmade(header: dict[str, Any], payload: bytes) -> str:
+    """A token whose payload bytes are whatever the test wants, header still readable.
+
+    The payload segment stays valid base64url on purpose. PyJWT decodes both segments while
+    it reads the header, so a payload that is not even base64 falls one step earlier, in
+    ``header_readable``, and would measure the wrong rule.
+    """
+    return f"{segment(header)}.{encoded(payload)}.c2lnbmF0dXJl"
 
 
 # --- reading an answer --------------------------------------------------------------------
@@ -297,7 +306,7 @@ async def test_a_missing_header_type_is_no_reason_to_fall() -> None:
 @pytest.mark.anyio
 async def test_an_unreadable_payload_falls_in_the_payload_step() -> None:
     result = await exchange_dryrun.dry_run(
-        handmade({"alg": "RS256", "kid": KID, "typ": "JWT"}, "@@@@"), config_for()
+        handmade({"alg": "RS256", "kid": KID, "typ": "JWT"}, b"[[[not json"), config_for()
     )
     assert_fell_at(result, "payload_readable", errors.REASON_EXCHANGE_MALFORMED)
 
