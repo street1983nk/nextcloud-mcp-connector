@@ -67,7 +67,7 @@ ExApp, and a container log is read by everyone who can read container logs (T-22
 
 import logging
 import os
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -75,7 +75,7 @@ from mcp.server.auth.provider import AccessToken
 from starlette.requests import Request
 
 from .. import config
-from ..errors import ToolError
+from ..errors import REASON_EXCHANGE_ACCOUNT, REASON_EXCHANGE_FAILED, ToolError
 from .exchange import (
     DEFAULT_EXCHANGE_ALGORITHMS,
     ExchangeRefused,
@@ -93,6 +93,7 @@ __all__ = [
     "ChainedVerifier",
     "ExchangeBranch",
     "ExchangeConfig",
+    "RefusalNote",
     "StoreBranch",
     "build_chain",
     "exchange_shaped_request",
@@ -361,6 +362,20 @@ def _allowlist(raw: str, name: str) -> tuple[str, ...]:
 #: reader of this field can tell at a glance which issuer a token came from.
 EXCHANGE_CLAIM = "exchange_claims"
 
+#: How this module reports a refused exchange attempt: one asynchronous call, one rejection
+#: identifier of :data:`~mcp_connector.errors.REASONS`, no answer (AUDIT-07).
+#:
+#: A type alias and deliberately not a protocol class out of ``audit/``, because ``oauth/``
+#: does not import ``audit/``: the entry point builds the writer and hands in its bound
+#: method, and the chain knows only that it may call an asynchronous function with one
+#: string. That is the same shape ``accounts`` travels in since phase 23, and it is what
+#: keeps the direction of this dependency a wire in one entry point rather than an import
+#: here.
+#:
+#: The identifier is the only value that may travel: it comes out of the frozen set of
+#: ``errors`` and never out of a token whose signature did not hold (T-24-04).
+type RefusalNote = Callable[[str], Awaitable[None]]
+
 
 class StoreBranch(IdentitySource, Protocol):
     """The branch that answers for the tokens this server issued itself, plus its eraser.
@@ -465,6 +480,7 @@ class ChainedVerifier:
         checker: ExchangeBranch,
         config: ExchangeConfig,
         accounts: ExchangeAccounts | None = None,
+        refusals: RefusalNote | None = None,
     ) -> None:
         self._store = store
         self._checker = checker
@@ -474,11 +490,36 @@ class ChainedVerifier:
         #: an account source refuses every exchange token instead of assuming anything
         #: (T-23-07).
         self._accounts = accounts
+        #: Where a refused attempt is written down, or ``None`` (AUDIT-07). ``None`` is the
+        #: factory state of D-14 and the state of every installation with the audit log
+        #: switched off: then nothing is written and no store is opened.
+        self._refusals = refusals
 
     def __repr__(self) -> str:
         # The class of the store branch and the one word that matters, never a configured
         # value: an issuer or an audience can name an internal provider (T-22-04).
         return f"ChainedVerifier(store={type(self._store).__name__}, exchange='armed')"
+
+    async def _note(self, reason: str) -> None:
+        """Write one refused attempt down, if there is anywhere to write it, and never fail.
+
+        Bookkeeping may not change the answer of a transport boundary. That is the rule
+        ``audit/record.note`` follows on the tool path (D-13, fail open), and on this path it
+        weighs more: everything here happens before any authentication, so a writer that
+        could end a request would hand a stranger a 500 he ordered with one call, on exactly
+        the path he drives (T-24-19). So every failure of the writer ends here, and the line
+        names the type of it and nothing else, because the message of a store error carries
+        the path of the file.
+
+        ``None`` is the ordinary state and is silent: without the audit log there is no
+        writer, and a line per refusal would be the noise this branch exists to avoid.
+        """
+        if self._refusals is None:
+            return
+        try:
+            await self._refusals(reason)
+        except Exception as exc:
+            logger.error("a refused exchange attempt was not written down: %s", type(exc).__name__)
 
     async def verify_token(self, token: str) -> AccessToken | None:
         """The SDK protocol, answered by exactly one of the two branches and never by both.
@@ -521,9 +562,14 @@ class ChainedVerifier:
                 subject=None,
                 claims={EXCHANGE_CLAIM: claims},
             )
-        except ExchangeRefused:
+        except ExchangeRefused as refused:
             # The same promise read the other way round: a checked refusal ends here and is
-            # never offered to the store branch afterwards.
+            # never offered to the store branch afterwards. Since AUDIT-07 it leaves one row
+            # behind, carrying the group of plan 24-02 and nothing out of the token: the
+            # signature of that token did not hold, so every value in it is text a stranger
+            # chose (T-24-04). The answer to the caller is unchanged and stays the same
+            # three values for every group (T-24-03).
+            await self._note(refused.reason)
             return None
         except Exception as exc:
             # Fail closed means this one branch and no other. An exception travelling from a
@@ -532,6 +578,11 @@ class ChainedVerifier:
             # into a refusal costs nothing and buys the promise of T-22-09. The line names
             # the type of the failure and nothing else: no token, no claim, no principal.
             logger.error("an exchanged token could not be checked: %s", type(exc).__name__)
+            # The row of the case in which the reason is genuinely unknown. The log line
+            # above is for whoever reads container logs and names the type; the row is for
+            # whoever reads the trail and names the group. Neither carries the other's
+            # content.
+            await self._note(REASON_EXCHANGE_FAILED)
             return None
         return access
 
@@ -545,20 +596,42 @@ class ChainedVerifier:
         that principal acts here. The existence check of the account lives in that source
         and not in this method, because it is the one thing the two operating modes differ
         in (``oauth/exchange_accounts.py``); everything around it is the same code for both.
-        Every unclarity is a refusal: no source, no mapping result and every exception of
-        the source answer ``None``, which the transport boundary turns into the end of the
-        request. Store tokens go to the store branch exactly as before.
+        Every unclarity is a refusal: no source, no mapping result, a source that says no
+        and every exception of the source answer ``None``, which the transport boundary
+        turns into the end of the request. Store tokens go to the store branch exactly as
+        before.
+
+        The four ways of saying no live in :meth:`_exchange_identity` and are written down
+        here, in one place and with one identifier (AUDIT-07). One place, because that is
+        what makes "one row per refused attempt" a property of the structure instead of a
+        habit four branches have to keep: a fifth way to refuse inside that method is
+        recorded without anybody remembering this line.
         """
         claims = access.claims or {}
         if EXCHANGE_CLAIM not in claims:
             return await self._store.resolve_identity(access)
+        identity = await self._exchange_identity(claims[EXCHANGE_CLAIM])
+        if identity is None:
+            await self._note(REASON_EXCHANGE_ACCOUNT)
+        return identity
+
+    async def _exchange_identity(self, claims: Mapping[str, Any]) -> OAuthIdentity | None:
+        """The identity behind a checked claim set, or ``None`` for every kind of no.
+
+        Split off from :meth:`resolve_identity` so that the four refusals of this branch
+        have one answer and therefore one row. What they are is unchanged: the state after
+        phase 22, a claim set the mapping finds no principal in, an account source that
+        says no, and an account source that fails. From outside they are one answer, for
+        the reason ``oauth/verifier.py`` gives for its own refusals and
+        ``oauth/exchange_accounts.py`` repeats for this seam.
+        """
         if self._accounts is None:
             # The state after phase 22: an armed chain without an account source refuses.
             return None
         # The principal comes out of the mapping and never out of ``sub`` directly: a raw
         # claim in this place would be a login name of a foreign realm posing as the
         # principal of this server (T-23-06, pitfall 5 of the research).
-        principal = principal_from_claims(claims[EXCHANGE_CLAIM], self._config.mapping)
+        principal = principal_from_claims(claims, self._config.mapping)
         if principal is None:
             return None
         try:
@@ -567,7 +640,7 @@ class ChainedVerifier:
             # the SDK token model. And the way from here to the pause switch runs without a
             # single change to ``exapp/middleware.py``, because that boundary reads
             # ``identity.principal`` and nothing else.
-            return await self._accounts.identity_for(principal, claims[EXCHANGE_CLAIM])
+            return await self._accounts.identity_for(principal, claims)
         except Exception as exc:
             # The exact shape of the catch in ``verify_token`` (T-23-08, T-23-09): one
             # refusal for this one call, one line naming the type of the failure and
@@ -604,6 +677,7 @@ def build_chain(
     env: Mapping[str, str] | None = None,
     config: ExchangeConfig | None = None,
     accounts: ExchangeAccounts | None = None,
+    refusals: RefusalNote | None = None,
 ) -> StoreBranch:
     """The one place a deployment hangs the chain in, and the one place it does not.
 
@@ -621,6 +695,14 @@ def build_chain(
     ``accounts`` is the account source the identity branch of ``resolve_identity`` asks
     (plans 23-03 and 23-04 build the two implementations). ``None`` keeps the state after
     phase 22: the chain hangs, and every exchange token is refused at the identity step.
+
+    ``refusals`` is where a refused attempt is written down (AUDIT-07), and it is read the
+    same way as ``accounts``: ``None`` is the factory state, because the audit log is off
+    unless an administrator switched it on (D-14), and then nothing is written and no store
+    is opened. The entry point builds the writer and hands its method in; this module never
+    imports ``audit/``, so an installation with the log off has no path here at all rather
+    than a writer that writes nowhere. Without a configured exchange path the argument is
+    dropped with the rest: there is no chain to write from.
     """
     loaded = config if config is not None else load_exchange_config(env)
     if loaded is None:
@@ -633,4 +715,5 @@ def build_chain(
         checker=ExchangeTokenChecker(loaded.settings),
         config=loaded,
         accounts=accounts,
+        refusals=refusals,
     )
