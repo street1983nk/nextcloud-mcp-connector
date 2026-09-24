@@ -245,6 +245,18 @@ Prérequis :
 		  - which is why the number of routes below stays the one the first line of this
 		  - comment names.
 		  -
+		  - The seventh deliberately absent path is /exchange-check, added in plan 24-06. It
+		  - is the handler of the occ command mcp_connector:exchange:check, which holds a
+		  - token an administrator was handed against the configured token exchange path and
+		  - names every rule with its outcome. What a declaration would publish here is not a
+		  - list of accounts but an oracle: anyone who can reach the PHP proxy could hold any
+		  - token against this instance and read back which single rule refused it, and that
+		  - proxy attaches valid AppAPI headers itself (T-02-20, T-24-08, T-24-27). AppAPI
+		  - calls this path over PublicFunctions like the six above, so it needs no
+		  - declaration to work, and the handler carries the same double check. It changes
+		  - nothing, opens no session and writes no audit row, which is why it has no
+		  - mandatory option. A test asserts that this path is declared in no url below.
+		  -
 		  - Order matters: the first route that matches path and verb wins, and its access
 		  - level decides alone.
 		  -
