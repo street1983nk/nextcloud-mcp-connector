@@ -28,6 +28,8 @@ FILES_ROOT = f"{BASE}/remote.php/dav/files/{USER}"
 TARGET = "/Docs/new-note.md"
 TARGET_URL = f"{FILES_ROOT}/Docs/new-note.md"
 CONTENT = "# Neue Notiz\nZeile zwei\n"
+UPLOAD_ID = "upload-test"
+UPLOAD_FOLDER_URL = dav.uploads_url(Credentials(BASE, USER, SECRET), UPLOAD_ID, path=TARGET)
 
 
 @pytest.fixture
@@ -249,3 +251,94 @@ async def test_put_new_file_quotes_special_characters_in_the_target(clients: NcC
     assert url.startswith(f"{FILES_ROOT}/Docs/")
     assert " " not in url
     assert "&" not in url
+
+
+@pytest.mark.anyio
+async def test_binary_upload_assembles_a_pdf_without_replacing_an_existing_file(
+    clients: NcClients,
+) -> None:
+    pdf = b"%PDF-1.7\nhandwritten scan\n"
+    encoded = base64.b64encode(pdf).decode("ascii")
+    with respx.mock(assert_all_called=True) as mock:
+        mkcol = mock.route(method="MKCOL", url=UPLOAD_FOLDER_URL).mock(
+            return_value=httpx.Response(201)
+        )
+        put = mock.route(method="PUT", url=f"{UPLOAD_FOLDER_URL}/00001").mock(
+            return_value=httpx.Response(201)
+        )
+        move = mock.route(method="MOVE", url=f"{UPLOAD_FOLDER_URL}/.file").mock(
+            return_value=httpx.Response(201, headers={"etag": '"pdf-etag"'})
+        )
+
+        result = await files_tools.upload_binary(
+            clients,
+            path=TARGET,
+            content_base64=encoded,
+            total_bytes=len(pdf),
+            upload_id=UPLOAD_ID,
+            final=True,
+            content_type="application/pdf",
+        )
+
+    assert mkcol.calls[0].request.headers["destination"] == TARGET_URL
+    assert put.calls[0].request.content == pdf
+    assert put.calls[0].request.headers["oc-total-length"] == str(len(pdf))
+    assert put.calls[0].request.headers["content-type"] == "application/pdf"
+    assert move.calls[0].request.headers["destination"] == TARGET_URL
+    assert move.calls[0].request.headers["overwrite"] == "F"
+    assert result == {
+        "path": TARGET,
+        "etag": '"pdf-etag"',
+        "created": True,
+        "upload_id": UPLOAD_ID,
+        "chunk_index": 1,
+        "bytes": len(pdf),
+        "total_bytes": len(pdf),
+        "completed": True,
+    }
+
+
+@pytest.mark.anyio
+async def test_binary_upload_returns_a_continuation_for_a_large_file(clients: NcClients) -> None:
+    chunk = b"x" * files_tools.MIN_UPLOAD_CHUNK_BYTES
+    with respx.mock(assert_all_called=True) as mock:
+        mock.route(method="MKCOL", url=UPLOAD_FOLDER_URL).mock(return_value=httpx.Response(201))
+        put = mock.route(method="PUT", url=f"{UPLOAD_FOLDER_URL}/00001").mock(
+            return_value=httpx.Response(201)
+        )
+
+        result = await files_tools.upload_binary(
+            clients,
+            path=TARGET,
+            content_base64=base64.b64encode(chunk).decode("ascii"),
+            total_bytes=len(chunk) + 10,
+            upload_id=UPLOAD_ID,
+            final=False,
+        )
+
+    assert put.calls[0].request.content == chunk
+    assert result == {
+        "path": TARGET,
+        "upload_id": UPLOAD_ID,
+        "chunk_index": 1,
+        "bytes": len(chunk),
+        "total_bytes": len(chunk) + 10,
+        "completed": False,
+        "next_chunk": 2,
+    }
+
+
+@pytest.mark.anyio
+async def test_binary_upload_rejects_invalid_base64_before_network(clients: NcClients) -> None:
+    with respx.mock as mock:
+        with pytest.raises(ToolError) as excinfo:
+            await files_tools.upload_binary(
+                clients,
+                path=TARGET,
+                content_base64="not base64!",
+                total_bytes=10,
+                final=True,
+            )
+        assert len(mock.calls) == 0
+
+    assert "base64" in excinfo.value.message.lower()

@@ -20,6 +20,7 @@ files_search
 files_list
 files_read
 files_upload
+files_download
 calendar_list_events
 calendar_create_event
 notes_search

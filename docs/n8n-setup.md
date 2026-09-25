@@ -33,7 +33,7 @@ This connector answers a different shape of the same problem:
 
 | | Built in Nextcloud node | This connector over MCP |
 |---|---|---|
-| Coverage | Files, folders, users | 21 tools: files, search, calendar, contacts, notes, Deck, Tables, Talk, mail counters, a bundled context tool |
+| Coverage | Files, folders, users | 22 tools: files, search, calendar, contacts, notes, Deck, Tables, Talk, mail counters, a bundled context tool |
 | Identity | One credential per node, shared by every run | One OAuth connection per person, every request runs under that account |
 | Credential in n8n | Nextcloud user plus app password, stored in n8n | No password anywhere: the sign in happens on Nextcloud's own pages |
 | Ending access | Delete the credential in n8n | Revoke in Nextcloud, Settings, Security, Devices and sessions, or on this app's connections page. Takes effect on the next request |
@@ -200,7 +200,7 @@ For "answer a question over my Nextcloud", use an **AI Agent** node with a chat 
 
 Two settings matter more than they look:
 
-* **Limit the tools.** The sub-node has an include and exclude list. 21 tool descriptions are
+* **Limit the tools.** The sub-node has an include and exclude list. 22 tool descriptions are
   context the model pays for on every turn, and an agent that only files meeting notes needs
   `notes_create` and `files_list`, not the Talk family.
 * **`prepare_context` first.** This connector has one tool that bundles the usual "what is
@@ -255,7 +255,7 @@ is the first thing that fails when somebody reproduces the measurement below.
 **6. Removing the credential in n8n does not revoke anything.** Same as with the hosted
 connectors: the authorization lives in Nextcloud. End it in Nextcloud.
 
-**7. The tool set is 21 tools and the number is not held by this page.**
+**7. The tool set is 22 tools and the number is not held by this page.**
 `tests/contract/test_tool_surface.py` holds it. A guide that promises a number is a guide that
 goes stale.
 

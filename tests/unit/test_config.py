@@ -68,6 +68,25 @@ def test_trailing_slash_is_removed_and_subpath_is_kept() -> None:
     assert config.normalize_base_url("  https://host.test/nc  ") == "https://host.test/nc"
 
 
+def test_files_root_defaults_to_the_whole_files_area() -> None:
+    assert config.files_root({}) == "/"
+
+
+def test_files_root_normalizes_the_bound_directory() -> None:
+    assert config.files_root({config.ENV_FILES_ROOT: " /RTC/mth/knsk/// "}) == "/RTC/mth/knsk"
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["rtc/mth/knsk", "/rtc/../secret", r"/rtc\\mth", "/rtc\x00mth"],
+)
+def test_invalid_files_root_is_rejected(raw: str) -> None:
+    with pytest.raises(ToolError) as excinfo:
+        config.normalize_files_root(raw)
+    assert config.ENV_FILES_ROOT in excinfo.value.message
+    assert excinfo.value.hint
+
+
 @pytest.mark.parametrize(
     "raw",
     ["cloud.test", "ftp://cloud.test", "file:///etc/passwd", "", "   ", "https://"],

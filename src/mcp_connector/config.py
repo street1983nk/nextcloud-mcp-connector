@@ -47,6 +47,7 @@ ENV_STATIC_BEARER = "NC_MCP_STATIC_BEARER"
 ENV_DISABLE_DNS_REBINDING = "NC_MCP_DISABLE_DNS_REBINDING_PROTECTION"
 ENV_PUBLIC_URL = "NC_MCP_PUBLIC_URL"
 ENV_TALK_SEND = "NC_MCP_TALK_SEND"
+ENV_FILES_ROOT = "NC_MCP_FILES_ROOT"
 
 # The audit log of phase 18. The first one is the switch the whole feature hangs on (D-14),
 # the other two move the two limits of the store (D-09). All three read by the three
@@ -274,6 +275,41 @@ def load_base_url(env: Mapping[str, str] | None = None) -> str:
     """The configured Nextcloud instance. Needed in every mode, including passthrough."""
     source = os.environ if env is None else env
     return normalize_base_url(_required(source, ENV_URL))
+
+
+def normalize_files_root(raw: str) -> str:
+    """Normalize the optional Nextcloud directory exposed to the file tools."""
+    candidate = (raw or "/").strip() or "/"
+    if "\\" in candidate or any(ord(char) < 32 or ord(char) == 127 for char in candidate):
+        raise ToolError(
+            message=f"{ENV_FILES_ROOT} contains an invalid path.",
+            hint=(
+                "Use a Nextcloud path such as /Documents/AI, without backslashes "
+                "or control characters."
+            ),
+        )
+    if not candidate.startswith("/"):
+        raise ToolError(
+            message=f"{ENV_FILES_ROOT} must start with '/'.",
+            hint="Use a Nextcloud path such as /Documents/AI.",
+        )
+    segments: list[str] = []
+    for segment in candidate.split("/"):
+        if segment in ("", "."):
+            continue
+        if segment == "..":
+            raise ToolError(
+                message=f"{ENV_FILES_ROOT} must stay inside the user's files.",
+                hint="Parent references are not allowed; choose an absolute directory path.",
+            )
+        segments.append(segment)
+    return "/" + "/".join(segments)
+
+
+def files_root(env: Mapping[str, str] | None = None) -> str:
+    """Return the configured virtual root for every Nextcloud file operation."""
+    source = os.environ if env is None else env
+    return normalize_files_root(source.get(ENV_FILES_ROOT, "/"))
 
 
 def load_stdio_credentials(env: Mapping[str, str] | None = None) -> Credentials:

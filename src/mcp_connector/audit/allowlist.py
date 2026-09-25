@@ -11,7 +11,8 @@ live tool surface rather than trusting that both were kept in step by hand.
 from collections.abc import Mapping
 
 #: The names whose bare mention already carries content, and which therefore never enter a
-#: set above. ``content`` on ``files_upload`` and ``notes_create`` and ``message`` on
+#: set above. ``content`` and ``content_base64`` on ``files_upload``, ``content`` on
+#: ``notes_create`` and ``message`` on
 #: ``talk_send`` are the clear three (18-RESEARCH.md:428-433): that a body was handed along
 #: is trivially true for a write tool, so the name carries no information at all and would
 #: stand in the entry for one reason only, to grow a value next to it one day by accident.
@@ -22,6 +23,7 @@ from collections.abc import Mapping
 FORBIDDEN_PARAMS: frozenset[str] = frozenset(
     {
         "content",
+        "content_base64",
         "description",
         "location",
         "message",
@@ -47,10 +49,13 @@ PARAM_ALLOWLIST: Mapping[str, frozenset[str]] = {
     "deck_browse": frozenset({"board_id", "level", "limit", "stack_id"}),
     "deck_create_card": frozenset({"board_id", "duedate", "stack_id"}),
     "fetch": frozenset({"id"}),
+    "files_download": frozenset({"chunk_bytes", "offset", "path"}),
     "files_list": frozenset({"cursor", "limit", "path"}),
     "files_read": frozenset({"offset", "path"}),
     "files_search": frozenset({"cursor", "folder", "limit", "query"}),
-    "files_upload": frozenset({"path"}),
+    "files_upload": frozenset(
+        {"chunk_index", "content_type", "final", "path", "total_bytes", "upload_id"}
+    ),
     "mail_browse": frozenset({"account_id", "cursor", "filter", "level", "limit", "mailbox_id"}),
     "notes_create": frozenset({"category"}),
     "notes_read": frozenset({"note_id"}),

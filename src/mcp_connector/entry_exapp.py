@@ -88,6 +88,7 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
     this mode the wrapper is not optional, so a missing wrap is an error and not a
     warning: it would leave the whole JSON-RPC preamble unauthenticated (CR-01).
     """
+    config.files_root(env)
     security = TransportSecuritySettings(
         allowed_hosts=config.allowed_hosts(env),
         enable_dns_rebinding_protection=config.dns_rebinding_protection(env),

@@ -62,6 +62,11 @@ from mcp_connector.server import mcp
 #               one of the 21 schemas is generated, which is a decision of its own and not
 #               a diet of five descriptions.
 #
+#   Measurement 2026-09-20, all 22 curated tools with chunked files_download: 16412 bytes
+#   Budget      unchanged at 18000, because the measured surface still fits below the
+#               existing ceiling. The tool has three arguments; its description names the
+#               continuation contract that supports files of any total size in 8 MiB chunks.
+#
 # The older lines stay where they are: a regression is only attributable when the number it
 # regressed from is still readable. The first 2026-08-21 line is the tables_browse and
 # tables_create_row pair of phase 8 (751 and 780 bytes), which took the surface past the
@@ -75,11 +80,11 @@ from mcp_connector.server import mcp
 # The fifth is the first line of this file that lowers the number instead of raising it, and
 # it is the only kind of line that needs no justification beyond its own measurement.
 #
-# The headroom is for wording, not for a new tool: at ~4 bytes per token the whole surface
-# costs roughly 3.9k tokens in every single session of every client. A twenty-second tool or a
-# description that grows into a paragraph is supposed to trip this gate, so the decision
-# gets made on purpose instead of by accident. Raising the number is allowed, but only
-# together with a new measurement line above, so a regression stays attributable.
+# At ~4 bytes per token the whole surface costs roughly 4k tokens in every single session of
+# every client. The twenty-second tool was added with an explicit measurement and without
+# raising the ceiling. A future tool or a description that grows into a paragraph still has
+# to fit this gate or justify a new measurement and budget here, so a regression stays
+# attributable.
 BUDGET_BYTES = 18_000
 
 # The second claim, and the one that actually reports a regression. A total with headroom

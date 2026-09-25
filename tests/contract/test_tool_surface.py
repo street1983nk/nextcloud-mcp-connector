@@ -31,7 +31,7 @@ from mcp_connector.tools import mail as mail_tools
 README = Path(__file__).resolve().parents[2] / "README.md"
 DOCS = Path(__file__).resolve().parents[2] / "docs"
 
-# The curated set (D-03 to D-09). A set comparison, not a subset check: a twenty-second tool
+# The curated set (D-03 to D-09). A set comparison, not a subset check: a twenty-third tool
 # fails this file just as loudly as a missing one. Counter proof for the reviewer: adding
 # ``@mcp.tool`` for a ``files_delete`` anywhere under ``server/reg_*.py`` turns
 # ``test_the_curated_set_is_complete_and_only_the_chatgpt_profile_has_a_schema`` and
@@ -41,6 +41,7 @@ EXPECTED_TOOLS = {
     "files_search",
     "files_list",
     "files_read",
+    "files_download",
     "files_upload",
     "calendar_list_events",
     "calendar_create_event",
@@ -101,6 +102,24 @@ async def test_files_read_is_exposed_with_honest_annotations() -> None:
 
 
 @pytest.mark.anyio
+async def test_files_download_is_an_embedded_resource_read() -> None:
+    async with Client(mcp, raise_exceptions=True) as client:
+        tools = {tool.name: tool for tool in (await client.list_tools()).tools}
+
+    tool = tools["files_download"]
+    annotations = tool.annotations
+    assert annotations is not None
+    assert annotations.read_only_hint is True
+    assert annotations.open_world_hint is False
+    assert tool.output_schema is None, "binary content is an embedded resource, not JSON"
+    assert set(tool.input_schema.get("properties", {})) == {"path", "offset", "chunk_bytes"}
+    assert set(tool.input_schema.get("required", [])) == {"path"}
+    description = tool.description or ""
+    assert "next_offset" in description
+    assert "any-size" in description
+
+
+@pytest.mark.anyio
 async def test_files_upload_is_annotated_as_create_only() -> None:
     """The only write tool of the phase must say out loud what it does and does not do."""
     async with Client(mcp, raise_exceptions=True) as client:
@@ -122,16 +141,16 @@ async def test_files_upload_is_annotated_as_create_only() -> None:
 
 
 @pytest.mark.anyio
-async def test_the_four_file_tools_are_complete_and_read_first() -> None:
-    """D-03: search, list, read and upload, and only the last one writes."""
+async def test_the_five_file_tools_are_complete_and_read_first() -> None:
+    """D-03: search, list, read, download and upload, and only the last one writes."""
     async with Client(mcp, raise_exceptions=True) as client:
         tools = {tool.name: tool for tool in (await client.list_tools()).tools}
 
-    for name in ("files_search", "files_list", "files_read", "files_upload"):
+    for name in ("files_search", "files_list", "files_read", "files_download", "files_upload"):
         assert name in tools, f"{name} is part of the curated file set (D-03)"
         assert tools[name].output_schema is None, "structured_output=False (schema diet)"
 
-    for name in ("files_search", "files_list"):
+    for name in ("files_search", "files_list", "files_read", "files_download"):
         annotations = tools[name].annotations
         assert annotations is not None
         assert annotations.read_only_hint is True, f"{name} only reads"
@@ -511,12 +530,12 @@ async def test_prepare_context_is_listed_as_a_bundling_read() -> None:
 
 @pytest.mark.anyio
 async def test_the_curated_set_is_complete_and_only_the_chatgpt_profile_has_a_schema() -> None:
-    """The whole surface in one assertion: 21 tools, and the diet holds for 19 of them."""
+    """The whole surface in one assertion: 22 tools, and the diet holds for 20 of them."""
     async with Client(mcp, raise_exceptions=True) as client:
         tools = {tool.name: tool for tool in (await client.list_tools()).tools}
 
     assert set(tools) == EXPECTED_TOOLS
-    assert len(tools) == 21, "the curated set is twenty-one tools, no more and no fewer"
+    assert len(tools) == 22, "the curated set is twenty-two tools, no more and no fewer"
 
     with_schema = {name for name, tool in tools.items() if tool.output_schema is not None}
     assert with_schema == STRUCTURED_TOOLS, (
@@ -716,7 +735,7 @@ async def test_no_input_schema_accepts_a_user_parameter() -> None:
     async with Client(mcp, raise_exceptions=True) as client:
         tools = {tool.name: tool for tool in (await client.list_tools()).tools}
 
-    assert set(tools) == EXPECTED_TOOLS, "the confused deputy check must cover all 21 schemas"
+    assert set(tools) == EXPECTED_TOOLS, "the confused deputy check must cover all 22 schemas"
 
     findings: list[str] = []
     for name, tool in sorted(tools.items()):
@@ -756,7 +775,7 @@ async def test_the_readme_permission_table_matches_the_live_registry() -> None:
 def test_a_documented_tool_count_is_the_current_one_or_says_which_run_it_is_from() -> None:
     """IN-04: a page may record a run with an old count, it may not leave it unexplained.
 
-    Two kinds of number live in ``docs/``. A statement about the product ("all 21 tools")
+    Two kinds of number live in ``docs/``. A statement about the product ("all 22 tools")
     has to be the number this registry answers. A dated evidence line ("connected, 15 tools
     listed") is a record of a run and stays as it was recorded, and a reader who counts both
     holds one of them for wrong unless the page says which is which. So a page that names a

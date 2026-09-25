@@ -2602,6 +2602,9 @@ neuer Client im Paket, Werkzeugoberfläche und Budget-Gate unverändert (D-12). 
 sondern ein Nachweis, und er besteht aus vier Läufen am 2026-08-29, alle gegen den Stand dieses
 Berichts.
 
+Die 21-Tool-Zahl unten ist die historische Messung dieses Berichts. Die aktuelle Zahl liegt in
+`tests/contract/test_tool_surface.py`.
+
 | # | Nachweis | Kommando | Ergebnis |
 |---|----------|----------|----------|
 | 1 | Nichts liegt unverfolgt herum, und nichts hat sich seit dem Stand vor der Phase bewegt | `git status --short src/ appinfo/ pyproject.toml uv.lock` und `git diff --stat 90d2f68..HEAD -- src appinfo pyproject.toml uv.lock` | beide **leer**. `90d2f68` ist der letzte Commit vor `docs(17): research openDesk spike domain`, also der Stand vor der Phase. Die Phase hat 33 Dateien geändert, keine davon unter `src/` oder `appinfo/` |

@@ -15,6 +15,7 @@ import httpx
 import pytest
 import respx
 
+from mcp_connector import config
 from mcp_connector.errors import ToolError
 from mcp_connector.nextcloud import NcClients
 from mcp_connector.nextcloud.credentials import Credentials
@@ -163,6 +164,33 @@ async def test_a_hit_that_cannot_be_resolved_later_says_so(clients: NcClients) -
     assert by_id[f"url:{BASE}/index.php/call/abc123#message_42"]["resolvable"] is False
     assert by_id[f"url:{BASE}/index.php/call/abc123#message_42"]["kind"] == "url"
     assert "resolvable" not in by_id["file:4711"], "a file id resolves, so it costs no field"
+
+
+@pytest.mark.anyio
+async def test_file_search_results_outside_the_bound_root_are_skipped(
+    clients: NcClients, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(config.ENV_FILES_ROOT, "/rtc/mth/knsk")
+    inside = {
+        "title": "inside.pdf",
+        "resourceUrl": f"{BASE}/index.php/f/5001",
+        "attributes": {"fileId": "5001", "path": "rtc/mth/knsk/inside.pdf"},
+    }
+    outside = {
+        "title": "outside.pdf",
+        "resourceUrl": f"{BASE}/index.php/f/5002",
+        "attributes": {"fileId": "5002", "path": "Documents/outside.pdf"},
+    }
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(PROVIDERS_URL).mock(return_value=httpx.Response(200, json=provider_list("files")))
+        mock.get(search_url("files")).mock(
+            return_value=httpx.Response(200, json=hits("Files", [inside, outside]))
+        )
+
+        result = await search_tools.unified_search(clients, query="pdf")
+
+    assert [hit["id"] for hit in result["results"]] == ["file:5001"]
+    assert result["skipped"] == 1
 
 
 @pytest.mark.anyio

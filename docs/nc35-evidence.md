@@ -93,6 +93,9 @@ mcp_connector (MCP Connector): 0.1.13 [enabled]
 
 What then answered, over the whole chain (client, Caddy, HaRP, ExApp container, Nextcloud):
 
+This table records the historical 21-tool run. The current tool count is held by
+`tests/contract/test_tool_surface.py`.
+
 | What was run | Result |
 |---|---|
 | `scripts/oauth_flow_check.py` | all seven steps, including the refusals: a decision without an independent identity is a 400, the credential of a connect page is shown once and the second read is a 400, and eleven token attempts end in a 429 with `Retry-After: 300` |

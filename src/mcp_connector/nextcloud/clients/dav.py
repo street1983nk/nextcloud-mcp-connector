@@ -1,11 +1,10 @@
-"""WebDAV client: SEARCH, PROPFIND with Depth 0 and 1, GET with a Range, create-only PUT.
+"""WebDAV client: SEARCH, PROPFIND, ranged GET, and create-only file uploads.
 
-This module implements no destructive request. There is no DELETE, no MOVE, no COPY and no
-PROPPATCH, and the single write is a PUT that carries ``If-None-Match: *``. That header is
-the whole overwrite protection (TOOL-09, threat T-01-15): sabre/dav evaluates preconditions
-for every method, and ``*`` means the request only succeeds while nothing exists at the
-target. The check therefore runs on the server, inside the same request, which is why this
-client does no PROPFIND probe before the PUT: a probe would only add a race window.
+The ordinary file write is a PUT that carries ``If-None-Match: *``. Large binary uploads use
+Nextcloud's private chunk directory and one final MOVE with ``Overwrite: F``; that MOVE only
+assembles a new file and can never replace an existing target. No tool exposes delete, copy,
+rename, property editing, or an overwrite mode. The precondition is evaluated by Nextcloud in
+the same request, which is why this client does no PROPFIND probe before a create-only PUT.
 
 Status handling follows two rules from the research: never repeat a failed
 authentication (Nextcloud counts failures per source IP and slows down every user of the
@@ -13,6 +12,7 @@ server afterwards), and never let a redirect pass silently (the auth header woul
 foreign host or vanish).
 """
 
+import hashlib
 import re
 from collections.abc import Sequence
 from posixpath import dirname
@@ -33,6 +33,7 @@ from ..credentials import Credentials
 from . import xml
 
 DAV_FILES_PREFIX = "/remote.php/dav/files/"
+DAV_UPLOADS_PREFIX = "/remote.php/dav/uploads/"
 
 #: Digits, and only ASCII ones. ``str.isdigit`` also accepts a superscript two and an
 #: Arabic-Indic digit, and neither is a file id Nextcloud ever handed out. This is the
@@ -110,7 +111,15 @@ def safe_path(path: str) -> str:
                 hint=_PATH_HINT,
             )
         segments.append(segment)
-    return "/" + "/".join(segments)
+    requested = "/" + "/".join(segments)
+    root = config.files_root()
+    if root == "/":
+        return requested
+    # A configured root becomes the virtual `/` for agents: `/scan.pdf` means a file below
+    # the bound directory, while its explicit absolute spelling remains accepted as well.
+    if requested == root or requested.startswith(root + "/"):
+        return requested
+    return root if requested == "/" else f"{root}{requested}"
 
 
 def files_url(creds: Credentials, path: str) -> str:
@@ -183,24 +192,46 @@ async def get_range(
         end = "" if limit is None else str(offset + limit - 1)
         headers["Range"] = f"bytes={offset}-{end}"
 
-    response = await client.get(
-        files_url(creds, target),
-        headers=headers,
-        auth=creds.auth(),
-    )
-    _check(response, target)
-    if "Range" in headers and response.status_code == 200:
-        stop = None if limit is None else offset + limit
-        return response.content[offset:stop]
-    return response.content
+    # Bound memory even when a proxy ignores Range. Discard the prefix and stop reading
+    # once the requested window has arrived rather than buffering the complete file.
+    headers["Accept-Encoding"] = "identity"
+    async with client.stream(
+        "GET", files_url(creds, target), headers=headers, auth=creds.auth()
+    ) as response:
+        _check(response, target)
+        content_range = response.headers.get("Content-Range")
+        if response.status_code == 206 and content_range:
+            match = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+|\*)", content_range)
+            if (
+                match is None
+                or int(match[1]) != offset
+                or int(match[2]) < offset
+                or (limit is not None and int(match[2]) >= offset + limit)
+            ):
+                raise ToolError(
+                    message="Nextcloud returned a different byte range than requested.",
+                    hint="Retry the same offset; check the proxy if this repeats.",
+                )
+        skip = offset if response.status_code == 200 else 0
+        result = bytearray()
+        async for chunk in response.aiter_bytes(chunk_size=64 * 1024):
+            if skip:
+                consumed = min(skip, len(chunk))
+                skip -= consumed
+                chunk = chunk[consumed:]
+            remaining = None if limit is None else limit - len(result)
+            result.extend(chunk if remaining is None else chunk[:remaining])
+            if limit is not None and len(result) >= limit:
+                break
+        return bytes(result)
 
 
 def search_scope(creds: Credentials, folder: str = "/") -> str:
-    """Return the search scope: the user's own home, or one folder below it.
+    """Return the search scope: the configured sandbox, or one folder below it.
 
     The scope is never built from a parameter alone. The user segment comes from the auth
     channel and the folder part runs through :func:`safe_path` first, so a search cannot
-    reach into another account (threat T-01-32).
+    reach into another account or outside ``NC_MCP_FILES_ROOT`` (threat T-01-32).
 
     ``creds.user`` is quoted like everywhere else in this package (WR-10). This was the
     single place that wrote it into a path unquoted, which was harmless while the value
@@ -439,14 +470,24 @@ def parse_entries(body: str | bytes, creds: Credentials) -> list[dict[str, Any]]
     question this client asks, so it is skipped instead of turned into a path that would
     later be sent back to Nextcloud.
     """
-    home = f"{DAV_FILES_PREFIX}{creds.user}"
+    home = f"{urlsplit(creds.base_url).path.rstrip('/')}{DAV_FILES_PREFIX}{creds.user}"
     entries: list[dict[str, Any]] = []
     for href, props in xml.parse_multistatus(body):
         path = _home_path_of(href, home)
-        if path is None:
+        if path is None or not in_files_root(path):
             continue
         entries.append(_entry(path, props))
     return entries
+
+
+def in_files_root(path: str) -> bool:
+    """Check a returned absolute path without remapping it into the virtual root."""
+    if "\\" in path or any(ord(char) < 32 or ord(char) == 127 for char in path):
+        return False
+    if any(part in (".", "..") for part in path.split("/")):
+        return False
+    root = config.files_root()
+    return root == "/" or path == root or path.startswith(root + "/")
 
 
 def _home_path_of(href: str, home: str) -> str | None:
@@ -502,6 +543,143 @@ async def put_new_file(
         "etag": response.headers.get("etag", ""),
         "created": True,
     }
+
+
+def uploads_url(creds: Credentials, upload_id: str, part: str | None = None, *, path: str) -> str:
+    """Isolate connector uploads by sandbox and destination, including on retries.
+
+    Caller-controlled ids never name a browser's existing temporary upload directory.
+    Changing the destination or configured root selects a different staging directory.
+    """
+    user = quote(creds.user, safe="")
+    identity = "\x00".join((config.files_root(), safe_path(path), upload_id))
+    folder = "nc-mcp-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
+    suffix = "" if part is None else f"/{quote(part, safe='')}"
+    return f"{creds.base_url}{DAV_UPLOADS_PREFIX}{user}/{folder}{suffix}"
+
+
+async def start_chunked_upload(
+    client: httpx.AsyncClient,
+    creds: Credentials,
+    path: str,
+    upload_id: str,
+) -> None:
+    """Create the temporary folder used by Nextcloud's chunk-upload protocol."""
+    target = safe_path(path)
+    response = await client.request(
+        "MKCOL",
+        uploads_url(creds, upload_id, path=target),
+        headers={"Destination": files_url(creds, target)},
+        auth=creds.auth(),
+    )
+    if response.status_code == 405:
+        # A retry after an uncertain first response may find the folder already present. The
+        # upload id is random or caller-owned, and all actual writes remain create-only.
+        return
+    _check_chunk_response(response, target)
+
+
+async def put_upload_chunk(
+    client: httpx.AsyncClient,
+    creds: Credentials,
+    path: str,
+    upload_id: str,
+    chunk_index: int,
+    data: bytes,
+    total_size: int,
+    content_type: str,
+) -> None:
+    """Store one chunk in Nextcloud's temporary upload folder."""
+    target = safe_path(path)
+    response = await client.put(
+        uploads_url(creds, upload_id, f"{chunk_index:05d}", path=target),
+        content=data,
+        headers={
+            "Destination": files_url(creds, target),
+            "OC-Total-Length": str(total_size),
+            "Content-Type": content_type,
+        },
+        auth=creds.auth(),
+    )
+    _check_chunk_response(response, target)
+
+
+async def finish_chunked_upload(
+    client: httpx.AsyncClient,
+    creds: Credentials,
+    path: str,
+    upload_id: str,
+    total_size: int,
+) -> dict:
+    """Assemble the temporary chunks into a new file without allowing replacement."""
+    target = safe_path(path)
+    response = await client.request(
+        "MOVE",
+        f"{uploads_url(creds, upload_id, path=target)}/.file",
+        headers={
+            "Destination": files_url(creds, target),
+            "OC-Total-Length": str(total_size),
+            "Overwrite": "F",
+        },
+        auth=creds.auth(),
+    )
+    # As with a direct PUT, only 201 proves that this was a new destination. A 204
+    # means the server ignored Overwrite: F and must not be reported as a safe create.
+    if response.status_code in (200, 204):
+        _check_write(response, target)
+    _check_chunk_response(response, target)
+    return {
+        "path": target,
+        "etag": response.headers.get("etag", ""),
+        "created": True,
+    }
+
+
+def _check_chunk_response(response: httpx.Response, path: str) -> None:
+    """Translate a chunk request response while preserving create-only semantics."""
+    status = response.status_code
+    if status in (200, 201, 204):
+        return
+    if status == 412:
+        raise ConflictError(
+            message=f"A file already exists at {path}.",
+            hint="This server never overwrites files. Choose a different name.",
+        )
+    if status == 403:
+        raise ToolError(
+            message=f"No permission to write to {path}.",
+            hint="Check the share permissions of the target folder in Nextcloud.",
+            reason=REASON_PERMISSION_DENIED,
+        )
+    if status in (404, 409):
+        parent = dirname(path) or "/"
+        raise ToolError(
+            message=f"The parent folder {parent} of {path} does not exist.",
+            hint="Create the folder in Nextcloud first, or upload into a folder that exists.",
+            reason=REASON_UNKNOWN_ID,
+        )
+    if status == 413:
+        raise ToolError(
+            message=f"Nextcloud refused the upload of {path} as too large.",
+            hint="Upload smaller chunks or check the Nextcloud server's upload limits.",
+        )
+    if status == 423:
+        raise ToolError(
+            message=f"{path} is locked in Nextcloud.",
+            hint="Wait until the other client releases the lock, or choose another name.",
+        )
+    if status == 507:
+        raise ToolError(
+            message=f"Not enough space in Nextcloud for {path}.",
+            hint="Free up quota in Nextcloud and try again.",
+        )
+    _check(response, path)
+    raise ToolError(
+        message=(
+            f"Nextcloud answered the chunk upload of {path} with an unexpected status {status}."
+        ),
+        hint="Check the Nextcloud log for that request; the file was not created.",
+    )
 
 
 def _check_write(response: httpx.Response, path: str) -> None:

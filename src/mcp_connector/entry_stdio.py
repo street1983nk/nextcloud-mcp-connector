@@ -11,6 +11,7 @@ no headers and no Authorization, the app password comes from the environment (D-
 
 import logging
 
+from . import config
 from .config import load_stdio_credentials
 from .errors import ToolError
 from .nextcloud.http import configure_logging
@@ -24,6 +25,8 @@ def main() -> None:
     configure_logging()
     try:
         load_stdio_credentials()
+        # Validate the optional file sandbox before the stdio wire starts.
+        config.files_root()
     except ToolError as exc:
         logger.error("%s %s", exc.message, exc.hint)
         raise SystemExit(2) from None

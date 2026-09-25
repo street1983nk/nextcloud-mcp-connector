@@ -88,6 +88,7 @@ def build_app(env: Mapping[str, str] | None = None) -> Starlette:
                 "same MCP endpoint plus the three lifecycle routes."
             ),
         )
+    config.files_root(env)
     security = TransportSecuritySettings(
         allowed_hosts=config.allowed_hosts(env),
         enable_dns_rebinding_protection=config.dns_rebinding_protection(env),

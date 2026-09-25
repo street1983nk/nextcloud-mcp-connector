@@ -11,6 +11,7 @@ import httpx
 import pytest
 import respx
 
+from mcp_connector import config
 from mcp_connector.errors import ToolError
 from mcp_connector.nextcloud import NcClients
 from mcp_connector.nextcloud.clients import dav
@@ -23,6 +24,18 @@ SECRET = "app-password-test"
 FILES_ROOT = f"{BASE}/remote.php/dav/files/{USER}"
 NOTES_URL = f"{FILES_ROOT}/Docs/notes.md"
 CONTENT = "# Notes\nline two\n"
+
+
+def test_configured_files_root_is_a_virtual_sandbox(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(config.ENV_FILES_ROOT, "/rtc/mth/knsk")
+
+    assert dav.safe_path("/") == "/rtc/mth/knsk"
+    assert dav.safe_path("/scan.pdf") == "/rtc/mth/knsk/scan.pdf"
+    assert dav.safe_path("/rtc/mth/knsk/scan.pdf") == "/rtc/mth/knsk/scan.pdf"
+    assert dav.safe_path("/other") == "/rtc/mth/knsk/other"
+    assert dav.search_scope(Credentials("http://nc.test", "alice", "secret")) == (
+        "/files/alice/rtc/mth/knsk"
+    )
 
 
 def _propfind_body(
@@ -140,6 +153,68 @@ async def test_binary_file_is_rejected_without_base64(clients: NcClients) -> Non
 
     assert "image/png" in excinfo.value.message
     assert not get.called
+
+
+@pytest.mark.anyio
+async def test_download_returns_a_complete_binary_file(clients: NcClients) -> None:
+    body = b"%PDF-1.7\nhandwritten notes\n%%EOF"
+    url = f"{FILES_ROOT}/Docs/scan.pdf"
+    with respx.mock(assert_all_called=True) as mock:
+        mock.route(method="PROPFIND", url=url).mock(
+            return_value=httpx.Response(
+                207,
+                text=_propfind_body(
+                    length=len(body),
+                    content_type="application/pdf",
+                    href="/remote.php/dav/files/alice/Docs/scan.pdf",
+                ),
+            )
+        )
+        get = mock.route(method="GET", url=url).mock(return_value=httpx.Response(200, content=body))
+        result = await files_tools.download(clients, path="/Docs/scan.pdf")
+
+    assert result == {
+        "path": "/Docs/scan.pdf",
+        "size": len(body),
+        "content_type": "application/pdf",
+        "offset": 0,
+        "bytes": len(body),
+        "truncated": False,
+        "content": body,
+    }
+    assert get.calls[0].request.headers["range"] == f"bytes=0-{len(body) - 1}"
+    assert "next_offset" not in result
+
+
+@pytest.mark.anyio
+async def test_download_slices_a_file_larger_than_the_per_call_limit(clients: NcClients) -> None:
+    url = f"{FILES_ROOT}/Docs/large.pdf"
+    total = files_tools.HARD_DOWNLOAD_BYTES * 4
+    chunk = b"chunk"
+    with respx.mock as mock:
+        mock.route(method="PROPFIND", url=url).mock(
+            return_value=httpx.Response(
+                207,
+                text=_propfind_body(
+                    length=total,
+                    content_type="application/pdf",
+                    href="/remote.php/dav/files/alice/Docs/large.pdf",
+                ),
+            )
+        )
+        get = mock.route(method="GET", url=url).mock(
+            return_value=httpx.Response(206, content=chunk)
+        )
+        result = await files_tools.download(clients, path="/Docs/large.pdf", offset=100)
+
+    assert get.calls[0].request.headers["range"] == (
+        f"bytes=100-{100 + files_tools.DEFAULT_DOWNLOAD_BYTES - 1}"
+    )
+    assert result["size"] == total
+    assert result["offset"] == 100
+    assert result["bytes"] == len(chunk)
+    assert result["truncated"] is True
+    assert result["next_offset"] == 100 + len(chunk)
 
 
 @pytest.mark.anyio

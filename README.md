@@ -15,7 +15,7 @@ You bring the model, and no content leaves your server.
 
 ## What it does
 
-- 21 tools across nine app families: files, calendar, notes, Deck, contacts, Tables, Talk,
+- 22 tools across nine app families: files, calendar, notes, Deck, contacts, Tables, Talk,
   Mail and cloud wide search
 - OAuth 2.1 to the MCP authorization specification: dynamic client registration, PKCE S256,
   audience bound tokens, refresh rotation with reuse detection and immediate revocation.
@@ -35,7 +35,8 @@ You bring the model, and no content leaves your server.
 - No deleting: no tool issues a DELETE against files, events, notes, cards or contacts
 - No overwriting: writes are create-only, and `files_upload` refuses an existing path with a
   clear error instead of replacing it
-- No moving and no renaming, no share changes and no permission changes
+- No user-visible moving or renaming, no share changes and no permission changes; binary
+  uploads use Nextcloud's private chunk assembly and still refuse an existing destination
 - Mail is strictly read only: no sending, no draft, no move, no flag, no delete, and no
   attachment download
 - No admin access: the server acts as one user and inherits exactly that user's permissions
@@ -56,7 +57,8 @@ the live registry and fails if a name or a level disagrees with it.
 | `files_search` | read | Files and folders by name via WebDAV search; contents are not indexed |
 | `files_list` | read | The direct children of a folder, with size and modification time |
 | `files_read` | read | The content of one file |
-| `files_upload` | create-only | A new file; an existing path is refused, never overwritten |
+| `files_download` | read | Any-size file as bounded embedded-resource chunks |
+| `files_upload` | create-only | A new text file or any-size binary upload in base64 chunks; an existing path is refused, never overwritten |
 | `calendar_list_events` | read | Events in an explicit time range, with an explicit time zone |
 | `calendar_create_event` | create-only | A new event; existing events are never changed |
 | `notes_search` | read | Notes by title and content, via the Nextcloud notes search provider |
@@ -131,6 +133,8 @@ uv tool install nextcloud-mcp-connector
 export NC_MCP_URL=https://cloud.example.com
 export NC_MCP_USER=alice
 export NC_MCP_APP_PASSWORD=xxxxx-xxxxx-xxxxx-xxxxx-xxxxx
+# Optional: expose only this Nextcloud directory to file tools
+export NC_MCP_FILES_ROOT=/Documents/AI
 
 nc-mcp
 ```
@@ -140,6 +144,9 @@ The same server speaks Streamable HTTP for remote clients, on `POST /mcp`, where
 and the three errors that actually happen: [docs/client-setup.md](docs/client-setup.md). OAuth
 for administrators: [docs/oauth-setup.md](docs/oauth-setup.md). Automation platforms are
 clients too, with one OAuth connection per person: [docs/n8n-setup.md](docs/n8n-setup.md).
+
+When `NC_MCP_FILES_ROOT` is set, `/` becomes that directory for the file tools. For example,
+`/scan.pdf` is resolved under `/Documents/AI`, and no file tool can reach its parent folders.
 
 ![Connections page with two connected assistants](docs/screenshots/connections-page.png)
 

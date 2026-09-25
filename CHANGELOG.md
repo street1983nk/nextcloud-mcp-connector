@@ -13,6 +13,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `files_download` returns Nextcloud files as embedded MCP binary resources. It applies the
+  caller's existing Nextcloud permissions, refuses folders and supports files of any total
+  size through bounded 8 MiB chunks linked by `next_offset`.
+
+- `files_upload` accepts base64 chunks for PDFs and other binary files. Nextcloud assembles
+  the chunks server-side, with an 8 MiB per-call bound and `Overwrite: F` on the final step,
+  so an existing destination is still refused.
+
+- `NC_MCP_FILES_ROOT` can bind every file tool to one Nextcloud directory. Inside the sandbox,
+  `/` is the configured directory and paths are resolved below it; the default remains the
+  whole files area.
+
+- File transfers now stream range responses with bounded memory, validate advertised byte
+  ranges, filter DAV and unified-search metadata against the directory binding, isolate
+  temporary uploads by destination and root, and reject inconsistent upload sizes and
+  replacement responses. DAV result paths now support Nextcloud installed under a URL
+  subpath. Documented the client-side PDF assembly and Mathpix upload-ticket handoff.
+
 - The token exchange path can be configured, through the variables of the
   `NC_MCP_EXCHANGE_` namespace. It is off in the factory state and stays off until
   `NC_MCP_EXCHANGE_ENABLED` arms it, so an installation that sets none of these variables

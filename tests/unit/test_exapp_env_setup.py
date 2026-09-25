@@ -20,6 +20,7 @@ and prove that the gate actually fires.
 
 import ipaddress
 import re
+import shlex
 import shutil
 import subprocess
 from collections.abc import Callable
@@ -722,7 +723,7 @@ def test_the_tunnel_probe_reads_the_process_table(
         (entry / "comm").write_text(f"{comm}\n", encoding="utf-8", newline="\n")
 
     body = shell_function("frpc_is_running", HEALTHCHECK).replace(
-        "/proc/[0-9]*", f"{fake_proc.as_posix()}/[0-9]*"
+        "/proc/[0-9]*", f"{shlex.quote(fake_proc.as_posix())}/[0-9]*"
     )
     assert fake_proc.as_posix() in body, "the process table path is not a single literal"
     result = run_bash(f"set -eu\n{body}\nfrpc_is_running\n")

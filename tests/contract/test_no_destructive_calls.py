@@ -123,6 +123,11 @@ FORBIDDEN: dict[str, str] = {
     "security decision of the account holder",
 }
 
+# The only MOVE in production is Nextcloud's internal chunk-assembly step. It carries
+# ``Overwrite: F`` and is therefore still create-only; user-facing move and rename tools
+# remain forbidden.
+CHUNK_ASSEMBLY_MOVE = "nextcloud/clients/dav.py"
+
 #: The five needles above that name a Tables route, with a line that would carry them into
 #: the code. They stay next to the counter proof rather than next to the dictionary,
 #: because their only job is to prove that each needle can still be hit. Every line is
@@ -338,6 +343,8 @@ def _violations(relative: str, lines: Iterable[tuple[int, str]]) -> list[str]:
     for number, text in lines:
         for needle, why in FORBIDDEN.items():
             if needle not in text:
+                continue
+            if needle == "MOVE" and relative == CHUNK_ASSEMBLY_MOVE and text.strip() == '"MOVE",':
                 continue
             if needle == "DELETE" and _is_own_sql(relative, text):
                 continue

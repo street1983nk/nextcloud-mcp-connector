@@ -247,6 +247,7 @@ def build_oauth_app(
     # After the last line that can still change the answer, and on both call paths: this is
     # where they meet, and ``main`` passes here exactly once per start (WR-01).
     _announce_exchange_path(exchange_config)
+    config.files_root(env)
 
     security = TransportSecuritySettings(
         allowed_hosts=config.allowed_hosts(env),
