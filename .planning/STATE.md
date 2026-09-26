@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-26)
 Phase: Milestone v1.6 complete (Phasen 20-24)
 Plan: keiner
 Status: Awaiting next milestone
-Last activity: 2026-09-26, Milestone v1.6 abgeschlossen und archiviert
+Last activity: 2026-09-26, Quick-Task 260926-ktw (24-REVIEW-Infos IN-01 bis IN-07) abgeschlossen
 
 ## Performance Metrics
 
@@ -798,6 +798,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 | Date | Task | Commits | Directory |
 |------|------|---------|-----------|
+| 2026-09-26 | 24-REVIEW-Infos IN-01 bis IN-07 abgeraeumt: Bremszustand _windows aus eq/hash (compare=False), AST-Gate refusals.py importiert nichts aus oauth, actor-Auslassung im repr begruendet und getestet (R-24-04), exchange_check_routes nimmt die geladene Config, Spalten-Docstring korrigiert (neun zu elf), privacy.md nennt die reservierten --user-Woerter, --keep-armed-Hilfetext nennt die verbleibende Test-CA. Alle Gates gruen. | 017c30c, 1a024a2, 687e161, 4b5a7ed (Merge bc721b5) | .planning/quick/260926-ktw-24-review-infos-in-01-bis-in-07-abraeume/ |
 | 2026-09-25 | Community-PR #8 (piAreSquare) übernommen: die fünf Review-Änderungen selbst umgesetzt (files_download in die Vulture-Whitelist, Dockerfile.railway raus, Mathpix-.mmd-Sonderfall aus _is_text entfernt, Beispielpfad /Documents/AI, Titel und Beschreibung gesetzt), auf den Fork-Branch gepusht, CI 4/4 grün (Lauf 36113314273), serverseitig squash-gemergt mit Autorenschaft beim Beitragenden. ACHTUNG: origin/main ist damit vorgerückt; das lokale main liegt 77 Commits voraus und muss beim Push-Hook-Entscheid des Owners rebased oder gemergt werden, bevor gepusht wird. Kein Release, kein Tag. | 89bb7e7 (Squash auf origin/main), f9838e2 (Übernahme-Commit auf dem PR-Branch) | .planning/reviews/pr-8-overwrite-f-beweis.md |
 | 2026-09-23 | BL-15 Rest: ehrliche Tool-Beschreibung von unified_search, Contract-Pin umgedreht, Backlog geschlossen | 9a32764, 6ee0a03, 5c4c043 | .planning/quick/260923-bl15-honest-search-note/ |
 | 2026-09-23 | BL-17: Public-URL aus NEXTCLOUD_URL abgeleitet (AIO-No-Config), Präzedenzkette Formwert > Variable > Ableitung > Default gepinnt, Rescue fällt auf Ableitung, Doku umgestellt | dac73f5, cfb74aa, 62ed52b, 5063a9f, 6b215f8 | .planning/quick/260923-bl17-public-url-derivation/ |

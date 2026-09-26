@@ -62,7 +62,7 @@ gates_after_fixes:
 **Reviewed:** 2026-09-24
 **Depth:** standard (Datei fuer Datei, sprachspezifische Pruefungen, Quervergleich Code gegen Doku)
 **Files Reviewed:** 22
-**Status:** resolved (1 Critical und 6 Warnings behoben am 2026-09-24, 7 Info offen)
+**Status:** resolved (1 Critical und 6 Warnings behoben am 2026-09-24; IN-01 bis IN-07 behoben am 2026-09-26, quick 260926-ktw)
 
 ## Stand der Behebung
 
@@ -78,7 +78,7 @@ Testlauf am Ende steht bei 4392 passed, 33 skipped, 168 deselected.
 | WR-04 | fixed | `be60861` |
 | WR-05 | fixed | `301109c` |
 | WR-06 | fixed | `922e5c8` |
-| IN-01 bis IN-07 | open | - |
+| IN-01 bis IN-07 | resolved | 017c30c, 1a024a2, 687e161, 4b5a7ed (quick 260926-ktw, 2026-09-26) |
 
 Die sieben Info-Befunde bleiben unveraendert dokumentiert. Sie waren nicht Teil dieser
 Runde und sind damit weiterhin offene, benannte Punkte.
@@ -429,8 +429,9 @@ finally:
 
 ## Info
 
-Die sieben folgenden Befunde sind **offen** und bleiben bewusst dokumentiert. Sie waren nicht
-Teil der Behebungsrunde vom 2026-09-24.
+Die sieben folgenden Befunde waren nicht Teil der Behebungsrunde vom 2026-09-24. Sie sind
+seit dem 2026-09-26 **behoben** (quick 260926-ktw, ein Commit pro Befundgruppe mit der ID in
+der Nachricht) und bleiben hier als Befundtext dokumentiert.
 
 ### IN-01: Frozen dataclass mit veraenderlichem Zustand erzeugt ein unbrauchbares `__hash__`
 
@@ -539,4 +540,5 @@ _Reviewed: 2026-09-24_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
 _Resolved: 2026-09-24 (1 Critical und 6 Warnings behoben, 7 Info offen)_
+_Info resolved: 2026-09-26 (IN-01 bis IN-07, quick 260926-ktw)_
 _Fixer: Claude (gsd-code-fixer)_
