@@ -370,7 +370,7 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
         *purge_routes(env, nextcloud=nextcloud, store_provider=store),
         *audit_verify_routes(env, store_provider=audit_store),
         *audit_read_routes(env, store_provider=audit_store),
-        *exchange_check_routes(env),
+        *exchange_check_routes(env, config=exchange_config),
     ):
         app.router.routes.append(route)
     return app

@@ -45,7 +45,7 @@ from starlette.responses import Response
 from starlette.routing import Route
 
 from ..errors import ToolError
-from ..oauth.chain import load_exchange_config
+from ..oauth.chain import ExchangeConfig, load_exchange_config
 from ..oauth.exchange_dryrun import (
     MAX_TOKEN_BYTES,
     OUTCOME_FAILED,
@@ -231,7 +231,9 @@ STEP_NAMES: Final[dict[str, str]] = {
 logger = logging.getLogger("mcp_connector.exapp.exchange_check")
 
 
-def exchange_check_routes(env: Mapping[str, str] | None = None) -> list[Route]:
+def exchange_check_routes(
+    env: Mapping[str, str] | None = None, config: ExchangeConfig | None = None
+) -> list[Route]:
     """The one route of the dry run, handed out rather than registered on the server object.
 
     A factory for the reason D-23 gives and ``exapp/lifecycle.py`` states: a registration on
@@ -239,14 +241,19 @@ def exchange_check_routes(env: Mapping[str, str] | None = None) -> list[Route]:
     phase 1 as soon as anything imports this module, and that mode has no AppAPI identity to
     check it against.
 
-    The configuration is read once, here, and not per request. Reading it in the handler would
-    turn the one state :func:`~mcp_connector.oauth.chain.load_exchange_config` refuses loudly,
-    the half configured one, into a 500 on a path whose whole contract is 200. Here it cannot:
-    ``entry_exapp.build_exapp_app`` already calls the same function over the same environment
-    before it appends these routes, so a half configured deployment is refused at startup and
-    this call can never be the first one to raise.
+    ``config`` is the answer ``entry_exapp.build_exapp_app`` already read at startup, handed
+    in the way ``build_chain`` receives it, so one application has exactly one reader of this
+    question and the dry run cannot judge a token against a different configuration than the
+    chain does. ``env`` is only the fallback for a caller without a prepared answer, which
+    today means the tests; ``None`` stays ambiguous between "not handed in" and "off", and
+    that is harmless for the reason ``build_chain`` gives: the fallback over the same
+    environment answers ``None`` again. Either way the configuration is settled here, when
+    the routes are built, and never per request, because reading it in the handler would
+    turn the half configured state :func:`~mcp_connector.oauth.chain.load_exchange_config`
+    refuses loudly into a 500 on a path whose whole contract is 200, and the fallback cannot
+    be the first call to raise since the entry point has refused that state at startup.
     """
-    config = load_exchange_config(env)
+    config = config if config is not None else load_exchange_config(env)
 
     async def exchange_check(request: Request) -> Response:
         """Walk every rule against the presented token, then name each one with its outcome."""
