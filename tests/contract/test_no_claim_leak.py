@@ -26,6 +26,8 @@ finding, while ``exchange_accounts.acting_party(claims)`` is one however it is s
 
 Every counter proof runs through the very function the gate runs through. A counter proof
 that reimplements the check proves something about the counter proof.
+
+The file also holds the import direction of ``audit/refusals.py``: nothing out of ``..oauth``.
 """
 
 import ast
@@ -190,6 +192,35 @@ def _entry_violations(relative: str, source: str) -> list[str]:
     return findings
 
 
+#: The package the writer of the refusal chain must not import from.
+OAUTH = "oauth"
+
+
+# The rule of the module docstring of ``audit/refusals.py`` ("What this module must not
+# import"): the writer runs on the pre-authentication path and names the five minute window a
+# second time rather than importing it, so an import out of ``..oauth`` would be the first
+# step towards a token value reaching a row (IN-07 of 24-REVIEW.md).
+def _oauth_imports(relative: str, source: str) -> list[str]:
+    """Every import in ``source`` that reaches into :data:`OAUTH`, each naming file and line.
+
+    Compared by dotted segment and never by substring, so a future module called
+    ``oauthless`` is no finding, and asked of the syntax tree, so the word in a comment or a
+    docstring is none either. The relative form ``from .. import oauth`` carries the package
+    in the imported name rather than in the module, which is why the names are asked as well.
+    """
+    findings: list[str] = []
+    for node in ast.walk(ast.parse(source, filename=relative)):
+        if isinstance(node, ast.ImportFrom):
+            module = (node.module or "").split(".")
+            names = [segment for alias in node.names for segment in alias.name.split(".")]
+            if OAUTH in module or OAUTH in names:
+                findings.append(f"{relative}:{node.lineno}: imports out of {OAUTH}")
+        elif isinstance(node, ast.Import):
+            if any(OAUTH in alias.name.split(".") for alias in node.names):
+                findings.append(f"{relative}:{node.lineno}: imports out of {OAUTH}")
+    return findings
+
+
 # --- the acting party, and the two places that may read it ---------------------------------
 
 
@@ -329,3 +360,40 @@ def test_the_forbidden_names_are_not_decoration() -> None:
     assert findings != [], "no forbidden name occurs in the measured code of oauth/"
     assert any("'claims'" in finding for finding in findings)
     assert any("'azp'" in finding for finding in findings)
+
+
+# --- the import direction of the refusal writer ------------------------------------------
+
+
+def test_the_refusal_writer_imports_nothing_out_of_oauth() -> None:
+    """IN-07: the rule the module docstring of ``audit/refusals.py`` states, held as a gate."""
+    path = SRC / REFUSALS
+
+    findings = _oauth_imports(REFUSALS, path.read_text(encoding="utf-8"))
+
+    assert findings == [], "the writer of the refusal chain imports nothing out of oauth:\n" + (
+        "\n".join(findings)
+    )
+
+
+def test_the_import_gate_would_notice_every_spelling_of_oauth() -> None:
+    """Counter proof over the same function: five spellings of the import, one finding each
+    with its line, and neither a neighbouring name nor the word in prose is a finding."""
+    spellings = [
+        "from ..oauth import throttle\n",
+        "from ..oauth.throttle import WINDOW\n",
+        "from .. import oauth\n",
+        "import mcp_connector.oauth.throttle\n",
+        "from mcp_connector.oauth import chain\n",
+    ]
+    for spelling in spellings:
+        findings = _oauth_imports(REFUSALS, '"""A module."""\n' + spelling)
+        assert len(findings) == 1, spelling
+        assert findings[0].startswith(f"{REFUSALS}:2:"), "a finding names file and line"
+
+    harmless = (
+        '"""This module imports nothing out of oauth."""\n'
+        "from ..errors import known_reason  # and nothing out of oauth\n"
+        "import oauthless\n"
+    )
+    assert _oauth_imports(REFUSALS, harmless) == []

@@ -279,6 +279,28 @@ async def test_the_state_of_the_brake_is_bounded_by_the_number_of_reasons(
     assert REASON_UNSPECIFIED in REASONS, "and the one key is a known identifier, not free text"
 
 
+async def test_a_writer_hashes_and_compares_by_where_it_writes_not_by_its_brake(
+    tmp_path: Path,
+) -> None:
+    """IN-01: the brake is state, not identity. A frozen dataclass that let the dictionary
+    into ``__eq__`` and ``__hash__`` would raise on ``hash()`` and would call two writers over
+    the same store different the moment one of them had counted a refusal."""
+    store = AuditStore(tmp_path / "audit.sqlite3")
+
+    async def provider() -> AuditStore:
+        return store
+
+    first = refusals.RefusalWriter(store_provider=provider)
+    second = refusals.RefusalWriter(store_provider=provider)
+    assert hash(first) == hash(second)
+
+    await first.note_refusal(REASON_EXCHANGE_CLAIMS, moment=NOW)
+
+    assert first == second, "one of the two has braked, and they still write to the same place"
+    assert hash(first) == hash(second)
+    assert len({first, second}) == 1
+
+
 # --- what the row carries, and what it may never carry ------------------------------------
 
 
