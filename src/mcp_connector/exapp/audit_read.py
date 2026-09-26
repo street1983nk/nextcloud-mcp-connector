@@ -303,8 +303,15 @@ def _line(row: tuple[Any, ...]) -> str:
     names a call can carry, and a reader compares them: an empty client name next to a
     filled acting party is what a call over the token exchange path looks like.
 
-    The count stands last, and it is last so the ten columns that were there before it kept
-    their places. It is the one value a row of the refusal chain carries (AUDIT-07): the
+    With this version the nine columns of the line became eleven, and not every one kept its
+    place. The acting party stands sixth, directly behind the client name, and moves the four
+    columns behind it (``outcome``, ``reason``, ``duration_ms``, ``params``) back by one: a
+    script that reads the text form by position reads shifted from this version on. The
+    document form of :func:`_document` is keyed by name and stays stable, and it is the form
+    for scripts.
+
+    The count stands last, and it is last so that it moves no column a second time. It is the
+    one value a row of the refusal chain carries (AUDIT-07): the
     writer of those rows is braked to one per reason and window, so the row says how many
     attempts it stands for, and without this column that number would be readable in no shape
     of this answer at all. A marker for a gap uses the same column for the same meaning, and

@@ -560,6 +560,29 @@ async def test_the_repr_names_the_credential_way_and_still_masks_the_password(
     assert "app_password='***'" in shown
 
 
+def test_the_repr_leaves_the_acting_party_out_and_keeps_the_registered_name() -> None:
+    """IN-03 and R-24-04: the acting party names a client of a foreign realm, and a repr
+    lands in logs nobody reads as an audit path. Neither the value nor the field name may
+    appear, while the name a client registered here does."""
+    identity = verifier_module.OAuthIdentity(
+        nc_user="login-name-1c9e",
+        app_password="secret-password-5d2b",
+        auth_id="auth-id-8e41",
+        client_id="client-id-3a70",
+        principal="principal-6f15",
+        client_name="named-here",
+        actor="foreign-azp-7f3a",
+    )
+
+    shown = repr(identity)
+
+    assert "named-here" in shown
+    assert "foreign-azp-7f3a" not in shown
+    assert "actor" not in shown
+    assert "secret-password-5d2b" not in shown
+    assert "app_password='***'" in shown
+
+
 # --- the principal rule ------------------------------------------------------------------
 
 

@@ -37,6 +37,7 @@ from mcp_connector import config
 from mcp_connector.exapp import audit_verify, exchange_check
 from mcp_connector.nextcloud.clients.xml import hardened_parser
 from mcp_connector.oauth import exchange_dryrun
+from mcp_connector.oauth.chain import load_exchange_config
 
 APP_ID = "mcp_connector"
 APP_SECRET = "app-secret-test"
@@ -206,6 +207,32 @@ def test_the_machine_readable_answer_carries_the_verdict_a_script_watches() -> N
     assert payload["passed"] is False
     assert payload["limit"] == exchange_dryrun.LIMIT_SENTENCE
     assert payload["cost"] == exchange_dryrun.COST_SENTENCE
+
+
+def test_the_configuration_handed_in_wins_over_the_environment() -> None:
+    """IN-04: ``build_exapp_app`` reads the exchange configuration once and hands it in, so
+    the routes answer from that answer and not from a second read of the environment.
+
+    The environment is :data:`ENV`, the deployment without a single exchange key, and not an
+    empty mapping: the AppAPI guard reads its secret from the same environment, and an empty
+    one would refuse the call before the configuration is ever asked.
+    """
+    routes = exchange_check.exchange_check_routes(ENV, config=load_exchange_config(ARMED))
+    client = TestClient(Starlette(routes=routes))
+
+    payload = call(client, token=opaque(64), as_json=True).json()
+
+    assert payload.get("outcome") != exchange_check.OUTCOME_NOT_CONFIGURED
+    assert payload["checked"] is True
+
+
+def test_without_a_configuration_handed_in_the_environment_still_decides() -> None:
+    """The fallback half of IN-04: a caller without a prepared answer keeps today's reading."""
+    armed = call(client_for(ARMED), token=opaque(64), as_json=True).json()
+    unarmed = call(client_for(ENV), token=opaque(64), as_json=True).json()
+
+    assert armed["checked"] is True
+    assert unarmed["outcome"] == exchange_check.OUTCOME_NOT_CONFIGURED
 
 
 # --- every step reaches the answer: pitfall 8 -----------------------------------------

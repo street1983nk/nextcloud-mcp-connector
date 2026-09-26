@@ -148,8 +148,14 @@ class OAuthIdentity:
     twice: a registered client named itself **here**, an acting party registered somewhere
     else, and a reader who has only one name column cannot tell the two apart without
     reading ``client_id`` alongside. Both are foreign text and both are carried unquoted,
-    under the same rule and for the same reason. It defaults to the empty string, which is
-    every path that has no delegation, so no existing construction site changes meaning.
+    under the same rule and for the same reason. That sameness holds for carrying them and
+    not for the debugging output: ``actor`` is deliberately left out of the repr, because it
+    names a client of a foreign realm and a repr ends up in logs that nobody reads as an audit
+    path. Whoever wants to see the acting party reads the ``actor`` column of the audit trail.
+    ``client_name`` stands in the repr because that name was registered here. The omission
+    is the direction the owner accepted for R-24-04 (24-SECURITY.md), and a test holds it. It
+    defaults to the empty string, which is every path that has no delegation, so no existing
+    construction site changes meaning.
 
     ``credential`` says **where** the Nextcloud credential of this request comes from, and
     never who the caller is. ``app_password`` is empty under

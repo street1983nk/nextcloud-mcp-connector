@@ -62,7 +62,9 @@ repeated rejections cannot tell a misconfigured client from somebody trying keys
 
 They are kept apart from the record of accounts: they stand in a chain of their own, named
 `x:exchange`, with the row kind `refusal`, and `occ mcp_connector:audit:read --user=refusals`
-is how an administrator reads them.
+is how an administrator reads them. `instance` and `refusals` are reserved words of the
+`--user` option: the chain of an account that is really called by one of these names is read
+by a call without `--user`.
 
 Such a row holds four things and nothing else: the moment, the group of the rejection reason
 (`exchange_malformed`, `exchange_key`, `exchange_issuer`, `exchange_claims`,

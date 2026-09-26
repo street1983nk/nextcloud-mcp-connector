@@ -332,7 +332,10 @@ def trust_the_issuer() -> None:
         f"cat >> {TRUST_BUNDLE}",
         stdin=root,
     )
-    print(f"the test issuer root is appended to {TRUST_BUNDLE}")
+    print(
+        f"the test issuer root is appended to {TRUST_BUNDLE}: the container now trusts the "
+        "test issuer until it is registered again"
+    )
 
 
 def probe_the_issuer() -> None:
@@ -697,7 +700,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--keep-armed",
         action="store_true",
-        help="leave the exchange configuration in place (for a second look, never for a rest)",
+        help=(
+            "leave the exchange configuration in place (for a second look, never for a rest); "
+            "the ExApp container then also keeps the test issuer's CA in its trust store until "
+            "it is registered again"
+        ),
     )
     options = parser.parse_args(argv)
 

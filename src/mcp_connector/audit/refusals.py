@@ -27,12 +27,13 @@ failure and nothing else: the message of a store error can carry a path (D-13).
 
 **What this module must not import.** Anything under ``..oauth``. The window below is the
 same five minutes ``oauth/throttle.WINDOW`` counts in and is named here a second time rather
-than imported, for that reason. Checked on 2026-09-23: this import direction is covered by no
-test of this repository. ``tests/contract/test_module_boundaries.py`` holds a different
-invariant (no module reaches into the private names of a foreign ``tools/*.py``), and the
-module docstring of ``record.py`` only forbids ``..server`` and everything under ``..exapp``.
-The rule is therefore held by the acceptance criterion of the plan that wrote this file, and
-it is written out here so the next reader knows it is a rule and not an accident.
+than imported, for that reason. The direction is held by
+``test_the_refusal_writer_imports_nothing_out_of_oauth`` in
+``tests/contract/test_no_claim_leak.py``, which reads this file's imports off its syntax tree
+and whose counter proof shows it sees every spelling of such an import. It is not the
+invariant of ``tests/contract/test_module_boundaries.py`` (no module reaches into the private
+names of a foreign ``tools/*.py``), nor the one the module docstring of ``record.py`` states
+(no ``..server`` and nothing under ``..exapp``).
 """
 
 import logging
@@ -57,8 +58,8 @@ type StoreProvider = Callable[[], Awaitable[AuditStore]]
 
 #: How long one written refusal speaks for every further refusal of the same reason. Five
 #: minutes, the same length ``oauth/throttle.WINDOW`` counts its limits in, named here instead
-#: of imported because ``audit/`` must not import ``oauth/`` (see the module docstring, and
-#: note that no test of this repository holds that direction: checked 2026-09-23).
+#: of imported because ``audit/`` must not import ``oauth/`` (see the module docstring; the
+#: direction is held by ``test_the_refusal_writer_imports_nothing_out_of_oauth``).
 #:
 #: The number matters for what an operator sees rather than for what the file costs: with a
 #: shorter window the trail fills with lines that all say the same thing, with a longer one an
@@ -93,8 +94,12 @@ class RefusalWriter:
     size_limit: int = store.SIZE_LIMIT_BYTES
     #: Not an argument of the constructor: two writers sharing one window would be two brakes
     #: that are one, and a caller handing in a prepared state would be a caller deciding when
-    #: the next row is written.
-    _windows: dict[str, tuple[int, int]] = field(default_factory=dict, init=False, repr=False)
+    #: the next row is written. Nor does it take part in the comparison or the hash: a writer
+    #: whose dictionary did would be unhashable, and two writers would be compared by what
+    #: their brakes have counted rather than by the store they write to.
+    _windows: dict[str, tuple[int, int]] = field(
+        default_factory=dict, init=False, repr=False, compare=False
+    )
 
     async def note_refusal(self, reason: str, *, moment: int | None = None) -> None:
         """Note one refused exchange attempt. Never raises, never writes a value.
