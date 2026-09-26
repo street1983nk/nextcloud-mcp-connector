@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.6
-milestone_name: F13 Token Exchange Identity Mapper
-status: Awaiting next milestone
-stopped_at: Milestone v1.6 complete (Phasen 20-24 archiviert nach milestones/v1.6-phases/)
-last_updated: "2026-09-26T12:18:37.740Z"
-last_activity: 2026-09-26, Milestone v1.6 abgeschlossen und archiviert; vorher secure-phase 24 (38/38, T-24-32 als R-24-05 akzeptiert), Rebase auf PR-#8-Squash 89bb7e7, 4428 Tests gruen
+milestone: v1.7
+milestone_name: Ausschluss-Tag kein-ki
+status: planning
+last_updated: "2026-09-26T13:21:33.017Z"
+last_activity: 2026-09-26
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 22
-  completed_plans: 22
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-09-26)
 
 ## Current Position
 
-Phase: Milestone v1.6 complete (Phasen 20-24)
-Plan: keiner
-Status: Awaiting next milestone
-Last activity: 2026-09-26, Quick-Task 260926-ktw (24-REVIEW-Infos IN-01 bis IN-07) abgeschlossen
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-09-26 — Milestone v1.7 started
 
 ## Performance Metrics
 

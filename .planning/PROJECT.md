@@ -8,9 +8,18 @@ Ein schlankes MCP-only-ExApp für Nextcloud: Nutzer installieren es per Klick au
 
 Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
 
-## Current Milestone
+## Current Milestone: v1.7 Ausschluss-Tag kein-ki
 
-Keiner aktiv. v1.6 wurde am 2026-09-26 abgeschlossen; der nächste Zyklus startet mit `/gsd:new-milestone`, sobald das Owner-Thema feststeht. Kandidat ist files_update (Schreibzugriff mit harten Schienen, Massnahmenkatalog in scripts/docs/specs/ideation-isv-monetarisierung-2026-08-25/brainstorm-schreibzugriffe-2026-09-25.md), extern getaktet durch Daniels Antwort auf das Design-Issue-Angebot.
+**Goal:** Eine Datei oder ein Ordner mit dem kollaborativen System-Tag `kein-ki` erscheint in keiner Tool-Antwort des Connectors mehr, fail-closed und ohne das Latenzbudget zu reissen.
+
+**Target features:**
+- System-Tag `kein-ki`: getaggte Dateien tauchen nicht in unified_search, Datei-Listings, fetch/Inhalten und prepare_context auf
+- Subtree-Semantik: ein Tag auf einem Ordner deckt alles darunter
+- Fail-closed: ist die Tag-Abfrage nicht beantwortbar (systemtags aus, OCS-Fehler, Timeout), werden die betroffenen Einträge zurückgehalten und die Degradation in der Antwort benannt, nach dem Muster der anderen Familien
+- Gebatchte Tag-Abfrage: ein Roundtrip je Antwort, nicht je Datei; vor der Designentscheidung gemessen (BL-16-Kostennotiz)
+- Doku dreisprachig; die Store-Text-Erwähnung reist erst mit dem nächsten Release
+
+**Key context:** BL-16, Owner-Freigabe 26.09.2026. Dossier-Regel: Sicherheitsgrenzen sind nie bezahlt; Connector Enterprise bekommt später die Governance obendrauf (zentrale Policies, Allow-Mode, Audit-Beweis, Vier-Augen). Offene Designfrage für die discuss-phase: ist das Tag auf einem Ordner zugleich die freie Ordner-Ausschlussliste (Owner 04.09.: "nützlich")? Parallel läuft extern: files_update als Community-PR (Design-Issue #9, Daniel/simul8), die Flächen überschneiden sich nicht.
 
 ## Current State
 
@@ -82,7 +91,9 @@ Kandidaten nach v1.6 (Stand 2026-09-26):
 
 ### Active
 
-(Leer. MUCGPT/F13/BaerGPT-Verprobungen am 2026-08-20 per Owner-Entscheid deferred: extern getaktet, Trigger it@M-Antwort bzw. Owner-Kontakte; siehe Future Requirements in REQUIREMENTS.md und BL-12.)
+- [ ] Ausschluss-Tag kein-ki: getaggte Dateien und Ordner (Subtree) erscheinen in keiner Tool-Antwort, fail-closed, gebatchte Abfrage (v1.7, BL-16)
+
+(Weiter extern getaktet: MUCGPT/F13/BaerGPT-Verprobungen, files_update via Community-PR nach Design-Issue #9.)
 
 ### Out of Scope
 
@@ -162,4 +173,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-26 after v1.6 milestone*
+*Last updated: 2026-09-26 at the start of milestone v1.7*
