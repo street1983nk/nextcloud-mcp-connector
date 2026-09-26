@@ -1,39 +1,17 @@
 # Stack Research
 
-**Domain:** Nextcloud MCP-only ExApp, Milestone v1.6 "F13 Token Exchange Identity Mapper"
-(Annahme fremder, nach RFC 8693 getauschter Keycloak-Tokens: JWKS, Standard-Claims,
-Claim-Mapping, Audit-Anschluss)
-**Researched:** 2026-09-18
-**Confidence:** HIGH für alles, was gegen PyPI, gegen die PyJWT-Sicherheitshinweise und gegen
-den installierten Quelltext (`.venv`, `src/mcp_connector/oauth/oidc.py`, `verifier.py`,
-`mcp/server/auth/*`) gelesen wurde. MEDIUM für die Keycloak-Claim-Konventionen, die aus der
-Keycloak-Doku plus Sekundärquellen stammen und erst mit dem Beispiel-Token aus Entscheidung 3
-der Spec-Note belegt sind. LOW für nichts, was hier als Empfehlung steht.
+**Domain:** Nextcloud MCP-only ExApp, Milestone v1.7 "Ausschluss-Tag kein-ki" (BL-16)
+**Researched:** 2026-09-26
+**Confidence:** HIGH (Quellcode nextcloud/server stable32 bis stable35 gelesen und gedifft, Kernaussagen live gegen die lokale NC 35.0.0 gemessen; einzige MEDIUM-Stelle: AppAPI-Impersonation auf der REPORT-Route, siehe unten)
 
-**Diese Datei ersetzt die v1.5-Stack-Recherche vom 2026-08-28.** Der Kernstack (Python 3.13,
-`mcp>=2.0,<3`, httpx, lxml, uv, AppAPI/HaRP, SQLite, stdlib-Audit) wird nicht angetastet und
-hier nicht erneut begründet. Es geht ausschließlich um die JWKS-Validierung fremder Tokens.
+## Kurzfassung (entscheidungsrelevant)
 
----
-
-## Antwort in drei Sätzen
-
-**Es kommt keine einzige neue Laufzeit-Abhängigkeit dazu, aber eine Untergrenze muss steigen:**
-PyJWT bleibt die Bibliothek, die Version muss von `>=2.13,<3` auf `>=2.14,<3` angehoben und der
-Lock von 2.13.0 auf 2.14.0 gezogen werden, weil 2.14.0 vom 11.09.2026 eine reine
-Sicherheitsfreigabe ist, deren Befunde genau den Code treffen, den dieser Milestone baut
-(JWKS-Abruf, `kid`-Behandlung, JWK-Parsing).
-**`PyJWKClient` wird trotzdem nicht benutzt:** er ist synchron auf `urllib` gebaut und würde im
-heißen Pfad jedes Werkzeugaufrufs den Event-Loop blockieren; die asynchrone JWKS-Maschinerie
-existiert seit PR #6 bereits in `oauth/oidc.py` (Cache mit Verfallszeit, Rotation über
-unbekannte `kid`, Algorithmus-Allowlist, Schlüsseltyp-Allowlist, Größenlimit, keine Umleitungen)
-und wird für den Exchange-Pfad herausgelöst statt zweitgeschrieben.
-**Zwei Fähigkeiten fehlen dieser vorhandenen Maschinerie für den neuen Bedrohungsfall**, und
-beide sind eigener Code, kein Paket: eine Abkühlzeit gegen die Verstärkung durch unbekannte
-`kid` (PyJWT löst dasselbe Problem in 2.14 mit `cooldown_duration=30`) und ein Single-Flight,
-damit gleichzeitige Anfragen nicht gleichzeitig abrufen.
-
----
+- **Keine neue Abhängigkeit.** httpx + lxml reichen. Alles läuft über WebDAV (Sabre in `apps/dav`), es gibt **keine OCS-API für System-Tags**.
+- **Die gebatchte Route ist `REPORT oc:filter-files` mit `oc:systemtag`** auf `/remote.php/dav/files/{user}/`: ein Roundtrip liefert *alle* direkt getaggten Dateien und Ordner im Sichtbereich des Nutzers, mit Pfad und fileid. Das kostet unabhängig von der Anzahl N der Einträge in der Antwort. Tag-zuerst schlägt Antwort-zuerst.
+- **Keine API liefert vererbte Tags.** Weder `nc:system-tags` noch der REPORT noch `nc:object-ids` noch Unified Search kennen Vorfahren (gemessen). Subtree-Semantik baut der Client: Präfixvergleich der Antwortpfade gegen die Pfade der getaggten Ordner. Einen Vorfahren-Walk braucht es dank Tag-zuerst nicht.
+- **App systemtags aus: die DAV-API antwortet weiter** (gemessen auf NC 35: REPORT, `nc:system-tags` und Tag-Liste liefern unverändert). Weg sind nur die Capability `systemtags.enabled` und der Unified-Search-Provider `systemtags`. "App aus" ist also kein Fehlerfall der Abfrage.
+- **Nichts filtert serverseitig.** Unified Search (`files`, `systemtags`, `notes` ...) liefert getaggte Einträge ungefiltert aus (gemessen). Der Provider `systemtags` liefert sogar genau die getaggten Dateien, wenn jemand nach dem Tag-Namen sucht.
+- **Zwei harte Grenzen, die kein Client-Code schließt:** (1) Ein Tag mit Sichtbarkeit `invisible` ist für Nicht-Admins komplett unsichtbar, dann wirkt er stillschweigend nicht (fail-open, gemessen). (2) An Freigabegrenzen reißt die Subtree-Semantik: Wer nur einen Unterordner eines getaggten Ordners geteilt bekommt, sieht den getaggten Vorfahren nicht, und der REPORT ist für ihn leer (gemessen mit bob).
 
 ## Recommended Stack
 
@@ -41,209 +19,171 @@ damit gleichzeitige Anfragen nicht gleichzeitig abrufen.
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| `pyjwt[crypto]` | **`>=2.14,<3`** (heute 2.14.0, 11.09.2026; Lock steht auf 2.13.0) | Header lesen, Signatur prüfen, Standard-Claims prüfen, JWK zu Schlüsselobjekt | Schon direkte Abhängigkeit (`oauth/oidc.py` nutzt sie), schon von `mcp` selbst verlangt (`pyjwt[crypto]>=2.10.1`), und 2.14.0 schließt fünf Befunde, die ausschließlich den JWKS-Pfad betreffen. Details unten unter "Warum 2.14 keine Kür ist". |
-| `cryptography` | `>=50,<51` (heute 50.0.1; Lock steht auf 50.0.0) | RSA/EC/EdDSA-Verifikation unter PyJWT, Testschlüssel erzeugen | Bereits direkte Abhängigkeit seit Phase 03-02. 50.0.1 ist ein reiner Wheel-Neubau gegen OpenSSL 4.0.2, kein API-Wechsel: mitziehen, wenn der Lock ohnehin angefasst wird. |
-| `httpx` | `>=0.28,<0.29` (unverändert, 0.28.1 ist weiterhin die aktuelle Fassung der 0.x-Linie) | JWKS und Discovery abrufen | Die Projektregel aus `docs/dependency-audit.md` gilt weiter: eigener Code spricht `httpx`, weil `respx` `httpx` mockt und nicht `httpx2`. `oauth/oidc.py` macht es bereits so, inklusive eigenem Client ohne geteilten Pool gegenüber der fremden Vertrauensdomäne (T-06-14). |
-| `mcp` | `>=2.0,<3` (unverändert, 2.0.0 installiert) | Transportgrenze, Token-Endpunkt, `TokenVerifier`-Protokoll | Neu und für diesen Milestone relevant: das SDK trägt serverseitig bereits den SEP-990-Assertion-Grant (`AuthSettings.identity_assertion_enabled`, `OAuthAuthorizationServerProvider.exchange_identity_assertion`, `JwtBearerRequest` im Token-Handler). Das ist ein fertiger Andockpunkt, der nichts kostet. Siehe "Zwei Einbauorte". |
-| Python | 3.13 (unverändert) | `asyncio.Lock` für Single-Flight, `time.monotonic` für Abkühlzeit und Cache, `hmac.compare_digest` | Alles, was über PyJWT hinaus gebraucht wird, steht in der Standardbibliothek. |
+| httpx | 0.28.x (unverändert) | `PROPFIND` auf `/remote.php/dav/systemtags/`, `REPORT` auf `/remote.php/dav/files/{user}/` | Dieselben Methoden-Aufrufe (`client.request("REPORT", ...)`) wie das vorhandene `SEARCH`/`PROPFIND` in `dav.py`; gleiche Auth (`creds.auth()`), gleiche Statusregeln (`_check`: kein Retry, kein stiller Redirect) |
+| lxml | vorhanden | Request-Bodies bauen, Antworten härtet `xml.parse_root` | Body-Bau mit `etree.SubElement` wie bei `build_search_body` (Tag-Id wird Element-Text, nie f-String); `parse_root` trägt XXE/DTD-Schutz |
+| Nextcloud WebDAV (Sabre, App `dav`) | NC 32 bis 35 | Einzige API-Fläche für System-Tags | `dav` ist in `core/shipped.json` `alwaysEnabled` (32 und 35 geprüft); `SystemTagPlugin` wird in `apps/dav/lib/Server.php` bedingungslos registriert, `FilesReportPlugin` immer, sobald ein Nutzer angemeldet ist |
+
+### Die Nextcloud-API-Fläche im Detail
+
+Alle Klassen in `apps/dav/lib/SystemTag/` und `apps/dav/lib/Connector/Sabre/FilesReportPlugin.php` sind zwischen stable32 und stable35 **semantisch identisch** (Diff zeigt nur `#[\Override]`, `strict_types`, String-Casts, strikte `in_array`). Eine Implementierung trägt das ganze Versionsfenster.
+
+#### 1. Tag-Namen zu Id auflösen: `PROPFIND /remote.php/dav/systemtags/`
+
+```
+PROPFIND /remote.php/dav/systemtags/    Depth: 1
+<d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
+  <d:prop><oc:id/><oc:display-name/><oc:user-visible/><oc:user-assignable/><d:getetag/></d:prop>
+</d:propfind>
+```
+Antwort (gemessen NC 35): pro Tag ein `d:response` mit href `/remote.php/dav/systemtags/{id}/`, `oc:id` = `1`, `oc:display-name` = `kein-ki-probe`, `oc:user-visible`/`oc:user-assignable` = `true|false`, `d:getetag`. Der erste `d:response` ist die Collection selbst mit 404-propstat (von `parse_multistatus` schon korrekt übersprungen).
+
+- Nicht-Admins sehen nur `visibility=1` (`SystemTagsByIdCollection::getChildren` -> `getAllTags(true)`), Admins alle.
+- Namen sind seit `createTag` case-insensitiv eindeutig (`mb_strtolower`-Vergleich, 32 und 35). Instanzen mit Altbestand können trotzdem Dubletten haben. **Regel:** case-insensitiv vergleichen und *alle* passenden Ids einsammeln.
+- Kein OCS-Weg: `apps/systemtags/appinfo/routes.php` hat genau eine Route (`/apps/systemtags/lastused`, Index-Route, kein OCS). "OCS systemtags-relations" gibt es nicht, `systemtags-relations` ist eine DAV-Collection.
+
+#### 2. Die gebatchte Route: `REPORT oc:filter-files` mit `oc:systemtag`
+
+```
+REPORT /remote.php/dav/files/{user}/    Content-Type: application/xml
+<oc:filter-files xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns">
+  <d:prop><oc:fileid/><d:resourcetype/></d:prop>
+  <oc:filter-rules><oc:systemtag>{id}</oc:systemtag></oc:filter-rules>
+</oc:filter-files>
+```
+Antwort: `207` Multi-Status, ein `d:response` je **direkt** getaggtem Knoten, href `/remote.php/dav/files/{user}/{pfad}` (Ordner ohne abschließenden Slash im gemessenen Fall), `oc:fileid`, `d:resourcetype` mit `d:collection` für Ordner. Genau diesen Aufruf macht das Nextcloud-Frontend selbst (`apps/systemtags/src/services/systemtags.ts`, `formatReportPayload`).
+
+Verhalten aus Quelle und Messung:
+- **Nur direkte Zuordnung.** Getaggter Ordner `/probe-kk/tagged`: der REPORT liefert nur diesen Ordner, nicht `direct.txt` oder `sub/deep.txt` darunter (gemessen).
+- **Zielordner wird für systemtag ignoriert.** `processFilterRulesForFileNodes` ruft `userFolder->searchBySystemTag()` über den ganzen Nutzerbaum; ein REPORT auf `/probe-kk/tagged/sub` lieferte trotzdem `/probe-kk/tagged` (gemessen). Immer auf die Home-Wurzel schicken und lokal filtern.
+- **Freigaben inklusive**, in der Pfadsicht des Empfängers (Suche läuft über alle Mounts des Nutzers).
+- **Mehrere `oc:systemtag`-Regeln = UND (Schnittmenge)**, nicht ODER. Bei mehreren passenden Ids: ein REPORT je Id (parallel mit `asyncio.gather`).
+- **Unbekannte oder für den Nutzer unsichtbare Id -> `412`**, Body `<s:message>Cannot filter by non-existing tag</s:message>` (gemessen, Id 999 und `invisible`). Kein Treffer = `207` mit leerem Multi-Status.
+- **Ohne `d:limit` keine Kappung** (dbLimit 0). Das ist hier gewollt: eine gekappte Tag-Menge wäre fail-open.
+- Kosten gemessen (NC 35 lokal, 6 Läufe): REPORT 0,24 bis 0,26 s, identisch zum PROPFIND-Depth-1 der Home-Wurzel (0,25 bis 0,27 s). Der Boden ist der PHP-Bootstrap pro Request, nicht die Tag-Abfrage. Kleiner Datenbestand, Messung mit realistischer Tag-Menge gehört in die Phase (BL-16-Kostennotiz).
+
+#### 3. `nc:system-tags` als PROPFIND-/SEARCH-Eigenschaft
+
+```
+<nc:system-tags>
+  <nc:system-tag oc:can-assign="true" oc:id="1" oc:user-assignable="true"
+                 oc:user-visible="true" nc:color="">kein-ki-probe</nc:system-tag>
+</nc:system-tags>
+```
+- Liefert **nur die eigenen Tags** des Eintrags (Kinder des getaggten Ordners: leeres `<nc:system-tags/>`, gemessen).
+- Im PROPFIND Depth 1 serverseitig gebatcht (`preloadCollection` holt Ordner plus Kinder in einem `getTagIdsForObjects`), in SEARCH-Antworten ebenfalls wählbar (gemessen), dort pro Treffer ein DB-Lookup, aber weiterhin ein HTTP-Roundtrip. Messbar teurer war es nicht.
+- **Parser-Falle:** `xml.parse_multistatus` flacht strukturierte Properties zu Kind-Tag-Namen ab (`_value_of`), Namen und `oc:id`-Attribute gingen verloren. Wer die Eigenschaft liest, braucht einen eigenen Leser auf `xml.parse_root`.
+- **Nicht als Kernmechanismus verwenden** (keine Vorfahren). Höchstens als billige Gegenprobe in Listings, falls die discuss-phase Verteidigung in der Tiefe will.
+
+#### 4. Weitere Routen, die es gibt, die wir aber nicht brauchen
+
+| Route | Liefert | Warum nicht |
+|-------|---------|-------------|
+| `PROPFIND /remote.php/dav/systemtags/{id}/files` mit `nc:object-ids` (NC 31+) | Liste von fileids, serverseitig per `getFirstNodeById` auf den Nutzer gefiltert | Nur Ids, keine Pfade, also keine Subtree-Prüfung ohne N weitere Lookups. Serialisierung ist zudem verschachtelt gleichnamig (`<nc:object-ids><nc:object-ids><nc:id>681</nc:id><nc:type>files</nc:type></nc:object-ids></nc:object-ids>`, gemessen) |
+| `PROPFIND /remote.php/dav/systemtags-relations/files/{fileid}` Depth 1 | Tags einer einzelnen Datei | Ein Roundtrip pro Datei, genau das Muster, das das Latenzbudget reißt |
+| DAV `SEARCH` mit `where systemtag` | nichts | `FileSearchBackend::getPropertyDefinitionsForScope` exponiert keine System-Tag-Eigenschaft (nur `oc:tags`/Favoriten der Nutzer-Tags); intern kann `SearchBuilder` `systemtag`, DAV reicht es nicht durch |
+| Unified Search Provider `systemtags` (`/ocs/v2.php/search/providers/systemtags/search?term=kein-ki`) | getaggte Dateien mit `fileId`/`path` | LIKE-Suche auf den Namen, paginiert, verschwindet mit der App; als Tag-Quelle unzuverlässig. **Aber:** als Leck relevant, siehe unten |
+| Capability `systemtags.enabled` (`/ocs/v2.php/cloud/capabilities`) | `{"enabled": true}` oder fehlt | Sagt nur, ob die UI-App an ist; die DAV-API antwortet auch ohne sie. Höchstens Hinweistext |
+
+### Antworten auf die sieben Fragen
+
+| Frage | Antwort | Beleg |
+|-------|---------|-------|
+| (1) OCS systemtags / systemtags-relations | Existiert nicht als OCS. Beides sind DAV-Collections unter `/remote.php/dav/` (`systemtags`, `systemtags-relations`, `systemtags-assigned`), registriert in `apps/dav/lib/RootCollection.php` ohne App-Prüfung. Auth = normale DAV-Auth des Nutzers | Quelle 32/35, live |
+| (2) PROPFIND `nc:system-tags` + `oc:fileid` | Funktioniert, nur direkte Tags, Form siehe oben; Depth 1 serverseitig gebatcht | Quelle, live |
+| (3) REPORT files-by-tag | `oc:filter-files` + `oc:systemtag`, ganzer Nutzerbaum, direkte Zuordnungen, 412 bei unbekannter Id | Quelle, Frontend-Code, live |
+| (4) Batching | **REPORT tag-zuerst**: 1 Roundtrip je Tool-Antwort (plus einmalige, cachebare Namensauflösung), unabhängig von N | live gemessen |
+| (5) Subtree | Keine API vererbt. Vererbung existiert nur intern in `workflowengine/lib/Check/FileSystemTags.php` (läuft die Eltern im Storage-Cache ab, für Zugriffsregeln), nicht als Lese-API. Client prüft Präfixe | Quelle, live |
+| (6) systemtags aus | DAV-API unverändert (Tag-Manager/Mapper sind Core, `OC\SystemTag`); Capability und Suchprovider `systemtags` weg | Quelle, live NC 35 |
+| (7) Filtert Unified Search? | Nein. `FilesSearchProvider` hat keinen Tag-Filter (Filter: term, since, until, person, min/max-size, mime, type, path, is-favorite, title-only); getaggte und darunterliegende Dateien kommen mit `attributes.fileId`/`attributes.path` zurück | Quelle, live |
 
 ### Supporting Libraries
 
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| `respx` (dev) | `>=0.23.1` (vorhanden) | JWKS-Abrufe, Rotation, 500er, Umleitungen und Zeitüberschreitungen im Test nachstellen | Für jeden Test des neuen JWKS-Moduls. Kein echter Keycloak nötig, solange das Beispiel-Token aus Entscheidung 3 der Spec-Note fehlt. |
-| `cryptography` (dev-Nutzung) | wie oben | Testschlüsselpaare erzeugen und daraus JWKS-Dokumente bauen | Ersetzt jedes Zusatzpaket zur Schlüsselerzeugung. Es braucht kein `jwcrypto` und kein `authlib` nur zum Bauen eines Test-JWKS. |
-| `pytest` (dev) | `>=9.1.1` (vorhanden) | Tests | Unverändert. |
+| (keine neue) | | | Alles Nötige ist in `dav.py`/`xml.py` angelegt |
 
-### Development Tools
+### Integrationspunkte im vorhandenen Code
 
-| Tool | Purpose | Notes |
-|------|---------|-------|
-| `uv` | Lock und Sync | `uv lock --upgrade-package pyjwt --upgrade-package cryptography` nach der Anhebung in `pyproject.toml`, danach `uv sync`. Die Untergrenze im Manifest allein ändert den Lock nicht. |
-| ruff / pyright / vulture | Qualitätsgates | Unverändert, gelten für das neue Modul wie für jedes andere. Neuer Code lokal grün vor dem Commit. |
-| `docs/dependency-audit.md` | Nachweis der Paketlegitimität | Braucht einen Nachtrag: PyJWT-Zeile mit 2.14.0 und dem Grund der Anhebung. Neue Pakete gibt es nicht zu prüfen, das ist der Punkt. |
+- `clients/dav.py`: zwei neue Funktionen im Stil von `build_fileid_body`/`find_by_fileid`:
+  - `resolve_tag_ids(client, creds, name) -> list[str]`: PROPFIND Depth 1 auf `f"{creds.base_url}/remote.php/dav/systemtags/"`, Body per lxml, `xml.parse_multistatus` genügt hier (alle Werte sind Blätter), case-insensitiver Namensvergleich.
+  - `tagged_paths(client, creds, tag_id) -> list[(path, fileid, is_collection)]`: REPORT auf `files_url(creds, "/")`-Wurzel (**ohne** `safe_path`-Umbiegung auf `NC_MCP_FILES_ROOT`), Body per lxml, Tag-Id vorher gegen `_DIGITS` geprüft.
+- **Nicht `parse_entries` für die Tag-Menge nehmen**: es verwirft alles außerhalb von `in_files_root`. Liegt der getaggte Ordner *oberhalb* der konfigurierten Sandbox-Wurzel (z. B. `/` oder `/Arbeit` bei Root `/Arbeit/Projekte`), fiele genau der entscheidende Vorfahr heraus: fail-open. Die Tag-Menge braucht `_home_path_of` ohne Sandbox-Filter; Hrefs außerhalb des eigenen Homes bleiben verworfen.
+- `_check` für die neuen Aufrufe erweitern oder eigene Übersetzung: `412` beim REPORT heißt "Tag unbekannt oder unsichtbar" und ist **kein** leerer Treffer.
+- `clients/ocs.py` (`provider_search`): keine API-Änderung; die Filterung passiert auf `attributes.path`/`attributes.fileId` der Einträge nach dem Aufruf. Der Provider `systemtags` (falls die Registry ihn zulässt) muss mitgefiltert werden, sonst listet eine Suche nach "kein-ki" die geschützten Dateien.
+- Notes sind Dateien (Note-Id = fileid, liegen im Notes-Ordner): der fileid-Satz aus dem REPORT deckt sie direkt ab, der Pfad-Präfix deckt getaggte Kategorie-Ordner ab.
+- Timeout/Degradation: dieselbe Budget- und `degraded`-Mechanik wie die anderen Beine von `prepare_context`; fällt der REPORT aus (Timeout, 5xx, 405, unerwarteter Body), werden alle dateibezogenen Einträge der Antwort zurückgehalten.
 
 ## Installation
 
 ```bash
-# pyproject.toml: eine Zeile ändern
-#   "pyjwt[crypto]>=2.13,<3"  ->  "pyjwt[crypto]>=2.14,<3"
-
-uv lock --upgrade-package pyjwt --upgrade-package cryptography
+# Nichts zu installieren. pyproject.toml und uv.lock bleiben unverändert.
 uv sync
-uv run pytest -q
 ```
-
-Kein `uv add`. Das ist das Ergebnis dieser Recherche in einer Zeile.
-
----
-
-## Warum 2.14 keine Kür ist
-
-PyJWT 2.14.0 (11.09.2026) ist eine Sicherheitsfreigabe. Fünf der Befunde liegen im JWKS-Pfad,
-und drei davon treffen Code, den dieser Milestone schreibt oder bereits geerbt hat:
-
-| Hinweis | Was er beschreibt | Warum er uns betrifft |
-|---------|-------------------|-----------------------|
-| `GHSA-2gx3-rcp4-g85q` | Ein unbekanntes `kid` im ungeprüften Header erzwingt je Anfrage einen JWKS-Abruf, auch gegen einen frischen Cache. Ein Angreifer ohne gültiges Token erzeugt damit eine Anfrage nach außen je Anfrage nach innen. Behoben in 2.14 mit einer Abkühlzeit von 30 Sekunden, mit Serialisierung gleichzeitiger Entscheidungen und mit `cooldown_duration` als Stellschraube. | **Das ist exakt das Verhalten unseres eigenen `OidcClient._key`**: `if not fresh or kid not in self._keys.keys: await self._refresh_keys(now)`. Im ID-Token-Pfad war das hinter einem Browser-Fluss versteckt, im Exchange-Pfad steht es an der Transportgrenze und nimmt Angreifereingaben bei jedem Werkzeugaufruf. Die Abkühlzeit muss also in unseren Code, nicht nur in die Bibliothek. |
-| `GHSA-9v7f-9g4p-ffgj` | `PyJWKClient` folgte Umleitungen beim JWKS-Abruf, ein umgeleitetes Ziel galt als vertrauenswürdige Schlüsselquelle. Behoben in 2.14. | Unser Abrufweg macht es schon richtig (`follow_redirects=False`, Gleich-Origin-Prüfung gegen den Issuer). Der Hinweis belegt, dass diese Entscheidung kein Übermaß war, und er ist das stärkste Argument gegen `PyJWKClient` auf 2.13. |
-| `GHSA-w6j9-cwv2-h6wq`, `GHSA-8wjv-2p76-3863` | Fehlerhafte JWK-Set-Einträge lassen `AttributeError`/`TypeError` entkommen, tief verschachtelte JWS/JWK-Eingaben erzeugen unbehandelte Rekursionsfehler. Behoben in 2.14: ein kaputter Eintrag wird übersprungen statt das ganze Set zu kippen. | Unser `_usable_key` fängt nur `jwt.PyJWTError` um `jwt.PyJWK(entry)`, und `jwt.get_unverified_header(token)` fängt ebenfalls nur `PyJWTError`. Auf 2.13 wird aus einem bösartigen Token oder einem kaputten JWKS-Eintrag damit eine unbehandelte Ausnahme an der Transportgrenze statt einer Abweisung. Das ist der Unterschied zwischen fail-closed und 500. |
-| `GHSA-r6x4-923q-g947` und drei weitere | Härtung der HMAC-Schlüsselprüfung gegen Public-Key-Material als JWK, JWKS, Array, DER oder PEM. | Betrifft uns nur mittelbar, weil `HS*` in `_ALLOWED_ALGORITHMS` gar nicht vorkommt. Gratis-Tiefenverteidigung, falls jemand die Allowlist je aufweicht. |
-| `GHSA-jq35-7prp-9v3f` (bereits in 2.13) | Die Allowlist `algorithms=[...]` war umgehbar, wenn mit einem `PyJWK`-Objekt dekodiert wurde: der Header-`alg` wurde geprüft, verifiziert wurde mit dem am Schlüssel gebundenen Verfahren. | Erklärt, warum unser Muster (rohes Schlüsselobjekt plus explizite Allowlist plus eigener Vergleich von JWKS-`alg` und Header-`alg`) beibehalten werden soll. Ab 2.13 wäre auch die Übergabe des `PyJWK` selbst sicher; wechseln muss man deshalb nicht. |
-
-Kompatibilität: `mcp` 2.0.0 verlangt `pyjwt[crypto]>=2.10.1`, die Anhebung kollidiert also mit
-nichts. 2.14.0 enthält keine für uns relevante Bruchstelle; die Umbauten am `JWKSetCache` stehen
-im noch unveröffentlichten Abschnitt des Changelogs und betreffen ohnehin nur `PyJWKClient`.
-
----
-
-## Die Architekturentscheidung, die der Stack nicht abnimmt: zwei Einbauorte
-
-Die Bibliothek ist in beiden Fällen dieselbe. Der Ort entscheidet über die Kosten im heißen Pfad.
-
-**Weg A, direkte Annahme an der Transportgrenze.** Das fremde Token ist der Bearer auf `/mcp`.
-`verifier.py` bekommt einen zweiten Zweig: kein Store-Treffer, aber ein Token, dessen `iss` der
-konfigurierte Exchange-Issuer ist, wird gegen das JWKS geprüft und auf ein Konto gemappt. Das ist
-das, was der F13-Orchestrator erwartet, weil er das getauschte Token einfach weiterreicht. Preis:
-eine Signaturprüfung je Werkzeugaufruf (RS256-Verifikation liegt im Bereich einiger Zehntel
-Millisekunden, das ist tragbar) und ein Cache, der wie der vorhandene Fünf-Sekunden-Cache
-funktionieren muss, aber nur bis `exp` reichen darf.
-
-**Weg B, Assertion-Grant nach SEP-990.** Das fremde Token wird an unserem `/token` mit
-`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer` eingelöst; wir geben ein eigenes Token
-aus, und der heiße Pfad bleibt Wort für Wort der heutige (Store, RFC-8707-Audience,
-Sperrprüfung, Audit, Fünf-Sekunden-Cache). Das SDK trägt diesen Weg bereits:
-`identity_assertion_enabled` in `AuthSettings`, `JwtBearerRequest` im Token-Handler,
-`exchange_identity_assertion(client, params)` als Provider-Haken, Bewerbung in den
-Metadaten, und der Handler weist öffentliche Clients vorher ab.
-
-Empfehlung: **das JWKS- und Claim-Modul so bauen, dass es beide bedient** (eine Funktion "Token
-zu geprüften Claims", ohne Wissen über Transport oder Store), **Weg A als Vorgabe umsetzen**,
-weil er die Erwartung des Orchestrators trifft, und Weg B als Andockpunkt dokumentieren. Die vier
-offenen F13-Entscheidungen ändern daran nichts; sie ändern nur Konfigurationswerte.
-
----
-
-## Integrationspunkte im vorhandenen Code
-
-| Datei | Was dort passiert | Was der Milestone anfasst |
-|-------|-------------------|---------------------------|
-| `oauth/oidc.py` (462 Zeilen) | Enthält bereits alles Schwierige: `_KeyCache`, `_refresh_keys`, `_usable_key`, `_ALLOWED_ALGORITHMS`, `_ALLOWED_KEY_TYPES`, `MAX_RESPONSE_BYTES`, `_LEEWAY_SECONDS = 60`, `JWKS_CACHE_SECONDS = 300`, eigener httpx-Client ohne Cookies und ohne Umleitungen. | Diese Teile in ein neues `oauth/jwks.py` herauslösen und von beiden Seiten nutzen. Kein Zweitschreiben: zwei JWKS-Implementierungen in einem Projekt sind zwei Stellen, an denen eine Abkühlzeit fehlen kann. Die Herauslösung ist reine Umstellung, kein Verhaltenswechsel, und die vorhandenen Tests (`tests/unit/test_oauth_oidc.py`) halten sie fest. |
-| `oauth/verifier.py` | `StoreTokenVerifier.verify_token` (Store, Fünf-Sekunden-Cache, RFC-8707-Prüfung über `check_resource_allowed`, Sperrprüfung über `get_client`) und `resolve_identity` (liefert `OAuthIdentity`). | Der zweite Zweig gehört hierher, aber **nicht in dieselbe Methode**: ein eigener Verifier, der das `IdentitySource`-Protokoll erfüllt und dem `StoreTokenVerifier` vorgeschaltet oder nachgeschaltet wird, hält die heutige Methode unverändert und damit ihre Tests gültig. Die Audience-Prüfung dockt an derselben Stelle an (`check_resource_allowed(row.resource, self._resource)`), nur mit `aud` aus den Claims statt aus der Store-Zeile. |
-| `oauth/principal.py` | Zentrale Identitätsregel: `principal_of` (Konto-Id, ersatzweise Anmeldename), `login_name_of` (was Basic-Auth braucht), `same_principal` (konstante Zeit). | Das Claim-Mapping endet hier und nirgends sonst. Der LDAP-Fall aus Entscheidung 2 der Spec-Note ist genau die Unterscheidung, die dieses Modul schon trennt. Kein neuer Identitätsbegriff. |
-| `deps.py` / `OAuthIdentity` | Trägt `nc_user` **und** `app_password`; die Anmeldedaten kommen heute aus der Store-Zeile der Einwilligung. | **Die offene Frage mit der größten Wirkung, und sie ist keine Bibliotheksfrage:** ein über Exchange gemapptes Konto hat kein App-Passwort im Store. Entweder die Anmeldung läuft im ExApp-Modus über den AppAPI-Kanal (`exapp/auth.py`, Nutzerkennung im Header, Nextcloud prüft), oder der Exchange-Pfad setzt eine zuvor eingerichtete Verbindung desselben Kontos voraus, oder es braucht einen dritten Weg. Alle drei kosten kein Paket, aber sie gehören in ARCHITECTURE und in die Roadmap, nicht in den Stack. |
-| `config.py` | `select_mode`, plus die `NC_MCP_OIDC_*`-Gruppe aus dem Standalone-OAuth. | Vorschlag für die neue Gruppe in derselben Schreibweise: `NC_MCP_EXCHANGE_ENABLED` (ab Werk aus, wie die Spec-Note zusagt), `NC_MCP_EXCHANGE_ISSUER`, `NC_MCP_EXCHANGE_AUDIENCE`, `NC_MCP_EXCHANGE_ACCOUNT_CLAIM`, `NC_MCP_EXCHANGE_ALGORITHMS`. Die vier F13-Entscheidungen sind damit Werte und kein Umbau. Der Schalter ist explizit und wird nicht aus dem Gesetztsein der anderen Werte geraten (D-27, keine stillen Rückfälle). |
-| `audit/record.py` | Kette je Prinzipal (`u:<principal>`). | Der Exchange-Aufruf schreibt in die Kette des gemappten Prinzipals. Damit die Herkunft sichtbar bleibt, gehört die Zugangsart als Feld dazu. Kein neues Paket, eine Zeile mehr im Datensatz. |
-
----
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| Eigene asynchrone JWKS-Schicht auf PyJWT | `jwt.PyJWKClient` (in PyJWT enthalten, 2.14 mit `cooldown_duration`) | Nur in synchronem Code oder in einem Skript. In einem ASGI-Server müsste jeder Abruf über `anyio.to_thread.run_sync` laufen, weil `urllib.request.urlopen` blockiert; dazu fehlen ihm Gleich-Origin-Prüfung gegen den Issuer, Größenlimit auf der Antwort, Schlüsseltyp-Allowlist und die Behandlung eines doppelt vergebenen `kid`. Wir hätten also einen Thread-Pool-Umweg und trotzdem eine Hülle drumherum. Sein Nutzen für uns ist die Vorlage: 30 Sekunden Abkühlzeit, Serialisierung, Cache nie bei Fehlern leeren. |
-| PyJWT | `joserfc` 1.7.5 (29.08.2026) | Wenn JWE, JWT-Verschlüsselung oder eine vollständige JOSE-Abdeckung gebraucht würde. Sauber gepflegte Bibliothek desselben Autors wie Authlib, aber sie bringt **keinen** HTTP-Abruf mit, das JWKS-Holen bliebe unser Code. Sie ersetzt also nur den Teil, den wir schon haben, und kostet ein neues Paket im Solo-Betrieb. |
-| PyJWT | `Authlib` 1.8.0 (30.08.2026) | Wenn der Connector einen vollständigen OAuth-Autorisierungsserver von der Stange brauchte. Er hat seinen eigenen, an das MCP-SDK gebunden, seit v1.0 im Store. Authlib zöge eine zweite OAuth-Weltsicht in dasselbe Projekt. |
-| PyJWT | `python-jose` 3.5.0 (28.05.2025) | Nie. Letzte Freigabe über ein Jahr alt, Geschichte mit Algorithmus-Confusion-Befunden, mehrere Krypto-Hinterlegungen. |
-| PyJWT + `cryptography` | `jwcrypto` 1.6.1 | Nur wenn JWKS-Dokumente auch erzeugt werden müssten und `cryptography` dafür zu umständlich wäre. Für Testschlüssel reicht `cryptography`. |
-| `respx` gegen ein nachgestelltes JWKS | Ein echter Keycloak im Test (Container) | Erst wenn der Realm-Export aus Entscheidung 3 vorliegt, und dann als optionaler Lauf hinter einem eigenen pytest-Marker wie `integration` und `matrix`. Kein Keycloak im Vorgabe-Testlauf: die Vorgabe startet heute bewusst nichts. |
-| `httpx` `>=0.28,<0.29` | `httpx2` (transitiv über `mcp` vorhanden) | Nicht für eigenen Code, solange `respx` nur `httpx` mockt. Die Regel steht seit `docs/dependency-audit.md` und gilt unverändert. |
+| REPORT tag-zuerst (1 Roundtrip, ganze Tag-Menge) | `nc:system-tags` in jede vorhandene PROPFIND/SEARCH-Abfrage mitnehmen (0 zusätzliche Roundtrips) | Nur als Zusatz für direkte Tags. Allein reicht es nicht: Vorfahren fehlen, ein Vorfahren-Walk kostet einen PROPFIND pro Pfadebene |
+| Tag-Menge pro Tool-Antwort frisch holen | Tag-Menge über Aufrufe cachen, validiert per `d:getetag` von `/systemtags/{id}` | Der Tag-ETag ändert sich bei Zuordnen/Entfernen (`updateEtagForTags`), **nicht** beim Verschieben/Umbenennen eines getaggten Ordners. Ein Pfad-Cache würde nach einem Rename fail-open. Cachen nur die Namensauflösung Name -> Id (kurze TTL, bei 412 neu auflösen) |
+| Client-seitige Filterung im Connector | Serverseitige Durchsetzung über `files_accesscontrol` (Regel "System-Tag kein-ki" + Bedingung) | Sperrt den Zugriff auch für den Nutzer selbst bzw. braucht Admin-Regelwerk und eine Fremd-App; passt eher zur späteren Enterprise-Governance als zur freien Grundfunktion |
+| Roh-httpx | `nc_py_api` (`nc.files` bietet Tag-Listen und Kriterien-Listing über denselben REPORT, LOW confidence, nicht geprüft) | Nie im Hot Path; gleiche Route, zusätzliche Abhängigkeit, Projektregel "kein nc_py_api im Hot Path" |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `PyJWKClient` im heißen Pfad | Synchron auf `urllib`; blockiert den Event-Loop bei jedem Abruf und bei jeder Zeitüberschreitung (Vorgabe 30 Sekunden) | Das herausgelöste asynchrone `oauth/jwks.py` auf `httpx` |
-| Unbegrenzter Neuabruf bei unbekanntem `kid` | `GHSA-2gx3-rcp4-g85q`: eine Angreiferanfrage erzeugt einen Abruf nach außen, ohne dass ein gültiges Token nötig wäre. Unser geerbter Code tut genau das | Abkühlzeit von 30 Sekunden nach jedem erfolgreichen Abruf, `asyncio.Lock` als Single-Flight, kurzes Gedächtnis für kürzlich abgewiesene `kid` |
-| `jku` oder `x5u` aus dem Token-Header lesen | Der Angreifer benennt damit die Schlüsselquelle. Auch PyJWT weist inzwischen Nicht-HTTP-Schemata in `PyJWKClient` ab, was zeigt, wohin dieser Weg führt | JWKS-Adresse ausschließlich aus Discovery des konfigurierten Issuers, Gleich-Origin geprüft, wie `oidc.py` es schon macht |
-| `options={"verify_signature": False}` für irgendetwas außer dem Header | Ungeprüfte Claims dürfen nie eine Entscheidung tragen | `jwt.get_unverified_header` allein für `alg` und `kid`, alles andere erst nach `jwt.decode` |
-| `verify_aud` ausschalten, weil Keycloak ab Werk `"aud": "account"` setzt | Damit fiele der RFC-8707-Schutz, der der Grund ist, warum es diesen Andockpunkt gibt: ein Token für einen anderen Dienst würde hier gelten | Audience-Konvention als Pflichtkonfiguration (`NC_MCP_EXCHANGE_AUDIENCE`), Abweisung bei Fehlen. Das ist F13-Entscheidung 1, und bis sie da ist, bleibt der Pfad aus |
-| Ein Nextcloud- oder Keycloak-Admin-Client als Abhängigkeit | Für "existiert dieses Konto?" genügt der vorhandene OCS-Weg über `nextcloud/clients` | Vorhandene Nextcloud-Schicht |
-| `requests`, `aiohttp`, ein zweiter HTTP-Stapel | Drei HTTP-Bibliotheken in einem Solo-Projekt | `httpx` |
-| Stille Kontoanlage bei unbekanntem Claim | Die Spec-Note sagt Abweisung ausdrücklich zu, und eine Anlage wäre eine Rechtegrenze, die der Connector selbst zieht | Abweisung, im Audit als solche sichtbar |
+| Pro-Datei-Lookups über `systemtags-relations/files/{fileid}` | N Roundtrips je Antwort, sprengt das Latenzbudget | Ein REPORT je Tag-Id |
+| Capability `systemtags` als Schalter "Tag-Prüfung möglich ja/nein" | Die DAV-API antwortet auch bei deaktivierter App (gemessen); ein Fail-closed auf die Capability würde auf solchen Instanzen jede Datei-Antwort leeren, obwohl die Prüfung beantwortbar ist | Erfolg oder Misserfolg des REPORT selbst entscheidet |
+| `parse_multistatus` für `nc:system-tags` oder `nc:object-ids` | Flacht strukturierte Werte ab | Eigener Leser auf `xml.parse_root` |
+| Mehrere `oc:systemtag` in einem REPORT | UND-Verknüpfung, liefert die Schnittmenge | Ein REPORT je Id |
+| REPORT mit `d:limit` | Gekappte Tag-Menge = unerkannt ungeschützte Dateien | Ohne Limit abfragen; bei unplausibler Größe degradieren statt kappen |
+| Unified-Search-Provider `systemtags` als Tag-Quelle | App-abhängig, LIKE-Suche, paginiert | REPORT |
+| Tag-Schreibpfade (POST `/systemtags/`, PUT/DELETE auf `systemtags-relations`) | Ein Agent, der den Tag entfernen kann, hebelt die Grenze aus; gehört nicht in den Connector | Nur lesen; AST-Grep-Gate um diese Pfade erweitern |
 
----
+## Stack Patterns by Variant
 
-## Fallstricke, die der Stack nicht abnimmt
+**Tag hat Sichtbarkeit `public` (kollaborativ) oder `restricted`:**
+- REPORT und Tag-Liste funktionieren für alle Nutzer (beide gemessen; `restricted` = sichtbar, nur Admins/Gruppen dürfen zuordnen)
+- `restricted` ist für Organisationen die bessere Wahl: Nutzer können den Tag nicht selbst entfernen
 
-1. **Algorithmus-Confusion.** `algorithms=[...]` immer explizit, `HS*` und `none` niemals in der
-   Liste (`_ALLOWED_ALGORITHMS` in `oidc.py` erledigt das bereits), zusätzlich der vorhandene
-   Vergleich zwischen dem im JWKS deklarierten `alg` und dem Header-`alg`. Keycloak signiert ab
-   Werk mit RS256; die Konfiguration bleibt trotzdem eine Liste, kein fest verdrahteter Wert.
-   Grundlage ist RFC 8725 (JWT Best Current Practices).
-2. **`kid`-Behandlung.** Ein `kid` ist Pflicht (Keycloak setzt ihn immer). Ein `kid`, das im JWKS
-   mehr als einmal vorkommt, macht dieses `kid` unbrauchbar, statt einen der Schlüssel zu wählen;
-   diese Regel steht schon in `_refresh_keys` und muss die Herauslösung überleben.
-3. **Cache-Verfallszeit und Rotation.** 300 Sekunden Cache plus Neuabruf bei unbekanntem `kid`
-   ist das richtige Paar: Keycloak hält alte Schlüssel im JWKS, bis die damit ausgestellten Tokens
-   abgelaufen sind, ein neues `kid` taucht also vor dem Cache-Ablauf auf. Mit Abkühlzeit heißt
-   das: ein frisch rotierter Schlüssel kann bis zu 30 Sekunden warten. Das ist der bewusste Preis.
-4. **fail-closed, aber nicht cache-löschend.** Ein nicht erreichbares JWKS führt zur Abweisung der
-   Anfrage. Es darf aber nicht den zuletzt erfolgreich geholten Schlüsselsatz leeren. Genau diese
-   Verwechslung war `GHSA-fhv5-28vv-h8m8` in PyJWT (ein `finally`-Block schrieb `None` in den
-   Cache und machte aus einem Aussetzer einen Totalausfall). Unser Code holt heute nur bei Erfolg
-   neu, und das muss so bleiben.
-5. **Cross-JWT-Confusion.** Keycloak setzt `typ` an zwei Stellen mit verschiedenen Werten: im
-   JOSE-Header `JWT`, im Claim-Satz `Bearer`. Ein ID-Token, ein Refresh-Token und ein Access-Token
-   desselben Realms sind alle vom selben Schlüssel signiert. Ohne Prüfung der Tokenart nimmt der
-   Exchange-Pfad ein ID-Token an, das nie dafür gedacht war. RFC 8725 Abschnitt 3.11 nennt das
-   beim Namen; SEP-990 verlangt für den Assertion-Weg sogar ein eigenes `typ`
-   (`oauth-id-jag+jwt`). Welche Prüfung greift, hängt an F13-Entscheidung 3 und gehört als
-   Konfiguration vorbereitet.
-6. **Clock-Skew.** 60 Sekunden Toleranz wie in `oidc.py` (`_LEEWAY_SECONDS`), auf `exp`, `nbf`
-   und `iat`. `nbf` setzt Keycloak in der Regel nicht: die Prüfung muss "wenn vorhanden" lauten,
-   nicht "erforderlich", sonst weist der Pfad korrekte Tokens ab. `iss` und `exp` dagegen sind
-   Pflichtfelder in `options={"require": [...]}`.
-7. **`sub` gegen `preferred_username`.** `sub` ist stabil und opak, `preferred_username` ist
-   veränderlich und bei LDAP-gebundenen Instanzen nicht die interne Kennung. Das ist F13-
-   Entscheidung 2 und die von der Spec-Note selbst benannte häufigste Fehlerquelle. Der Claim-Name
-   bleibt deshalb konfigurierbar, und das Ergebnis läuft durch `principal.py`, nicht an ihm vorbei.
-8. **Antwortgröße und Schlüsselzahl.** `MAX_RESPONSE_BYTES = 256 KiB` und `_MAX_KEYS = 20` stehen
-   schon da. Ein fremder Issuer ist keine vertrauenswürdige Datenquelle, auch wenn er
-   konfiguriert ist.
+**Tag hat Sichtbarkeit `invisible`:**
+- Für Nicht-Admins fehlt der Tag in der Liste, `nc:system-tags` ist leer, REPORT antwortet 412 (gemessen). Der Connector kann ihn nicht sehen, der Schutz wirkt nicht
+- Doku muss das als Admin-Regel nennen; der Connector kann "kein Tag namens kein-ki sichtbar" nicht von "Tag existiert unsichtbar" unterscheiden
 
----
+**Kein Tag `kein-ki` sichtbar vorhanden:**
+- Niemand kann etwas getaggt haben, das der Nutzer sieht (bis auf `invisible`): kein Ausschluss nötig, kein Degradationsfall. Ob die Antwort das benennt, ist eine discuss-phase-Frage
+
+**ExApp-Modus (AppAPI-Impersonation) vs. App-Passwort:**
+- Beide nutzen denselben Sabre-Server; `FilesReportPlugin` wird registriert, sobald eine Nutzersitzung existiert. Die Messung lief mit App-Passwort; **den REPORT einmal im ExApp-Container über AppAPI verproben** (MEDIUM, bis gemessen)
 
 ## Version Compatibility
 
-| Package A | Compatible With | Notes |
-|-----------|-----------------|-------|
-| `pyjwt` 2.14.0 | `mcp` 2.0.0 (verlangt `pyjwt[crypto]>=2.10.1`) | Keine Kollision, die Anhebung der Untergrenze ist frei |
-| `pyjwt` 2.14.0 | `cryptography` 50.x | Das `crypto`-Extra verlangt `cryptography`; 50.0.1 ist gegenüber 50.0.0 nur ein Wheel-Neubau (OpenSSL 4.0.2) |
-| `httpx` 0.28.1 | `respx` 0.23.1 | Bestehendes Paar, Grund für den Verzicht auf `httpx2` in eigenem Code |
-| `httpx2` (transitiv über `mcp`) | eigener Code | Bewusst nicht. Regel aus `docs/dependency-audit.md`, unverändert |
-| Python 3.13 | alles oben | `pyjwt` verlangt `>=3.9`, `cryptography` `>=3.9`, keine Untergrenze in unsere Richtung |
-
----
+| Komponente | Kompatibel mit | Notes |
+|------------|----------------|-------|
+| `oc:filter-files` + `oc:systemtag` | NC 32, 33, 34, 35 | `FilesReportPlugin.php` 32 vs 35: nur Attribute/strikte Vergleiche geändert |
+| `nc:system-tags`, `/systemtags/`, `systemtags-relations` | NC 32 bis 35 | `SystemTagPlugin.php` 32 vs 35: Casts, `sanitizeWordsAndEmojis` beim Anlegen (NC 35), sonst gleich |
+| `nc:object-ids` | NC 31+ | Nicht genutzt |
+| Case-insensitive Namenseindeutigkeit | NC 32 bis 35 (in `createTag`) | Altbestände können Dubletten haben |
+| Tag-ETag ändert bei Zuordnung | NC 32 bis 35 (`SystemTagObjectMapper::updateEtagForTags`) | Nicht bei Move/Rename |
 
 ## Sources
 
-- PyPI JSON-API, abgefragt am 18.09.2026: `pyjwt` 2.14.0 (11.09.2026), `cryptography` 50.0.1
-  (25.08.2026), `httpx` 0.28.1 (06.12.2024), `joserfc` 1.7.5 (29.08.2026), `authlib` 1.8.0
-  (30.08.2026), `python-jose` 3.5.0 (28.05.2025), `jwcrypto` 1.6.1 (15.09.2026);
-  `mcp` 2.0.0 `requires_dist` mit `pyjwt[crypto]>=2.10.1` und `httpx2>=2.5.0`. HIGH
-- PyJWT-Changelog (`github.com/jpadilla/pyjwt`, `CHANGELOG.rst`, Stand 18.09.2026) und die
-  Sicherheitshinweise `GHSA-2gx3-rcp4-g85q`, `GHSA-9v7f-9g4p-ffgj`, `GHSA-jq35-7prp-9v3f`,
-  `GHSA-fhv5-28vv-h8m8`, `GHSA-8wjv-2p76-3863`. HIGH
-- Quelltext `jwt/jwks_client.py` in zwei Fassungen gelesen: installiert 2.13.0 aus `.venv`,
-  aktuell aus `master` (mit `cooldown_duration`, `_NoRedirectHandler`, `threading.RLock`). HIGH
-- Quelltext dieses Projekts: `src/mcp_connector/oauth/oidc.py`, `verifier.py`, `principal.py`,
-  `config.py`, `deps.py`, `docs/dependency-audit.md`, `pyproject.toml`, `uv.lock`. HIGH
-- Quelltext MCP-SDK 2.0.0 aus `.venv`: `mcp/server/auth/handlers/token.py` (`JwtBearerRequest`,
-  `identity_assertion_enabled`), `mcp/server/auth/provider.py` (`exchange_identity_assertion`
-  mit den SEP-990-Verarbeitungsregeln), `mcp/server/auth/settings.py`, `mcp/server/auth/routes.py`,
-  `mcp/client/auth/extensions/identity_assertion.py`. HIGH
-- Keycloak: "Standard Token Exchange is now officially supported in Keycloak 26.2"
-  (keycloak.org, 05/2025) und `keycloak.org/securing-apps/token-exchange` zu `audience`,
-  `requested_token_type` und der Herkunft des `aud`-Claims. MEDIUM
-- Keycloak-Token-Konventionen (`typ: Bearer` im Claim-Satz gegenüber `JWT` im JOSE-Header, `azp`
-  statt `client_id`, `"aud": "account"` ab Werk, JWKS unter
-  `/realms/{realm}/protocol/openid-connect/certs`, Rotation mit Weiterhalten alter Schlüssel):
-  mehrere übereinstimmende Sekundärquellen, nicht gegen eine laufende Instanz geprüft. MEDIUM,
-  aufzulösen mit dem Beispiel-Token und dem Realm-Export aus Entscheidung 3 der Spec-Note.
-- RFC 8725 (JWT Best Current Practices) für Algorithmus-Allowlist und Cross-JWT-Confusion,
-  RFC 8693 für den Tausch selbst, RFC 8707 für die Audience, die hier schon andockt. HIGH
+- github.com/nextcloud/server, Branches stable32, stable33, stable34, stable35 (per `gh api` geladen und gedifft), HIGH:
+  - `apps/dav/lib/SystemTag/SystemTagPlugin.php` (Property-Namen, `preloadCollection`, `object-ids`)
+  - `apps/dav/lib/SystemTag/SystemTagList.php`, `SystemTagsObjectList.php` (XML-Form)
+  - `apps/dav/lib/SystemTag/SystemTagsByIdCollection.php`, `SystemTagsRelationsCollection.php`, `SystemTagsObjectTypeCollection.php`, `SystemTagsObjectMappingCollection.php`, `SystemTagNode.php`, `SystemTagObjectType.php`
+  - `apps/dav/lib/Connector/Sabre/FilesReportPlugin.php` (REPORT-Logik, 412, UND-Semantik, Scope)
+  - `apps/dav/lib/Server.php`, `apps/dav/lib/RootCollection.php` (bedingungslose Registrierung)
+  - `apps/dav/lib/Files/FileSearchBackend.php` (keine systemtag-Eigenschaft in SEARCH)
+  - `lib/private/SystemTag/SystemTagManager.php`, `SystemTagObjectMapper.php`, `lib/private/Files/Cache/QuerySearchHelper.php`, `SearchBuilder.php`, `lib/private/Files/Node/Folder.php`
+  - `apps/systemtags/appinfo/routes.php`, `lib/Capabilities.php`, `lib/Search/TagSearchProvider.php`, `src/services/systemtags.ts`, `src/services/api.ts`
+  - `apps/files/lib/Search/FilesSearchProvider.php`, `apps/workflowengine/lib/Check/FileSystemTags.php`
+  - `core/shipped.json` (`dav` alwaysEnabled, `systemtags` nur defaultEnabled)
+- Live-Messung 2026-09-26 gegen lokale NC 35.0.0 (`nc35-nc`, via Caddy :8082), Konten alice/bob, Wegwerf-Tag `kein-ki-probe`, Wegwerf-App-Passwörter; alles danach entfernt (Share, Tag, Dateien, Tokens), App systemtags wieder aktiv. HIGH für NC 35, für 32 bis 34 über den Quell-Diff abgesichert
+- https://docs.nextcloud.com/server/latest/developer_manual/client_apis/WebDAV/basic.html: dokumentiert `oc:filter-files` nur für Favoriten und `oc:fileid`; System-Tag-Filter und `nc:system-tags` stehen nicht in der Entwicklerdoku (Quellcode ist die Referenz), MEDIUM
+- https://docs.nextcloud.com/server/stable/user_manual/en/files/tagging.html und help.nextcloud.com-Threads zu Tag-Vererbung: Vererbung existiert nur über Workflow/Automated Tagging, nicht als API, MEDIUM
 
 ---
-*Stack research for: JWKS-Validierung fremder Keycloak-Tokens im Nextcloud MCP Connector*
-*Researched: 2026-09-18*
+*Stack research for: kein-ki-Ausschluss-Tag im Nextcloud MCP Connector*
+*Researched: 2026-09-26*

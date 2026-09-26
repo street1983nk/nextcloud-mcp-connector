@@ -1,433 +1,389 @@
 # Architecture Research
 
-**Domain:** Ein fünfter Identitätsweg in einer ausgelieferten MCP-ExApp: ein fremdes, nach RFC 8693 getauschtes Keycloak-JWT wird geprüft und auf ein Nextcloud-Konto abgebildet (v1.6 F13 Token Exchange Identity Mapper)
-**Researched:** 2026-09-18
-**Confidence:** HIGH für alle Aussagen über die eigene Codebasis (Datei und Zeile gelesen, nicht erinnert), HIGH für das Verhalten von `check_resource_allowed` im installierten MCP-SDK (Quellcode gelesen), HIGH für Keycloaks Standard Token Exchange V2 (offizielle Keycloak-Doku über Context7), MEDIUM für `occ user:auth-tokens:add` ohne Nutzerpasswort (Doku gelesen, nicht gemessen), MEDIUM für das Durchreichen eines fremden JWT durch HaRP (dieselbe Strecke trägt heute unsere opaken Tokens, die Größenordnung ist aber eine andere)
+**Domain:** Ausschluss-Tag `kein-ki` in einer ausgelieferten MCP-ExApp: ein kollaboratives System-Tag auf einer Datei oder einem Ordner (Subtree) hält diese Inhalte aus jeder Tool-Antwort heraus, fail-closed, mit einer gebatchten Tag-Abfrage je Antwort (v1.7, BL-16)
+**Researched:** 2026-09-26
+**Confidence:** HIGH für alle Aussagen über die eigene Codebasis (Datei und Zeile gelesen, nicht erinnert); HIGH für die Findling-Trefferform (`php/lib/Search/Provider.php:384` im lokalen Repo gelesen); MEDIUM für das Verhalten von `REPORT oc:filter-files` mit `oc:systemtag` (Server-Quelltext `FilesReportPlugin.php` über WebFetch gelesen, nicht gemessen); MEDIUM für `nc:system-tags` als Datei-Property mit Sichtbarkeitsfilter (`SystemTagPlugin.php` gelesen); LOW bis zur Messung für "Notes-Id gleich Datei-Id" (Trainingswissen, nicht verifiziert) und für das Verhalten bei geteilten Ordnern mit getaggtem Vorfahren beim Eigentümer
 
-**Kernaussage in fünf Sätzen.** Der Exchange-Pfad braucht keinen sechsten Modus in `config.select_mode` und keine Änderung an `exapp/middleware.py`: die Transportgrenze nimmt bereits jedes Objekt, das dem Protokoll `IdentitySource` genügt (`oauth/verifier.py:152`), und die beiden Einbaustellen sind genau zwei Zeilen, `entry_exapp.py:113` und `entry_oauth.py:210`. Die richtige Bauform ist deshalb eine Prüferkette: erst der bestehende `StoreTokenVerifier` (lokaler SQLite-Treffer, fünf Sekunden Cache), und nur wenn der `None` sagt und der Exchange-Pfad eingeschaltet ist, der neue `ExchangeVerifier`; damit ist "die vier bestehenden Wege werden nicht angefasst" keine Disziplin, sondern Bauform, weil ein heute gültiges Token den neuen Prüfer nie erreicht. Die eigentliche Architekturfrage ist nicht die Token-Prüfung, sondern woher der gemappte Nutzer seine Nextcloud-Anmeldedaten bekommt, und dort stehen genau zwei tragfähige Wege gegeneinander: AppAPI-Impersonation mit `APP_SECRET` (nur im ExApp-Betrieb, kostet keine Provisionierung, macht aber die Signatur des fremden IdP zum Äquivalent des Instanz-Geheimnisses) gegen eine vorab gebundene Autorisierung mit eigenem App-Passwort je Konto (funktioniert in beiden Betriebsarten, kostet einen einmaligen Browser-Schritt je Nutzer, fügt aber keine einzige neue Vollmacht hinzu). Die Standalone-OAuth-Maschinerie aus PR #6 liefert dabei weniger, als die Spec-Note annimmt: `oidc.py` liefert JWKS-Abruf, Schlüsselrotation, Algorithmen-Allowlist und ID-Token-Prüfung als fertiges Muster, aber das App-Passwort kommt dort weiterhin aus Login Flow v2 im Browser (`oauth/consent.py:394-455`), also aus einem Weg, den ein Maschine-zu-Maschine-Aufruf konstruktionsbedingt nicht gehen kann. Und eine Korrektur an der Spec-Note, die vor dem zweiten Treffen bei F13 landen sollte: Keycloak unterstützt den `resource`-Parameter aus RFC 8693 laut eigener Doku noch nicht, die Audience eines getauschten Tokens ist eine Keycloak-Client-Id und keine Resource-URL, weshalb die RFC-8707-Prüfung in `verifier.py:246` zwar die richtige konzeptionelle Andockstelle, aber nicht die richtige Funktion ist.
+**Kernaussage in fünf Sätzen.** Der Filter gehört weder in den `graceful`-Wrapper (der sieht fertige, heterogene Antworten, `server/__init__.py:103-133`) noch in 22 Registrierungen, sondern an sechs Engstellen, durch die nachweislich jede dateiabgeleitete Antwort läuft: `files.search`, `files.list_dir`, den Einzelzugriff hinter `dav.stat`/`find_by_fileid`, `search._normalise`, und die beiden Notes-Leser; `prepare_context`, `search` (ChatGPT) und `fetch` erben ihn, weil sie ausschließlich über diese Stellen gehen. Der Tag-Blick wird pro Tool-Aufruf genau einmal geladen und hängt an `NcClients`, das `deps.resolve_clients` (`deps.py:116-118`) genau einmal je Aufruf baut; damit ist "eine Abfrage je Antwort" Bauform statt Disziplin, und die Invalidierung ist trivial, weil der Blick mit dem Aufruf stirbt. Für die Subtree-Semantik schlägt "getaggte Menge einmal holen, Pfade per Präfix testen" die Ahnenketten-Prüfung klar: WebDAV hat kein gebatchtes Primitiv für Vorfahren, wohl aber `REPORT oc:filter-files` mit `oc:systemtag`, das alle getaggten Knoten des Nutzers in einem Roundtrip liefert, und deren hrefs laufen durch dieselbe Normalisierung wie die Sandbox (`dav._home_path_of`, `dav.py:493-502`). Die Sandbox aus PR #8 ist die richtige Vorlage für die Pfadnormalisierung und den Segmenttest (`dav.in_files_root`, `dav.py:483-490`), aber nicht für den Einbauort: sie ist statische Konfiguration ohne I/O und sitzt deshalb synchron in `parse_entries`, der Tag-Blick braucht einen Netzabruf und damit eine asynchrone, request-gebundene Stelle. Zwei Befunde gehen über das Feature hinaus und sollten in die Roadmap: Findling-Treffer tragen nur `fileId` und keinen `path` und passieren deshalb heute die Sandbox ungeprüft (`search.py:246-252`), und Notes laufen über die Notes-REST-API komplett an der Sandbox vorbei; derselbe Pfad-Resolver, den der Ausschluss für pfadlose Treffer braucht, schließt beide Lücken mit.
 
 ---
 
-## Teil 0: Die Randbedingungen, die dieser Meilenstein erbt
-
-Alles aus dem Code gelesen. Diese acht Punkte entscheiden jede Bauentscheidung weiter unten mit.
+## Teil 0: Die Randbedingungen, die dieses Feature erbt
 
 | # | Randbedingung | Beleg |
 |---|---------------|-------|
-| R1 | Es gibt **fünf** Modi, nicht vier. `Mode` ist `stdio, exapp, oauth, http_passthrough, http_static_bearer`; `oauth` ist der Standalone-Betrieb aus PR #6 und wird über `NC_MCP_AUTH_MODE=oauth` ausdrücklich gewählt, nie geraten. | `config.py:87`, `config.py:231` (`select_mode`), `config.py:259` (`oauth_configured`) |
-| R2 | Die Identität wird **einmal je Anfrage an der ASGI-Grenze** aufgelöst und in `request.state` abgelegt; der synchrone Credential-Layer liest nur noch. | `exapp/middleware.py:242` (`_deposit`), `deps.py:311` (`_oauth_identity`) |
-| R3 | Die Transportgrenze nimmt **jeden** `TokenVerifier` und fragt per `isinstance(..., IdentitySource)`, ob er auch eine Identität liefern kann. Ein Prüfer ohne Identitätshälfte hinterlegt nichts, und der Credential-Layer verweigert dann von selbst. | `exapp/middleware.py:257-262`, `oauth/verifier.py:152-163` |
-| R4 | Der Pausenschalter je Konto liest `identity.principal` aus demselben `request.state`. Wer dort eine Identität hinterlegt, ist automatisch vom Schalter erfasst. | `exapp/middleware.py:177-215` (`_switch_refusal`) |
-| R5 | Das Audit-Log hängt an genau derselben Naht: `deps.resolve_caller` baut den `Caller` aus der hinterlegten `OAuthIdentity` (Principal, client_id, auth_id, client_name), `audit/record.py:236` schreibt daraus die Kette `u:<principal>`. Wer eine `OAuthIdentity` hinterlegt, ist ohne eine Zeile in `audit/` protokolliert. | `deps.py:139-183`, `audit/record.py:227-250`, `audit/store.py:185` (`user_chain`) |
-| R6 | Es gibt ein etabliertes Muster für einen **reservierten Pseudo-Client**: `CONNECT_CLIENT_ID = "urn:mcp-connector:browser-onboarding"`, als `clients`-Zeile mit `allowed=False` angelegt, damit die Fremdschlüssel der `flows`- und `authorizations`-Tabelle greifen, ohne dass eine echte Registrierung existiert. | `oauth/connect.py:83`, `oauth/connect.py:213` |
-| R7 | PyJWT ist **direkte** Abhängigkeit (`pyjwt[crypto]>=2.13,<3`) und wird heute in genau einer Datei benutzt: `oauth/oidc.py`. Die Spec-Note nennt an dieser Stelle `oauth/cimd.py`, das ist sachlich falsch und sollte vor dem Versand korrigiert werden. | `pyproject.toml:18`, `grep "import jwt" src/` = eine Fundstelle |
-| R8 | Die SDK-Auth-Schicht ist in den relevanten Modi **nicht** beteiligt: `server/__init__.py:44` ruft `deps.build_auth()` einmal beim Import, und das liefert `(None, None)`, sobald kein statischer Bearer gesetzt ist. Im ExApp- und im Standalone-Betrieb prüft ausschließlich unsere Middleware. Es gibt also nur eine Stelle, an der ein zweiter Prüfer einzuhängen wäre, nicht zwei. | `server/__init__.py:44-59`, `deps.py:212` |
+| R1 | Genau ein `NcClients` je Tool-Aufruf, gebaut in `deps.resolve_clients`; alle 22 Registrierungen rufen es als erste Zeile | `deps.py:116-118`, z.B. `reg_files.py:33,52,66,88,141` |
+| R2 | `NcClients` ist `frozen=True, slots=True` mit zwei Feldern, 34 Testdateien bauen es direkt | `nextcloud/__init__.py:16-21`; `grep -rl "NcClients(" tests` = 34 |
+| R3 | Komponierende Tools reichen dasselbe `NcClients` durch: `prepare_context` an `unified_search` und an `chatgpt.fetch` für Auszüge, `chatgpt.search` an `unified_search`, `fetch(file)` an `files.read` | `context.py:249,775`; `chatgpt.py:165,252,281` |
+| R4 | Die Sandbox filtert DAV-Ergebnisse synchron beim Parsen und Suchtreffer über `attributes.path`; Nicht-files-Provider ohne `path` passieren | `dav.py:477`; `search.py:214,240-255` |
+| R5 | Rückgegebene Pfade sind absolute Pfade im Nutzer-Home (nicht die virtuelle Wurzel), URL-dekodiert, ohne Schluss-Slash | `dav.py:493-502`; `safe_path` bildet nur Eingaben auf die Wurzel ab, `dav.py:115-122` |
+| R6 | Zwei Degradations-Formen: `unified_search` schreibt `{"provider", "reason"}`, `prepare_context` schreibt `{"source", "reason"}` und reicht die inneren Einträge unverändert durch | `search.py:101,114,176`; `context.py:513,518,800-805` |
+| R7 | Die Datei-Familie kennt kein `degraded`; eine leere Erfolgsantwort, wo eigentlich "nicht lesbar" gilt, vermeidet die Codebasis ausdrücklich (T-11-17-Muster) | `files.py:139-155,189-197`; `chatgpt.py:612-613,693-697` |
+| R8 | Refusal-Gründe sind eingefroren (12 Stück); ein dreizehnter ist eine Review-Entscheidung, ein Test läuft `src/` ab. `guard_tripped` ("a guard of this server stopped the call") existiert bereits | `errors.py:39,56-58` |
+| R9 | Modulweite Caches nur für Nicht-Nutzerdaten mit TTL, Schlüssel `(base_url, user)`; Nutzerdaten nie über den Aufruf hinaus (D-20) | `capabilities.py:62,151-165`; `chatgpt.py:27-28`, `search.py:3-5` |
+| R10 | Suchanfragen mit mehr als 100 Operatoren lehnt Nextcloud ab; der DAV-Client baut deshalb flache Bäume | `dav.py:266-268` |
 
 ---
 
-## Teil 1: Die bestehende Architektur, am Code nachvollzogen
+## Standard Architecture
 
-### Die fünf Wege und ihre Anmeldedaten
-
-| Modus | ausgelöst durch (`config.select_mode`) | Nextcloud-Anmeldedaten | Credential-Zweig |
-|---|---|---|---|
-| `stdio` | `headers is None` | Umgebung (`NC_MCP_USER`, `NC_MCP_APP_PASSWORD`) | `deps.py:105` |
-| `exapp` | `APP_ID` und `APP_SECRET` gesetzt | Nutzerkennung aus `AUTHORIZATION-APP-API`, Geheimnis ist `APP_SECRET` | `deps.py:234` |
-| `oauth` | `NC_MCP_AUTH_MODE=oauth` | App-Passwort aus der gespeicherten Autorisierung | `deps.py:270` |
-| `http_static_bearer` | `NC_MCP_STATIC_BEARER` gesetzt | Umgebung, durch den Bearer geschützt | `deps.py:105` |
-| `http_passthrough` | Rest | Basic-Anmeldedaten der Anfrage | `deps.py:339` |
-
-Zwei Dinge daran sind für diesen Meilenstein entscheidend. Erstens: im `exapp`-Modus entscheidet die Nutzerkennung im signierten AppAPI-Header allein, welcher der zwei Kanäle gilt; ist sie leer, geht `_credentials_from_appapi` in `_credentials_from_oauth` (`deps.py:267`). Der Exchange-Pfad ist also ein Fall von "AppAPI-Handschlag gültig, Nutzerkennung leer", und damit genau der Zweig, den der OAuth-Bearer heute schon benutzt. Zweitens: `Credentials` kennt nur zwei Authentisierungsarten, `basic` und `appapi` (`nextcloud/credentials.py:18-20`). Ein dritter Wert wäre eine neue Authentisierungsart gegenüber Nextcloud, und die gibt es nicht; der Exchange-Pfad wird eine der beiden benutzen.
-
-### Der heutige heiße Pfad, einmal durchgezeichnet (ExApp, OAuth-Zweig)
+### System Overview
 
 ```
-MCP-Client
-    |  Authorization: Bearer <opakes Token dieses Servers>
-    v
-HaRP (signiert AUTHORIZATION-APP-API, Nutzerkennung leer, weil kein NC-Credential)
-    v
-RequireAppApi.__call__                         exapp/middleware.py:125
-    |-- require_appapi(request)                exapp/auth.py:80      -> 401 ohne Hinweis
-    |-- _bearer_is_valid(request)              exapp/middleware.py:221
-    |     |-- StoreTokenVerifier.verify_token  oauth/verifier.py:217
-    |     |     SHA-256-Digest -> 5-s-Prozesscache -> SQLite: access_tokens, authorizations
-    |     |     RFC-8707-Audience: check_resource_allowed(row.resource, public_url + /mcp)
-    |     |     AUTH-07: get_client(..., may_fetch=False)
-    |     |     -> AccessToken(claims={auth_id, client_name})
-    |     '-- _deposit                         exapp/middleware.py:242
-    |           StoreTokenVerifier.resolve_identity  oauth/verifier.py:276
-    |           laedt Autorisierung, entschluesselt App-Passwort (AES-GCM, aad=auth_id)
-    |           -> request.state.oauth_identity = OAuthIdentity(...)
-    |-- _switch_refusal                        exapp/middleware.py:177   -> 403 access_disabled
-    |-- _deposit_recorder                      exapp/middleware.py:157
-    v
-MCP-Transport -> Tool -> deps.resolve_clients  deps.py:107
-    |-- resolve_credentials -> _credentials_from_appapi (user leer) -> _credentials_from_oauth
-    |     liest request.state.oauth_identity, baut Credentials(mode=basic)
-    v
-httpx -> Nextcloud (Basic: Login-Name + App-Passwort)
-    |
-    '-- graceful/finally -> audit.record.note -> deps.resolve_caller -> Kette u:<principal>
+┌──────────────────────────────────────────────────────────────────────────┐
+│ server/reg_*.py (22 Tools)   @graceful: ToolError -> Satz, Audit-Zeile    │
+│   jede Registrierung: clients = deps.resolve_clients(ctx)   (R1)          │
+│                                   │                                       │
+│                                   ▼                                       │
+│   NcClients(client, creds, exclusion=ExclusionGuard())   NEU: 3. Feld     │
+├──────────────────────────────────────────────────────────────────────────┤
+│ tools/ (Familien)                                                         │
+│  ┌──────────────┐ ┌───────────────┐ ┌──────────┐ ┌──────────────────────┐ │
+│  │ files.py     │ │ search.py     │ │ notes.py │ │ chatgpt.py/context.py│ │
+│  │ E1 search    │ │ E4 _normalise │ │ E5 search│ │ erben E1..E6, eigene │ │
+│  │ E2 list_dir  │ │  (+paralleler │ │ E6 read  │ │ Prüfung nur als      │ │
+│  │ E3 read/dl   │ │   Tag-Abruf)  │ │          │ │ Tiefenverteidigung   │ │
+│  └──────┬───────┘ └──────┬────────┘ └────┬─────┘ └──────────┬───────────┘ │
+│         └────────────────┴───── await clients.exclusion.view(clients) ──┘ │
+├──────────────────────────────────────────────────────────────────────────┤
+│ nextcloud/exclusion.py  NEU                                               │
+│   ExclusionGuard: single-flight je Aufruf, Ergebnis = View | Unchecked    │
+│   ExclusionView:  tagged_ids, tagged_prefixes, excludes(path, fileid)     │
+│   _tag_ids-Cache: (base_url,user) -> Tag-Ids, TTL, nur positiv            │
+├──────────────────────────────────────────────────────────────────────────┤
+│ nextcloud/clients/                                                        │
+│   systemtags.py NEU: PROPFIND /dav/systemtags (Name -> Id)                │
+│                      REPORT oc:filter-files auf /dav/files/<user>         │
+│   dav.py GEÄNDERT:  home_entries() (parse_entries ohne Sandbox-Drop),     │
+│                      paths_for_fileids() (gebatchtes SEARCH über fileid)  │
+└──────────────────────────────────────────────────────────────────────────┘
 ```
 
-Kein Netzaufruf im heißen Pfad außer dem einen nach Nextcloud. Genau diese Eigenschaft muss der Exchange-Pfad erhalten, und er kann es, weil ein JWKS-Cache der einzige neue Fremdabruf ist und der nur bei unbekanntem `kid` anläuft.
+### Component Responsibilities
 
-### Was die Standalone-OAuth-Maschinerie aus PR #6 wirklich beisteuert
-
-Die Spec-Note sagt, das gemergte Stück sei "die zweite Hälfte des Exchange-Pfads". Das stimmt für die Prüfmechanik und stimmt nicht für die Anmeldedaten.
-
-**Wiederverwendbar, fertig und erprobt (`oauth/oidc.py`, 462 Zeilen):**
-
-- JWKS-Abruf mit Cache (`JWKS_CACHE_SECONDS = 300`), höchstens ein Nachladen je Aufruf bei unbekanntem `kid` (`oidc.py:316` `_key`, `oidc.py:333` `_refresh_keys`)
-- Schlüssel-Hygiene: nur `RSA/EC/OKP`, nie `oct`, `use`/`key_ops` müssen Verifikation erlauben, ein doppelt vergebener `kid` macht den `kid` unbrauchbar statt einen der beiden zu wählen (`oidc.py:388` `_usable_key`)
-- Algorithmen-Allowlist rein asymmetrisch, `HS*` und `none` sind nie erlaubt (`oidc.py:66`)
-- Claim-Prüfung über PyJWT mit `issuer`, `audience`, `leeway=60`, `options={"require": [...]}` (`oidc.py:281-292`)
-- Eigener HTTP-Client für die fremde Vertrauensdomäne: kein gemeinsamer Pool mit dem Nextcloud-Pfad, keine Redirects, keine Cookies, Antwortgröße begrenzt (`oidc.py:353-380`)
-- Eine benannte Mapping-Strategie mit Versionssuffix statt eines fest verdrahteten Claim-Namens (`oidc.py:160` `user_oidc_unique_uid_sub_v1`, `oidc.py:310` `account_id_for`)
-
-**Nicht wiederverwendbar:** der Weg zum App-Passwort. Im Standalone-Betrieb kommt es weiterhin aus Nextclouds Login Flow v2, gepollt in `oauth/consent.py:394`, und wird erst nach `loginflow.account(...)` unter der kanonischen Konto-Id gespeichert (`consent.py:438` -> `store.create_authorization`, `store.py:772`). Der OIDC-Teil aus PR #6 beweist ausschließlich, **welcher Browser** die Zustimmung erteilt (`oauth/oidc_identity.py:36` `identifies`, gestützt auf `store.redeem_browser_proof`, `store.py:1785`). Er erzeugt keine Anmeldedaten. Ein Maschine-zu-Maschine-Aufruf hat weder Browser noch Cookie und kann diesen Weg nicht gehen.
+| Komponente | Verantwortung | Neu / geändert |
+|------------|---------------|----------------|
+| `nextcloud/clients/systemtags.py` | Roh-HTTP: Tag-Name auf Tag-Id(s) auflösen (PROPFIND `/remote.php/dav/systemtags/`, `oc:display-name`, `oc:user-visible`, `oc:user-assignable`); getaggte Knoten holen (`REPORT oc:filter-files` mit `<oc:systemtag>`-Regel, Props nur `oc:fileid` + `d:resourcetype`). Statusübersetzung nach dem `_check`-Muster, kein Retry | NEU |
+| `nextcloud/clients/dav.py` | `home_entries(body, creds)`: `parse_entries` ohne den `in_files_root`-Drop, `parse_entries` ruft es und filtert danach (Verhalten unverändert). `paths_for_fileids(ids)`: ein SEARCH mit flachem `<d:or>` über `<d:eq oc:fileid>`, gestückelt unter R10 | GEÄNDERT (additiv) |
+| `nextcloud/exclusion.py` | Policy: `ExclusionView` (rein, ohne I/O, testbar), `ExclusionGuard` (per Aufruf, `asyncio.Lock`, merkt sich View oder Fehlschlag), Tag-Id-Cache nach dem `capabilities`-Muster, `withhold`-Hilfen, die Degradationssätze | NEU |
+| `nextcloud/__init__.py` `NcClients` | drittes Feld `exclusion: ExclusionGuard = field(default_factory=ExclusionGuard)`; der Default hält die 34 Test-Konstruktionen gültig (R2) | GEÄNDERT |
+| `tools/files.py` | E1 bis E3, plus die Entscheidung zu Uploads (siehe Offene Fragen) | GEÄNDERT |
+| `tools/search.py` | E4: Tag-Abruf parallel zur Provider-Auffächerung starten, in `_normalise` jeden dateitragenden Treffer prüfen, pfadlose Treffer über `paths_for_fileids` auflösen, Fail-closed als `degraded` je betroffenem Provider | GEÄNDERT |
+| `tools/notes.py` | E5/E6: Notiz-Ids als Datei-Ids prüfen (nach Messung), pfadlos -> Resolver | GEÄNDERT |
+| `tools/chatgpt.py`, `tools/context.py` | keine eigene Logik; erben. Höchstens eine Zeile in `_fetch_file` als Tiefenverteidigung (kostet dank Guard keinen Roundtrip) | minimal |
+| `config.py` + `entry_*.py` | optional `NC_MCP_EXCLUDE_TAG` (Default `kein-ki`), Validierung beim Start nach dem Muster `config.files_root(env)` (`entry_http.py:91`, `entry_exapp.py:93`, `entry_oauth.py:250`, `entry_stdio.py:29`) | GEÄNDERT, falls Owner einen Schalter will |
+| `tests/contract/` | NEU: Klassifikations-Gate über alle registrierten Tools (dateiabgeleitet ja/nein), rot bei jedem 23. Tool ohne Eintrag | NEU |
 
 ---
 
-## Teil 2: Wo der Exchange-Pfad andockt
+## Frage 1: Die Sandbox aus PR #8 als nächste Analogie
 
-### E1: Kein sechster Modus, sondern ein zweiter Prüfer in einer Kette
+**Wo sie einhakt (gelesen):**
 
-`select_mode` bleibt unverändert. Begründung aus dem Code, nicht aus Geschmack:
+| Stelle | Datei:Zeile | Was passiert |
+|--------|-------------|--------------|
+| Eingabepfade | `dav.py:85-122` `safe_path` | normalisiert, bildet `/x` auf `<root>/x` ab; läuft vor jedem Request |
+| Suchbereich | `dav.py:229-249` `search_scope` | Scope der DAV-Suche ist nie außerhalb der Wurzel |
+| DAV-Ergebnisse | `dav.py:466-480` `parse_entries`, Zeile 477 | jeder href außerhalb von Home oder Wurzel wird verworfen; trifft `search` (426), `propfind_children` (455), `find_by_fileid` (390) |
+| Unified Search | `search.py:214` in `_normalise`, Logik `search.py:240-255` | prüft `attributes.path`; `files` ohne Pfad wird verworfen, jeder andere Provider ohne Pfad passiert |
+| Nicht erfasst | `dav.py:143-172` `stat` | parst selbst, nicht über `parse_entries`; geschützt nur, weil der Eingabepfad schon durch `safe_path` lief |
 
-1. Ein sechster Modus müsste sich aus Umgebung **und Anfrage** entscheiden, denn dieselbe Instanz muss weiter gewöhnliche OAuth-Clients bedienen (Claude.ai) und zusätzlich F13-Aufrufe annehmen. `select_mode` ist aber eine reine Funktion aus Umgebung plus Header und kennt bewusst keine "es kommt drauf an, was im Bearer steht"-Verzweigung. Ein Modus je Token wäre genau der stille Fallback, den `deps.py:33-36` und `entry_oauth.load_settings` ausdrücklich verbieten.
-2. Der Credential-Layer braucht keinen neuen Zweig, solange der Exchange-Pfad eine `OAuthIdentity` hinterlegt: `_credentials_from_oauth` liest nur `request.state` (R2).
-3. Die Transportgrenze ist bereits auf genau diese Erweiterung ausgelegt (R3): Parameter statt Import, Protokoll statt Basisklasse.
+**Kann der Ausschluss auf denselben Engstellen reiten?** Auf denselben Pfaden ja, an derselben Codezeile nein.
 
-**Bauform:** ein neues, kleines Kompositum `ChainedVerifier` (oder `verifier.chain(...)`), das selbst `verify_token` und `resolve_identity` implementiert und beides an seine Glieder delegiert.
+- `parse_entries` ist synchron und bekommt nur `body` und `creds`. Der Tag-Blick braucht einen Netzabruf, der nicht in einen Parser gehört, und er muss vor dem Fenstern und Paginieren wirken (`files.py:138`, `files.py:186-187`), sonst lügen `count`, `truncated` und `next`. Die Filterung gehört deshalb eine Ebene höher in die Tool-Funktionen, direkt nach dem DAV-Aufruf und vor dem Schnitt. Der DAV-Client bleibt policy-frei, genau wie er heute nichts über Talk oder Notes weiß.
+- `_normalise` (`search.py:201-237`) ist ebenfalls synchron, bekommt aber schon heute Kontext (`clients`). Die richtige Form: `unified_search` startet den Tag-Abruf als weitere Aufgabe im bestehenden `asyncio.gather` (`search.py:104-107`), sodass er keine Wanduhrzeit kostet, und reicht den fertigen Blick an `_normalise` weiter. Die Prüfung sitzt direkt neben Zeile 214.
+- **Wiederverwenden, nicht kopieren:** `_home_path_of` (`dav.py:493-502`) für die hrefs aus dem REPORT, und die Segmentregel `path == p or path.startswith(p + "/")` aus `in_files_root` (`dav.py:490`) als eine gemeinsame Funktion. Zwei Schreibweisen derselben Präfixregel sind genau der Fehler, den `ids.py` als "einzige Quelle" in v1.3 abgeschafft hat.
+- **Nicht wiederverwenden:** `parse_entries` selbst für die getaggte Menge. Es verwirft alles außerhalb von `NC_MCP_FILES_ROOT`, und ein getaggter Vorfahr der Wurzel (Wurzel `/Shared/KI`, Tag auf `/Shared`) muss gerade drinbleiben. Deshalb `home_entries` als ungefilterte Hälfte herauslösen.
+
+**Nebenbefund, sandboxrelevant:** Findling setzt nur `fileId`, keinen `path` (`nextcloud-search/php/lib/Search/Provider.php:384`), und ist nicht in `PROVIDER_KINDS` (`provider_map.py:55-85`), läuft also als `url`-Treffer mit `provider != "files"` durch `_entry_in_files_root` und passiert (`search.py:249,252`). Notes gehen über `/apps/notes/api/v1` und berühren `parse_entries` nie. Beide sind heute Sandbox-Lücken; der Pfad-Resolver aus diesem Feature schließt sie mit, wenn der Owner das in den Scope nimmt.
+
+---
+
+## Frage 2: Ehrliche Scope-Liste über alle 22 Tools
+
+Gezählt aus den `@mcp.tool`-Stellen in `server/reg_*.py`.
+
+| # | Tool | Registrierung | Liefert dateiabgeleiteten Inhalt? | Engstelle | Anmerkung |
+|---|------|---------------|-----------------------------------|-----------|-----------|
+| 1 | `files_search` | `reg_files.py:23` | JA (Namen, Pfade, Ids) | E1 `files.py:136-138` | Filtern vor dem Fenster; Suchordner selbst prüfen |
+| 2 | `files_list` | `reg_files.py:43` | JA | E2 `files.py:179-187` | Zielordner prüfen, Kinder vor Sortierung filtern |
+| 3 | `files_read` | `reg_files.py:60` | JA (Inhalt) | E3 `files.py:243-244` | nach `stat`, vor `get_range` |
+| 4 | `files_download` | `reg_files.py:72` | JA (Bytes) | E3 `files.py:323-324` | dito |
+| 5 | `files_upload` | `reg_files.py:108` | nein, aber Schreibziel und Existenz-Orakel (`ConflictError` "A file already exists at ...", `dav.py:644-647,704-707`) | E3-Variante `files.py:390,435` | Owner-Frage: in `kein-ki`-Ordner schreiben verbieten? |
+| 6 | `unified_search` | `reg_search.py:20` | JA (files, findling, notes; Titel, Subline) | E4 `search.py:201-237` | provider-agnostisch per `fileId`/`/f/<id>` prüfen, nicht nur `files` |
+| 7 | `search` (ChatGPT) | `reg_chatgpt.py:27` | JA | erbt E4 über `chatgpt.py:165` | keine eigene Prüfung |
+| 8 | `fetch` | `reg_chatgpt.py:36` | JA für `file:` und `note:`; nein für `card`, `event`, `mail`, `message`, `table` | `file`: `chatgpt.py:240` + erbt E3 über `files.read` (252); `note`: erbt E6 (281) | sieben Id-Arten, zwei betroffen |
+| 9 | `prepare_context` | `reg_context.py:37` | JA (Suchtreffer, Auszüge) | erbt E4 (`context.py:249`) und E3/E6 über `fetch` (775) | Kalender-, Talk-, Mail-Bein unberührt |
+| 10 | `notes_search` | `reg_notes.py:21` | JA, sofern Notiz = Datei (Notes speichert Markdown-Dateien) | E5 `notes.py:63-90` | Messpunkt: Notiz-Id == Datei-Id |
+| 11 | `notes_read` | `reg_notes.py:33` | JA | E6 `notes.py:105` | dito |
+| 12 | `notes_create` | `reg_notes.py:44` | nein (Antwort ist das eigene Geschriebene) | keine | Grenzfall: Kategorie-Ordner getaggt |
+| 13 | `calendar_list_events` | `reg_calendar.py:20` | nein | keine | CalDAV, keine ATTACH-Projektion gefunden |
+| 14 | `calendar_create_event` | `reg_calendar.py:53` | nein | keine | |
+| 15 | `contacts_search` | `reg_contacts.py:20` | nein | keine | CardDAV |
+| 16 | `deck_browse` | `reg_deck.py:25` | nein | keine | Deck-API 1.0 ohne Anhänge (`clients/deck.py:14,41`) |
+| 17 | `deck_create_card` | `reg_deck.py:52` | nein | keine | |
+| 18 | `tables_browse` | `reg_tables.py:25` | nein (Zellinhalt; ein Link-Zelltyp kann einen Dateinamen tragen) | keine | als Restrisiko benennen |
+| 19 | `tables_create_row` | `reg_tables.py:54` | nein | keine | |
+| 20 | `talk_browse` | `reg_talk.py:39` | **Referenz, kein Inhalt**: eine in den Chat geteilte Datei erscheint als Name über `messageParameters` (`talk.py:574-604`) | optional | Parameter vom Typ `file` tragen `id` und `path`, wären mit demselben Blick billig maskierbar |
+| 21 | `talk_send` | `reg_talk.py:74` | nein | keine | |
+| 22 | `mail_browse` | `reg_mail.py:51` | nein (nur `has_attachments`, `mail.py:505-506`) | keine | Mail liest keine Anhänge |
+
+**Ergebnis:** 11 von 22 Tools liefern dateiabgeleiteten Inhalt (1 bis 11), einer ist ein Schreibpfad mit Orakel (5, in der Zählung enthalten), einer trägt Dateireferenzen (20), elf sind unbetroffen. Die 11 betroffenen laufen über **sechs** Engstellen (E1 bis E6); nur diese werden angefasst. Das Klassifikations-Gate hält die Tabelle als Test fest, damit ein 23. Tool nicht ungeprüft durchrutscht.
+
+**Ehrlich zu benennen, auch wenn nicht gebaut:** Talk-Dateiparameter (Name, keine Bytes), Tables-Linkzellen, Unified-Search-Provider Dritter, die eine Datei weder per `attributes.fileId` noch per `/f/<id>`-URL kenntlich machen (dann ist die Datei für uns nicht erkennbar und der Treffer passiert; das ist die Grenze eines Filters, der nur sieht, was Nextcloud meldet).
+
+---
+
+## Frage 3: Wo der Cache lebt und welche Invalidierung er braucht
+
+**Zwei Ebenen, getrennt nach Datenart:**
+
+| Ebene | Inhalt | Ort | Lebensdauer | Invalidierung |
+|-------|--------|-----|-------------|---------------|
+| Per Aufruf | `ExclusionView` (getaggte fileids und Ordnerpräfixe) oder der Fehlschlag | `NcClients.exclusion`, gebaut in `deps.py:118` | genau ein Tool-Aufruf | keine nötig, stirbt mit dem Aufruf; eine Tag-Änderung wirkt ab dem nächsten Aufruf |
+| Prozessweit | Tag-Name -> Tag-Id(s) | Modul-Dict in `exclusion.py`, Schlüssel `(base_url, user)` wie `capabilities.py:151` | TTL, Vorschlag 60 s wie `capabilities.TTL_SECONDS` | **nur positive Treffer cachen**; bei `412` aus dem REPORT (Tag gelöscht, laut `FilesReportPlugin` "Cannot filter by non-existing tag") Eintrag löschen, einmal neu auflösen, dann fail-closed |
+
+**Warum die getaggte Menge nicht prozessweit:** Sie ist Nutzerdatum (welche Ordner jemand für sensibel hält), und R9/D-20 verbieten genau das. Außerdem würde jede TTL ein Fenster öffnen, in dem ein frisch getaggter Ordner noch ausgeliefert wird; das ist das eine Versprechen des Features.
+
+**Warum kein negativer Cache der Tag-Id:** "Tag existiert nicht" heißt korrekt "nichts ausgeschlossen". Gecacht würde ein Admin, der `kein-ki` anlegt und sofort vergibt, bis zu 60 s lang nicht wirken. Die PROPFIND auf `/systemtags` ist billig; ohne Tag wird sie je Aufruf wiederholt, mit Tag entfällt sie warm.
+
+**Single-flight je Aufruf:** `prepare_context` holt den Blick in der Suche und danach bis zu drei Auszüge parallel (`context.py:752-754`). `ExclusionGuard` hält ein `asyncio.Lock` und merkt sich das erste Ergebnis, sodass drei parallele `fetch` genau null zusätzliche Abrufe machen. Das Muster ist dasselbe, das `oauth/jwks.py` für den Schlüsselsatz in v1.6 eingeführt hat (Single-Flight, fail-closed).
+
+**Lazy statt eager:** Der Guard lädt erst, wenn eine Engstelle fragt. Die elf unbetroffenen Tools zahlen damit nichts, und das Klassifikations-Gate beweist, dass sie nie fragen.
+
+**Kosten je Antwort (Hypothese, BL-16-Messung vor der Designentscheidung):**
+- warm, Tag existiert: 1 Roundtrip (REPORT), parallel zur eigentlichen Arbeit in `unified_search`/`prepare_context`, seriell vor dem Lesen in `files_read`/`download`.
+- kalt: +1 PROPFIND.
+- nur wenn pfadlose Treffer (Findling, Notes) im Ergebnis sind: +1 SEARCH `paths_for_fileids`, gestückelt je 49 Ids (49 `eq` + 48 `or` bleibt unter 100 Operatoren, R10).
+
+---
+
+## Frage 4: Subtree-Semantik, Ahnenkette gegen getaggte Menge
+
+| Kriterium | A: Ahnenkette je Ergebnis prüfen | B: getaggte Menge einmal holen, Präfix testen |
+|-----------|----------------------------------|-----------------------------------------------|
+| Roundtrips | Vorfahren-fileids liefert DAV nicht; je Vorfahr ein PROPFIND Depth 0 mit `nc:system-tags`, also N Treffer mal Tiefe | 1 REPORT unabhängig von der Trefferzahl |
+| Batchbar | nein, SEARCH kann nicht über Pfade verodern, nur über Props | ja, Ergebnis ist eine Menge |
+| Latenz im Budget | reißt `prepare_context` (25 Treffer x Tiefe) | parallelisierbar zur Provider-Auffächerung |
+| Pfadnormalisierung | jeder Vorfahrpfad separat | hrefs durch `_home_path_of`, dieselbe Form wie alle anderen Pfade (R5) |
+| Größenrisiko | klein je Abfrage | wächst mit der Zahl getaggter Knoten (siehe Pitfalls) |
+
+**Empfehlung: B.** Ablauf:
+
+1. REPORT auf `/remote.php/dav/files/<user>` (Home-Wurzel, **nicht** die Sandbox-Wurzel, sonst fehlen getaggte Vorfahren der Wurzel; `FilesReportPlugin` schränkt auf den Teilbaum des Ziels ein).
+2. hrefs über `home_entries` -> absolute Home-Pfade plus fileid plus `is_collection`.
+3. `ExclusionView.excludes(path, fileid)`: `fileid in tagged_ids` **oder** der Pfad liegt segmentgenau unter einem getaggten Ordner (`p == t or p.startswith(t + "/")`, `t == "/"` deckt alles).
+4. Getaggte Dateien (keine Ordner) gehen nur in `tagged_ids`, nicht in die Präfixe: eine Datei hat keinen Teilbaum, und ein Präfixeintrag für sie wäre nur unnötige Arbeit je Test.
+
+**Warum die fileid zusätzlich zum Pfad:** Die fileid ist über Umbenennen und Verschieben stabil, der Pfad nicht, und Findling/Notes liefern überhaupt nur die Id. Direkt getaggte Treffer erkennt die Id-Menge ohne Pfadauflösung; nur für den Subtree-Test braucht ein pfadloser Treffer seinen Pfad.
+
+**Die ehrliche Grenze von B (und von A genauso):** Beide sehen nur, was der Nutzer sieht. Taggt Alice `/Projekte` und teilt `/Projekte/Sub` an Bob, liegt Bobs Sicht unter `/Sub` (oder `/Shared/Sub`), und `/Projekte` ist für Bob nicht erreichbar; der REPORT findet es für Bob nicht, Bob bekommt `Sub` ausgeliefert. Das ist keine Implementierungsschwäche, sondern die Nutzer-API: der Connector sieht nie mehr als der Nutzer (Core Value), also auch keine Tags auf Knoten, die der Nutzer nicht sieht. Messen, dokumentieren, und als Enterprise-Governance-Thema (zentrale Policy) benennen. Konfidenz LOW bis gemessen, weil `searchBySystemTag` über Mounts hinweg auch anders auflösen könnte.
+
+**Wechselwirkung mit der Sandbox-Normalisierung:** Vergleiche immer zwischen absoluten Home-Pfaden. `safe_path` bildet Eingaben auf die virtuelle Wurzel ab (`dav.py:118-122`), zurückgegebene Pfade sind aber absolut (R5); die getaggten Pfade kommen aus demselben `_home_path_of`, also passt die Form. Unified-Search-Pfade kommen als `attributes.path` ohne führenden Slash und werden heute schon mit `"/" + raw_path.lstrip("/")` normalisiert (`search.py:255`); dieselbe Normalisierung, eine Funktion.
+
+---
+
+## Frage 5: Fail-closed in die bestehende Degradationsbenennung
+
+**Was als "nicht prüfbar" gilt:** PROPFIND `/systemtags` scheitert (systemtags-App aus: 404/405), REPORT scheitert (Timeout, 5xx, 412 nach erneuter Auflösung), `httpx.RequestError`, oder die Antwort ist nicht parsebar. **Kein** Fehler: der Tag existiert nicht (dann ist nichts ausgeschlossen). Der Guard speichert den Fehlschlag als Wert (`Unchecked(reason: str)`), nicht als Exception, damit jede Engstelle ihn in ihrer eigenen Form ausspricht.
+
+| Antwortform | Tools | Fail-closed-Verhalten | Begründung aus dem Code |
+|-------------|-------|------------------------|-------------------------|
+| Einzelzugriff | `files_read`, `files_download`, `fetch(file)`, `fetch(note)`, `notes_read` | `ToolError` mit `reason=REASON_GUARD_TRIPPED`; `graceful` macht daraus Satz plus Audit-Zeile (`server/__init__.py:111-113,133`) | ein Treffer, keine Teilantwort möglich; `guard_tripped` existiert, kein 13. Grund nötig (R8) |
+| Liste einer Familie | `files_search`, `files_list`, `notes_search` | ebenfalls `ToolError`: jeder Eintrag ist betroffen, eine leere Liste mit Randnotiz wäre die "leere Erfolgsantwort", die die Codebasis meidet (R7) | es gibt in dieser Familie kein `degraded`, und es für einen Totalausfall einzuführen, kostet Schema ohne Nutzen |
+| Gemischte Quellen | `unified_search`, `search`, `prepare_context` | dateitragende Treffer zurückhalten, der Rest (Karten, Nachrichten, Tabellen, Termine, Talk, Mail) bleibt; je betroffenem Provider ein Eintrag `{"provider": "<id>", "reason": "<n> hits withheld: the kein-ki exclusion could not be checked (...)"}` | exakt die bestehende Form (R6); `prepare_context` reicht sie über `_degraded_of` (`context.py:518`) unverändert durch, eine Form für ein Problem |
+
+**Ausgeschlossene Treffer im Normalfall (Tag prüfbar):** werden weggelassen. Ob sie gezählt werden (in `skipped`, `search.py:133-136`, oder eigener Schlüssel) oder stumm fehlen, ist eine FEATURES/Owner-Frage; architektonisch geht beides an derselben Zeile. Hinweis: `skipped` heißt heute "unbrauchbar", eine zweite Bedeutung im selben Schlüssel widerspräche TOOL-17 ("eine Bedeutung je Antwortschlüssel").
+
+**Explizit benannte Ziele** (Pfad an `files_read`, `files_list`, `files_search(folder=...)`, Id an `fetch`) sind ausgeschlossen: `ToolError` mit `guard_tripped` und einem Satz, der den Tag nennt, statt "nicht gefunden". Eine Lüge über Nicht-Existenz würde den Nutzer, dessen Agent das ist, falsch informieren; er sieht die Datei im Web ohnehin.
+
+**Audit:** Der Wrapper schreibt heute schon jede Ablehnung mit ihrem Grund; `guard_tripped` erscheint dort ohne weitere Änderung. Ob die Audit-Zeile zwischen "ausgeschlossen" und "nicht prüfbar" unterscheiden soll, ist die einzige Stelle, an der ein 13. Grund diskutiert werden müsste.
+
+---
+
+## Architectural Patterns
+
+### Pattern 1: Request-gebundener Guard am Parameterobjekt
+
+**What:** Der Tag-Blick hängt an `NcClients`, dem einzigen Objekt, das jede Tool-Funktion bekommt ("the seam where phase 2 hooks in the AppAPI impersonation without touching tool code", `nextcloud/__init__.py:3-4`).
+**When to use:** Jede request-gebundene, nutzerspezifische Vorabinformation, die mehrere komponierte Tools teilen sollen.
+**Trade-offs:** Ein veränderlicher Zustand in einem `frozen`-Dataclass (das Feld selbst ist unveränderlich, sein Inhalt nicht); dafür keine ContextVar-Magie, die bei `asyncio.gather` und `create_task` Kopiersemantik hat.
 
 ```python
-# neu, oauth/verifier.py oder oauth/exchange.py
-class ChainedVerifier:
-    """Erst der Store, dann der Exchange. Reihenfolge ist die Sicherheit."""
+@dataclass(frozen=True, slots=True)
+class NcClients:
+    client: httpx.AsyncClient
+    creds: Credentials
+    exclusion: ExclusionGuard = field(default_factory=ExclusionGuard)
 
-    async def verify_token(self, token: str) -> AccessToken | None:
-        access = await self._store_verifier.verify_token(token)   # lokal, 5-s-Cache
-        if access is not None or self._exchange is None:
-            return access
-        return await self._exchange.verify_token(token)           # nur wenn eingeschaltet
-
-    async def resolve_identity(self, access: AccessToken) -> OAuthIdentity | None:
-        if access.claims and access.claims.get(EXCHANGE_CLAIM):
-            return await self._exchange.resolve_identity(access)
-        return await self._store_verifier.resolve_identity(access)
+class ExclusionGuard:
+    __slots__ = ("_lock", "_state")
+    async def view(self, clients: "NcClients") -> ExclusionView | Unchecked:
+        async with self._lock:
+            if self._state is None:
+                self._state = await _load(clients)   # nie raise: Fehlschlag wird Unchecked
+            return self._state
 ```
 
-Vier Eigenschaften, die diese Reihenfolge trägt:
+### Pattern 2: Filtern vor dem Fenster
 
-- Ein heute gültiges Token trifft den neuen Prüfer **nie**, weil der Store zuerst antwortet. Das ist die Garantie "die vier bestehenden Wege werden nicht angefasst" als Bauform statt als Vorsatz.
-- Ist der Exchange-Pfad aus (Werkszustand), ist `self._exchange is None` und die Kette ist verhaltensgleich mit dem heutigen Prüfer. Ein Test, der das behauptet, ist billig zu schreiben.
-- Die Weiche in `resolve_identity` läuft über einen eigenen Claim im `AccessToken` und nicht über Zustand zwischen den zwei Aufrufen. Das SDK-Modell bietet `claims` genau dafür an, und `AUTH_ID_CLAIM`/`CLIENT_NAME_CLAIM` (`verifier.py:88`, `:96`) sind der Präzedenzfall.
-- `provider.on_revocation(verifier.invalidate)` (`entry_exapp.py:117`) muss die Kette treffen, nicht nur das erste Glied. Also bekommt die Kette ein `invalidate()`, das beide Caches leert. Das ist eine Zeile und eine Testzeile.
+**What:** Jede Liste wird gefiltert, bevor `offset`/`capped` geschnitten und `truncated`/`next` berechnet wird.
+**When to use:** `files.search` (zwischen 136 und 138), `files.list_dir` (zwischen 179 und 186), `_normalise`.
+**Trade-offs:** Eine Seite kann kürzer als `limit` werden, wenn viele Treffer ausgeschlossen sind; bei `files.search` (Holen mit `offset + capped + 1`, `files.py:135`) muss die Wächterzeile "gibt es mehr" nach dem Filtern gezählt werden, sonst wird ein ausgeschlossener Sentinel zur falschen Aussage "nichts mehr".
 
-**Genaue Einbaustellen:**
+### Pattern 3: Parallel statt davor
 
-| Datei | Zeile heute | Änderung |
-|---|---|---|
-| `entry_exapp.py` | 113 `verifier = StoreTokenVerifier(...)` | `verifier = chain(StoreTokenVerifier(...), exchange_verifier_or_none(env, store))` |
-| `entry_exapp.py` | 117 `provider.on_revocation(verifier.invalidate)` | unverändert, wenn die Kette `invalidate` anbietet |
-| `entry_oauth.py` | 210 / 212 | dieselbe Zeile, dieselbe Änderung |
-| `exapp/middleware.py` | keine | keine. Das ist das Ziel. |
-| `config.py` `select_mode` | keine | keine. Nur neue `ENV_*`-Konstanten plus ein `exchange_settings(env)`-Leser am Ende der Datei, in der Form der schon vorhandenen Leser (`audit_log_enabled` bei `config.py:554`). |
+**What:** Wo die Antwort ohnehin auf Netz wartet, startet der Tag-Abruf im selben `gather`.
+**When to use:** `unified_search` (`search.py:104-107`); `prepare_context` erbt es über das Suchbein.
+**Trade-offs:** Bei Einzelzugriffen (`files_read`) gibt es nichts zu parallelisieren außer `stat`; dort `stat` und Tag-Abruf per `gather` gemeinsam starten und erst vor `get_range` entscheiden. Die Bytes werden nie geholt, bevor die Prüfung durch ist.
 
-### E2: Die Audience dockt am richtigen Ort, aber nicht an der richtigen Funktion an
+### Pattern 4: Klassifikations-Gate statt Handverdrahtung
 
-Die Spec-Note sagt: "Der Platz, an dem eure Audience-Konvention andockt, existiert also schon" und meint die RFC-8707-Prüfung in `verifier.py:246`. Konzeptionell richtig, mechanisch nicht übertragbar, und das ist eine belegbare Korrektur:
-
-- Die vorhandene Prüfung ist `check_resource_allowed(requested, configured)` aus dem SDK. Der Quellcode (`.venv/Lib/site-packages/mcp/shared/auth_utils.py`) macht **URL-Vergleich**: Schema und Netloc müssen gleich sein, der Pfad muss ein Präfix sein. Für zwei Werte ohne Schema und Host degeneriert das zu einem Pfad-Präfix-Vergleich auf beliebigen Zeichenketten, also zu einer Regel, die niemand beabsichtigt hat.
-- Keycloak stellt bei Standard Token Exchange V2 die Audience aus dem `audience`-Parameter, und der nimmt **Client-Ids**, keine Resource-URLs. Die Keycloak-Doku sagt zum `resource`-Parameter nach RFC 8693 wörtlich "Not supported yet" (Vergleichstabelle V2 gegen V1 in `docs/guides/securing-apps/token-exchange.adoc`). Ein herabgestuftes Token trägt dann `"aud": ["target-client2"]` und `"azp": "requester-client"`.
-
-**Folge für den Bau:** eigener Vergleich, kein Aufruf von `check_resource_allowed`. Die Audience des Exchange-Pfads ist eine konfigurierte Zeichenkette (oder eine kleine Liste), verglichen in konstanter Zeit auf UTF-8-Bytes, so wie `principal.same_principal` es vormacht (`oauth/principal.py:88`). `aud` kann laut JWT-Spezifikation Zeichenkette oder Liste sein, beides muss behandelt werden; PyJWT nimmt `audience=` und prüft das selbst korrekt, das ist der billigste Weg.
-
-**Folge für das zweite Treffen mit F13 (Entscheidung 1 der Spec-Note):** die Frage "fester Bezeichner, Basis-URL oder Wert aus der `tenant.yml`" hat damit eine Vorzugsantwort. Empfehlung an F13: eine Keycloak-Client-Id je Connector-Instanz, stabil und sprechend, zum Beispiel `nextcloud-mcp-<instanz>`. Unsere Konfiguration heißt `NC_MCP_EXCHANGE_AUDIENCE` und nimmt genau diesen Wert; der dokumentierte Default ist die Resource-URL dieser Instanz (`public_url + /mcp`), damit die Konfiguration auch dann noch passt, wenn Keycloak den `resource`-Parameter eines Tages nachreicht. Zusätzlich empfehlenswert: ein optionales `NC_MCP_EXCHANGE_AZP` (welcher Requester-Client darf tauschen), weil `azp` der einzige Claim ist, der den Orchestrator von jedem anderen Client desselben Realms unterscheidet.
+**What:** Ein Contract-Test listet alle registrierten Tools (aus der aktiven Registry, wie `test_tool_surface.py:532,564`) und verlangt für jedes einen Eintrag "dateiabgeleitet: ja/nein/Referenz". Für die Ja-Tools läuft ein Negativbeweis mit getaggtem Fixture (Datei direkt, Ordner als Vorfahr, Vorfahr der Sandbox-Wurzel, Guard-Fehlschlag).
+**When to use:** Genau hier: es beantwortet "jede Antwort genau einmal, ohne 22 Tools zu verdrahten" mit einem Beweis statt einer Zusicherung.
 
 ---
 
-## Teil 3: Die Kernfrage: woher kommen die Nextcloud-Anmeldedaten für ein gemapptes Konto
+## Data Flow
 
-Das ist die eine Frage, die dieser Meilenstein entscheiden muss, und sie ist **noch nicht entschieden**. Die Spec-Note umgeht sie, weil sie annimmt, die Standalone-Maschinerie löse sie mit. Sie löst sie nicht (Teil 1, letzter Abschnitt). Es gibt drei Wege, zwei davon tragen.
-
-### Weg A: AppAPI-Impersonation (nur ExApp-Betrieb)
-
-Der Container besitzt `APP_SECRET` und kann jedes Konto der Instanz ansprechen, indem er `AUTHORIZATION-APP-API: base64("<user>:<APP_SECRET>")` setzt (`nextcloud/credentials.py:96` `appapi_auth_headers`). Genau das tut der AUTH-01-Pfad heute für den Nutzer, den HaRP benannt hat. Der Exchange-Pfad würde denselben Mechanismus benutzen, nur dass der Name aus dem geprüften JWT kommt statt aus dem HaRP-Header.
-
-- **Kosten:** null Provisionierung. Kein App-Passwort, kein Browser-Schritt, kein neues Geheimnis im Container. Ein neuer Nutzer in Keycloak funktioniert sofort.
-- **Preis:** die Signatur des fremden IdP wird zum funktionalen Äquivalent von `APP_SECRET`. Wer ein Token für `aud=<unsere Audience>` ausstellen kann, handelt als jedes Konto der Instanz. Die Fähigkeit ist nicht neu (der Container hat sie seit v1.0), neu ist, dass eine **zweite Partei** bestimmen darf, welches Konto gemeint ist.
-- **Code-Fläche:** `OAuthIdentity` bekommt ein Feld mit Default (`credential: str = CREDENTIAL_APP_PASSWORD`), damit kein bestehender Konstruktionsort bricht; `deps._credentials_from_appapi` reicht seine `settings` an `_credentials_from_oauth` weiter, das einen zweiten Zweig bekommt, der `Credentials(mode=MODE_APPAPI, user=..., secret=settings.app_secret, ...)` baut. Zwei kleine, gut testbare Änderungen an `deps.py`.
-- **Notwendige Gegengewichte, alle lokal und billig:** ab Werk aus; exakter Audience-Vergleich; Issuer fest konfiguriert; nur asymmetrische Algorithmen; **eine Konten-Allowlist oder eine Gruppenbindung**, damit ein kompromittierter IdP nicht sofort den Administrator bedeutet; der Pausenschalter gilt automatisch (R4); Audit-Zeile je Aufruf (R5).
-- **Was Weg A nicht braucht:** eine Existenzprüfung des Kontos im heißen Pfad. Ein nicht existierender Nutzer führt zu einem 401 von Nextcloud selbst, also fail-closed ohne Netzaufruf von uns. Die Forderung "Abweisung statt stiller Anlage" ist damit erfüllt, weil wir ohnehin kein Konto anlegen können.
-
-### Weg B: Vorab gebundene Autorisierung mit eigenem App-Passwort (beide Betriebsarten)
-
-Je Konto existiert genau eine gespeicherte Autorisierung unter einem reservierten Pseudo-Client (Muster R6, zum Beispiel `urn:mcp-connector:token-exchange`). Der Exchange-Pfad bildet das Token auf einen Principal ab und sucht diese eine Zeile; findet er keine, ist der Aufruf abgewiesen.
-
-- **Kosten:** ein einmaliger Browser-Schritt je Nutzer (Login Flow v2), also Provisionierung.
-- **Preis:** keine neue Vollmacht. Der Connector kann danach genau das, was er vorher konnte, und jede Bindung ist in Nextcloud unter "Geräte und Sitzungen" sichtbar und widerrufbar, dazu auf unserer Verbindungsseite (`oauth/connections.py:336` listet über `store.authorizations_of_user(principal)`).
-- **Code-Fläche:** ein neuer Store-Lesezugriff (`binding_of(principal, client_id)`, eine SELECT-Zeile; `authorizations_of_user` bei `store.py:941` fragt bereits `COALESCE(nc_account_id, nc_user) = ? AND revoked_at IS NULL`, es fehlt nur der Client-Filter, kein Schema-Wechsel) plus eine Provisionierungs-Route, die im Wesentlichen `oauth/connect.py` ist, nur dass sie speichert statt anzeigt.
-- **Geschenkt dazu:** `resolve_identity` muss gar nicht neu geschrieben werden. Trägt der `ExchangeVerifier` in `verify_token` den `AUTH_ID_CLAIM` der gefundenen Bindung ein, kann die Kette die bestehende `StoreTokenVerifier.resolve_identity` (`verifier.py:276`) unverändert benutzen: Entschlüsselung, Widerrufsblick und Maskierung inklusive. Das ist der eleganteste Teil des ganzen Entwurfs.
-- **Der offene Betriebspunkt:** wie kommen 500 Konten einer Landesinstanz zu ihrer Bindung. `occ user:auth-tokens:add <uid>` (früher `user:add-app-password`) existiert und kann ein App-Passwort erzeugen, aber das Ergebnis müsste anschließend in unseren Store gelangen, wofür es heute keinen Weg gibt und für den ein Klartext-App-Passwort durch eine Konfiguration wandern würde. Das ist schlechter als der Browser-Schritt. MEDIUM confidence, nicht gemessen.
-
-### Weg C: Dienstkonto oder gemeinsames Konto
-
-Ausdrücklich verworfen. Das ist genau der Zustand, den die Spec-Note als heutigen Notbehelf beschreibt und den der Meilenstein ablösen soll, und er bricht das Kernversprechen ("der Assistent sieht nie mehr als der angemeldete Nutzer").
-
-### Empfehlung und die Entscheidung, die der Owner treffen muss
-
-| Kriterium | Weg A (Impersonation) | Weg B (gebundene Autorisierung) |
-|---|---|---|
-| Betriebsarten | nur `exapp` | `exapp` und `oauth` |
-| Provisionierung je Nutzer | keine | einmalig im Browser |
-| Neue Vollmacht | ja: IdP-Signatur wirkt wie `APP_SECRET` | keine |
-| Sichtbar und widerrufbar für den Nutzer | nein (nur Pausenschalter) | ja, an zwei Stellen |
-| Code-Fläche | `deps.py` plus ein Feld an `OAuthIdentity` | Store-Lesezugriff plus Provisionierungs-Route |
-| Passt zur F13-Erzählung "Identität kommt vom IdP" | vollständig | teilweise (Konto bleibt vorab gebunden) |
-| Aufwand bis zum ersten echten Durchstich | klein | mittel bis groß |
-
-**Empfehlung:** Weg A als Ziel, Weg B als Rückfallebene für den Standalone-Betrieb, und beide teilen rund achtzig Prozent des Codes (JWKS, Claims, Mapping, Audience, Konfiguration, Kette, Audit). Die Reihenfolge ist deshalb nicht "erst A oder erst B", sondern: erst der gemeinsame Teil, dann die eine Zeile, die den Credential-Weg wählt. Wer zuerst gebaut wird, kann bis unmittelbar vor dieser Phase offenbleiben.
-
-**Was der Owner entscheiden muss, in einem Satz:** Darf die Signatur eines fremden Identity Providers in einer Instanz, die diesen Schalter einschaltet, so wirken wie das Instanz-Geheimnis der ExApp, abgesichert durch Audience, Issuer, Konten-Allowlist, Pausenschalter und Audit-Kette? Ein Ja ist Weg A und macht F13 sofort betriebsfähig. Ein Nein ist Weg B und kostet je Nutzer einen Browser-Schritt.
-
-**Was F13 dazu beitragen muss:** Entscheidung 2 der Spec-Note (Konto-Claim) wird bei Weg A härter, nicht weicher. Bei Weg B fängt eine falsche Abbildung damit auf, dass keine Bindung gefunden wird; bei Weg A landet eine falsche Abbildung auf einem existierenden Konto. Der LDAP-Fall (Anmeldename ungleich interner Kennung) ist damit kein Randfall, sondern die Kernfrage des Testfalls, den wir aus ihrem Beispiel-Token bauen.
-
----
-
-## Teil 4: Neue und geänderte Komponenten, explizit getrennt
-
-### Neu
-
-| Komponente | Datei | Verantwortung | Bemerkung |
-|---|---|---|---|
-| Exchange-Prüfer | `oauth/exchange.py` | `verify_token` für ein fremdes JWT: Issuer, Signatur, Standard-Claims, Audience, Mapping, Ergebnis als `AccessToken` mit Claims | implementiert `IdentitySource` nur dann vollständig, wenn Weg A gebaut wird |
-| Prüferkette | `oauth/verifier.py` (Ergänzung) oder `oauth/chain.py` | Reihenfolge Store vor Exchange, Weiche in `resolve_identity`, gemeinsames `invalidate()` | ~60 Zeilen, der Rest ist Delegation |
-| JWKS-Client | `oauth/jwks.py` | Abruf, Cache mit Verfallszeit, Rotation, fail-closed | **Alternative prüfen:** der Kern steht bereits in `oidc.py:316-386`. Empfehlung: `_KeyCache`, `_usable_key`, `_refresh_keys` und den gehärteten `_request` aus `oidc.py` in ein `oauth/jwks.py` herausziehen und `OidcClient` darauf umstellen, statt eine zweite Implementierung danebenzulegen. Das ist eine Umstellung ohne Verhaltensänderung, mit vorhandenen Tests abgesichert, und sie verhindert genau die Sorte Doppelpflege, die später eine Sicherheitslücke in nur einer der zwei Kopien schließt. |
-| Mapping-Konfiguration | `oauth/exchange.py` oder `oauth/mapping.py` | benannte Strategien Claim -> Principal, in der Form von `STRATEGY_USER_OIDC_UNIQUE_UID_SUB_V1` | mindestens drei Strategien, siehe Teil 5 |
-| Reservierter Client | Konstante neben `CONNECT_CLIENT_ID` | `urn:mcp-connector:token-exchange`, `allowed=False` | nur bei Weg B nötig, bei Weg A nützlich als Audit-Kennzeichen |
-| Bindungs-Lesezugriff | `oauth/store.py` (neue Methode) | eine Autorisierung je Principal und reserviertem Client | nur Weg B, kein Schema-Wechsel |
-| Provisionierungs-Route | `oauth/exchange_enroll.py` | Login Flow v2 -> `create_authorization` unter dem reservierten Client | nur Weg B, ~`connect.py` mit Speichern statt Anzeigen |
-| Doku | `docs/token-exchange.md` | Variablen, Keycloak-Seite, Betriebsregeln, die vier F13-Entscheidungen als benannte Andockpunkte | am Muster von `docs/standalone-oauth.md` |
-
-### Geändert
-
-| Komponente | Datei:Funktion | Änderung | Risiko |
-|---|---|---|---|
-| Konfiguration | `config.py` (Ende der Datei) | neue `ENV_EXCHANGE_*`-Konstanten, `exchange_configured(env)`, `exchange_settings(env)` | niedrig. `select_mode` wird **nicht** angefasst. |
-| ExApp-Aufbau | `entry_exapp.py:113` | Kette statt einzelnem Prüfer | niedrig, eine Zeile plus Fabrik |
-| Standalone-Aufbau | `entry_oauth.py:210` | dieselbe | niedrig |
-| Identitätsobjekt | `oauth/verifier.py:112` `OAuthIdentity` | nur bei Weg A: ein Feld mit Default (`credential`), `__repr__` zieht mit | niedrig, Default hält alle Konstruktionsorte |
-| Credential-Layer | `deps.py:234` und `deps.py:270` | nur bei Weg A: `settings` durchreichen, zweiter Zweig für Impersonation | mittel. Das ist die Stelle, an der ein Fehler zur falschen Identität führt. Zwei-Konten-Negativbeweis als Integrationstest, nach dem Muster von `tests/integration/test_permission_fidelity_exapp.py`. |
-| OIDC-Client | `oauth/oidc.py` | nur bei der empfohlenen Herauslösung: benutzt `oauth/jwks.py` statt eigener Kopie | niedrig, verhaltensgleich, durch bestehende Unit-Tests abgesichert |
-| Doku-Bestand | `README*.md`, `docs/faq.md` | ein Satz, dass der Weg existiert und ab Werk aus ist | niedrig, aber Pflicht (Wahrheitsregel des Projekts) |
-
-### Ausdrücklich unverändert
-
-`exapp/middleware.py`, `config.select_mode`, `server/__init__.py`, `audit/record.py`, `audit/store.py`, alle 21 Werkzeuge, das Schema-Budget (kein neues Werkzeug), das Store-Schema (bei Weg A gar nicht, bei Weg B nur um eine Abfrage erweitert).
-
----
-
-## Teil 5: Datenflüsse, was sich ändert und was nicht
-
-### Neuer Pfad, Weg A (Impersonation)
+### Ein gefilterter `prepare_context`-Aufruf (detail=full)
 
 ```
-F13-Orchestrator
-    |  1. Keycloak: RFC-8693-Tausch, audience=<unsere Audience>
-    |  2. POST /mcp, Authorization: Bearer <JWT>
-    v
-HaRP (signiert AUTHORIZATION-APP-API, Nutzerkennung leer)
-    v
-RequireAppApi.__call__                      exapp/middleware.py:125   UNVERAENDERT
-    |-- _bearer_is_valid -> ChainedVerifier.verify_token              NEU
-    |     |-- StoreTokenVerifier.verify_token -> None (kein Store-Treffer)
-    |     '-- ExchangeVerifier.verify_token                            NEU
-    |           a) ungepruefter Header: alg in Allowlist, kid vorhanden
-    |           b) ungepruefter iss == konfigurierter Issuer, sonst sofort None
-    |              (verhindert, dass ein fremdes JWT einen JWKS-Abruf ausloest)
-    |           c) Schluessel aus dem JWKS-Cache, hoechstens ein Nachladen
-    |           d) jwt.decode(issuer=, audience=, leeway=60, require=[iss,exp,aud,sub])
-    |           e) Mapping-Strategie: Claim -> Principal
-    |           f) optionale Konten-Allowlist
-    |           -> AccessToken(claims={EXCHANGE_CLAIM, subject, client_name})
-    |-- _deposit -> ChainedVerifier.resolve_identity -> ExchangeVerifier
-    |     -> request.state.oauth_identity = OAuthIdentity(
-    |            nc_user=<gemappt>, principal=<gemappt>, app_password="",
-    |            credential=CREDENTIAL_IMPERSONATE, client_id="urn:...:token-exchange")
-    |-- _switch_refusal                     exapp/middleware.py:177   WIRKT AUTOMATISCH
-    |-- _deposit_recorder                                             UNVERAENDERT
-    v
-Tool -> deps.resolve_credentials -> _credentials_from_appapi (user leer)
-    -> _credentials_from_oauth: credential == impersonate             NEUER ZWEIG
-    -> Credentials(mode=appapi, user=<gemappt>, secret=APP_SECRET)
-    v
-httpx -> Nextcloud (AppAPI-Header, Rechtepruefung findet in Nextcloud statt)
-    |
-    '-- audit.record.note -> Kette u:<gemappter principal>            WIRKT AUTOMATISCH
+reg_context.prepare_context
+  -> deps.resolve_clients(ctx)            NcClients(..., exclusion=Guard(leer))
+  -> context.prepare_context
+       gather(
+         search.unified_search ──┬─ ocs.list_search_providers
+                                 ├─ gather(_ask(files), _ask(findling), _ask(notes), ...,
+                                 │         clients.exclusion.view(clients))      <- 1 REPORT (+PROPFIND kalt)
+                                 └─ _normalise(je Provider, view)
+                                      files:    attributes.path -> excludes(path, fileId)
+                                      findling: nur fileId -> id-Test; pfadlose sammeln
+                                      notes:    Notiz-Id -> id-Test; pfadlose sammeln
+                                    paths_for_fileids(pfadlose)                  <- 0 oder 1 SEARCH
+                                    Unchecked? -> Dateitreffer zurückhalten + degraded{provider}
+         _events, _talk, _mail                     unberührt
+       )
+  -> _bundle(...)                                 nur überlebende Treffer
+  -> _excerpts -> gather(chatgpt.fetch(file:..)) -> _fetch_file -> find_by_fileid
+                                                  -> files.read -> view()      <- Cache-Treffer, 0 Roundtrips
+  -> Antwort mit degraded (inkl. durchgereichter Ausschluss-Einträge)
+graceful: Audit-Zeile ok
 ```
 
-### Neuer Pfad, Weg B (gebundene Autorisierung)
-
-Identisch bis Schritt (f). Danach: `store.binding_of(principal, EXCHANGE_CLIENT_ID)`; keine Zeile bedeutet Abweisung mit 401; eine Zeile liefert `auth_id`, das als `AUTH_ID_CLAIM` in den `AccessToken` wandert. `resolve_identity` bleibt die vorhandene Store-Implementierung, der Credential-Zweig in `deps.py` bleibt unverändert, und der Aufruf geht mit Basic und dem gebundenen App-Passwort nach Nextcloud.
-
-### Was sich am heißen Pfad messbar ändert
-
-| Größe | heute | mit Exchange (Weg A) | mit Exchange (Weg B) |
-|---|---|---|---|
-| Nextcloud-Abrufe je Werkzeugaufruf | 1 | 1 | 1 |
-| Lokale SQLite-Lesezugriffe | 1 bis 2 (Cache-Miss) | 0 bis 1 (Pausenschalter) | 2 bis 3 |
-| Fremd-Netzabrufe | 0 | 0, außer bei unbekanntem `kid` (JWKS) | dito |
-| Kryptooperationen | HMAC-Vergleich | eine Signaturprüfung je Cache-Miss | dito |
-
-Die Signaturprüfung ist der einzige neue CPU-Posten und der Grund, warum der Exchange-Prüfer einen eigenen kurzen Positiv-Cache braucht: dieselbe Fensterlogik wie `VALIDATION_CACHE_TTL` (`store.py:180`, fünf Sekunden), zusätzlich gedeckelt auf `exp - now`, mit demselben harten Obergrenzen-Verhalten wie `CACHE_LIMIT` (`verifier.py:106`: bei Erreichen leeren statt klug kürzen).
-
----
-
-## Teil 6: Das Mapping, und warum der LDAP-Fall die eigentliche Arbeit ist
-
-Drei Namen, die in diesem Projekt schon streng auseinandergehalten werden (`oauth/principal.py`, Moduldokumentation): **Anmeldename** (`nc_user`, das was Basic-Auth braucht), **Principal** (`nc_account_id`, kanonische Konto-Id, Grundlage von Pausenschalter, Besitz und Audit-Kette) und **Anzeigename** (nur zum Lesen). Ein Claim-Mapping muss sagen, **welchen der drei** es trifft.
-
-Empfohlene benannte Strategien, alle mit Versionssuffix nach dem Muster `user_oidc_unique_uid_sub_v1`:
-
-| Strategie | Claim | Ergebnis | Wann richtig |
-|---|---|---|---|
-| `login_name_v1` | konfigurierbar, typisch `preferred_username` | Anmeldename | Instanz ohne LDAP, Keycloak spiegelt die Nextcloud-Anmeldenamen |
-| `account_id_v1` | konfigurierbar, typisch ein eigener Claim | Principal direkt | wenn F13 die kanonische Kennung im Token führen kann, der sauberste Fall |
-| `user_oidc_unique_uid_sub_v1` | `sub` | Principal, abgeleitet als SHA-256 von `"<provider_id>_0_<sub>"` | Instanz, die Nutzer über `user_oidc` mit "unique user id" führt. **Code existiert bereits** (`oidc.py:160`) und ist im Standalone-Betrieb erprobt |
-| (bewusst nicht gebaut) | `email` | - | brauchte eine Suche in Nextcloud im heißen Pfad; wenn überhaupt, dann nur zur Bindungszeit in Weg B |
-
-Zwei Regeln, die aus dem Bestand folgen und in die Umsetzung gehören:
-
-1. **Bei Weg A muss die Strategie den Anmeldenamen liefern**, denn der AppAPI-Header nimmt die Nutzerkennung, mit der Nextcloud das Konto auflöst. Der Principal für Pausenschalter und Audit ist derselbe Wert, solange keine kanonische Id bekannt ist; das entspricht genau dem Legacy-Zweig, den `principal_of` (`principal.py:69`) für ExApp-Zeilen ohne Konto-Id schon kennt. Wer den Principal sauber haben will, muss ihn einmal auflösen und das kostet einen Nextcloud-Abruf, also Bindungszeit statt Aufrufzeit. **Das ist ein echter Zielkonflikt und gehört als Entscheidung in die Phase, nicht in den Code.**
-2. **Bei Weg B liefert die Strategie den Principal**, weil die Bindung genau danach gesucht wird und die Zeile den Anmeldenamen ohnehin mitbringt.
-
-Der Testfall aus Entscheidung 3 der Spec-Note (Beispiel-Token plus Realm-Export) gehört als anonymisierte Fixture nach `tests/fixtures/` und als Unit-Test gegen jede Strategie ins Repo, öffentlich, wie in Abschnitt 7 der Note zugesagt. Bis er da ist, wird gegen selbst erzeugte Schlüssel und selbst gebaute Tokens getestet; das prüft die Mechanik, nicht die Struktur.
-
----
-
-## Teil 7: Der Audit-Anschluss kostet fast nichts
-
-Die Spec-Note verspricht: "ein über Exchange handelnder Aufruf ist genauso nachvollziehbar wie jeder andere". Aus R5 folgt, dass dieses Versprechen ohne eine Zeile in `audit/` erfüllt ist, sofern die hinterlegte Identität eine echte `OAuthIdentity` ist (`deps._oauth_identity` prüft `isinstance`, `deps.py:324`). Dann gilt automatisch:
-
-- Kette `u:<principal>` (`audit/store.py:185`), also dieselbe Kette, in die AppAPI-Aufrufe desselben Kontos schreiben
-- `client_id` in der Zeile: der reservierte Bezeichner, damit ein Prüfer Exchange-Aufrufe von Claude-Aufrufen unterscheiden kann, ohne dass ein neues Feld nötig wäre
-- `client_name`: sinnvoll der `azp` aus dem Token, gereinigt und gekappt, denn `audit/record.py:131` schickt jeden Namen durch `printable(...)`
-- `auth_id`: bei Weg B die Bindungs-Zeile, bei Weg A leer oder ein stabiler Bezeichner des Exchange-Pfads
-
-Eine Sache fehlt und sollte bewusst entschieden werden: **abgewiesene** Exchange-Versuche stehen nirgends. `audit/record.py:227` schreibt nur nach einem Werkzeugaufruf, und ein 401 an der Transportgrenze erreicht den Recorder nie (er wird erst nach den drei Prüfungen hinterlegt, `middleware.py:157`). Für einen Behörden-Betrieb ist "ein fremdes Token wurde abgewiesen" aber oft die interessantere Zeile als der erfolgreiche Aufruf. Das ist eine Erweiterung der Audit-Kette um eine Zeilenart (nach dem Muster `KIND_SWITCH`), kein Umbau, und es gehört als eigener, kleiner Punkt in die Roadmap, nicht in die Exchange-Phase selbst.
-
----
-
-## Teil 8: Empfohlene Baureihenfolge mit Abhängigkeiten
+### Ein `files_read` auf eine Datei unter einem getaggten Ordner
 
 ```
-P1 JWKS-Herauslösung        (unabhaengig, keine Verhaltensaenderung)
-        |
-        v
-P2 Exchange-Prüfer, rein    (haengt an P1; kein Wiring, kein Store, reine Funktionen)
-        |
-        +--> P3 Konfiguration + Schalter   (haengt an P2 fuer die Feldnamen)
-        |
-        v
-P4 Kette + Einbau in beide Entry-Points    (haengt an P2, P3)
-        |
-        v
-P5 Credential-Weg  A oder B                (haengt an P4; OWNER-ENTSCHEIDUNG)
-        |
-        v
-P6 Nachweis, Doku, Haertung                (haengt an P5)
+reg_files.files_read -> files.read
+  target = dav.safe_path(path)                 /Projekte/Geheim/plan.md
+  gather(dav.stat(target), exclusion.view())   1 PROPFIND + 1 REPORT parallel
+  view.excludes("/Projekte/Geheim/plan.md", fileid)  -> True ("/Projekte/Geheim" getaggt)
+  raise ToolError(..., reason=REASON_GUARD_TRIPPED)   get_range wird nie gerufen
+graceful: ValueError-Satz an das Modell, Audit-Zeile rejected/guard_tripped
 ```
 
-| Phase | Inhalt | Warum an dieser Stelle | Abhängig von |
-|---|---|---|---|
-| **P1** | `oauth/jwks.py` aus `oidc.py` herauslösen, `OidcClient` darauf umstellen | Ohne diesen Schritt entstehen zwei JWKS-Implementierungen in einem Repo, und die zweite erbt die Härtungen der ersten nicht. Verhaltensgleich, durch bestehende Unit-Tests gedeckt, deshalb zuerst und billig. | - |
-| **P2** | Signatur- und Claim-Prüfung, Audience-Vergleich, Mapping-Strategien, alles als freistehende, testbare Funktionen ohne Server | Das sind die "entscheidungsunabhängigen Teile" aus Abschnitt 3 der Spec-Note. Sie lassen sich vollständig gegen selbst erzeugte Schlüssel testen, also ohne F13. | P1 |
-| **P3** | `ENV_EXCHANGE_*`, `exchange_settings`, fail-closed bei halber Konfiguration, ab Werk aus | Muss vor dem Einbau stehen, damit der Einbau den Aus-Zustand als Normalfall bauen kann statt ihn nachzurüsten. | P2 |
-| **P4** | Kette, `invalidate()`, zwei Zeilen in den Entry-Points, plus ein Test, der beweist, dass der Aus-Zustand verhaltensgleich mit heute ist | Ab hier ist der Pfad im Prozess vorhanden und weist alles ab, weil noch kein Credential-Weg existiert. Das ist ein guter, sicherer Zwischenstand. | P2, P3 |
-| **P5** | Der Credential-Weg. Weg A: `OAuthIdentity`-Feld plus `deps.py`-Zweig plus Konten-Allowlist plus Zwei-Konten-Negativbeweis. Weg B: Store-Lesezugriff plus Provisionierungs-Route plus Sichtbarkeit auf der Verbindungsseite. | Erst hier wird der Pfad betriebsfähig, und erst hier fällt die Vollmacht-Entscheidung an. Alles davor ist ohne sie baubar, genau wie die Spec-Note es zusagt. | P4, Owner-Entscheidung |
-| **P6** | `docs/token-exchange.md`, README-Sätze, Integrationstest gegen eine echte Keycloak-Instanz (die `nextcloud-docker-dev`-Topologie bringt Keycloak mit, siehe STACK-Notiz im CLAUDE.md), Rate-Limit-Verhalten des JWKS-Abrufs, Header-Größe messen | Nachweise brauchen den fertigen Pfad. Der Keycloak-Container ist die Stelle, an der die Annahmen über `aud` und `azp` zum ersten Mal echt werden. | P5 |
+---
 
-**Was zwischen P2 und P5 an F13 hängt und was nicht.** Nichts aus P1 bis P4 braucht eine der vier F13-Entscheidungen. Audience-Konvention und Konto-Claim werden Konfigurationswerte mit dokumentierten Defaults, das Beispiel-Token wird eine Test-Fixture, und der Exchange-Ziel-Eintrag auf F13-Seite ist reine Betriebsdoku. Genau das war die Zusage der Spec-Note, und die Architektur hält sie ein.
+## Scaling Considerations
+
+| Größe | Anpassung |
+|-------|-----------|
+| wenige getaggte Ordner (erwarteter Normalfall) | REPORT-Antwort klein, ein Roundtrip, nichts zu tun |
+| hunderte einzeln getaggte Dateien | REPORT mit minimalen Props (`oc:fileid`, `d:resourcetype`); Größe messen (BL-16) |
+| tausende getaggte Knoten | `{DAV:}nresults` des REPORT als Obergrenze setzen; ist sie erreicht, ist die Menge unvollständig und damit **Unchecked** (fail-closed), nicht "reicht schon" |
+
+### Scaling Priorities
+
+1. **Erster Engpass:** Größe der REPORT-Antwort bei massenhaft getaggten Einzeldateien. Gegenmittel: Obergrenze plus fail-closed, Doku "Ordner taggen statt Dateien".
+2. **Zweiter Engpass:** `paths_for_fileids` bei 100 Treffern von `unified_search` (drei Stücke à 49 Ids); nur relevant, wenn Findling/Notes viele Treffer liefern. Parallel stückeln.
 
 ---
 
-## Teil 9: Anti-Muster, die hier konkret drohen
+## Anti-Patterns
 
-**A1: Den Exchange-Pfad in `select_mode` einbauen.**
-Was daran falsch ist: der Modus wäre dann prozessweit, also entweder Exchange oder gewöhnliches OAuth, und eine Instanz könnte nicht beides bedienen. Ein Modus, der pro Anfrage aus dem Bearer entschieden wird, ist definitionsgemäß der stille Fallback, den `deps.py:33` verbietet.
-Stattdessen: Kette hinter der Transportgrenze, ein Modus wie bisher.
+### Anti-Pattern 1: Nachfilter im `graceful`-Wrapper
 
-**A2: `check_resource_allowed` für die Exchange-Audience wiederverwenden.**
-Was daran falsch ist: die Funktion vergleicht URLs hierarchisch (SDK-Quellcode gelesen). Mit Keycloak-Client-Ids degeneriert sie zu einem Präfix-Vergleich auf Zeichenketten, und `mcp/unter` würde gegen `mcp` passen.
-Stattdessen: exakter Vergleich in konstanter Zeit gegen eine konfigurierte Allowlist, `aud` als Zeichenkette und als Liste behandelt.
+**What people do:** Die fertige Antwort nach `file:`-Ids und `path`-Feldern durchsuchen und streichen.
+**Why it's wrong:** Die Antworten sind heterogen (JSON-Strings, zwei Pydantic-Modelle, `EmbeddedResource` mit Base64 in `reg_files.py:91-103`); `count`, `truncated`, `next`, `skipped` und Bucket-Degradationen (`context.py:537-545`) wären danach falsch; und der Inhalt wäre bereits geholt, bevor er gestrichen wird.
+**Do this instead:** Prüfen an den sechs Engstellen, vor dem Holen des Inhalts und vor dem Fenster.
 
-**A3: Bei unbekanntem Token sofort den JWKS-Satz nachladen.**
-Was daran falsch ist: jeder Fremde könnte mit einem selbst gebauten JWT einen ausgehenden Abruf auslösen. Der bestehende `_key` (`oidc.py:316`) lädt höchstens einmal je Aufruf nach, aber er lebt hinter einem ratenbegrenzten Browser-Callback; der Exchange-Prüfer sitzt im unauthentisierten heißen Pfad.
-Stattdessen: erst den ungeprüften `iss` gegen die Konfiguration halten, dann eine Mindestzeit zwischen zwei Nachladeversuchen erzwingen, und einen unerreichbaren Schlüsselsatz als Abweisung behandeln, nie als Durchlass.
+### Anti-Pattern 2: Prüfung in `parse_entries` einbauen
 
-**A4: Ein zweites `OAuthIdentity`-ähnliches Objekt einführen.**
-Was daran falsch ist: `deps._oauth_identity` prüft `isinstance(identity, OAuthIdentity)` (`deps.py:324`) und `resolve_caller` baut den Audit-`Caller` daraus. Ein eigenes Objekt hieße, beide Stellen zu ändern, und die Audit-Kette eines Exchange-Aufrufs wäre stillschweigend leer statt falsch, also unbemerkt.
-Stattdessen: dieselbe Klasse, höchstens um ein Feld mit Default erweitert.
+**What people do:** Den Ausschluss neben Zeile 477 in `dav.py` hängen, weil die Sandbox dort sitzt.
+**Why it's wrong:** Parser mit Netzabruf, Credentials-Durchgriff ohne `NcClients`, und die getaggte Menge selbst wird mit `parse_entries` geparst, würde sich also durch die Sandbox selbst beschneiden.
+**Do this instead:** `home_entries` herauslösen, Policy in `exclusion.py`, Anwendung in `tools/`.
 
-**A5: Die Identität ins Werkzeug durchreichen.**
-Was daran falsch ist: kein Werkzeug hat einen Nutzerparameter, und das ist die Kernabwehr gegen den confused deputy (T-01-12, im Moduldokument von `deps.py`). Ein Exchange-Pfad, der einen Nutzer als Werkzeugparameter nähme, wäre ein anderes Produkt.
-Stattdessen: alles an der Transportgrenze, wie heute.
+### Anti-Pattern 3: Nur `provider == "files"` prüfen
 
-**A6: Die Store-Prüfung überspringen, wenn das Token wie ein JWT aussieht.**
-Was daran falsch ist: die Reihenfolge Store-zuerst ist die Garantie dafür, dass bestehende Tokens den neuen Code nie erreichen. Eine Vorsortierung nach Tokenform gäbe diese Garantie auf, um einen lokalen SQLite-Lesezugriff zu sparen, den der Fünf-Sekunden-Cache ohnehin meistens erspart.
-Stattdessen: immer Store zuerst, Exchange nur bei `None`.
+**What people do:** Das Sandbox-Muster aus `search.py:249,252` spiegeln.
+**Why it's wrong:** Findling liefert Dateiinhalte als `url`-Art mit `fileId` (Provider.php:384); genau der Inhaltsprovider, der Dokumentinhalte in die Antwort bringt, bliebe ungefiltert.
+**Do this instead:** Jeden Treffer mit `attributes.fileId` oder `/f/<id>` in der URL als dateitragend behandeln, provider-agnostisch; `provider_map._file_id` (`provider_map.py:197-208`) als öffentliche Funktion für alle Provider nutzbar machen (Boundary-Gate beachten, `test_module_boundaries.py:170`).
 
----
+### Anti-Pattern 4: Getaggte Menge prozessweit cachen
 
-## Teil 10: Integrationspunkte, tabellarisch
-
-### Nach außen
-
-| Gegenstelle | Muster | Fallstricke |
-|---|---|---|
-| Keycloak (F13) | JWKS unter `<issuer>/protocol/openid-connect/certs`, Discovery unter `<issuer>/.well-known/openid-configuration`; wir sind reiner Resource Server und rufen nur den Schlüsselsatz ab | `resource`-Parameter nach RFC 8693 wird von Keycloak noch nicht unterstützt; `aud` ist eine Client-Id, `azp` der tauschende Client; Realm-Rotation ändert `kid`, deshalb Cache mit Verfallszeit und fail-closed |
-| HaRP / AppAPI | unverändert; `/mcp` ist PUBLIC, der 401 kommt von uns | Ein Keycloak-Zugriffstoken ist typischerweise ein bis vier Kilobyte groß, unsere heutigen Tokens sind kurz. Header-Obergrenzen von HaRP und jedem Reverse Proxy davor **einmal messen**, bevor jemand behauptet, der Weg trage. |
-| Nextcloud | unverändert. Weg A benutzt den vorhandenen AppAPI-Header-Weg, Weg B den vorhandenen Basic-Weg. | Kein neuer Aufruf, keine neue Route, keine neue Berechtigung |
-
-### Nach innen
-
-| Grenze | Kommunikation | Anmerkung |
-|---|---|---|
-| `entry_*` -> Prüferkette | Konstruktorparameter | die zwei einzigen Zeilen, die der Einbau ändert |
-| Kette -> Transportgrenze | `TokenVerifier` plus `IdentitySource` (Protokolle) | `middleware.py` bleibt unangetastet |
-| Transportgrenze -> Credential-Layer | `request.state.oauth_identity` (`OAUTH_STATE_ATTR`) | eine Konstante, zwei Seiten, keine dritte |
-| Transportgrenze -> Audit | `request.state.audit_recorder` (`AUDIT_STATE_ATTR`) | wirkt automatisch mit |
-| Exchange -> Store | nur bei Weg B, ein Lesezugriff | keine Schreiboperation im heißen Pfad |
-| `oauth/exchange.py` -> `oauth/jwks.py` | Funktionsaufruf | die einzige neue Abhängigkeit innerhalb des Pakets; `exchange.py` darf nichts aus `exapp/` importieren (die Schichtregel aus `audit/record.py`) |
+**What people do:** Die REPORT-Antwort 60 s cachen wie die Capabilities.
+**Why it's wrong:** Nutzerdatum über den Aufruf hinaus (D-20) und ein Zeitfenster, in dem ein frisch getaggter Ordner ausgeliefert wird.
+**Do this instead:** Nur die Tag-Id prozessweit, positiv, mit 412-Invalidierung.
 
 ---
 
-## Teil 11: Offene Punkte, ehrlich benannt
+## Integration Points
 
-1. **Die Credential-Entscheidung (Weg A oder Weg B)** ist nicht getroffen und kann nicht von der Recherche getroffen werden: sie ist eine Vollmachtsfrage, keine technische. Teil 3 legt beide Wege mit Preis und Kosten vor.
-2. **Principal gegen Anmeldename bei Weg A**: ob der Exchange-Pfad die kanonische Konto-Id einmal auflöst (ein Nextcloud-Abruf zur Bindungs- oder Erstaufrufzeit, saubere Audit-Kette) oder beim Anmeldenamen bleibt (kein Abruf, Legacy-Zweig von `principal_of`), ist offen.
-3. **Header-Größe über HaRP** mit einem echten Keycloak-Token: nicht gemessen. Vor dem ersten Durchstich messen.
-4. **Abgewiesene Exchange-Versuche im Audit-Log**: heute konstruktionsbedingt unsichtbar. Eigener kleiner Punkt für die Roadmap.
-5. **`occ user:auth-tokens:add` ohne Nutzerpasswort**: Doku gelesen, Verhalten nicht gemessen. Nur relevant, falls Weg B eine skriptbare Provisionierung bekommen soll.
-6. **Die vier F13-Entscheidungen** bleiben Konfiguration mit dokumentierten Defaults; für Entscheidung 1 liegt mit Teil 2 jetzt eine begründete Vorzugsantwort vor, die vor dem zweiten Treffen in die Spec-Note gehört, zusammen mit der Korrektur `cimd.py` zu `oidc.py`.
+### External Services
+
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| `PROPFIND /remote.php/dav/systemtags/` | Name -> Id(s), Depth 1, Props `oc:id`, `oc:display-name`, `oc:user-visible`, `oc:user-assignable` | mehrere Tags gleichen Namens mit unterschiedlicher Sichtbarkeit sind möglich; Vereinigung aller für den Nutzer sichtbaren nehmen |
+| `REPORT /remote.php/dav/files/<user>` mit `oc:filter-files`/`oc:systemtag` | getaggte Knoten, rekursiv im Ziel-Teilbaum; `{DAV:}nresults`/`nc:firstresult` für Paging; 412 bei unbekanntem Tag (FilesReportPlugin, MEDIUM) | Ziel ist die Home-Wurzel, nie `NC_MCP_FILES_ROOT` |
+| `SEARCH /remote.php/dav/` mit `oc:fileid`-Oder | Pfad je fileid für pfadlose Treffer | Vorlage `build_fileid_body` (`dav.py:316-365`), Operatorgrenze R10 |
+| `nc:system-tags` auf Dateiknoten | Alternative/Ergänzung für direkte Tags in `stat`/`propfind_children` ohne Extra-Roundtrip; filtert per `canUserSeeTag` | ein **unsichtbar** gestelltes Tag verschwindet hier still: nie allein darauf bauen |
+
+### Internal Boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `tools/*` -> `nextcloud/exclusion.py` | `await clients.exclusion.view(clients)`, dann `view.excludes(path, fileid)` rein synchron | eine öffentliche Fläche, keine Privat-Durchgriffe (AST-Gate) |
+| `exclusion.py` -> `clients/systemtags.py`, `clients/dav.py` | direkte Aufrufe, wie `capabilities.py` -> `ocs` | Client-Schicht bleibt policy-frei |
+| `tools/context.py`, `tools/chatgpt.py` -> Engstellen | unverändert über `unified_search`, `files.read`, `notes.read` | keine zweite Prüfung nötig; optional eine Zeile in `_fetch_file` |
 
 ---
+
+## Suggested Build Order
+
+| Schritt | Inhalt | Hängt ab von | Warum hier |
+|---------|--------|--------------|------------|
+| 0 | **Mess-Spike (BL-16-Kostennotiz):** REPORT-Kosten bei 1/100/5000 getaggten Knoten; 412-Verhalten; unsichtbares Tag; systemtags-App aus; geteilter Ordner mit getaggtem Vorfahr beim Eigentümer; Notiz-Id == Datei-Id; `nc:system-tags` in SEARCH selektierbar | nichts | Die Spec verlangt "vor der Designentscheidung gemessen"; drei Annahmen oben stehen auf LOW/MEDIUM |
+| 1 | `clients/systemtags.py` + `dav.home_entries` + `dav.paths_for_fileids`, reine Unit-Tests mit MockTransport | 0 | unterste Schicht, keine Policy |
+| 2 | `nextcloud/exclusion.py` (View rein, Guard, Tag-Id-Cache) + `NcClients`-Feld + gemeinsame Präfixfunktion mit `in_files_root` | 1 | danach existiert der Blick, aber niemand fragt ihn; Bestandstests bleiben grün |
+| 3 | Test-Infrastruktur: `conftest`-Standard, der den Guard in Bestandstests stumm "nichts getaggt" antworten lässt | 2 | sonst brechen dutzende MockTransport-Tests an einem unerwarteten REPORT (siehe PITFALLS) |
+| 4 | Datei-Familie E1 bis E3 inklusive Upload-Entscheidung | 2, 3, Owner-Antwort zu Uploads | kleinste Fläche, direkteste Beweise, und `fetch(file)`/Auszüge erben sie |
+| 5 | `unified_search` E4 (parallel, provider-agnostisch, Degradation) | 2, 3 | erbt nach `search` und `prepare_context` |
+| 6 | Notes E5/E6 + pfadlose Auflösung, optional Sandbox-Parität für Findling und Notes | 0 (Notiz-Id-Messung), 5 | hängt an der unsichersten Annahme |
+| 7 | Klassifikations-Gate über 22 Tools + Integrationsbeweis gegen die Test-Nextcloud (Zwei-Konten-Muster, getaggter Ordner, Guard-Ausfall per abgeschalteter systemtags-App) | 4, 5, 6 | beweist "jede Antwort", nicht nur "die Stellen, an die wir dachten" |
+| 8 | Optional: Talk-Dateiparameter maskieren | 2, Owner-Scope | Referenz statt Inhalt, bewusst zuletzt |
+| 9 | Doku EN/DE/FR (Semantik, Grenze bei geteilten Ordnern, fail-closed-Verhalten, "Ordner taggen statt Dateien") | 7 | Doku sagt das Gemessene |
+
+Schritte 4 und 5 sind nach 3 parallelisierbar (getrennte Dateien, `reg_*`-Prinzip).
+
+---
+
+## Offene Fragen für die discuss-phase
+
+1. **Uploads in `kein-ki`-Ordner** (`files.py:390,435`): verbieten (konsequent, kostet den Roundtrip auch auf Schreibpfaden) oder erlauben (Antwort enthält nur Eigenes)? Das Existenz-Orakel über `ConflictError` spricht für Verbieten.
+2. **Zählen oder schweigen** bei ausgeschlossenen Treffern; wenn zählen, eigener Schlüssel statt `skipped` (TOOL-17).
+3. **systemtags-App aus = alles Dateiabgeleitete verweigern:** PROJECT.md sagt fail-closed; betrieblich heißt das, der Connector liefert auf so einer Instanz keine Datei mehr. Braucht es einen Admin-Schalter (`NC_MCP_EXCLUDE_TAG=` leer = Feature aus), und ist "aus" dann eine Sicherheitsgrenze, die ein Admin bewusst abschaltet?
+4. **Ordner-Tag zugleich freie Ordner-Ausschlussliste** (Owner 04.09.): architektonisch dasselbe Präfix-Set; eine Env-Liste wäre eine zweite Quelle für `tagged_prefixes`, ohne neue Engstelle.
+5. **Sandbox-Parität für Findling und Notes** mitnehmen oder als eigenen Backlog-Punkt führen.
 
 ## Sources
 
-**Eigene Codebasis (HIGH, gelesen am 2026-09-18):** `src/mcp_connector/config.py`, `oauth/verifier.py`, `oauth/store.py`, `oauth/oidc.py`, `oauth/oidc_identity.py`, `oauth/consent.py`, `oauth/connect.py`, `oauth/principal.py`, `oauth/loginflow.py`, `exapp/middleware.py`, `exapp/auth.py`, `deps.py`, `nextcloud/credentials.py`, `audit/__init__.py`, `audit/record.py`, `audit/store.py`, `entry_exapp.py`, `entry_oauth.py`, `server/__init__.py`, `pyproject.toml`, `docs/standalone-oauth.md`, `tests/contract/test_module_boundaries.py`
-
-**MCP-SDK (HIGH, installiertes Paket gelesen):** `.venv/Lib/site-packages/mcp/shared/auth_utils.py`, `check_resource_allowed`
-
-**Keycloak (HIGH, offizielle Doku über Context7, `/keycloak/keycloak`):** `docs/guides/securing-apps/token-exchange.adoc` (Standard Token Exchange V2 nach RFC 8693, Verhalten des `audience`-Parameters, `resource`-Parameter "Not supported yet", Beispiel eines herabgestuften Tokens mit `azp` und `aud`), `docs/documentation/server_admin/topics/clients/oidc/con-audience.adoc`
-
-**Nextcloud (MEDIUM, Doku, nicht gemessen):** [occ-Handbuch](https://docs.nextcloud.com/server/stable/admin_manual/occ_command.html), [Nutzer- und Gruppenbefehle](https://docs.nextcloud.com/server/stable/admin_manual/occ_users.html) zu `user:auth-tokens:add` als Nachfolger von `user:add-app-password`
-
-**Projektkontext:** `.planning/PROJECT.md`, `C:\Users\Student\Desktop\F13-Spec-Note-Identity-Mapper-2026-09-16.md` (Stand 18.09.)
+- Eigener Code, gelesen am 2026-09-26: `src/mcp_connector/nextcloud/clients/dav.py`, `tools/files.py`, `tools/search.py`, `tools/chatgpt.py`, `tools/context.py`, `tools/notes.py`, `tools/talk.py` (574-604), `provider_map.py`, `deps.py` (80-160), `nextcloud/__init__.py`, `server/__init__.py`, `server/reg_*.py`, `errors.py` (20-94), `config.py` (270-313), `nextcloud/capabilities.py`, `tests/contract/test_module_boundaries.py`, `tests/contract/test_tool_surface.py` (HIGH)
+- Findling-Provider: `C:/Users/Student/nextcloud-search/php/lib/Search/Provider.php:377-447` (HIGH)
+- https://raw.githubusercontent.com/nextcloud/server/master/apps/dav/lib/Connector/Sabre/FilesReportPlugin.php , systemtag-Filter, 412 bei unbekanntem Tag, `nresults`/`firstresult`, Teilbaum-Einschränkung (MEDIUM, gelesen, nicht gemessen)
+- https://raw.githubusercontent.com/nextcloud/server/master/apps/dav/lib/SystemTag/SystemTagPlugin.php , `nc:system-tags` auf Dateiknoten mit `canUserSeeTag`-Filter, `nc:object-ids` auf Tag-Knoten (MEDIUM)
+- https://docs.nextcloud.com/server/latest/developer_manual/client_apis/WebDAV/basic.html , REPORT `oc:filter-files` (dokumentiert nur `oc:favorite`; systemtag nur im Quelltext) (MEDIUM)
+- https://github.com/nextcloud/server/pull/64298 , Vorladen der System-Tag-Properties je PROPFIND (Leistungshinweis für `nc:system-tags`) (LOW, nur Suchtreffer)
 
 ---
-*Architecture research for: F13 Token Exchange Identity Mapper (v1.6)*
-*Researched: 2026-09-18*
+*Architecture research for: kein-ki Ausschluss-Tag (v1.7, BL-16)*
+*Researched: 2026-09-26*
