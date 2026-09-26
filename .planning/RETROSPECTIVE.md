@@ -2,7 +2,7 @@
 
 Living document, appended at each milestone close.
 
-## Milestone: v1.0 — MVP im Store
+## Milestone: v1.0 , MVP im Store
 
 **Shipped:** 2026-08-20
 **Phases:** 5 | **Plans:** 50 | **Tasks:** 111 | **Timeline:** 2026-08-14 bis 2026-08-20 (7 Tage)
@@ -62,7 +62,7 @@ Store-Texte und siebenteilige Client-Doku.
   Session mit Sub-Agents (größte Läufe ~200-300k Tokens je Executor).
 - Sessions: im Kern 6 Arbeitstage (14.-20.08.), Abschlusstag mit ~20 Commits und Release.
 
-## Milestone: v1.1 — Verwaltungs-Clients und Härtungs-Reste
+## Milestone: v1.1 , Verwaltungs-Clients und Härtungs-Reste
 
 **Shipped:** 2026-08-20
 **Phases:** 1 (Phase 6; Phase 7 deferred) | **Plans:** 11 (10 + 1 Gap-Closure)
@@ -79,9 +79,9 @@ CIMD als DCR-Alternative (live mit Claude Code bewiesen), SSRF-gehärteter Dokum
 
 ### What Was Inefficient
 
-- tests/contract lief bei den Executoren nicht mit (nur tests/unit) — ein roter CI-Lauf (IN-04-Tool-Zahl-Regel), der lokal vermeidbar war. Merksatz: voller Lauf inkl. contract vor jedem Push.
+- tests/contract lief bei den Executoren nicht mit (nur tests/unit) , ein roter CI-Lauf (IN-04-Tool-Zahl-Regel), der lokal vermeidbar war. Merksatz: voller Lauf inkl. contract vor jedem Push.
 - Doku und Code drifteten am selben Tag: zwei oauth-setup.md-Aussagen wurden durch die eigenen Review-Fixes (a47bb57/bd75cd8) falsch und mussten im Audit nachgezogen werden. Review-Fixes brauchen einen Doku-Sweep im selben Commit-Zug.
-- Der einzige CIMD-E2E-Live-Beleg entstand vor den Review-Fixes (W-5) — Live-Rerun steht als Tech-Debt.
+- Der einzige CIMD-E2E-Live-Beleg entstand vor den Review-Fixes (W-5) , Live-Rerun steht als Tech-Debt.
 
 ### Patterns Established
 
@@ -91,9 +91,9 @@ CIMD als DCR-Alternative (live mit Claude Code bewiesen), SSRF-gehärteter Dokum
 
 ### Key Lessons
 
-- Ein Client, der die DCR-Antwort nicht zurückliest (Cursor), macht Teilregistrierung wirkungslos — der Fehlschlag wandert nur den Endpoint entlang. Sichtbarkeit + dokumentierter Ausweichweg ist die richtige Antwort, wenn die Sicherheitsentscheidung steht.
+- Ein Client, der die DCR-Antwort nicht zurückliest (Cursor), macht Teilregistrierung wirkungslos , der Fehlschlag wandert nur den Endpoint entlang. Sichtbarkeit + dokumentierter Ausweichweg ist die richtige Antwort, wenn die Sicherheitsentscheidung steht.
 - Store-Installationen haben keine Deploy-Env: jeder neue Schalter MUSS in die Admin-Settings-Kette (CONFIG_KEYS + Formular), sonst ist er für Ein-Klick-Nutzer nicht bedienbar (B-1).
-- Externe Taktung gehört in eine eigene Phase, die deferred werden kann, ohne den Milestone zu blockieren — genau so geschnitten, genau so gebraucht.
+- Externe Taktung gehört in eine eigene Phase, die deferred werden kann, ohne den Milestone zu blockieren , genau so geschnitten, genau so gebraucht.
 
 ### Cost Observations
 
@@ -101,7 +101,7 @@ CIMD als DCR-Alternative (live mit Claude Code bewiesen), SSRF-gehärteter Dokum
 - Sessions: 1 Arbeitstag (20.08., Milestone-Init bis Abschluss inkl. Audit-Fixes).
 - Notable: 1 roter CI-Lauf, 1 API-Abbruch mit sauberem Retry (06-02), 2 menschliche Checkpoints (Cursor-Login, Owner-Entscheide).
 
-## Milestone: v1.2 — Kuratierte Breite
+## Milestone: v1.2 , Kuratierte Breite
 
 **Shipped:** 2026-08-25
 **Phasen:** 4 | **Pläne:** 28
@@ -121,7 +121,7 @@ Talk, Tables und Mail als drei neue Familien (21 Tools gesamt), Mail strikt lese
 ### What Was Inefficient
 
 - Die Release-Nummer im ROADMAP-Titel (0.1.6) war zweimal überholt, bevor die Phase startete; vorgezogene Releases müssen die Roadmap sofort mitziehen.
-- Ein Planner-Verifikationsschnipsel nannte eine falsche Signatur, ein Plan einen falschen Antwortschlüssel (conversations statt results) — beides fingen die Executor am echten Code ab, kostete aber Aufmerksamkeit.
+- Ein Planner-Verifikationsschnipsel nannte eine falsche Signatur, ein Plan einen falschen Antwortschlüssel (conversations statt results) , beides fingen die Executor am echten Code ab, kostete aber Aufmerksamkeit.
 - Der Runbook-Text und das Build-Skript widersprachen sich bei der Signatur bis nach dem Release (erst eb05a6f räumte auf).
 
 ### Patterns Established
@@ -133,7 +133,7 @@ Talk, Tables und Mail als drei neue Familien (21 Tools gesamt), Mail strikt lese
 
 ### Key Lessons
 
-- Navigations-unread=0 trotz ungelesener Mails: fremde Felder erst messen, dann benutzen — die Postfachliste war der ehrliche Zähler.
+- Navigations-unread=0 trotz ungelesener Mails: fremde Felder erst messen, dann benutzen , die Postfachliste war der ehrliche Zähler.
 - Ein assistententauglicher Suchtreffer braucht beide Hälften: provider_map-Eintrag UND die resolvable-Wahrheit im Bündel (_short war die versteckte zweite Hälfte von TOOL-16).
 - tar.gz ist nicht byte-reproduzierbar: 45710 lokal vs 45546 publiziert; jede lokale Signatur ist wertlos für den Store.
 
@@ -143,7 +143,7 @@ Talk, Tables und Mail als drei neue Familien (21 Tools gesamt), Mail strikt lese
 - Sessions: 4 Arbeitstage (21.08. Phasen 8+9, 24.08. Phase 10, 25.08. Phase 11 inkl. Release und Milestone-Abschluss).
 - Notable: 1 API-Abbruch (11-01) mit sauberem Continuation-Agent; 2 Owner-Checkpoints (Tag-Freigabe, Store-Sitzung); Store-Upload aus dem Browser-Seitenkontext, HTTP 201 beim ersten Versuch.
 
-## Milestone: v1.3 — Pflege und 0.1.9
+## Milestone: v1.3 , Pflege und 0.1.9
 
 **Shipped:** 2026-08-26
 **Phasen:** 2 | **Pläne:** 10
@@ -161,9 +161,9 @@ Die vier v1.2-Schulden geschlossen (message_truncated je Ebene eine Bedeutung, I
 
 ### What Was Inefficient
 
-- Die "fünf Versionsstellen" der Roadmap waren real sechs (uv.lock) — der Pattern-Mapper fand es, aber die Requirement-Formulierung hätte es tragen sollen.
+- Die "fünf Versionsstellen" der Roadmap waren real sechs (uv.lock) , der Pattern-Mapper fand es, aber die Requirement-Formulierung hätte es tragen sollen.
 - Zwei Doku-Fakten überlebten das Review nicht (falsche v1.2-Messzahl in einer Proof-Zeile, falsche Unsichtbarkeits-Begründung im Changelog); Beweisdokumente brauchen dieselbe Faktenprüfung wie Code.
-- Nach dem Tag driftet der Repo-Changelog vom signierten Asset (WR-02-Fix) — bekanntes, akzeptiertes Muster, aber jedes Mal eine Audit-Zeile wert.
+- Nach dem Tag driftet der Repo-Changelog vom signierten Asset (WR-02-Fix) , bekanntes, akzeptiertes Muster, aber jedes Mal eine Audit-Zeile wert.
 
 ### Patterns Established
 
@@ -183,7 +183,7 @@ Die vier v1.2-Schulden geschlossen (message_truncated je Ebene eine Bedeutung, I
 - Sessions: 2 Arbeitstage (25.08. Planung+Execution+Release, 26.08. D-07 + Action-Bumps + Abschluss); 1 Session-Limit-Abbruch des Planners, sauber per Resume fortgesetzt.
 - Notable: 1 Owner-Checkpoint (Tag-Freigabe mit Store-Weg-Abfrage), Store-Upload HTTP 201 beim ersten Versuch, Review 0C/3W alle gefixt.
 
-## Milestone: v1.4 — Pflege und 0.1.10
+## Milestone: v1.4 , Pflege und 0.1.10
 
 **Shipped:** 2026-08-28
 **Phasen:** 2 | **Pläne:** 6
@@ -223,11 +223,63 @@ Die Store-Beschreibung trägt einen kurzen Enterprise-Abschnitt mit dem Kontakt 
 - Sessions: 1 Arbeitstag (28.08.), Release-Freigabe nach fünf Stunden Checkpoint-Wartezeit.
 - Notable: drei Runden secure-phase für einen einzigen Threat (T-15-PT), weil jede Runde einen weiteren ungenauen Halbsatz in derselben Beweiszeile fand.
 
+## Milestone: v1.5 , Vorlauf openDesk (nachgetragen)
+
+**Shipped:** 2026-08-31 (Abschluss nachgetragen 2026-09-18, dieser Eintrag nachgetragen 2026-09-26)
+**Phasen:** 4 | **Pläne:** 32
+
+### What Was Built
+
+Release 0.1.11 (gekürzter Trifecta-Absatz, Autorenkontakt admin@infranode.dev), zeitboxierter openDesk-Spike auf OpenProject mit Fragenliste für den ISV-Call, Audit-Log als erster Enterprise-Baustein (hash-verkettet, ab Werk aus, mit Bedienung und Textnachzug).
+
+### Key Lessons
+
+- `/gsd:complete-milestone` nie aufschieben: der Milestone stand 18 Tage als complete in STATE.md, ohne Eintrag, ohne Archiv. Der Nachtrag kostete eine eigene Aufräumrunde beim v1.6-Start.
+- Eintrag bewusst schlank, weil die Rohdaten (Sessions, Gap-Runden) beim Nachtrag nicht mehr sauber rekonstruierbar waren; Aussagen stammen aus den Phase-Verifikationen.
+
+## Milestone: v1.6 , F13 Token Exchange Identity Mapper
+
+**Shipped:** 2026-09-26
+**Phasen:** 5 | **Pläne:** 22
+
+### What Was Built
+
+Ein zweiter, ab Werk ausgeschalteter Prüfpfad nimmt ein nach RFC 8693 getauschtes Keycloak-Token an und handelt unter dem gemappten Nextcloud-Konto: eine gehärtete Schlüsselsatz-Schicht (Phase 20), ein freistehender JWS-Prüfer (21), Konfigurationskette mit formbasierter Weiche und vor-authentischer Drossel (22), Konto-Mapping mit zwei Profilen und beiden Credential-Wegen (23), Audit-Anschluss, Trockenlauf-Kommando, Zwei-Konten-Negativbeweis und Einrichtungsdoku (24). Alles ohne eine einzige F13-Antwort; das Abhängige blieb Konfiguration mit dokumentierten Defaults.
+
+### What Worked
+
+- Die Milestone-Prämisse "nur entscheidungsunabhängige Teile bauen" hat gehalten: 15/15 Requirements geliefert, während die vier externen F13-Entscheidungen offen blieben und als benannte Andockpunkte dokumentiert sind.
+- Messen statt behaupten durchgezogen: Token-Umschlag exakt 8192 Bytes, 36 JWKS-Abrufe je 300 s, 429-Lauf, Zwei-Konten-Beweis mit Apache- und Impersonationslog, 200-dann-401-Widerruf.
+- Ein am Checkpoint vorgelegter Zielkonflikt (Rolle von occ oauth2:add-client) wurde als offene F13-Antwort markiert statt geraten; ein Test hält die Markierung.
+
+### What Was Inefficient
+
+- Drei Session-Limit-Unterbrechungen in Phase 23 mussten mit frischen Executors überbrückt werden; RAM-Knappheit der Box zwang Vollläufe an Gate-Punkte.
+- Der Plan 24-08 versprach eine Mitigation ("Basic-Header ändert die Identität nicht"), die die eigene Messung widerlegte. Der Befund wurde sauber dokumentiert, aber das Register erst in der secure-phase am Abschlusstag ehrlich gemacht (T-24-32 als akzeptiertes Risiko R-24-05).
+- PR #8 wurde nach vier Tagen Funkstille eigenmächtig fertiggestellt und gemergt, gegen die Owner-Ansage. Fachlich sauber, prozessual falsch; daraus wurde eine feste Regel.
+
+### Patterns Established
+
+- Plan-Zeit-Threat-Register über alle Pläne plus secure-phase mit Zeilenbelegen am aktuellen HEAD, nach Rebase erneut belegt statt alte SHAs zu zitieren.
+- Externe Abhängigkeiten als markierte, getestete Andockpunkte (Konfiguration mit Default plus Ehrlichkeitsabschnitt in der Doku) statt als Blocker oder Ratespiel.
+
+### Key Lessons
+
+- phase.complete und milestone.complete verfälschen STATE.md weiterhin; nach jedem Lauf von Hand nachziehen (diesmal: stopped_at zeigte auf 22-03).
+- Die automatische Accomplishment-Extraktion liest auch Blocking-Hinweise als One-Liner; MILESTONES.md nach milestone.complete immer redigieren.
+- Eine gemessene Widerlegung einer geplanten Mitigation ist ein Register-Eintrag, keine Fussnote: Disposition offen lassen und den Owner entscheiden lassen (akzeptieren oder bauen).
+
+### Cost Observations
+
+- Modell-Mix: Executor/Planner/Auditor opus (Owner-Vorgabe; bei Limits frischer Executor), Checker/Verifier sonnet, Orchestrierung fable.
+- Sessions: 9 Kalendertage (18.-26.09.), 217 Commits, +40.143/-3.428 Zeilen über 174 Dateien.
+- Notable: der Abschlusstag lief komplett in einer Session (Rebase auf PR #8, Gates, secure-phase, Archiv), weil alle Phasen schon verifiziert waren.
+
 ## Cross-Milestone Trends
 
-| Metrik | v1.0 | v1.1 | v1.2 | v1.3 | v1.4 |
-|--------|------|------|------|------|------|
-| Phasen / Pläne / Tasks | 5 / 50 / 111 | 1 / 11 / 20 | 4 / 28 / 67 | 2 / 10 / 26 | 2 / 6 / 12 |
-| Kalenderzeit | 7 Tage | 1 Tag | 5 Tage (21.-25.08.) | 2 Tage (25.-26.08.) | 1 Tag (28.08.) |
-| Verifier-Gap-Runden | 1 (Phase 5) | 1 (Phase 6, CLIENT-04) | 0 (alle 4 Phasen passed im ersten Lauf) | 0 (beide Phasen passed im ersten Lauf) | 0 (beide Phasen passed im ersten Lauf) |
-| Live-Releases im Milestone | 3 (0.1.0, 0.1.1, 0.1.2) | 0 (0.1.3-Kandidat wartet auf Owner-Freigabe) | 5 (0.1.4 bis 0.1.8, drei davon vorgezogen) | 1 (0.1.9) | 1 (0.1.10) |
+| Metrik | v1.0 | v1.1 | v1.2 | v1.3 | v1.4 | v1.5 | v1.6 |
+|--------|------|------|------|------|------|------|------|
+| Phasen / Pläne / Tasks | 5 / 50 / 111 | 1 / 11 / 20 | 4 / 28 / 67 | 2 / 10 / 26 | 2 / 6 / 12 | 4 / 32 / n. rek. | 5 / 22 / 59 |
+| Kalenderzeit | 7 Tage | 1 Tag | 5 Tage (21.-25.08.) | 2 Tage (25.-26.08.) | 1 Tag (28.08.) | 4 Tage (28.-31.08.) | 9 Tage (18.-26.09.) |
+| Verifier-Gap-Runden | 1 (Phase 5) | 1 (Phase 6, CLIENT-04) | 0 (alle 4 Phasen passed im ersten Lauf) | 0 (beide Phasen passed im ersten Lauf) | 0 (beide Phasen passed im ersten Lauf) | n. rek. (nachgetragen) | 0 (alle 5 Phasen passed) |
+| Live-Releases im Milestone | 3 (0.1.0, 0.1.1, 0.1.2) | 0 (0.1.3-Kandidat wartet auf Owner-Freigabe) | 5 (0.1.4 bis 0.1.8, drei davon vorgezogen) | 1 (0.1.9) | 1 (0.1.10) | 1 (0.1.11) | 0 (Exchange-Pfad reist erst mit 0.3.0) |

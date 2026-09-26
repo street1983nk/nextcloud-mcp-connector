@@ -1,5 +1,28 @@
 # Milestones
 
+## v1.6 F13 Token Exchange Identity Mapper (Shipped: 2026-09-26)
+
+**Phases completed:** 5 phases (20 bis 24), 22 plans, 59 tasks
+**Umfang:** 217 Commits, 174 Dateien, +40.143/-3.428 Zeilen, 2026-09-18 bis 2026-09-26 (9 Tage)
+**Endstand:** 4428 Tests grün auf HEAD nach Rebase auf Community-PR #8; jede Phase goal-backward verifiziert; 24-SECURITY.md mit 38/38 Threats geschlossen (34 mitigate belegt, 4 accept)
+
+**Key accomplishments:**
+
+- Ein zweiter, ab Werk ausgeschalteter Prüfpfad nimmt ein nach RFC 8693 getauschtes Keycloak-Token an und handelt unter dem gemappten Nextcloud-Konto, ohne die Rechtegrenze aufzuweichen; im Aus-Zustand ist das Verhalten byte-gleich zu vorher (Kette hinter unveränderter Transportgrenze, Weiche strukturell über die Tokenform).
+- Phase 20: oauth/jwks.py als einzige Schlüsselsatz-Schicht (kid-Abkühlzeit 60 s, Single-Flight, gemessene Grenzen), PyJWT auf 2.14 und cryptography auf 50.0.1 gehoben, Audit-Nachtrag mit fünf GHSA-Kennungen.
+- Phase 21: freistehender Keycloak-JWS-Prüfer (Issuer-Vorfilter ohne Abruf, typ=Bearer, 30 s Toleranz, 900 s Lebensdauergrenze), jede Abweichung als eine detailfreie ExchangeRefused.
+- Phase 22: eigener Konfigurationsnamensraum NC_MCP_EXCHANGE_* mit fail-closed Startprüfung, vor-authentische Drossel (30 Ablehnungen, dann 429 mit Retry-After), byte-gleiche Fehlerantworten.
+- Phase 23: Claim-Mapping mit zwei Profilen und kanonischem Principal, Exchange-Identität mit Pausenschalter, AppAPI-Impersonation fail-closed, Standalone-Bindung unter reservierter EXCHANGE_CLIENT_ID, Enrollment-Dreischritt, Widerrufs-Seite mit gemessenem 200-dann-401.
+- Phase 24: actor-Spalte im Audit, gebremste Abweisungs-Kette x:exchange mit Sweep-Anschluss, Trockenlauf occ exchange:check ohne Nextcloud-Aufruf, Zwei-Konten-Negativbeweis gemessen (docs/exchange-evidence.md), Einrichtungsdoku docs/token-exchange.md mit ehrlich markierten F13-Grenzen.
+
+**Bewusst offen (extern getaktet):** die vier F13-Entscheidungen (Audience-Konvention, Konto-Claim, Beispiel-Token/Realm-Export, Exchange-Ziel-Eintrag) samt EXCH-F01/F02 und CLIENT-02; die Rolle von occ oauth2:add-client ist in docs/token-exchange.md als offene F13-Antwort markiert (Owner-Entscheid 24.09., ein Test hält die Markierung). Wiederaufnahme, sobald Denny Mattern/F13 antwortet.
+
+**Akzeptierte Risiken:** T-24-32 (eine von HaRP auflösbare Nextcloud-Anmeldung entscheidet vor dem getauschten Token; gemessen, dokumentiert, keine Rechteausweitung) per Owner-Entscheid 26.09. als R-24-05, Details in milestones/v1.6-phases/24-audit-anschluss-und-nachweis/24-SECURITY.md.
+
+**Hinweis Audit:** Ein separates Milestone-Audit wurde wie bei v1.5 nicht gefahren; die Aussagen stammen aus den fünf Phase-Verifikationen (alle passed), dem Code-Review der Phase 24 (C/W-Findings gefixt), der secure-phase 24 vom Abschlusstag und der vollen Suite auf dem rebasierten Stand.
+
+---
+
 ## v1.5 Vorlauf openDesk (Shipped: 2026-08-31, Abschluss nachgetragen 2026-09-18)
 
 **Phases completed:** 4 phases (16 bis 19), 32 plans
@@ -107,7 +130,7 @@ kein Tag.
 - Die Ein-Klick-Story ist auf NC 34.0.3 wörtlich wahr: die Store-UI zeigt "Deploy and enable" und "Remove", gemessen auf der auf 34.0.3.2 gehobenen Instanz; Doku und Store-Text (EN/DE/FR) sagen das Gemessene.
 - Conference-Material steht: Demo-Runbook mit sechs Schritten, einmal komplett durchgefahren (82,2 s gemessen gegen 82 s behauptet), Per-User-Schalter und Widerruf erstmals in beiden Richtungen belegt; Lightning-Talk-Entwurf (8 Folien, 280/300 s), nichts eingereicht, niemand kontaktiert.
 
-**Deferred at close:** Phase 7 (CLIENT-01..03: MUCGPT/F13/BaerGPT-Live-Verprobung) per Owner-Entscheid 2026-08-20 in die Future Requirements verschoben — extern getaktet (it@M-Antwort, Owner-Kontakte), Protokoll in docs/client-setup.md bleibt einlösbar. Tech-Debt-Posten siehe milestones/v1.1-MILESTONE-AUDIT.md Frontmatter.
+**Deferred at close:** Phase 7 (CLIENT-01..03: MUCGPT/F13/BaerGPT-Live-Verprobung) per Owner-Entscheid 2026-08-20 in die Future Requirements verschoben , extern getaktet (it@M-Antwort, Owner-Kontakte), Protokoll in docs/client-setup.md bleibt einlösbar. Tech-Debt-Posten siehe milestones/v1.1-MILESTONE-AUDIT.md Frontmatter.
 
 ---
 

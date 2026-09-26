@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: F13 Token Exchange Identity Mapper
-status: "Milestone v1.6 baulich komplett: Phase 24 ausgeführt (9/9 Pläne in 5 Wellen), Code-Review resolved (CR-01 + WR-01..06 gefixt, 7 Infos offen dokumentiert), goal-backward verifiziert (24-VERIFICATION.md, passed, 5/5 Erfolgskriterien); offen nur noch Milestone-Abschluss per /gsd:complete-milestone und der Push-Hook-Entscheid"
-stopped_at: Milestone complete (Phase 24 was final phase)
-last_updated: 2026-09-24T08:00:00.000Z
-last_activity: 2026-09-24, Phase 24 ausgeführt und verifiziert; Owner-Entscheid am Checkpoint 24-09 (occ oauth2:add-client-Rolle als offene F13-Antwort markiert, Frage an F13 vertagt); Review-Fixes 8b7f6a1 bis 922e5c8, Endstand 4392 Tests grün
+status: Awaiting next milestone
+stopped_at: Milestone v1.6 complete (Phasen 20-24 archiviert nach milestones/v1.6-phases/)
+last_updated: "2026-09-26T12:18:37.740Z"
+last_activity: 2026-09-26, Milestone v1.6 abgeschlossen und archiviert; vorher secure-phase 24 (38/38, T-24-32 als R-24-05 akzeptiert), Rebase auf PR-#8-Squash 89bb7e7, 4428 Tests gruen
 progress:
   total_phases: 5
   completed_phases: 5
@@ -18,18 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-08-21)
+See: .planning/PROJECT.md (updated 2026-09-26)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** Milestone complete
+**Current focus:** Kein aktiver Milestone. Nächster Kandidat files_update (wartet auf Daniels Antwort zum Design-Issue); F13-Spur ruht bis zu den vier Antworten; Release 0.3.0 nur mit Owner-Freigabe.
 
 ## Current Position
 
-Phase: 24 von 24 (v1.6: Phasen 20-24), ABGESCHLOSSEN und verifiziert (passed, 5/5)
-Plan: 9 von 9 ausgeführt (Wellen 1-5, ein Owner-Checkpoint in 24-09 entschieden: offen-markieren)
-Status: Milestone v1.6 baulich komplett; Review resolved, VERIFICATION passed; als Nächstes /gsd:complete-milestone (Owner-Thema) und Push-Hook-Entscheid
-Progress: [██████████] 100%
-Last activity: 2026-09-24, Phase 24 komplett (actor-Feld, Abweisungs-Kette mit Sweep-Anschluss, Trockenlauf-Kommando, Zwei-Konten-Beweis gemessen, Einrichtungsdoku mit offen markierter occ-Client-Rolle); 4392 Tests grün
+Phase: Milestone v1.6 complete (Phasen 20-24)
+Plan: keiner
+Status: Awaiting next milestone
+Last activity: 2026-09-26, Milestone v1.6 abgeschlossen und archiviert
 
 ## Performance Metrics
 
@@ -814,8 +813,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Roadmap v1.6 gegenlesen und freigeben (5 Phasen 20-24, 15 Requirements, Coverage 15/15)
-- Danach: /gsd:plan-phase 20 (JWKS-Schicht und PyJWT-Stand, EXCH-01 und DEP-01)
-- Recherche je Phase: 20 bis 22 sind laut research/SUMMARY.md überspringbar, 23 (Credential-Wege) und 24 (Nachweis, Header-Größe über HaRP) brauchen tiefere Recherche in der Planung
-- Owner-Gate bleibt: ein Tag auf `v*` entsteht nur nach ausdrücklicher, wörtlicher Freigabe; die Auslieferung als Store-Release ist EXAPP-12 und ausdrücklich nicht Teil von v1.6
-- Extern getaktet und kein Blocker: die vier F13-Entscheidungen (Audience-Konvention, Konto-Claim, Beispiel-Token und Realm-Export, Exchange-Ziel-Eintrag); alles daran Hängende bleibt Konfiguration mit dokumentiertem Default
+- Start the next milestone with /gsd-new-milestone

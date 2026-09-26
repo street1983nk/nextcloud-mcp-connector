@@ -8,31 +8,15 @@ Ein schlankes MCP-only-ExApp für Nextcloud: Nutzer installieren es per Klick au
 
 Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
 
-## Current Milestone: v1.6 F13 Token Exchange Identity Mapper
+## Current Milestone
 
-**Goal:** Der Connector nimmt ein nach RFC 8693 getauschtes Token eines fremden Identity Providers (F13-Orchestrator, Keycloak) an und handelt unter dem gemappten Nextcloud-Konto, ohne die Rechtegrenze aufzuweichen.
-
-**Target features:**
-- JWKS-Abruf und Signaturprüfung: Schlüsselrotation, Cache mit Verfallszeit, fail-closed bei unerreichbarem Schlüsselsatz
-- Prüfung der Standard-Claims (iss, exp, nbf, aud) mit Clock-Skew-Toleranz; Audience-Prüfung dockt an der bestehenden RFC-8707-Stelle an
-- Konfigurierbares Claim-Mapping auf ein Nextcloud-Konto: Abweisung statt stiller Anlage, LDAP-Fall (Anmeldename ungleich interner Kennung) mitgedacht
-- Anschluss an die bestehende Audit-Kette: ein über Exchange handelnder Aufruf ist genauso nachvollziehbar wie jeder andere
-- Exchange-Pfad ab Werk aus; die vier F13-Entscheidungen (Audience-Konvention, Konto-Claim, Beispiel-Token/Realm-Export, Exchange-Ziel-Eintrag) bleiben konfigurierbare Andockpunkte
-
-**Key context:** Grundlage ist die Spec-Note an Denny Mattern (Desktop/F13-Spec-Note-Identity-Mapper-2026-09-16.md, Stand 18.09.); der Entwurf liegt im admin-Postfach, der Owner sendet. Aufgesetzt wird auf der Standalone-OAuth-Maschinerie aus PR #6 (0.2.0). Gebaut werden nur die entscheidungsunabhängigen Teile; was von Dennys Antworten abhängt, bleibt Konfiguration mit dokumentierten Defaults. Kein Store-Release ohne Owner-Freigabe.
-
-## Vorheriger Milestone: v1.5 Vorlauf openDesk (shipped 2026-08-31)
-
-**Goal war:** Den offenen Textrest als Release 0.1.11 ausliefern und die openDesk-Frage vor dem ISV-Call am 14.09. belegbar machen, ohne den großen v2.0-Schnitt vorwegzunehmen.
-
-**Target features:**
-- Release 0.1.11 mit den Textänderungen aus dem `[Unreleased]`-Block: gekürzter Trifecta-Absatz samt Teilen-Formulierung, Autorenkontakt admin@infranode.dev im Manifest
-- Zeitboxierter openDesk-Spike auf OpenProject: Auth-Modell, API-Zugang, Machbarkeit innerhalb der ExApp-Architektur, dazu eine Fragenliste für den ISV-Call
-- Audit-Log über jeden Tool-Aufruf als erster Enterprise-Baustein, der unabhängig von openDesk trägt
-
-**Key context:** Der Enterprise-Abschnitt in READMEs und Store-Beschreibung nennt Audit-Log, Gruppen-Policies und SSO ausdrücklich als geplant und heute in keiner Form vorhanden. Sobald das Audit-Log existiert, muss dieser Text mitziehen, sonst wird eine wahre Aussage falsch. Tag und Store-Upload nur nach ausdrücklicher Owner-Freigabe. Der große Schnitt (Mail-Entwürfe, Talk-Threads, v2.0 openDesk in voller Breite) bleibt nach dem ISV-Call und der Enterprise-Signal-Auswertung ab Oktober.
+Keiner aktiv. v1.6 wurde am 2026-09-26 abgeschlossen; der nächste Zyklus startet mit `/gsd:new-milestone`, sobald das Owner-Thema feststeht. Kandidat ist files_update (Schreibzugriff mit harten Schienen, Massnahmenkatalog in scripts/docs/specs/ideation-isv-monetarisierung-2026-08-25/brainstorm-schreibzugriffe-2026-09-25.md), extern getaktet durch Daniels Antwort auf das Design-Issue-Angebot.
 
 ## Current State
+
+**v1.6 shipped 2026-09-26** (kein separates Milestone-Audit, wie v1.5; 15/15 Requirements, jede Phase goal-backward verifiziert, secure-phase 24 mit 38/38 Threats, 4428 Tests): Der Connector nimmt einen nach RFC 8693 getauschten Keycloak-Token (F13-Orchestrator) an und handelt unter dem gemappten Nextcloud-Konto, ohne die Rechtegrenze aufzuweichen. Der Pfad ist ab Werk aus, im Aus-Zustand byte-gleich zu vorher, vor-authentisch gedrosselt, hash-verkettet auditiert (actor-Spalte, Abweisungskette x:exchange), per `occ mcp_connector:exchange:check` ohne Live-Zugriff verprobbar und in docs/token-exchange.md mit ehrlich markierten Grenzen dokumentiert. Zwei-Konten-Negativbeweis gemessen (docs/exchange-evidence.md). Die vier F13-Entscheidungen bleiben Konfiguration mit dokumentierten Defaults; die Rolle von `occ oauth2:add-client` ist als offene F13-Antwort markiert (Owner 24.09.). Akzeptiert: T-24-32 (mitfahrende Nextcloud-Anmeldung entscheidet vor dem Token; gemessen, dokumentiert, keine Rechteausweitung; R-24-05, Owner 26.09.). NICHT released: der Exchange-Pfad reist erst mit 0.3.0 (nur mit Owner-Freigabe). Nebenläufig im Milestone-Zeitraum: Community-PR #8 (piAreSquare) gemergt (files_download, Chunk-Upload, NC_MCP_FILES_ROOT-Sandbox), main darauf rebased.
+
+**v1.5 shipped 2026-08-31, Abschluss nachgetragen 2026-09-18** (kein Milestone-Audit): Release 0.1.11 (gekürzter Trifecta-Absatz, Autorenkontakt admin@infranode.dev), zeitboxierter openDesk-Spike auf OpenProject mit Fragenliste für den ISV-Call, Audit-Log als erster Enterprise-Baustein (hash-verkettet, ab Werk aus, Phasen 18+19 inkl. Bedienung und Textnachzug). Zwischen v1.5 und v1.6 ausserhalb von Milestones: PR #6 Standalone-OAuth (DaniW42, 0.2.0) und PR #7 Anzeigename gemergt, Releases 0.2.0 (nur GitHub/ghcr) und 0.2.1 (Store, Textrelease).
 
 **v1.4 shipped 2026-08-28** (Audit passed 4/4, Release 0.1.10 live im Store): Die Store-Beschreibung trägt jetzt einen kurzen Enterprise-Abschnitt mit dem Kontakt admin@infranode.dev, und die private Outlook-Adresse ist aus dem öffentlichen Manifest verschwunden. Dazu die Doku-Reste aus v1.3: Übersetzungsfehler in README.fr/de, hängende Changelog-Linkdefinition, Ampersand-Kommentar, chronologische Nachweistabelle, und die Reichweite des Vokabular-Gates gegenüber .planning ist als begründete Ausnahme mit Halter-Test entschieden. Kein Code geändert: dieselben 21 Werkzeuge, Budget 15712/18000. Lehre des Milestones: Beweisdokumente brauchen dieselbe Faktenprüfung wie Code, und ein als behoben gebuchter Review-Befund ohne nachgefahrenen Beleg ist schlimmer als ein offener.
 
@@ -51,45 +35,50 @@ BL-12 MUCGPT-Verprobung wartet auf it@M-Antwort).
 
 ## Next Milestone Goals
 
-Kandidaten nach v1.5:
-- openDesk in der Breite (v2.0): die im Spike nicht angefassten Komponenten (XWiki, Matrix, OX), Gruppen-Policies, ZenDiS-Kanal
-- Mail-Entwürfe (create draft, nie Senden; Trigger Store-Feedback), Talk-Threads (capability-gated), Mail-Deep-Link-Auflösung (RFC-Message-Id zu databaseId, erst nach Messung)
-- MUCGPT/F13/BaerGPT live verproben, sobald externer Zugang besteht (deferred CLIENT-01..03, Protokoll in docs/client-setup.md)
-- Enterprise-Signale auswerten (Fake-Door seit 0.1.9 live; Go: >=5 qualifizierte Org-Signale in 6 Wochen oder 1 Ankerkunde; Kriterium lokal beim Owner) und ISV-Call 14.09. einarbeiten
-- Rest-Tech-Debt: IN-Punkte aus 13-REVIEW (FR-Wortlaut "confidemment", Proof-Zeilen-Sortierung), Vokabular-Gate-Reichweite auf .planning prüfen (I-2 aus v1.3-Audit), W-2 (13-VERIFICATION nennt entfernte Datei)
-- Querschnitt: Prototype Fund Frist 1.10. bis 30.11.2026 (Solo-Dev, 47,5k); UG-Gründung als Träger (ISV)
-- v2.0 "openDesk/Behörden" als Einzeiler (OpenProject/XWiki/Matrix/OX, Gruppen-Policies, Audit-Log, ZenDiS)
+Kandidaten nach v1.6 (Stand 2026-09-26):
+- **files_update / Schreibzugriff mit harten Schienen (Kandidat Nr. 1):** Owner-Entscheid 25.09.: Daniel (DaniW42/simul8) baut als Community-PR, Prozess über ein Design-Issue (Entwurf: Desktop/design-issue-files-update-ENTWURF.md), Massnahmenkatalog verbindlich; WARTET auf Daniels Antwort. Linie: sicheres Editieren frei (B), Freigabe-Governance bezahlt (D), Scope-Fence gegen den Audit-Log-Präzedenzfall
+- **Release 0.3.0** (nur mit Owner-Freigabe): bündelt Exchange-Pfad (v1.6), PR-#8-Features (files_download, Chunk-Upload, Sandbox), Store-Text-Fixes (RAG raus, Findling-Satz) und Public-URL-Ableitung
+- **F13-Wiederaufnahme**, sobald Denny Mattern antwortet: EXCH-F01 (Golden-Fixture aus echtem Token), EXCH-F02 (vier verprobte Konfigurationswerte), CLIENT-02 (Live-Verprobung)
+- Enterprise-/ISV-Spur: Fabrice-Call nachholen (Wiedervorlage war 25.09.), Approved-Write-Suite (D) erst danach öffentlich; Fake-Door-Auswertung ab Oktober, Findling-Pro-Entscheid vertagt auf 03.11.
+- openDesk in der Breite (v2.0) und Mail-Entwürfe/Talk-Threads: unverändert spätere Kandidaten
+- MUCGPT/BaerGPT live verproben, sobald externer Zugang besteht (deferred CLIENT-01/03)
 
 ## Requirements
 
 ### Validated
 
-- ✓ Als ExApp per Klick aus dem Nextcloud App Store installierbar (AppAPI/Deploy Daemon) — v1.0 (Store-Release 0.1.0..0.1.2; Ein-Klick-Lücke via Declarative Admin-Settings geschlossen)
-- ✓ MCP-Spec-konformes OAuth 2.1 — v1.0 (Claude.ai und ChatGPT verbinden sich nur mit der Resource-URL; DCR, PKCE, Rotation mit Reuse-Detection)
-- ✓ Per-User-Verwaltung in den Nextcloud-Settings — v1.0 (Verbindungsseite unter Settings/Security, Pause wirkt an allen 4 Autorisierungspunkten)
-- ✓ Kuratierte Tool-Basis — v1.0 (16 Tools, Budget-Gate 12500 Bytes, Contract-Test gegen die aktive Registry)
-- ✓ prepare_context — v1.0 (Suche + Terminwoche in einem Aufruf, Marker-Filter gegen Text-Fälschung)
-- ✓ Risikoarme Writes, destruktive Ops konstruktionsbedingt ausgeschlossen — v1.0 (AST-Grep-Gate, Zwei-Konten-Negativbeweis)
-- ✓ Transport stdio + Streamable HTTP, App-Passwort + Login Flow v2 — v1.0
-- ✓ App-Store-Einreichung vor der Nextcloud Conference September 2026 — v1.0 (eingereicht 2026-08-19, fünf Wochen vor Termin)
-- ✓ Contribution-Fix an nextcloud/context_agent#227 — v1.0 (Fork + DCO-signierter Fix, Disclosure in #203)
-- ✓ Client ID Metadata Documents als DCR-Alternative, SSRF-geprüft — v1.1 Phase 6 (Claude Code verbindet sich live ohne Registrierung; DCR-Kontrollen greifen wortgleich, kein Fetch außerhalb von /authorize)
-- ✓ Cursor-Verhalten gemessen statt vermutet, Loopback-Portfrage beantwortet — v1.1 Phase 6 (Teilregistrierung wirkt live mit 201; Cursor scheitert belegt an seiner eigenen cursor://-Adresse, Owner-Entscheid BL-14 "sichtbar machen plus Doku"; RFC-8252-7.3-Portregel eingebaut und mit wechselnden Ports live bestätigt)
-- ✓ NC-34.0.3-UI-Smoke: Ein-Klick-Installation über die Store-UI nachgewiesen — v1.1 Phase 6 (Deploy-and-enable- und Remove-Knopf gemessen, Doku/Store-Text EN/DE/FR sagen das Gemessene)
-- ✓ Conference-Demo-Material — v1.1 Phase 6 (Runbook einmal komplett durchgefahren, 82 s; Lightning-Talk-Entwurf, CfP-Schließung im Kopf vermerkt)
-- ✓ Talk-Familie: lesen nebenwirkungsfrei (vier Leseparameter live gemessen), senden token-adressiert und admin-abschaltbar — v1.2 (TALK-01..04)
-- ✓ Tables-Familie: drei Lese-Ebenen gekappt, Zeile anlegen über Spaltentitel mit Vorab-Ablehnungen — v1.2 (TABLES-01..02)
-- ✓ Mail-Familie strikt lesend inkl. Volltext, Filtergrammatik und AppAPI-Erreichbarkeitsbeweis — v1.2 (MAIL-01..04)
-- ✓ Lethal-Trifecta ausdrücklich adressiert (Doku + Store-Text dreisprachig + TALK-04-Schalter) — v1.2 (SEC-01)
-- ✓ prepare_context mit Talk-Digest und Mail-Zählern, gemessen statt geschätzt — v1.2 (CTX-01..02)
-- ✓ Budget-Gate auf Messung verankert (18000), Suchtreffer aus Talk/Tables auflösbar — v1.2 (TOOL-15..16)
-- ✓ Release 0.1.8 im Store mit vier Nachweisen und Owner-Tag-Gate — v1.2 (EXAPP-07)
-- ✓ Konsistenz-Nachzieher: eine Bedeutung je Antwortschlüssel, Id-Codec als einzige Quelle, keine Privat-Durchgriffe (AST-Gate) — v1.3 (TOOL-17..19)
-- ✓ Security-Nachzieher als Regressionstests statt Prüfschritte, Vokabular-Gate in voller Reichweite — v1.3 (SEC-02)
-- ✓ CIMD live nachgemessen: echter Client verbindet ohne Registrierung, Gegenprobe mit Schalter aus, selbsttragende Proof-Zeile — v1.3 (EXAPP-08)
-- ✓ Release 0.1.9 im Store mit elf Proof-Zeilen, Owner-Tag-Gate und Signatur über das heruntergeladene Asset — v1.3 (EXAPP-09)
-- ✓ Doku-Reste aus v1.3 geschlossen und Vokabular-Gate-Reichweite entschieden — v1.4 (DOC-01, DOC-02, SEC-03)
-- ✓ Release 0.1.10 im Store mit dem gekürzten Enterprise-Abschnitt und dem Kontaktwechsel auf admin@infranode.dev — v1.4 (EXAPP-10)
+- ✓ Als ExApp per Klick aus dem Nextcloud App Store installierbar (AppAPI/Deploy Daemon) , v1.0 (Store-Release 0.1.0..0.1.2; Ein-Klick-Lücke via Declarative Admin-Settings geschlossen)
+- ✓ MCP-Spec-konformes OAuth 2.1 , v1.0 (Claude.ai und ChatGPT verbinden sich nur mit der Resource-URL; DCR, PKCE, Rotation mit Reuse-Detection)
+- ✓ Per-User-Verwaltung in den Nextcloud-Settings , v1.0 (Verbindungsseite unter Settings/Security, Pause wirkt an allen 4 Autorisierungspunkten)
+- ✓ Kuratierte Tool-Basis , v1.0 (16 Tools, Budget-Gate 12500 Bytes, Contract-Test gegen die aktive Registry)
+- ✓ prepare_context , v1.0 (Suche + Terminwoche in einem Aufruf, Marker-Filter gegen Text-Fälschung)
+- ✓ Risikoarme Writes, destruktive Ops konstruktionsbedingt ausgeschlossen , v1.0 (AST-Grep-Gate, Zwei-Konten-Negativbeweis)
+- ✓ Transport stdio + Streamable HTTP, App-Passwort + Login Flow v2 , v1.0
+- ✓ App-Store-Einreichung vor der Nextcloud Conference September 2026 , v1.0 (eingereicht 2026-08-19, fünf Wochen vor Termin)
+- ✓ Contribution-Fix an nextcloud/context_agent#227 , v1.0 (Fork + DCO-signierter Fix, Disclosure in #203)
+- ✓ Client ID Metadata Documents als DCR-Alternative, SSRF-geprüft , v1.1 Phase 6 (Claude Code verbindet sich live ohne Registrierung; DCR-Kontrollen greifen wortgleich, kein Fetch außerhalb von /authorize)
+- ✓ Cursor-Verhalten gemessen statt vermutet, Loopback-Portfrage beantwortet , v1.1 Phase 6 (Teilregistrierung wirkt live mit 201; Cursor scheitert belegt an seiner eigenen cursor://-Adresse, Owner-Entscheid BL-14 "sichtbar machen plus Doku"; RFC-8252-7.3-Portregel eingebaut und mit wechselnden Ports live bestätigt)
+- ✓ NC-34.0.3-UI-Smoke: Ein-Klick-Installation über die Store-UI nachgewiesen , v1.1 Phase 6 (Deploy-and-enable- und Remove-Knopf gemessen, Doku/Store-Text EN/DE/FR sagen das Gemessene)
+- ✓ Conference-Demo-Material , v1.1 Phase 6 (Runbook einmal komplett durchgefahren, 82 s; Lightning-Talk-Entwurf, CfP-Schließung im Kopf vermerkt)
+- ✓ Talk-Familie: lesen nebenwirkungsfrei (vier Leseparameter live gemessen), senden token-adressiert und admin-abschaltbar , v1.2 (TALK-01..04)
+- ✓ Tables-Familie: drei Lese-Ebenen gekappt, Zeile anlegen über Spaltentitel mit Vorab-Ablehnungen , v1.2 (TABLES-01..02)
+- ✓ Mail-Familie strikt lesend inkl. Volltext, Filtergrammatik und AppAPI-Erreichbarkeitsbeweis , v1.2 (MAIL-01..04)
+- ✓ Lethal-Trifecta ausdrücklich adressiert (Doku + Store-Text dreisprachig + TALK-04-Schalter) , v1.2 (SEC-01)
+- ✓ prepare_context mit Talk-Digest und Mail-Zählern, gemessen statt geschätzt , v1.2 (CTX-01..02)
+- ✓ Budget-Gate auf Messung verankert (18000), Suchtreffer aus Talk/Tables auflösbar , v1.2 (TOOL-15..16)
+- ✓ Release 0.1.8 im Store mit vier Nachweisen und Owner-Tag-Gate , v1.2 (EXAPP-07)
+- ✓ Konsistenz-Nachzieher: eine Bedeutung je Antwortschlüssel, Id-Codec als einzige Quelle, keine Privat-Durchgriffe (AST-Gate) , v1.3 (TOOL-17..19)
+- ✓ Security-Nachzieher als Regressionstests statt Prüfschritte, Vokabular-Gate in voller Reichweite , v1.3 (SEC-02)
+- ✓ CIMD live nachgemessen: echter Client verbindet ohne Registrierung, Gegenprobe mit Schalter aus, selbsttragende Proof-Zeile , v1.3 (EXAPP-08)
+- ✓ Release 0.1.9 im Store mit elf Proof-Zeilen, Owner-Tag-Gate und Signatur über das heruntergeladene Asset , v1.3 (EXAPP-09)
+- ✓ Doku-Reste aus v1.3 geschlossen und Vokabular-Gate-Reichweite entschieden , v1.4 (DOC-01, DOC-02, SEC-03)
+- ✓ Release 0.1.10 im Store mit dem gekürzten Enterprise-Abschnitt und dem Kontaktwechsel auf admin@infranode.dev , v1.4 (EXAPP-10)
+- ✓ Release 0.1.11, openDesk-Spike (OpenProject, Fragenliste für den ISV-Call) und Audit-Log als erster Enterprise-Baustein , v1.5 (Abschluss nachgetragen 2026-09-18)
+- ✓ Eine gehärtete Schlüsselsatz-Schicht (oauth/jwks.py: Abkühlzeit, Single-Flight, fail-closed), PyJWT 2.14 + cryptography 50.0.1 , v1.6 (EXCH-01, DEP-01)
+- ✓ Vollständige Keycloak-JWS-Prüfung als freistehende Funktionen, jede Abweichung ein eigener detailfreier Grund , v1.6 (EXCH-02, EXCH-03)
+- ✓ Exchange-Pfad als Kette hinter unveränderter Transportgrenze: eigener Namensraum ab Werk aus, formbasierte Weiche, vor-authentische Drossel, Aus-Zustand byte-gleich , v1.6 (CONF-01, EXCH-04, EXCH-05)
+- ✓ Konto-Mapping ohne stille Kontoanlage (zwei Profile, kanonischer Principal), AppAPI-Impersonation fail-closed, Standalone-Bindung mit Enrollment und sofortigem Widerruf , v1.6 (MAP-01, MAP-02, CRED-01, CRED-02)
+- ✓ Audit-Anschluss (actor-Spalte, gebremste Abweisungskette), Trockenlauf-Kommando, Zwei-Konten-Negativbeweis gemessen, Einrichtungsdoku mit ehrlichen F13-Grenzen , v1.6 (AUDIT-07, EXCH-06, EXCH-07, EXCH-08)
 
 ### Active
 
@@ -132,23 +121,28 @@ Kandidaten nach v1.5:
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| MCP-only-ExApp statt Standalone-Server oder context_agent-Konkurrenz | Explizit nachgefragte, unbesetzte Nische (context_agent#203); Store-Distribution = Zugänglichkeits-Vorsprung | ✓ Good — im Store gelandet, Nische bestätigt (Release-Ankündigung in #203 positiv aufgenommen) |
-| OAuth 2.1 nach MCP-Authorization-Spec als Kern-Differenzierer | Meistgefordertes Feature im Ökosystem (context_agent#74); niemand hat es | ✓ Good — Claude.ai und ChatGPT verbinden plug-and-play, E2E gemessen |
-| Kuratiert schlank (~15-20 Tools) statt Tool-Flut | Client-Tool-Limits real; Platzhirsch hat Breite schon; Schema-Diät-Patterns vorhanden | ✓ Good — 16 Tools bei 11268/12500 Bytes Budget |
-| mcp>=2.0,<3 statt 1.x (revidiert 14.08.) | 2.0.0 seit 28.07. GA; v2 bedient alte und neue Clients aus einem Endpoint | ✓ Good — Matrix-Test SDK 1.29 + 2.x gegen dieselbe URL grün |
-| Contribution-Fix an context_agent#227 als Flanke | Sichtbarkeit + Goodwill beim Nextcloud-Team vor der Conference | ✓ Good — Fix eingereicht, Disclosure platziert |
+| MCP-only-ExApp statt Standalone-Server oder context_agent-Konkurrenz | Explizit nachgefragte, unbesetzte Nische (context_agent#203); Store-Distribution = Zugänglichkeits-Vorsprung | ✓ Good , im Store gelandet, Nische bestätigt (Release-Ankündigung in #203 positiv aufgenommen) |
+| OAuth 2.1 nach MCP-Authorization-Spec als Kern-Differenzierer | Meistgefordertes Feature im Ökosystem (context_agent#74); niemand hat es | ✓ Good , Claude.ai und ChatGPT verbinden plug-and-play, E2E gemessen |
+| Kuratiert schlank (~15-20 Tools) statt Tool-Flut | Client-Tool-Limits real; Platzhirsch hat Breite schon; Schema-Diät-Patterns vorhanden | ✓ Good , 16 Tools bei 11268/12500 Bytes Budget |
+| mcp>=2.0,<3 statt 1.x (revidiert 14.08.) | 2.0.0 seit 28.07. GA; v2 bedient alte und neue Clients aus einem Endpoint | ✓ Good , Matrix-Test SDK 1.29 + 2.x gegen dieselbe URL grün |
+| Contribution-Fix an context_agent#227 als Flanke | Sichtbarkeit + Goodwill beim Nextcloud-Team vor der Conference | ✓ Good , Fix eingereicht, Disclosure platziert |
 | AGPL-3.0 | Ökosystem-Kultur; Übernahme-Chance wichtiger als maximale Wiederverwendbarkeit | ✓ Good |
-| Risikoarme Writes, destruktive Ops ausgeschlossen | "Kann nichts zerstören" ist Verkaufsargument, kein Mangel | ✓ Good — als Gate implementiert (AST-Grep), Kern der Store-Beschreibung und des LinkedIn-Narrativs |
-| Fail-closed bei DCR-redirect_uris revidiert zu Teilregistrierung (20.08.) | Cursor registriert 3 URIs auf einmal, eine unzulässige sperrte den ganzen Client aus | ✓ Good — wirkt live (201 mit den zwei zulässigen Adressen); Cursor scheitert danach an sich selbst (schickt die verworfene cursor://-Adresse an /authorize) |
-| BL-14 "sichtbar machen plus Doku" statt cursor://-Registrierung (Owner, 20.08.) | D-35 steht (Desktop-Schemes kann jede App abfangen); E5-Seite nennt den App-Passwort-Ausweg, Doku den Grund | ✓ Good — Phase 6 verified 6/6, kein Sicherheitsversprechen aufgeweicht |
-| MUCGPT-Verprobung als geführte Lücke abgenommen (Owner, 20.08.) | Braucht fremde Instanz (it@M); Protokoll einlösbar dokumentiert | — Pending (Mail gesendet, Antwort ausstehend) |
-| v1.2 "Kuratierte Breite" vorgezogen statt auf Store-Feedback zu warten (Owner, 21.08.) | Talk/Tables/Mail sind die meistgefragten Familien; Schlankheit bleibt über Schema-Diät und Budget-Gate | ✓ Good — 21 Tools bei 15657/18000 Bytes, Gate gesenkt statt angehoben |
-| talk_send kommt, hinter neuem Admin-Schalter (Owner, 21.08., Lethal-Trifecta-Entscheid) | Ausgangskanal gehört der Administration; Kette benannt statt beschwiegen | ✓ Good — Ende-zu-Ende gemessen, SEC-01 dreisprachig im Store-Text |
-| Mail strikt lesend, kein Schreibpfad im Client | Sensibelste Familie; "kann nichts zerstören" bleibt wörtlich wahr | ✓ Good — AST-Grep-Gate mit 9 Nadeln + Gegenproben, live nebenwirkungsfrei bewiesen |
-| Release-Signatur immer über das heruntergeladene Asset, Branch-Push vor dem Tag | tar.gz nicht byte-reproduzierbar (45710 lokal vs 45546 publiziert bei 0.1.8); Store-Links zeigen auf main | ✓ Good — Runbook Schritt 4/6 präzisiert, Skript-Ausgabe entschärft (eb05a6f); bei 0.1.9 wörtlich eingehalten (47546 lokal vs 47264 publiziert, Verified OK) |
-| Enterprise-Fake-Door mit dem Release 0.1.9 ausgeliefert (Owner, 25.08., ISV-Vorhaben) | Store liest das Manifest nur beim Upload; READMEs waren ohnehin offen; Signale messen statt bauen | — Pending (Go-Kriterium: >=5 Org-Signale in 6 Wochen oder 1 Ankerkunde; Auswertung ab Oktober) |
-| D-07: kein Enterprise-Issue, keine Enterprise-Interna im Repo (Owner, 26.08.) | Interne Messkriterien gehören nicht vor die Zielgruppe, die gemessen wird | ✓ Good — Entwurf + Go-Kriterium aus dem Repo entfernt (f9b3d2d), nur lokal beim Owner |
-| CIMD-Nachmessung über Messweg A gegen den Kandidaten VOR dem Tag (25.08.) | Beweis darf nicht von der Owner-Freigabe abhängen; Quellstand == Tag-Stand per leerem Diff belegt | ✓ Good — echter Client, POST /register = 0, Gegenprobe 0 Sockets |
+| Risikoarme Writes, destruktive Ops ausgeschlossen | "Kann nichts zerstören" ist Verkaufsargument, kein Mangel | ✓ Good , als Gate implementiert (AST-Grep), Kern der Store-Beschreibung und des LinkedIn-Narrativs |
+| Fail-closed bei DCR-redirect_uris revidiert zu Teilregistrierung (20.08.) | Cursor registriert 3 URIs auf einmal, eine unzulässige sperrte den ganzen Client aus | ✓ Good , wirkt live (201 mit den zwei zulässigen Adressen); Cursor scheitert danach an sich selbst (schickt die verworfene cursor://-Adresse an /authorize) |
+| BL-14 "sichtbar machen plus Doku" statt cursor://-Registrierung (Owner, 20.08.) | D-35 steht (Desktop-Schemes kann jede App abfangen); E5-Seite nennt den App-Passwort-Ausweg, Doku den Grund | ✓ Good , Phase 6 verified 6/6, kein Sicherheitsversprechen aufgeweicht |
+| MUCGPT-Verprobung als geführte Lücke abgenommen (Owner, 20.08.) | Braucht fremde Instanz (it@M); Protokoll einlösbar dokumentiert | , Pending (Mail gesendet, Antwort ausstehend) |
+| v1.2 "Kuratierte Breite" vorgezogen statt auf Store-Feedback zu warten (Owner, 21.08.) | Talk/Tables/Mail sind die meistgefragten Familien; Schlankheit bleibt über Schema-Diät und Budget-Gate | ✓ Good , 21 Tools bei 15657/18000 Bytes, Gate gesenkt statt angehoben |
+| talk_send kommt, hinter neuem Admin-Schalter (Owner, 21.08., Lethal-Trifecta-Entscheid) | Ausgangskanal gehört der Administration; Kette benannt statt beschwiegen | ✓ Good , Ende-zu-Ende gemessen, SEC-01 dreisprachig im Store-Text |
+| Mail strikt lesend, kein Schreibpfad im Client | Sensibelste Familie; "kann nichts zerstören" bleibt wörtlich wahr | ✓ Good , AST-Grep-Gate mit 9 Nadeln + Gegenproben, live nebenwirkungsfrei bewiesen |
+| Release-Signatur immer über das heruntergeladene Asset, Branch-Push vor dem Tag | tar.gz nicht byte-reproduzierbar (45710 lokal vs 45546 publiziert bei 0.1.8); Store-Links zeigen auf main | ✓ Good , Runbook Schritt 4/6 präzisiert, Skript-Ausgabe entschärft (eb05a6f); bei 0.1.9 wörtlich eingehalten (47546 lokal vs 47264 publiziert, Verified OK) |
+| Enterprise-Fake-Door mit dem Release 0.1.9 ausgeliefert (Owner, 25.08., ISV-Vorhaben) | Store liest das Manifest nur beim Upload; READMEs waren ohnehin offen; Signale messen statt bauen | , Pending (Go-Kriterium: >=5 Org-Signale in 6 Wochen oder 1 Ankerkunde; Auswertung ab Oktober) |
+| D-07: kein Enterprise-Issue, keine Enterprise-Interna im Repo (Owner, 26.08.) | Interne Messkriterien gehören nicht vor die Zielgruppe, die gemessen wird | ✓ Good , Entwurf + Go-Kriterium aus dem Repo entfernt (f9b3d2d), nur lokal beim Owner |
+| CIMD-Nachmessung über Messweg A gegen den Kandidaten VOR dem Tag (25.08.) | Beweis darf nicht von der Owner-Freigabe abhängen; Quellstand == Tag-Stand per leerem Diff belegt | ✓ Good , echter Client, POST /register = 0, Gegenprobe 0 Sockets |
+| D-v1.6-01: Exchange-Vollmacht über AppAPI-Impersonation (ExApp) bzw. vorab gebundene Autorisierung (Standalone), keine neue Vollmachtsklasse (Owner, 18.09.) | Rechtegrenze bleibt bei Nextcloud; keine stille Kontoanlage, kein Provisioning je Nutzer | ✓ Good , beide Wege gemessen (Impersonationslog, 200-dann-401-Widerruf) |
+| Nur entscheidungsunabhängige Teile bauen, F13-Abhängiges als Konfiguration mit Defaults (Milestone-Prämisse 18.09.) | Kein Warten auf externe Antworten; Spec-Note-Zusage einhalten | ✓ Good , 15/15 Requirements ohne eine einzige F13-Antwort geliefert, Andockpunkte dokumentiert |
+| Rolle von occ oauth2:add-client als OFFENE F13-Antwort markiert statt geraten (Owner, 24.09., Checkpoint 24-09) | Eine geratene Empfehlung in einer Einrichtungsdoku baut falsche Instanzen | , Pending (Frage liegt bei F13, ein Test hält die Markierung) |
+| T-24-32 akzeptiert statt Code-Mitigation (Owner, 26.09., R-24-05) | Gemessen, dokumentiert, keine Rechteausweitung; vorgesehener Betrieb ist Server-zu-Server ohne zweite Anmeldung | ✓ Good , Härtung in middleware.py bleibt als Option benannt |
+| PR #8 nach 4 Tagen Funkstille selbst fertiggestellt und gemergt (25.09.) | Sollte den Beitrag nicht verfallen lassen; verstiess aber gegen die Owner-Ansage "erst handeln, wenn er antwortet" | ⚠ Revisit , Regel seitdem: fremde PRs nie ohne Antwort des Beitragenden oder fallbezogene Owner-Freigabe fertigstellen |
 
 ## Evolution
 
@@ -168,4 +162,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-28 at the start of milestone v1.5*
+*Last updated: 2026-09-26 after v1.6 milestone*
