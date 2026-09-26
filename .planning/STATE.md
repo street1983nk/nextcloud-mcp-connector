@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.7
 milestone_name: Ausschluss-Tag kein-ki
 status: planning
-last_updated: "2026-09-26T13:21:33.017Z"
+last_updated: "2026-09-26T15:00:00.000Z"
 last_activity: 2026-09-26
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-26)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** Kein aktiver Milestone. Nächster Kandidat files_update (wartet auf Daniels Antwort zum Design-Issue); F13-Spur ruht bis zu den vier Antworten; Release 0.3.0 nur mit Owner-Freigabe.
+**Current focus:** Milestone v1.7 Ausschluss-Tag kein-ki (BL-16), Phasen 25-29; als Nächstes Phase 25 (Mess-Spike Tag-Abfrage). Nebenläufig extern: files_update als Community-PR (Design-Issue #9), F13-Spur ruht, Release 0.3.0 nur mit Owner-Freigabe.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-09-26 — Milestone v1.7 started
+Phase: 25 von 25-29 (Mess-Spike Tag-Abfrage)
+Plan: noch keiner (Phase nicht geplant)
+Status: Ready to plan
+Last activity: 2026-09-26, Roadmap v1.7 erstellt (5 Phasen, 14/14 Requirements zugeordnet)
+
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -773,6 +775,10 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
+- v1.7 Messvorbedingung: Phase 25 misst vor jeder Designentscheidung; Notes-Anschluss (EXCL-05) hängt am Befund "Notiz-Id = fileid", bei negativem Befund dokumentiert vertagt statt geraten
+- v1.7 Versionsfenster: App-aus-Verhalten des REPORT ist nur auf NC 35 gemessen; NC 32 bis 34 und die AppAPI-Impersonation-Variante sind offen, bis Phase 25 sie misst
+- v1.7 offene discuss-Fragen (nicht entschieden): Ordner-Tag als Ausschlussliste und Admin-Schalter (Phase 26), Upload-Orakel und Zählen-vs-Schweigen je Familie (Phase 27)
+- v1.7 Flächen-Nachbarschaft: files_update aus dem Community-PR muss beim Merge in den Klassifikations-Freeze (GATE-01) eingetragen werden
 - v1.5 Termin: der ISV-Call am 14.09. ist der harte Anker für Phase 17; die Fragenliste (OD-03) muss auch dann vorliegen, wenn OD-01 oder OD-02 ergebnislos bleiben, denn ein ungemessener Punkt ist selbst eine Frage für den Call
 - v1.5 offene Architekturfrage: Weg 0 hängt an einer einzigen ungemessenen Tatsache (trägt die serverseitige Token-Erneuerung von `integration_openproject` auch in openDesks OIDC-gebundenem Betrieb, oder fällt sie nach Ablauf des zwischengespeicherten Tokens auf 401); fällt sie, ist Weg 1 der Rückfall, nicht ein Ausweichen
 - v1.5 Textkollision: EXAPP-11 (Phase 16) und AUDIT-06 (Phase 19) fassen dieselben Dateien an; wird Phase 19 vor dem Tag v0.1.11 fertig, darf ihr Text NICHT in das 0.1.11-Asset geraten
@@ -806,11 +812,11 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-09-19T09:56:28.357Z
-Stopped at: Completed 22-03-PLAN.md
-Nächster Schritt: /gsd:verify-work 22, danach /gsd:plan-phase 23 (Konto-Mapping, MAP-01/MAP-02). Die eine benannte Stelle für Phase 23 ist der EXCHANGE_CLAIM-Zweig von ChainedVerifier.resolve_identity; die Drossel muss dafür nicht angefasst werden.
+Last session: 2026-09-26
+Stopped at: Roadmap v1.7 erstellt (Phasen 25-29)
+Nächster Schritt: /gsd:discuss-phase 25 oder direkt /gsd:plan-phase 25 (Mess-Spike Tag-Abfrage, braucht Live-Zugriff auf NC 32 bis 35)
 Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Phase 25 planen: /gsd:plan-phase 25

@@ -64,4 +64,19 @@ Extern getaktet, kein Blocker: nichts. Der Milestone ist vollstaendig ohne fremd
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (wird von der Roadmap gefuellt) | | |
+| EXCL-01 | Phase 27 | Pending |
+| EXCL-02 | Phase 26 | Pending |
+| EXCL-03 | Phase 27 | Pending |
+| EXCL-04 | Phase 26 | Pending |
+| EXCL-05 | Phase 27 (Messbedingung aus Phase 25) | Pending |
+| EXCL-06 | Phase 27 | Pending |
+| EXCL-07 | Phase 28 | Pending |
+| SBX-01 | Phase 27 | Pending |
+| SBX-02 | Phase 27 | Pending |
+| GATE-01 | Phase 28 | Pending |
+| GATE-02 | Phase 28 | Pending |
+| GATE-03 | Phase 28 | Pending |
+| OPS-01 | Phase 29 | Pending |
+| DOC-03 | Phase 29 | Pending |
+
+**Coverage:** 14/14 v1-Requirements zugeordnet, keine Waisen, keine Doppelungen. Phase 25 (Mess-Spike) trägt kein eigenes Requirement, sie liefert die Messvorbedingungen für EXCL-02, EXCL-04 und EXCL-05.
