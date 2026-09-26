@@ -9,7 +9,7 @@ All notable changes to this app are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0] - 2026-09-26
 
 ### Added
 
@@ -823,6 +823,7 @@ First release, submitted to the Nextcloud App Store.
   never sees more than that user sees in the web interface.
 - A privacy and data flow description, see [docs/privacy.md](docs/privacy.md).
 
+[0.3.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.1.15...v0.2.0
 [0.1.15]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.1.14...v0.1.15
