@@ -68,6 +68,7 @@ from .exchange_check import EXCHANGE_CHECK_PATH, TOKEN_OPTION
 from .purge import FORCE_OPTION, PURGE_PATH
 
 __all__ = [
+    "APPAPI_DESCRIPTION_LENGTH",
     "OCC_AUDIT_COMMAND_NAME",
     "OCC_AUDIT_HANDLER",
     "OCC_AUDIT_JSON_DESCRIPTION",
@@ -92,6 +93,13 @@ __all__ = [
 
 #: The OCS route AppAPI exposes for the occ commands of an ExApp.
 OCC_COMMAND_PATH = "/ocs/v2.php/apps/app_api/api/v1/occ_command"
+
+#: The most AppAPI stores for a command description: its migration
+#: ``Version2205Date20240411124836`` declares the column with this length, and MariaDB
+#: refuses a longer value (``1406 Data too long for column 'description'``) with a 400 that
+#: leaves the command out of ``occ list``. SQLite truncates silently, so a test has to hold
+#: this line rather than a topology.
+APPAPI_DESCRIPTION_LENGTH = 255
 
 #: What an administrator types. The app id as the namespace, which is what every ExApp
 #: command of an app shares and what makes it findable in ``occ list``.
@@ -201,10 +209,9 @@ OCC_EXCHANGE_CHECK_HANDLER = EXCHANGE_CHECK_PATH.removeprefix("/")
 #: handler, because the person deciding whether to run this against a token somebody handed
 #: them reads this text and not the source.
 OCC_EXCHANGE_CHECK_DESCRIPTION = (
-    "Hold a presented token against the token exchange path configured on this instance and "
-    "report every rule with its outcome. The check is a dry run: it makes no Nextcloud call, "
-    "it creates no session and no authorization, and it writes no row into the audit log. It "
-    "costs one outgoing key set request to the configured provider."
+    "Check a token against the token exchange path of this instance and report every rule "
+    "with its outcome. A dry run: no Nextcloud call, no session, no authorization and no audit "
+    "log row. It costs one key set request to the configured provider."
 )
 
 #: The description that names a price instead of hiding it, after the model of

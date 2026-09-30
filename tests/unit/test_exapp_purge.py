@@ -1078,6 +1078,20 @@ def test_the_command_and_the_route_cannot_drift_apart() -> None:
     assert occ.OCC_HANDLER, "an empty handler would register a command AppAPI cannot call"
 
 
+def test_every_command_description_fits_the_appapi_column() -> None:
+    """AppAPI stores a command description in a column of 255 characters.
+
+    Its migration ``Version2205Date20240411124836`` declares the column with that length,
+    and MariaDB refuses a longer value with ``1406 Data too long for column 'description'``,
+    so AppAPI answers 400 and the command never appears in ``occ list``. Measured on a
+    production Nextcloud 34.0.4 with AppAPI 34.0.0 on 2026-09-30: three commands registered,
+    the fourth did not. SQLite in the test topology truncates instead, which is why no
+    earlier test caught it.
+    """
+    for scheme in occ.command_schemes():
+        assert len(scheme["description"]) <= occ.APPAPI_DESCRIPTION_LENGTH, scheme["name"]
+
+
 def test_the_command_is_the_one_the_runbook_calls() -> None:
     scheme = occ.command_schemes()[0]
 

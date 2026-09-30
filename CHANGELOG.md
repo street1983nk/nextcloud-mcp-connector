@@ -11,6 +11,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `occ mcp_connector:exchange:check` is registered again. Its description was 325 characters,
+  AppAPI stores a command description in a column of 255, and MariaDB refuses the row where
+  SQLite truncates it, so on a MariaDB instance the command never appeared in `occ list`. The
+  description now fits, and a test holds every command to that limit.
+
 ### Changed
 
 - The "This link has expired" page now also says to open the link in the browser where you
