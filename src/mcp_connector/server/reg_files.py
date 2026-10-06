@@ -5,17 +5,46 @@ No tool takes a user name: the identity comes from the auth channel through
 """
 
 import base64
-from typing import Annotated
+from typing import Annotated, NotRequired, TypedDict
 from urllib.parse import quote
 
 from mcp.server.mcpserver import Context
 from mcp.types import BlobResourceContents, EmbeddedResource, TextContent
-from pydantic import Field
+from pydantic import Field, WithJsonSchema
 
 from .. import deps
 from ..errors import ToolError
 from ..tools import files as files_tools
 from . import CREATE_ONLY, READ_ONLY, compact, graceful, mcp
+
+
+class _OpenAIFile(TypedDict):
+    download_url: str
+    file_id: str
+    mime_type: NotRequired[str]
+    file_name: NotRequired[str]
+
+
+# Keep the ChatGPT file schema literal and compact. OpenAI's scanner requires all four
+# properties, with only download_url and file_id required. WithJsonSchema also avoids the
+# titles/defaults Pydantic would add to a nested model, which keeps tools/list under the
+# connector's deliberately strict 18 kB budget.
+OpenAIFile = Annotated[
+    _OpenAIFile,
+    WithJsonSchema(
+        {
+            "type": "object",
+            "properties": {
+                "download_url": {"type": "string"},
+                "file_id": {"type": "string"},
+                "mime_type": {"type": "string"},
+                "file_name": {"type": "string"},
+            },
+            "required": ["download_url", "file_id"],
+            "additionalProperties": False,
+        }
+    ),
+]
 
 
 @mcp.tool(annotations=READ_ONLY, structured_output=False)
@@ -115,42 +144,46 @@ async def files_download(
     ]
 
 
-@mcp.tool(annotations=CREATE_ONLY, structured_output=False)
+@mcp.tool(
+    annotations=CREATE_ONLY,
+    meta={"openai/fileParams": ["file"]},
+    structured_output=False,
+)
 @graceful
 async def files_upload(
-    path: Annotated[str, Field(description="New file path; must not exist")],
-    content: Annotated[
-        str | None,
-        Field(description="UTF-8 text; omit for binary"),
-    ] = None,
-    content_base64: Annotated[
-        str | None,
-        Field(description="Base64 chunk for binary upload"),
-    ] = None,
-    total_bytes: Annotated[
-        int | None,
-        Field(ge=0, description="Total binary size in bytes"),
-    ] = None,
-    chunk_index: Annotated[
-        int,
-        Field(ge=1, le=files_tools.MAX_UPLOAD_CHUNKS, description="Chunk number, starting at 1"),
-    ] = 1,
-    upload_id: Annotated[
-        str,
-        Field(description="Continuation id"),
-    ] = "",
-    final: Annotated[
-        bool,
-        Field(description="Assemble after this chunk"),
-    ] = False,
-    content_type: Annotated[
-        str,
-        Field(description="Binary MIME type"),
-    ] = "application/octet-stream",
+    path: Annotated[str, Field(description="New path; must not exist")],
+    content: str | None = None,
+    content_base64: str | None = None,
+    total_bytes: Annotated[int | None, Field(ge=0)] = None,
+    chunk_index: Annotated[int, Field(ge=1, le=files_tools.MAX_UPLOAD_CHUNKS)] = 1,
+    upload_id: str = "",
+    final: bool = False,
+    content_type: str = "application/octet-stream",
+    file: OpenAIFile = None,  # pyright: ignore[reportAssignmentType]
     ctx: Context | None = None,
 ) -> str:
-    """Create text or upload large binary files as base64 chunks; never overwrites."""
+    """Create a folder from path alone, or upload text/base64/ChatGPT files; never overwrites."""
     clients = deps.resolve_clients(ctx)
+    if file is not None:
+        if content is not None or content_base64 is not None:
+            raise ToolError(
+                message="Send a ChatGPT attachment, content, or content_base64; not more than one.",
+                hint="For a file attached to the chat, send only file and path.",
+            )
+        if any((total_bytes is not None, upload_id, final, chunk_index != 1)):
+            raise ToolError(
+                message="Base64 chunk fields cannot be combined with a ChatGPT attachment.",
+                hint="For a file attached to the chat, send only file and path.",
+            )
+        return compact(
+            await files_tools.upload_attachment(
+                clients,
+                path=path,
+                download_url=file["download_url"],
+                file_id=file["file_id"],
+                mime_type=file.get("mime_type", ""),
+            )
+        )
     if content_base64 is not None:
         if content is not None:
             raise ToolError(
@@ -180,8 +213,5 @@ async def files_upload(
             hint="Send the file bytes as base64, or remove the binary fields for text.",
         )
     if content is None:
-        raise ToolError(
-            message="Send content for a text file or content_base64 for a binary file.",
-            hint="For a PDF, encode one chunk of its bytes as base64.",
-        )
+        return compact(await files_tools.create_folder(clients, path=path))
     return compact(await files_tools.upload(clients, path=path, content=content))

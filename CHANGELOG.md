@@ -11,6 +11,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `files_upload` accepts native ChatGPT file parameters in addition to the existing text and
+  base64-chunk modes. ChatGPT attachments are streamed from their temporary file URL, including
+  signed Azure Blob Storage URLs used by ChatGPT, into a create-only WebDAV PUT without buffering
+  the complete file or weakening the no-overwrite guarantee. Existing MCP clients keep the
+  previous upload contract.
+- Calling `files_upload` with only a new `path` creates exactly one folder with WebDAV
+  `MKCOL`; the parent must already exist and an existing entry is never replaced.
+
 ## [0.5.0] - 2026-10-05
 
 ### Added

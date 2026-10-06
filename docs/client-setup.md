@@ -192,6 +192,20 @@ still apply. Upload staging is isolated by destination and configured root; afte
 from the original chunk-upload implementation, restart any unfinished uploads with a new
 upload ID. Existing completed files are unaffected.
 
+ChatGPT can also pass a file attached to the conversation directly to `files_upload`. The
+connector advertises the `file` argument through `_meta["openai/fileParams"]`; ChatGPT then
+provides a temporary download URL and file id. The connector streams those bytes straight
+into the create-only WebDAV PUT, so the model never has to base64-encode the attachment and
+the complete file is not buffered in connector memory. Signed Azure Blob Storage URLs used
+by ChatGPT are accepted alongside the OpenAI/ChatGPT file hosts, while unrelated hosts and
+redirects stay refused. The separately supplied `path` is still the only destination
+authority, and an existing file is never overwritten. Other MCP clients may keep using
+`content` or the existing `content_base64` chunk protocol.
+
+The same tool creates one folder when it is called with only `path` and no file/content
+argument. That uses create-only WebDAV `MKCOL`: the parent folder must already exist, and
+an existing file or folder at the target is never replaced.
+
 Each bare name is expanded into two entries, `example.com` and `example.com:*`, because a
 client that was given a port puts the port into the `Host` header. A name that already
 carries a port or a wildcard is taken exactly as written.

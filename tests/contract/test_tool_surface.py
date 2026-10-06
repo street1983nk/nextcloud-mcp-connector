@@ -140,6 +140,20 @@ async def test_files_upload_is_annotated_as_create_only() -> None:
         "the constraint belongs in the description the model reads"
     )
 
+    assert tool.meta is not None
+    assert tool.meta.get("openai/fileParams") == ["file"]
+    file_schema = tool.input_schema["properties"]["file"]
+    assert file_schema.get("type") == "object"
+    assert set(file_schema["properties"]) >= {
+        "download_url",
+        "file_id",
+        "mime_type",
+        "file_name",
+    }
+    assert set(file_schema["required"]) == {"download_url", "file_id"}
+    assert file_schema.get("additionalProperties") is False
+    assert "folder from path alone" in (tool.description or "")
+
 
 @pytest.mark.anyio
 async def test_the_six_file_tools_are_complete_and_read_first() -> None:

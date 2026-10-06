@@ -21,8 +21,11 @@ import asyncio
 import base64
 import re
 import uuid
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from typing import Any
+from urllib.parse import urlsplit
+
+import httpx
 
 from .. import config, documents, ids, paging
 from ..documents import detect as document_detect
@@ -104,9 +107,22 @@ DEFAULT_CONTENT_TYPE = "text/markdown"
 _CONTENT_TYPE_RE = re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]+/[A-Za-z0-9!#$%&'*+.^_`|~-]+$")
 _UPLOAD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
+# ChatGPT file parameters carry a temporary HTTPS URL. OpenAI does not promise one
+# fixed download hostname. ChatGPT can also hand out signed Azure Blob Storage URLs for
+# attachments. Matching is suffix-aware (for example, ``blob.core.windows.net.evil.test``
+# does not match the Azure suffix).
+_OPENAI_FILE_HOST_SUFFIXES = (
+    "oaiusercontent.com",
+    "chatgpt.com",
+    "openai.com",
+    "blob.core.windows.net",
+)
+_OPENAI_FILE_TIMEOUT = httpx.Timeout(120.0, connect=10.0)
+MAX_ATTACHMENT_BYTES = HARD_UPLOAD_CHUNK_BYTES * MAX_UPLOAD_CHUNKS
+
 _FILE_TARGET_HINT = (
     "Give the full path of the new file, for example /Docs/meeting-notes.md. "
-    "This tool writes files; it does not create folders."
+    "To create a folder, call files_upload with only the new folder path."
 )
 
 
@@ -590,6 +606,22 @@ async def download(
     return result
 
 
+async def create_folder(clients: NcClients, path: str) -> dict[str, Any]:
+    """Create exactly one folder and never replace an existing entry.
+
+    The parent must already exist. The same exclusion guard used by file uploads runs
+    before MKCOL, so a folder cannot be created inside a ``kein-ki`` subtree.
+    """
+    target = dav.safe_path(path)
+    if target == config.files_root():
+        raise ToolError(
+            message="The requested folder is the files root, which already exists.",
+            hint="Give a new folder below the root, for example /AI.",
+        )
+    await _writable(clients, target)
+    return await dav.create_folder(clients.client, clients.creds, target)
+
+
 async def upload(
     clients: NcClients,
     path: str,
@@ -636,6 +668,160 @@ async def upload(
 
     await _writable(clients, target)
     return await dav.put_new_file(clients.client, clients.creds, target, data, content_type)
+
+
+def _openai_download_url(value: str) -> str:
+    """Validate a ChatGPT file-parameter URL before any network request is made."""
+    raw = (value or "").strip()
+    try:
+        parsed = urlsplit(raw)
+        port = parsed.port
+    except ValueError:
+        parsed = None
+        port = None
+    host = (parsed.hostname or "").lower() if parsed is not None else ""
+    trusted_host = any(
+        host == suffix or host.endswith(f".{suffix}")
+        for suffix in _OPENAI_FILE_HOST_SUFFIXES
+    )
+    if (
+        parsed is None
+        or parsed.scheme != "https"
+        or not trusted_host
+        or parsed.username is not None
+        or parsed.password is not None
+        or (port is not None and port != 443)
+        or bool(parsed.fragment)
+    ):
+        label = host or "<missing>"
+        raise ToolError(
+            message=f"The attachment download host {label!r} is not an allowed ChatGPT file host.",
+            hint="Attach the file to the ChatGPT message and retry the upload.",
+        )
+    return raw
+
+
+def _attachment_content_type(declared: str, response: httpx.Response) -> str:
+    """Choose one bare MIME type without copying an unchecked header value to Nextcloud."""
+    supplied = (declared or "").strip()
+    if supplied:
+        if not _CONTENT_TYPE_RE.fullmatch(supplied):
+            raise ToolError(
+                message=f"{supplied!r} is not a plain mimetype.",
+                hint="Retry the attachment; ChatGPT should provide a bare type/subtype.",
+            )
+        return supplied
+    header = response.headers.get("Content-Type", "").split(";", 1)[0].strip()
+    return header if _CONTENT_TYPE_RE.fullmatch(header) else "application/octet-stream"
+
+
+async def upload_attachment(
+    clients: NcClients,
+    path: str,
+    download_url: str,
+    file_id: str,
+    mime_type: str = "",
+) -> dict[str, Any]:
+    """Stream one ChatGPT file parameter into a create-only Nextcloud PUT.
+
+    The temporary download URL is never returned, logged, or sent to Nextcloud. The file
+    name supplied by ChatGPT is deliberately not used here either: ``path`` is the single
+    destination authority, so a crafted attachment name cannot escape the folder chosen by
+    the model and the path guard.
+    """
+    if (path or "").strip().endswith("/"):
+        raise ToolError(message=f"{path!r} names a folder, not a file.", hint=_FILE_TARGET_HINT)
+    target = dav.safe_path(path)
+    if target == config.files_root():
+        raise ToolError(
+            message="The upload target is the root folder, not a file.",
+            hint=_FILE_TARGET_HINT,
+        )
+    if not (file_id or "").strip():
+        raise ToolError(
+            message="The ChatGPT attachment has no file id.",
+            hint="Attach the file to the ChatGPT message and retry the upload.",
+        )
+    source_url = _openai_download_url(download_url)
+    await _writable(clients, target)
+
+    # Do not follow redirects: the signed URL is the only origin ChatGPT authorized. A
+    # redirect would need a fresh allowlist decision and could otherwise bypass the SSRF
+    # boundary above. ``Accept-Encoding: identity`` keeps Content-Length and byte counts
+    # about the original file rather than a transfer encoding.
+    async with httpx.AsyncClient(
+        follow_redirects=False, timeout=_OPENAI_FILE_TIMEOUT
+    ) as source_client:
+        async with source_client.stream(
+            "GET", source_url, headers={"Accept-Encoding": "identity"}
+        ) as source:
+            if 300 <= source.status_code < 400:
+                raise ToolError(
+                    message="The ChatGPT attachment download redirected unexpectedly.",
+                    hint=(
+                        "Retry from the original attachment so ChatGPT can issue a fresh file URL."
+                    ),
+                )
+            if source.status_code in (401, 403, 404):
+                raise ToolError(
+                    message="The ChatGPT attachment link is unavailable or expired.",
+                    hint=(
+                        "Retry from the original attachment so ChatGPT can issue a fresh file URL."
+                    ),
+                )
+            if source.status_code != 200:
+                raise ToolError(
+                    message=(
+                        "The ChatGPT attachment download failed with HTTP "
+                        f"{source.status_code}."
+                    ),
+                    hint="Retry the upload from the original attachment.",
+                )
+
+            raw_length = source.headers.get("Content-Length", "").strip()
+            content_length = (
+                int(raw_length) if raw_length.isascii() and raw_length.isdigit() else None
+            )
+            if content_length is not None and content_length > MAX_ATTACHMENT_BYTES:
+                raise ToolError(
+                    message="The attachment exceeds the maximum supported upload size.",
+                    hint="Upload a smaller file or split it before attaching it to ChatGPT.",
+                )
+            content_type = _attachment_content_type(mime_type, source)
+            seen = 0
+
+            async def body() -> AsyncIterator[bytes]:
+                nonlocal seen
+                async for chunk in source.aiter_raw():
+                    seen += len(chunk)
+                    if seen > MAX_ATTACHMENT_BYTES:
+                        raise ToolError(
+                            message="The attachment exceeds the maximum supported upload size.",
+                            hint=(
+                                "Upload a smaller file or split it before attaching it to ChatGPT."
+                            ),
+                        )
+                    if content_length is not None and seen > content_length:
+                        raise ToolError(
+                            message="The attachment body is larger than its declared size.",
+                            hint="Retry the upload from the original attachment.",
+                        )
+                    yield chunk
+                if content_length is not None and seen != content_length:
+                    raise ToolError(
+                        message="The attachment download ended before its declared size.",
+                        hint="Retry the upload from the original attachment.",
+                    )
+
+            result = await dav.put_new_file_stream(
+                clients.client,
+                clients.creds,
+                target,
+                body(),
+                content_type,
+                content_length=content_length,
+            )
+            return {**result, "bytes": seen, "content_type": content_type}
 
 
 async def upload_binary(
