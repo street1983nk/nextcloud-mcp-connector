@@ -43,6 +43,11 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
 - Kein Cron, keine Indexierung, keine Telemetrie, keine Kopie Ihrer Daten, und keine
   Zugangsdaten werden je protokolliert
 
+Eine [experimentelle Erweiterung für Talk-Ereignisse](docs/talk-events.md) steht für
+ausdrücklich konfigurierte ExApp-Installationen zur Verfügung. Sie ist standardmäßig
+deaktiviert und ergänzt signierte Webhooks sowie eine persistente Warteschlange mit
+Hintergrundverarbeitung. Tools und Standard-Installationsmanifest bleiben unverändert.
+
 ## Was dieser Server nicht kann
 
 - Nichts löschen: kein Tool setzt ein DELETE auf Dateien, Termine, Notizen, Karten oder

@@ -332,3 +332,5 @@ _._decode_payload
 # (plan 27-03), talk.file_screen and the talk list answers call paths_of_fileids and
 # degraded_entry as well (plan 27-05), and unavailable_error is raised by fetch(file) (plan
 # 27-03) and by talk.one_room for a file conversation (plan 27-05).
+# SQLite reads this attribute internally to return named rows in the event outbox.
+_.row_factory

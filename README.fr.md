@@ -44,6 +44,11 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
 - Aucune tâche planifiée, aucune indexation, aucune télémétrie, aucune copie de vos données,
   et aucun identifiant n'est jamais journalisé
 
+Une [extension expérimentale d'événements Talk](docs/talk-events.md) est disponible
+pour les déploiements ExApp configurés explicitement. Désactivée par défaut, elle
+ajoute des webhooks signés et une file persistante traitée en arrière-plan. Les outils
+et le manifeste d'installation standard restent inchangés.
+
 ## Ce que ce serveur ne peut pas faire
 
 - Rien supprimer : aucun outil n'émet de DELETE sur des fichiers, événements, notes, cartes

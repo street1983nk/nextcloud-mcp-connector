@@ -37,6 +37,11 @@ You bring the model, and no content leaves your server.
   clients with a hard tool limit
 - No cron, no indexing, no telemetry, no copy of your data, and no credential is ever logged
 
+An [experimental opt-in Talk events extension](docs/talk-events.md) is available
+for separately configured ExApp deployments. It adds signed webhook delivery and
+a persistent background queue, disabled by default; the standard tool surface
+and default registration manifest are unchanged.
+
 ## What this server cannot do
 
 - No deleting: no tool issues a DELETE against files, events, notes, cards or contacts

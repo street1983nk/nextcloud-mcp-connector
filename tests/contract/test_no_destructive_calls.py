@@ -295,8 +295,8 @@ TABLES_READ_FORMS = (
 #: either of those segments.
 TABLES_READ_NEEDLES = ("/rows/", "/columns/")
 
-# The two files where the word DELETE is not an HTTP verb. TOOL-09 is a promise about what
-# this server does to data in Nextcloud, and both of these are our own SQLite files.
+# The files where the word DELETE is not an HTTP verb. TOOL-09 is a promise about what
+# this server does to data in Nextcloud; these are our own SQLite files.
 #
 # oauth/store.py has to drop an expired authorization code and a registration nobody ever
 # used, or it grows without a bound (T-03-17).
@@ -308,8 +308,10 @@ TABLES_READ_NEEDLES = ("/rows/", "/columns/")
 # of this app, and a marker in the instance chain says how many rows went and where.
 #
 # The exemption is deliberately narrow, two exact SQL forms per file, so an HTTP DELETE
-# written in either module is still reported, and ``.delete(`` above is never exempt anywhere.
-FILES_WITH_OWN_SQL = frozenset({"oauth/store.py", "audit/store.py"})
+# written in these modules is still reported, and ``.delete(`` above is never exempt anywhere.
+# events/store.py removes expired/revoked subscriptions and its bounded delivery outbox,
+# never messages or other Nextcloud user data. The counter-proof below covers this file too.
+FILES_WITH_OWN_SQL = frozenset({"oauth/store.py", "audit/store.py", "events/store.py"})
 SQL_DELETE_FORMS = ("DELETE FROM ", "ON DELETE CASCADE")
 
 # The second file where DELETE is not a tool deleting user data: the login flow revokes the
@@ -492,10 +494,10 @@ def test_the_sql_exemption_covers_sql_and_nothing_else() -> None:
     written as "ignore DELETE in this file" it would also hide the one line that would
     make this server delete something in Nextcloud from inside the store.
     """
-    store = "oauth/store.py"
-    assert _is_own_sql(store, 'conn.execute("DELETE FROM flows WHERE expires_at <= ?")')
-    assert _is_own_sql(store, "auth_id TEXT NOT NULL REFERENCES x(y) ON DELETE CASCADE,")
-    assert not _is_own_sql(store, 'await client.request("DELETE", url)')
+    for store in FILES_WITH_OWN_SQL:
+        assert _is_own_sql(store, 'conn.execute("DELETE FROM flows WHERE expires_at <= ?")')
+        assert _is_own_sql(store, "auth_id TEXT NOT NULL REFERENCES x(y) ON DELETE CASCADE,")
+        assert not _is_own_sql(store, 'await client.request("DELETE", url)')
     assert not _is_own_sql("tools/files.py", 'conn.execute("DELETE FROM flows")')
 
     for relative in FILES_WITH_OWN_SQL | FILES_WITH_OWN_APP_PASSWORD | FILES_WITH_OWN_CONFIG:

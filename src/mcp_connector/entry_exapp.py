@@ -32,6 +32,7 @@ from .audit import record as audit_record
 from .audit import refusals as audit_refusals
 from .audit.store import AUDIT_FILENAME
 from .errors import IssuerRefused, ToolError
+from .events import exapp as talk_events
 from .exapp import config_values
 from .exapp.audit_read import audit_read_routes
 from .exapp.audit_verify import audit_verify_routes
@@ -249,11 +250,12 @@ def build_exapp_app(env: Mapping[str, str] | None = None) -> Starlette:
         opened = await store()
         return await opened.access_disabled(nc_user)
 
+    event_runtime = talk_events.configure(app, env, store, provider.get_client, nextcloud.base_url)
     guarded = 0
     for route in app.router.routes:
         if isinstance(route, Route) and route.path == MCP_PATH:
             route.app = RequireAppApi(
-                route.app,
+                talk_events.wrap(route.app, event_runtime),
                 env,
                 token_verifier=boundary,
                 access_check=access_disabled,
