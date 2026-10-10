@@ -692,6 +692,7 @@ class NextcloudOAuthProvider(
                 scopes=" ".join(params.scopes or []),
                 resource=resource,
                 poll_token=started.poll_token,
+                poll_url=started.poll_url,
             )
         except Exception:
             logger.exception("the authorization request could not be written to the store")

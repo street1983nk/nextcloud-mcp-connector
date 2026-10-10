@@ -207,6 +207,7 @@ async def begin_enrollment(
             scopes="",
             resource="",
             poll_token=started.poll_token,
+            poll_url=started.poll_url,
             now=now,
         )
     except Exception:
@@ -246,7 +247,7 @@ async def complete_enrollment(
         await _forget_flow(store, flow_id)
         return EnrollmentSignIn(outcome=ENROLL_EXPIRED)
 
-    result = await loginflow.poll_once(row.poll_token, target=nextcloud)
+    result = await loginflow.poll_once(row.poll_token, row.poll_url, target=nextcloud)
     if result.outcome == loginflow.POLL_PENDING:
         return EnrollmentSignIn(outcome=ENROLL_PENDING)
     if result.outcome != loginflow.POLL_DONE or result.credentials is None:

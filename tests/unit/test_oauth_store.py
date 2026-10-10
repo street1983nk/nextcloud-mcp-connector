@@ -33,6 +33,7 @@ REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
 CHALLENGE = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
 
 APP_PASSWORD = "app-password-of-alice-xyz"
+POLL_URL = "http://nc.test/custom/poll"
 POLL_TOKEN = "poll-token-of-the-login-flow"
 REFRESH_TOKEN = "refresh-token-plain-value"
 SUCCESSOR_TOKEN = "successor-token-plain-value"
@@ -108,6 +109,7 @@ async def with_every_table_filled(subject: store.OAuthStore) -> None:
         scopes=SCOPES,
         resource=RESOURCE,
         poll_token=POLL_TOKEN,
+        poll_url=POLL_URL,
     )
     await subject.create_auth_code(
         AUTH_CODE,
@@ -355,6 +357,7 @@ async def test_no_plaintext_secret_is_anywhere_in_the_files(tmp_path: Path) -> N
         scopes=SCOPES,
         resource=RESOURCE,
         poll_token=POLL_TOKEN,
+        poll_url=POLL_URL,
     )
     await subject.create_auth_code(
         AUTH_CODE,
@@ -1042,6 +1045,7 @@ async def test_a_flow_round_trips_including_its_encrypted_poll_token(tmp_path: P
         scopes=SCOPES,
         resource=RESOURCE,
         poll_token=POLL_TOKEN,
+        poll_url=POLL_URL,
     )
 
     row = await subject.load_flow("flow-0001")
@@ -1051,6 +1055,7 @@ async def test_a_flow_round_trips_including_its_encrypted_poll_token(tmp_path: P
     assert row.redirect_uri_explicit is True
     assert row.code_challenge == CHALLENGE
     assert row.state == "opaque-client-state"
+    assert row.poll_url == POLL_URL
     assert row.poll_token == POLL_TOKEN
     assert POLL_TOKEN not in repr(row)
 
@@ -1072,6 +1077,7 @@ async def test_an_expired_flow_is_gone_instead_of_usable(tmp_path: Path) -> None
         scopes=SCOPES,
         resource=RESOURCE,
         poll_token=POLL_TOKEN,
+        poll_url=POLL_URL,
         now=int(time.time()) - store.FLOW_TTL - 1,
     )
 
@@ -1108,6 +1114,7 @@ async def with_a_running_flow(
         scopes=SCOPES,
         resource=RESOURCE,
         poll_token=POLL_TOKEN,
+        poll_url=POLL_URL,
         now=now,
     )
 
@@ -1456,6 +1463,7 @@ async def test_expired_rows_are_removed_when_the_store_is_used(tmp_path: Path) -
         scopes=SCOPES,
         resource=RESOURCE,
         poll_token=POLL_TOKEN,
+        poll_url=POLL_URL,
         now=long_ago,
     )
     await subject.create_auth_code(
@@ -2076,3 +2084,60 @@ async def test_the_pause_sweep_keeps_a_pause_whose_account_still_has_a_connectio
 
     assert await subject.access_disabled("a1b2c3") is True
     assert await subject.access_disabled("stranger") is False
+
+
+@pytest.mark.anyio
+async def test_a_legacy_flow_without_a_poll_url_is_refused_after_migration(tmp_path: Path) -> None:
+    """Opening an old database adds the column without inventing an endpoint."""
+    path = tmp_path / store.STORE_FILENAME
+    with sqlite3.connect(path) as conn:
+        conn.execute(
+            "CREATE TABLE flows ("
+            "flow_id TEXT PRIMARY KEY, "
+            "client_id TEXT NOT NULL REFERENCES clients(client_id) ON DELETE CASCADE, "
+            "redirect_uri TEXT NOT NULL, redirect_uri_explicit INTEGER NOT NULL, "
+            "code_challenge TEXT NOT NULL, state TEXT, scopes TEXT NOT NULL, "
+            "resource TEXT NOT NULL, poll_token_enc BLOB NOT NULL, expires_at INTEGER NOT NULL)"
+        )
+        conn.execute(
+            "INSERT INTO flows VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "legacy-flow",
+                CLIENT_ID,
+                REDIRECT_URI,
+                1,
+                CHALLENGE,
+                None,
+                SCOPES,
+                RESOURCE,
+                crypto.encrypt(KEY, POLL_TOKEN.encode(), aad="legacy-flow"),
+                1_000 + store.FLOW_TTL,
+            ),
+        )
+
+    first = open_store(tmp_path)
+    assert await first.load_flow("legacy-flow", now=1_000) is None
+    assert column_names(tmp_path, "flows").count("poll_url") == 1
+    assert query(tmp_path, "SELECT poll_url FROM flows WHERE flow_id = 'legacy-flow'") == [(None,)]
+
+    second = open_store(tmp_path)
+    assert await second.load_flow("legacy-flow", now=1_000) is None
+    assert column_names(tmp_path, "flows").count("poll_url") == 1
+    await with_client(second, now=1_000)
+    await second.create_flow(
+        "new-flow",
+        client_id=CLIENT_ID,
+        redirect_uri=REDIRECT_URI,
+        redirect_uri_explicit=True,
+        code_challenge=CHALLENGE,
+        state=None,
+        scopes=SCOPES,
+        resource=RESOURCE,
+        poll_token=POLL_TOKEN,
+        poll_url=POLL_URL,
+        now=1_000,
+    )
+    row = await open_store(tmp_path).load_flow("new-flow", now=1_000)
+    assert row is not None
+    assert row.poll_url == POLL_URL
+    assert row.poll_token == POLL_TOKEN

@@ -2,8 +2,8 @@
 
 Threats covered here: T-03-31 (header injection through the client name, which arrives from
 a dynamic client registration in plan 03-05), T-03-34 (a poll storm against Nextcloud),
-T-03-36 (an app password or a poll token in a log record) and pitfall 7c (the absolute poll
-address of the start answer, which the container may not be able to resolve at all).
+T-03-36 (an app password or a poll token in a log record) and the origin of the poll
+address returned by the start answer.
 
 Nothing here opens a socket. Every Nextcloud call is answered by respx, and every check that
 counts requests reads the call counter of the route it registered, so "exactly one attempt"
@@ -29,11 +29,10 @@ BASE_URL = "http://nc.test"
 TARGET = NextcloudTarget.from_url(BASE_URL)
 
 INIT_URL = f"{BASE_URL}{loginflow.INIT_PATH}"
-POLL_URL = f"{BASE_URL}{loginflow.POLL_PATH}"
+POLL_URL = f"{BASE_URL}/custom/login/poll"
 APP_PASSWORD_URL = f"{BASE_URL}{loginflow.APP_PASSWORD_PATH}"
 
-#: What Nextcloud returns as ``poll.endpoint``: a public absolute URL built from
-#: ``overwrite.cli.url``. It may point anywhere, and this project never calls it.
+#: A public endpoint may advertise a different origin from the internal Nextcloud target.
 FOREIGN_POLL_ENDPOINT = "https://public.example.org/login/v2/poll"
 
 LOGIN_URL = "https://cloud.example.com/index.php/login/v2/flow/abc123"
@@ -44,10 +43,10 @@ APP_PASSWORD = "aaaaa-bbbbb-ccccc-ddddd-eeeee"
 SOURCE = Path(loginflow.__file__)
 
 
-def start_body() -> dict[str, object]:
+def start_body(poll_url: str = POLL_URL) -> dict[str, object]:
     """The answer of ``POST /index.php/login/v2``, in the shape Nextcloud sends it."""
     return {
-        "poll": {"token": POLL_TOKEN, "endpoint": FOREIGN_POLL_ENDPOINT},
+        "poll": {"token": POLL_TOKEN, "endpoint": poll_url},
         "login": LOGIN_URL,
     }
 
@@ -124,6 +123,7 @@ async def test_the_start_sends_one_request_and_returns_the_token_and_the_login_u
 
     assert route.call_count == 1
     assert started is not None
+    assert started.poll_url == POLL_URL
     assert started.poll_token == POLL_TOKEN
     assert started.login_url == LOGIN_URL
 
@@ -165,12 +165,12 @@ async def test_a_start_that_does_not_reach_nextcloud_is_a_named_failure() -> Non
     "body",
     [
         {},
-        {"poll": {}, "login": LOGIN_URL},
-        {"poll": {"token": POLL_TOKEN}},
-        {"poll": {"token": ""}, "login": LOGIN_URL},
-        {"poll": {"token": POLL_TOKEN}, "login": ""},
+        {"poll": {"endpoint": POLL_URL}, "login": LOGIN_URL},
+        {"poll": {"token": POLL_TOKEN, "endpoint": POLL_URL}},
+        {"poll": {"token": "", "endpoint": POLL_URL}, "login": LOGIN_URL},
+        {"poll": {"token": POLL_TOKEN, "endpoint": POLL_URL}, "login": ""},
         {"poll": "not a mapping", "login": LOGIN_URL},
-        {"poll": {"token": 17}, "login": LOGIN_URL},
+        {"poll": {"token": 17, "endpoint": POLL_URL}, "login": LOGIN_URL},
     ],
     ids=[
         "an empty object",
@@ -217,14 +217,12 @@ async def test_a_login_url_that_is_not_http_is_refused(login: str) -> None:
 
 @respx.mock
 @pytest.mark.anyio
-async def test_one_poll_is_exactly_one_request_against_the_configured_base_url() -> None:
+async def test_one_poll_uses_the_supplied_endpoint_unchanged() -> None:
     poll = respx.post(POLL_URL).mock(return_value=httpx.Response(404))
-    foreign = respx.post(FOREIGN_POLL_ENDPOINT).mock(return_value=httpx.Response(200))
 
-    result = await loginflow.poll_once(POLL_TOKEN, target=TARGET)
+    result = await loginflow.poll_once(POLL_TOKEN, POLL_URL, target=TARGET)
 
     assert poll.call_count == 1
-    assert foreign.call_count == 0, "the absolute endpoint of the answer must never be called"
     assert result.outcome == loginflow.POLL_PENDING
     assert result.credentials is None
 
@@ -235,7 +233,7 @@ async def test_three_polls_are_three_requests_and_nothing_else() -> None:
     poll = respx.post(POLL_URL).mock(return_value=httpx.Response(404))
 
     for _ in range(3):
-        await loginflow.poll_once(POLL_TOKEN, target=TARGET)
+        await loginflow.poll_once(POLL_TOKEN, POLL_URL, target=TARGET)
 
     assert poll.call_count == 3
 
@@ -245,7 +243,7 @@ async def test_three_polls_are_three_requests_and_nothing_else() -> None:
 async def test_the_poll_sends_the_token_as_a_form_field() -> None:
     poll = respx.post(POLL_URL).mock(return_value=httpx.Response(404))
 
-    await loginflow.poll_once(POLL_TOKEN, target=TARGET)
+    await loginflow.poll_once(POLL_TOKEN, POLL_URL, target=TARGET)
 
     request = poll.calls[0].request
     assert request.content == f"token={POLL_TOKEN}".encode()
@@ -257,7 +255,7 @@ async def test_the_poll_sends_the_token_as_a_form_field() -> None:
 async def test_a_poll_that_answers_200_carries_the_credentials() -> None:
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=poll_body()))
 
-    result = await loginflow.poll_once(POLL_TOKEN, target=TARGET)
+    result = await loginflow.poll_once(POLL_TOKEN, POLL_URL, target=TARGET)
 
     assert result.outcome == loginflow.POLL_DONE
     assert result.credentials is not None
@@ -273,7 +271,7 @@ async def test_any_other_poll_status_is_a_named_failure_without_a_second_attempt
 ) -> None:
     poll = respx.post(POLL_URL).mock(return_value=httpx.Response(status, json={}))
 
-    result = await loginflow.poll_once(POLL_TOKEN, target=TARGET)
+    result = await loginflow.poll_once(POLL_TOKEN, POLL_URL, target=TARGET)
 
     assert result.outcome == loginflow.POLL_FAILED
     assert result.credentials is None
@@ -285,7 +283,7 @@ async def test_any_other_poll_status_is_a_named_failure_without_a_second_attempt
 async def test_a_poll_that_does_not_reach_nextcloud_is_a_named_failure() -> None:
     poll = respx.post(POLL_URL).mock(side_effect=httpx.ReadTimeout("too slow"))
 
-    result = await loginflow.poll_once(POLL_TOKEN, target=TARGET)
+    result = await loginflow.poll_once(POLL_TOKEN, POLL_URL, target=TARGET)
 
     assert result.outcome == loginflow.POLL_FAILED
     assert poll.call_count == 1
@@ -306,7 +304,7 @@ async def test_a_poll_that_does_not_reach_nextcloud_is_a_named_failure() -> None
 async def test_a_poll_answer_without_credentials_is_a_named_failure(body: object) -> None:
     respx.post(POLL_URL).mock(return_value=httpx.Response(200, json=body))
 
-    result = await loginflow.poll_once(POLL_TOKEN, target=TARGET)
+    result = await loginflow.poll_once(POLL_TOKEN, POLL_URL, target=TARGET)
 
     assert result.outcome == loginflow.POLL_FAILED
     assert result.credentials is None
@@ -366,7 +364,7 @@ async def test_a_revocation_that_does_not_reach_nextcloud_is_a_failure_not_an_ex
 
 
 def test_the_containers_mask_their_secrets() -> None:
-    started = loginflow.FlowStart(poll_token=POLL_TOKEN, login_url=LOGIN_URL)
+    started = loginflow.FlowStart(poll_token=POLL_TOKEN, poll_url=POLL_URL, login_url=LOGIN_URL)
     credentials = loginflow.AppCredentials(login_name=LOGIN_NAME, app_password=APP_PASSWORD)
 
     assert POLL_TOKEN not in repr(started)
@@ -388,7 +386,7 @@ async def test_no_secret_reaches_the_log_at_debug_level(
 
     with caplog.at_level(logging.DEBUG, logger="mcp_connector"):
         await loginflow.start_flow("Claude", target=TARGET)
-        await loginflow.poll_once(POLL_TOKEN, target=TARGET)
+        await loginflow.poll_once(POLL_TOKEN, POLL_URL, target=TARGET)
         await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, target=TARGET)
 
     text = caplog.text
@@ -406,7 +404,7 @@ async def test_a_successful_flow_logs_no_secret_either(caplog: pytest.LogCapture
 
     with caplog.at_level(logging.DEBUG, logger="mcp_connector"):
         await loginflow.start_flow("Claude", target=TARGET)
-        await loginflow.poll_once(POLL_TOKEN, target=TARGET)
+        await loginflow.poll_once(POLL_TOKEN, POLL_URL, target=TARGET)
         await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, target=TARGET)
 
     for secret in (POLL_TOKEN, APP_PASSWORD):
@@ -422,15 +420,8 @@ def test_the_module_carries_no_retry_loop(needle: str) -> None:
     assert not any(needle in line for line in code_lines()), f"{needle!r} is a retry"
 
 
-def test_the_absolute_poll_endpoint_of_the_answer_is_never_read() -> None:
-    """Pitfall 7c: it is a public URL from overwrite.cli.url and may not resolve here."""
-    for line in code_lines():
-        assert '"endpoint"' not in line, line
-        assert ".endpoint" not in line, line
-
-
-def test_every_url_of_this_module_is_built_from_the_configured_base_url() -> None:
-    """Shared pattern 2 of 03-PATTERNS.md: configuration decides the target, never a body."""
+def test_the_module_does_not_hardcode_a_nextcloud_origin() -> None:
+    """Origins come from the injected target and the validated start answer."""
     urls = [line for line in code_lines() if "http://" in line or "https://" in line]
     assert urls == [], urls
 
@@ -463,19 +454,17 @@ async def test_all_three_calls_go_to_the_injected_target_and_ignore_the_environm
     monkeypatch.setenv(config.ENV_NEXTCLOUD_URL, "http://environment.example")
     monkeypatch.setenv(config.ENV_URL, "http://environment.example")
     init = respx.post(f"{INJECTED_BASE}{loginflow.INIT_PATH}").mock(
-        return_value=httpx.Response(200, json=start_body())
+        return_value=httpx.Response(200, json=start_body(f"{INJECTED_BASE}/custom/poll"))
     )
-    poll = respx.post(f"{INJECTED_BASE}{loginflow.POLL_PATH}").mock(
-        return_value=httpx.Response(404)
-    )
+    poll = respx.post(f"{INJECTED_BASE}/custom/poll").mock(return_value=httpx.Response(404))
     revoke = respx.delete(f"{INJECTED_BASE}{loginflow.APP_PASSWORD_PATH}").mock(
         return_value=httpx.Response(200, json={})
     )
 
     assert await loginflow.start_flow("Claude", target=INJECTED) is not None
-    assert (await loginflow.poll_once(POLL_TOKEN, target=INJECTED)).outcome == (
-        loginflow.POLL_PENDING
-    )
+    assert (
+        await loginflow.poll_once(POLL_TOKEN, f"{INJECTED_BASE}/custom/poll", target=INJECTED)
+    ).outcome == (loginflow.POLL_PENDING)
     assert await loginflow.revoke_app_password(LOGIN_NAME, APP_PASSWORD, target=INJECTED)
 
     assert (init.call_count, poll.call_count, revoke.call_count) == (1, 1, 1)
@@ -611,3 +600,133 @@ async def test_a_display_name_does_not_rescue_an_unusable_account_id() -> None:
     )
 
     assert await loginflow.account(LOGIN_NAME, APP_PASSWORD, target=TARGET) is None
+
+
+@respx.mock
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        "http://nc.test:not-a-port/poll",
+        "http://nc.test:65536/poll",
+        "http://[broken/poll",
+        "/relative/poll",
+        "//nc.test/poll",
+        "https:///poll",
+        "ftp://nc.test/poll",
+    ],
+)
+async def test_a_malformed_poll_endpoint_is_refused(endpoint: str) -> None:
+    """An untrusted endpoint cannot turn the origin guard into a crash or a token leak."""
+    init = respx.post(INIT_URL).mock(return_value=httpx.Response(200, json=start_body(endpoint)))
+
+    assert await loginflow.start_flow("Claude", target=TARGET) is None
+    assert init.call_count == 1
+    assert len(respx.calls) == 1
+
+
+@respx.mock
+@pytest.mark.anyio
+@pytest.mark.parametrize("endpoint", [None, "", 17, {}, []])
+async def test_a_missing_or_unusable_poll_endpoint_is_refused(endpoint: object) -> None:
+    poll: dict[str, object] = {"token": POLL_TOKEN}
+    if endpoint is not None:
+        poll["endpoint"] = endpoint
+    respx.post(INIT_URL).mock(
+        return_value=httpx.Response(200, json={"poll": poll, "login": LOGIN_URL})
+    )
+
+    assert await loginflow.start_flow("Claude", target=TARGET) is None
+
+
+@respx.mock
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("base", "endpoint"),
+    [
+        ("http://nc.test", "http://nc.test:80/custom/poll?flow=abc"),
+        ("http://nc.test:80", "http://nc.test/custom/poll"),
+        ("https://nc.test", "https://nc.test:443/custom/poll"),
+        ("https://nc.test:443", "https://nc.test/custom/poll"),
+    ],
+)
+async def test_default_ports_share_an_origin_and_the_endpoint_is_used_unchanged(
+    base: str, endpoint: str
+) -> None:
+    target = NextcloudTarget.from_url(base)
+    respx.post(f"{target.base_url}{loginflow.INIT_PATH}").mock(
+        return_value=httpx.Response(200, json=start_body(endpoint))
+    )
+    poll = respx.post(endpoint).mock(return_value=httpx.Response(404))
+
+    started = await loginflow.start_flow("Claude", target=target)
+
+    assert started is not None
+    assert started.poll_url == endpoint
+    result = await loginflow.poll_once(started.poll_token, started.poll_url, target=target)
+    assert result.outcome == loginflow.POLL_PENDING
+    assert poll.call_count == 1
+    assert poll.calls[0].request.content == f"token={POLL_TOKEN}".encode()
+
+
+@respx.mock
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("base", "endpoint", "expected"),
+    [
+        ("http://nc.test", FOREIGN_POLL_ENDPOINT, "http://nc.test/login/v2/poll"),
+        ("http://nc.test", "http://other.test/poll", "http://nc.test/poll"),
+        ("http://nc.test", "https://nc.test/poll", "http://nc.test/poll"),
+        ("http://nc.test", "http://nc.test:8080/poll", "http://nc.test/poll"),
+        (
+            "http://caddy",
+            "https://cloud.example/nextcloud/index.php/login/v2/poll?flow=abc",
+            "http://caddy/nextcloud/index.php/login/v2/poll?flow=abc",
+        ),
+        (
+            "https://internal.test:8443/base",
+            "https://public.test/nc/index.php/login/v2/poll?a=%2F&b=1&b=2#ignored",
+            "https://internal.test:8443/nc/index.php/login/v2/poll?a=%2F&b=1&b=2",
+        ),
+        (
+            "http://caddy",
+            "https://public.test//other.test/index.php/login/v2/poll",
+            "http://caddy//other.test/index.php/login/v2/poll",
+        ),
+    ],
+)
+async def test_a_foreign_poll_origin_is_replaced_without_changing_path_or_query(
+    base: str, endpoint: str, expected: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Split-horizon polling reaches only the configured origin, including double-slash paths."""
+    target = NextcloudTarget.from_url(base)
+    init = respx.post(f"{target.base_url}{loginflow.INIT_PATH}").mock(
+        return_value=httpx.Response(200, json=start_body(endpoint))
+    )
+    # Match the complete URL: RESPX's path matcher normalizes a leading double slash.
+    poll = respx.post(url__regex=f"^{re.escape(expected)}$").mock(return_value=httpx.Response(404))
+
+    with caplog.at_level(logging.INFO, logger="mcp_connector.oauth.loginflow"):
+        started = await loginflow.start_flow("Claude", target=target)
+
+    assert started is not None
+    assert started.poll_url == expected
+    assert started.login_url == LOGIN_URL
+    messages = [
+        record for record in caplog.records if record.name == "mcp_connector.oauth.loginflow"
+    ]
+    assert len(messages) == 1
+    assert messages[0].levelno == logging.INFO
+    assert "configured origin" in messages[0].getMessage()
+    assert endpoint not in messages[0].getMessage()
+    assert POLL_TOKEN not in messages[0].getMessage()
+    assert "flow=abc" not in messages[0].getMessage()
+    assert "a=%2F" not in messages[0].getMessage()
+
+    result = await loginflow.poll_once(started.poll_token, started.poll_url, target=target)
+
+    assert result.outcome == loginflow.POLL_PENDING
+    assert init.call_count == poll.call_count == 1
+    assert len(respx.calls) == 2
+    assert poll.calls[0].request.url == httpx.URL(expected)
+    assert poll.calls[0].request.content == f"token={POLL_TOKEN}".encode()

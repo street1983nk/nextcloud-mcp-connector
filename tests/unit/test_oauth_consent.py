@@ -85,12 +85,12 @@ ENV = {
 }
 
 INIT_URL = f"{BASE_URL}{loginflow.INIT_PATH}"
-POLL_URL = f"{BASE_URL}{loginflow.POLL_PATH}"
+POLL_URL = f"{BASE_URL}/custom/login/poll"
 REVOKE_URL = f"{BASE_URL}{loginflow.APP_PASSWORD_PATH}"
 
 
-def start_body() -> dict[str, object]:
-    return {"poll": {"token": POLL_TOKEN, "endpoint": f"{BASE_URL}/x"}, "login": LOGIN_URL}
+def start_body(poll_url: str = POLL_URL) -> dict[str, object]:
+    return {"poll": {"token": POLL_TOKEN, "endpoint": poll_url}, "login": LOGIN_URL}
 
 
 def poll_body() -> dict[str, str]:
@@ -249,6 +249,7 @@ def test_the_flow_carries_every_field_of_the_request_and_twenty_minutes(
     assert row.scopes == "nextcloud"
     assert row.resource == RESOURCE
     assert row.poll_token == POLL_TOKEN
+    assert row.poll_url == POLL_URL
     assert 0 < row.expires_at - int(time.time()) <= FLOW_TTL
 
 
@@ -2024,6 +2025,7 @@ def out_of_band(store: OAuthStore, flow_id: str, *, display_name: str | None = N
             scopes="nextcloud",
             resource=RESOURCE,
             poll_token=POLL_TOKEN,
+            poll_url=POLL_URL,
         )
     )
     asyncio.run(
@@ -2474,7 +2476,16 @@ def test_the_consent_surface_uses_the_injected_target_and_not_the_environment(
     application was assembled with another target, a link on the injected host is rendered,
     and the waiting screen polls the injected Nextcloud and nothing else.
     """
-    provider = make(store)
+
+    async def provide() -> OAuthStore:
+        return store
+
+    provider = provider_module.NextcloudOAuthProvider(
+        nextcloud=NextcloudTarget.from_url(INJECTED_BASE),
+        env=ENV,
+        policy=registry.client_policy(ENV),
+        store_provider=provide,
+    )
     register(provider)
     client = TestClient(
         Starlette(
@@ -2490,14 +2501,16 @@ def test_the_consent_surface_uses_the_injected_target_and_not_the_environment(
         )
     )
     with respx.mock:
-        respx.post(INIT_URL).mock(return_value=httpx.Response(200, json=start_body()))
+        respx.post(f"{INJECTED_BASE}{loginflow.INIT_PATH}").mock(
+            return_value=httpx.Response(200, json=start_body(f"{INJECTED_BASE}/custom/poll"))
+        )
         flow_id = flow_of(start(client))
 
     injected_link = f"{INJECTED_BASE}/index.php/login/v2/flow/abc123"
     environment_link = f"{BASE_URL}/index.php/login/v2/flow/abc123"
     with respx.mock:
         environment_poll = respx.post(POLL_URL).mock(return_value=httpx.Response(404))
-        injected_poll = respx.post(f"{INJECTED_BASE}{loginflow.POLL_PATH}").mock(
+        injected_poll = respx.post(f"{INJECTED_BASE}/custom/poll").mock(
             return_value=httpx.Response(404)
         )
         accepted = client.get(f"{consent_url(flow_id)}&{ui_consent.LOGIN_PARAM}={injected_link}")
@@ -2531,7 +2544,7 @@ def test_the_provider_opens_its_login_flow_at_its_injected_target(store: OAuthSt
             return_value=httpx.Response(200, json=start_body())
         )
         injected_init = respx.post(f"{INJECTED_BASE}{loginflow.INIT_PATH}").mock(
-            return_value=httpx.Response(200, json=start_body())
+            return_value=httpx.Response(200, json=start_body(f"{INJECTED_BASE}/custom/poll"))
         )
         response = start(client)
 
@@ -2758,3 +2771,54 @@ def test_an_unresolved_account_stores_nothing_and_hands_the_password_back(
     assert revoke.call_count == 1
     assert asyncio.run(store.load_authorization(flow_id)) is None
     assert asyncio.run(store.load_flow(flow_id)) is None, "the spent poll leaves no waiting page"
+
+
+def test_split_horizon_authorization_stores_and_polls_the_internal_origin(
+    store: OAuthStore,
+) -> None:
+    """A public overwrite URL keeps its path while the whole OAuth flow uses the internal host."""
+    target = NextcloudTarget.from_url("http://caddy")
+    advertised = "https://cloud.example/nextcloud/index.php/login/v2/poll?flow=abc"
+    expected = "http://caddy/nextcloud/index.php/login/v2/poll?flow=abc"
+
+    async def provide() -> OAuthStore:
+        return store
+
+    provider = provider_module.NextcloudOAuthProvider(
+        nextcloud=target,
+        env=ENV,
+        policy=registry.client_policy(ENV),
+        store_provider=provide,
+    )
+    register(provider)
+    client = TestClient(
+        Starlette(
+            routes=[
+                *provider_module.auth_routes(ENV, provider=provider),
+                *consent.consent_routes(
+                    ENV,
+                    provider=provider,
+                    browser_identity=AppApiBrowserIdentitySource(ENV),
+                    nextcloud=target,
+                ),
+            ]
+        )
+    )
+
+    with respx.mock:
+        init = respx.post(f"{target.base_url}{loginflow.INIT_PATH}").mock(
+            return_value=httpx.Response(200, json=start_body(advertised))
+        )
+        response = start(client)
+        assert response.status_code == 302
+        flow_id = flow_of(response)
+        row = asyncio.run(store.load_flow(flow_id))
+        assert row is not None
+        assert row.poll_url == expected
+        poll = respx.post(expected).mock(return_value=httpx.Response(404))
+        waiting = client.get(consent_url(flow_id, step=ui_consent.STEP_WAIT))
+
+        assert waiting.status_code == 200
+        assert init.call_count == poll.call_count == 1
+        assert len(respx.calls) == 2
+        assert poll.calls[0].request.content == f"token={POLL_TOKEN}".encode()

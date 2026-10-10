@@ -298,6 +298,7 @@ CREATE TABLE IF NOT EXISTS flows (
   scopes TEXT NOT NULL,
   resource TEXT NOT NULL,
   poll_token_enc BLOB NOT NULL,
+  poll_url TEXT,
   expires_at INTEGER NOT NULL
 );
 
@@ -414,6 +415,7 @@ class FlowRow:
     scopes: str
     resource: str
     poll_token: str
+    poll_url: str
     expires_at: int
 
     def __repr__(self) -> str:
@@ -687,6 +689,7 @@ class OAuthStore:
         scopes: str,
         resource: str,
         poll_token: str,
+        poll_url: str,
         now: int | None = None,
     ) -> None:
         """Remember a pending authorization while Nextcloud runs the login."""
@@ -697,8 +700,8 @@ class OAuthStore:
             _purge_expired_rows(conn, moment)
             conn.execute(
                 "INSERT INTO flows (flow_id, client_id, redirect_uri, redirect_uri_explicit, "
-                "code_challenge, state, scopes, resource, poll_token_enc, expires_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "code_challenge, state, scopes, resource, poll_token_enc, expires_at, poll_url) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     flow_id,
                     client_id,
@@ -710,23 +713,25 @@ class OAuthStore:
                     resource,
                     blob,
                     moment + FLOW_TTL,
+                    poll_url,
                 ),
             )
 
         await self._write(work)
 
     async def load_flow(self, flow_id: str, *, now: int | None = None) -> FlowRow | None:
-        """The flow, or ``None`` when it does not exist or ran out of time."""
+        """The flow, or ``None`` when missing, expired, or lacking its poll URL."""
         moment = _moment(now)
 
         def work(conn: sqlite3.Connection) -> FlowRow | None:
             row = conn.execute(
                 "SELECT flow_id, client_id, redirect_uri, redirect_uri_explicit, code_challenge, "
-                "state, scopes, resource, poll_token_enc, expires_at FROM flows "
+                "state, scopes, resource, poll_token_enc, expires_at, poll_url FROM flows "
                 "WHERE flow_id = ? AND expires_at > ?",
                 (flow_id, moment),
             ).fetchone()
-            if row is None:
+            # Older builds did not persist the endpoint. Those sign ins must restart.
+            if row is None or not row[10]:
                 return None
             return FlowRow(
                 flow_id=row[0],
@@ -739,6 +744,7 @@ class OAuthStore:
                 resource=row[7],
                 poll_token=decrypt(self._key, row[8], aad=row[0]).decode("utf-8"),
                 expires_at=row[9],
+                poll_url=row[10],
             )
 
         return await self._read(work)
@@ -2088,6 +2094,10 @@ def _add_missing_columns(conn: sqlite3.Connection) -> None:
     same shape and the same reasoning). There is no data migration here either, and there is
     nothing that could be migrated: no existing row was ever read from a document.
     """
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(flows)")}
+    if "poll_url" not in columns:
+        # No endpoint can be recovered for existing flows; load_flow refuses them.
+        conn.execute("ALTER TABLE flows ADD COLUMN poll_url TEXT")
     columns = {row[1] for row in conn.execute("PRAGMA table_info(auth_codes)")}
     if "redirect_uri_explicit" not in columns:
         conn.execute(

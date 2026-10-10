@@ -52,6 +52,8 @@ DISPLAY = "Alice Example"
 PASSWORD = "fresh-app-password-xyz"
 LOGIN_URL = "https://nc.test/login/v2/flow/abc"
 
+POLL_URL = "http://nc.test/custom/enrollment/poll"
+
 STORE_FILE = "oauth.sqlite3"
 
 
@@ -85,7 +87,7 @@ class LoginFlowStub:
 
     def __init__(self) -> None:
         self.started: loginflow.FlowStart | None = loginflow.FlowStart(
-            poll_token="poll-token-of-this-enrollment", login_url=LOGIN_URL
+            poll_token="poll-token-of-this-enrollment", poll_url=POLL_URL, login_url=LOGIN_URL
         )
         self.poll = loginflow.PollResult(
             outcome=loginflow.POLL_DONE,
@@ -104,7 +106,9 @@ def flows(monkeypatch: pytest.MonkeyPatch) -> LoginFlowStub:
     async def start_flow(client_name: str, *, target: NextcloudTarget):
         return stub.started
 
-    async def poll_once(poll_token: str, *, target: NextcloudTarget):
+    async def poll_once(poll_token: str, poll_url: str, *, target: NextcloudTarget):
+        assert poll_token == "poll-token-of-this-enrollment"
+        assert poll_url == POLL_URL
         return stub.poll
 
     async def account(login_name: str, app_password: str, *, target: NextcloudTarget):
@@ -158,6 +162,7 @@ async def test_begin_opens_a_flow_under_the_holding_client(
     assert started.login_url == LOGIN_URL
     row = await subject.load_flow(started.flow_id)
     assert row is not None
+    assert row.poll_url == POLL_URL
     assert row.client_id == exchange_enroll.EXCHANGE_PENDING_CLIENT_ID
     client = await subject.load_client(exchange_enroll.EXCHANGE_PENDING_CLIENT_ID)
     assert client is not None

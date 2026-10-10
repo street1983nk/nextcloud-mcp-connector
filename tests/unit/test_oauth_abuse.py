@@ -109,7 +109,7 @@ ENV = {
 }
 
 INIT_URL = f"{BASE_URL}{loginflow.INIT_PATH}"
-POLL_URL = f"{BASE_URL}{loginflow.POLL_PATH}"
+POLL_URL = f"{BASE_URL}/custom/login/poll"
 PASSWORD_URL = f"{BASE_URL}{loginflow.APP_PASSWORD_PATH}"
 
 
@@ -227,7 +227,7 @@ def authorize_query(**overrides: str) -> dict[str, str]:
 
 
 def start_body() -> dict[str, object]:
-    return {"poll": {"token": POLL_TOKEN, "endpoint": f"{BASE_URL}/x"}, "login": LOGIN_URL}
+    return {"poll": {"token": POLL_TOKEN, "endpoint": POLL_URL}, "login": LOGIN_URL}
 
 
 def poll_body() -> dict[str, str]:

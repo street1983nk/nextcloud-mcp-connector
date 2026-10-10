@@ -57,6 +57,7 @@ async def with_flow(
         scopes="nextcloud",
         resource="https://mcp.example/mcp",
         poll_token="poll-token",
+        poll_url="http://nc.test/custom/poll",
         now=NOW - store.FLOW_TTL + flow_expires_in,
     )
     if account_id is not None:

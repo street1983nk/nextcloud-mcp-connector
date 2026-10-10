@@ -57,7 +57,7 @@ ENV = {
 TARGET = exapp_target(ENV)
 
 INIT_URL = f"{BASE_URL}{loginflow.INIT_PATH}"
-POLL_URL = f"{BASE_URL}{loginflow.POLL_PATH}"
+POLL_URL = f"{BASE_URL}/custom/login/poll"
 
 LOGIN_URL = "https://cloud.example.com/index.php/login/v2/flow/abc123"
 POLL_TOKEN = "poll-token-of-this-flow"
@@ -70,9 +70,8 @@ KEY = bytes(range(32))
 UI_DIR = Path(connect.__file__).resolve().parents[1] / "exapp" / "ui"
 
 
-def start_body() -> dict[str, object]:
-    endpoint = "https://public.example.org/login/v2/poll"
-    return {"poll": {"token": POLL_TOKEN, "endpoint": endpoint}, "login": LOGIN_URL}
+def start_body(poll_url: str = POLL_URL) -> dict[str, object]:
+    return {"poll": {"token": POLL_TOKEN, "endpoint": poll_url}, "login": LOGIN_URL}
 
 
 def poll_body() -> dict[str, str]:
@@ -248,6 +247,7 @@ def test_the_flow_record_is_unguessable_and_runs_out_after_twenty_minutes(
     row = load_flow(store, flow_id)
     assert row is not None
     assert row.poll_token == POLL_TOKEN
+    assert row.poll_url == POLL_URL
     assert abs(row.expires_at - (int(time.time()) + FLOW_TTL)) <= 5
 
 
@@ -805,6 +805,7 @@ def test_a_sign_in_that_ran_out_of_time_is_the_timeout_page(
             scopes="",
             resource="",
             poll_token=POLL_TOKEN,
+            poll_url=POLL_URL,
             now=long_ago,
         )
     )
@@ -1023,7 +1024,7 @@ def test_the_onboarding_opens_its_flow_at_the_injected_target(store: OAuthStore)
         return_value=httpx.Response(200, json=start_body())
     )
     injected_init = respx.post(f"{injected}{loginflow.INIT_PATH}").mock(
-        return_value=httpx.Response(200, json=start_body())
+        return_value=httpx.Response(200, json=start_body(f"{injected}/custom/poll"))
     )
 
     response = client.post(connect.CONNECT_PATH, data={connect.ACTION_FIELD: connect.ACTION_START})

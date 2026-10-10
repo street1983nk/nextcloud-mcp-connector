@@ -9,8 +9,8 @@ The module is built like :mod:`mcp_connector.exapp.status`, the one outgoing cal
 ExApp package, and follows the same four rules (03-PATTERNS.md):
 
 1. The target is the :class:`~mcp_connector.nextcloud.target.NextcloudTarget` the
-   deployment injected when it built the application, never a value from an answer and
-   never a second read of the environment.
+   deployment injected when it built the application. The poll endpoint comes from the
+   start answer, with a foreign origin replaced by the configured origin.
 2. The client comes from :func:`mcp_connector.nextcloud.http.shared_client`, which already
    refuses redirects and carries the timeouts of this project.
 3. One attempt per call and no retry (D-37). A failure is a return value, so a caller can
@@ -26,14 +26,14 @@ wrong exactly once (pitfall 7 of 03-RESEARCH.md):
   is not visible from outside, which is why the deadline of a sign in is ours
   (:data:`mcp_connector.oauth.store.FLOW_TTL`) and never read out of an answer.
 * The start answer carries an absolute poll address built from ``overwrite.cli.url``. It is
-  a public URL that this container may not be able to resolve at all, so it is deliberately
-  ignored: the poll below goes to the configured base URL with a fixed path.
+  used unchanged when its origin matches the injected target. For split-horizon deployments,
+  its path and query are transferred to the configured origin without guessing a poll path.
 """
 
 import logging
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
@@ -68,7 +68,7 @@ __all__ = [
 #: instance without pretty URLs as well.
 INIT_PATH = "/index.php/login/v2"
 
-#: The one poll address this project uses. Fixed on purpose, see the module docstring.
+#: The conventional Nextcloud poll path; the actual endpoint comes from the start answer.
 POLL_PATH = "/login/v2/poll"
 
 #: The OCS route that names the account a request authenticates as. Its ``id`` is the
@@ -122,10 +122,13 @@ class FlowStart:
     """A sign in that Nextcloud has opened: where the user goes, and how we ask about it."""
 
     poll_token: str
+    poll_url: str
     login_url: str
 
     def __repr__(self) -> str:
-        return f"FlowStart(login_url={self.login_url!r}, poll_token='***')"
+        return (
+            f"FlowStart(login_url={self.login_url!r}, poll_url={self.poll_url!r}, poll_token='***')"
+        )
 
 
 @dataclass(frozen=True, slots=True, repr=False)
@@ -205,9 +208,15 @@ async def start_flow(client_name: str, *, target: NextcloudTarget) -> FlowStart 
     payload = _payload(response, url)
     poll = payload.get("poll") if isinstance(payload, dict) else None
     token = _text(poll.get("token") if isinstance(poll, dict) else None)
+    poll_url = _text(poll.get("endpoint") if isinstance(poll, dict) else None)
     login = _text(payload.get("login") if isinstance(payload, dict) else None)
-    if token is None or login is None:
+    if token is None or poll_url is None or login is None:
         logger.error("the login flow start at %s answered a body without a usable flow", url)
+        return None
+
+    poll_url = _poll_url(poll_url, target.base_url)
+    if poll_url is None:
+        logger.error("the login flow start at %s answered an invalid poll endpoint", url)
         return None
 
     if urlsplit(login).scheme not in _LOGIN_SCHEMES:
@@ -216,10 +225,15 @@ async def start_flow(client_name: str, *, target: NextcloudTarget) -> FlowStart 
         logger.error("the login flow start at %s answered a login link with a foreign scheme", url)
         return None
 
-    return FlowStart(poll_token=token, login_url=login)
+    return FlowStart(poll_token=token, poll_url=poll_url, login_url=login)
 
 
-async def poll_once(poll_token: str, *, target: NextcloudTarget) -> PollResult:
+async def poll_once(
+    poll_token: str,
+    poll_url: str,
+    *,
+    target: NextcloudTarget,
+) -> PollResult:
     """Ask Nextcloud once whether the sign in is finished. Exactly one request, ever.
 
     One request per call is the whole throttling of the waiting page: it refreshes every few
@@ -230,7 +244,7 @@ async def poll_once(poll_token: str, *, target: NextcloudTarget) -> PollResult:
     the difference cannot come from this answer. It comes from the deadline the caller keeps
     in its own flow record.
     """
-    url = f"{target.base_url}{POLL_PATH}"
+    url = poll_url
     client = shared_client()
 
     try:
@@ -376,3 +390,41 @@ def _text(value: object) -> str | None:
     to build a flow or a credential out of it, instead of carrying the surprise further.
     """
     return value if isinstance(value, str) and value else None
+
+
+def _origin(url: str) -> tuple[str, str | None, int | None]:
+    """Return scheme, hostname and effective port, raising ValueError for malformed URLs."""
+    parsed = urlsplit(url)
+
+    port = parsed.port
+    if port is None:
+        if parsed.scheme == "https":
+            port = 443
+        elif parsed.scheme == "http":
+            port = 80
+
+    return parsed.scheme, parsed.hostname, port
+
+
+def _poll_url(endpoint: str, base_url: str) -> str | None:
+    """Keep the announced path and query on the configured origin, or refuse invalid URLs.
+
+    Nextcloud may announce its public overwrite URL while an ExApp reaches it through an
+    internal service name. Replace only the origin in that case; a base subpath must not
+    be prepended to the already absolute endpoint path.
+    """
+    try:
+        announced = urlsplit(endpoint)
+        if announced.scheme not in _LOGIN_SCHEMES or not announced.hostname:
+            return None
+        # Accessing the effective ports also validates them before either branch.
+        if _origin(endpoint) == _origin(base_url):
+            return endpoint
+        configured = urlsplit(base_url)
+    except ValueError:
+        return None
+
+    logger.info(
+        "the login flow poll endpoint uses the configured origin instead of its announced origin"
+    )
+    return urlunsplit((configured.scheme, configured.netloc, announced.path, announced.query, ""))

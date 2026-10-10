@@ -531,6 +531,7 @@ async def test_the_row_of_a_document_client_carries_the_foreign_key_of_a_flow(
         scopes=metadata.TOOL_SCOPE,
         resource=f"{PUBLIC_URL}/mcp",
         poll_token="the-poll-token-of-this-sign-in",
+        poll_url="http://nc.test/custom/poll",
     )
 
     flow = await store.load_flow("the-first-flow-of-a-document-client")

@@ -98,6 +98,7 @@ def with_flow(
             scopes="nextcloud",
             resource=f"{PUBLIC_URL}/mcp",
             poll_token="poll-token",
+            poll_url="http://nc.test/custom/poll",
         )
         if signed_in:
             await subject.create_authorization(

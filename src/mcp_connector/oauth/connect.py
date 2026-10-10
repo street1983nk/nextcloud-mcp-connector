@@ -226,6 +226,7 @@ async def _start(
             scopes="",
             resource="",
             poll_token=started.poll_token,
+            poll_url=started.poll_url,
         )
     except Exception:
         logger.exception("the login flow could not be written to the store")
@@ -287,7 +288,7 @@ async def _wait(
         await opened.delete_flow(flow_id)
         return _page(errors.error_page("E4", env=env))
 
-    result = await loginflow.poll_once(row.poll_token, target=nextcloud)
+    result = await loginflow.poll_once(row.poll_token, row.poll_url, target=nextcloud)
     if result.outcome == loginflow.POLL_PENDING:
         return waiting_page(flow_id, env=env)
     if result.outcome != loginflow.POLL_DONE or result.credentials is None:
