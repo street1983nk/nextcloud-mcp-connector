@@ -48,6 +48,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Dependency lift after a pip-audit pass: httpx2 2.13.1 (PYSEC-2026-3846,
   -3848, -3849) and PyJWT 2.15.1 (PYSEC-2026-4141, -4183).
 
+### Fixed
+
+- Sign in polls the endpoint Nextcloud announces in the login flow start answer
+  instead of a fixed path, so instances that serve it under `index.php` or a
+  subpath connect. When Nextcloud announces its public origin while the connector
+  reaches it internally (split horizon, such as `http://caddy` in ExApp mode), the
+  announced path and query move to the configured origin; a foreign host is never
+  contacted. Sign ins started before the update have to be started again.
+  Thanks to @slobinger (#18).
+
 ## [0.5.1] - 2026-10-08
 
 ### Changed
