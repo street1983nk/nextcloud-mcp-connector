@@ -13,6 +13,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Native ChatGPT file attachments in `files_upload` (`openai/fileParams`): trusted
+  OpenAI download hosts, bounded temporary staging, and create-only WebDAV PUT.
+  Validation completes before the destination write, preventing truncated source
+  streams from creating partial files. Text/base64 modes remain compatible.
+
 - SECURITY.md with the two private reporting channels, CONTRIBUTING.md, issue
   and pull request templates, and THIRD-PARTY.md with the licences of the
   shipped dependencies.

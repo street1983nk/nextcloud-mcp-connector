@@ -15,7 +15,7 @@ foreign host or vanish).
 import asyncio
 import hashlib
 import re
-from collections.abc import Sequence
+from collections.abc import AsyncIterable, Sequence
 from posixpath import dirname
 from typing import Any
 from urllib.parse import quote, unquote, urlsplit
@@ -796,6 +796,32 @@ async def put_new_file(
         "created": True,
     }
 
+
+async def put_new_file_stream(
+    client: httpx.AsyncClient,
+    creds: Credentials,
+    path: str,
+    data: AsyncIterable[bytes],
+    content_type: str,
+    content_length: int | None = None,
+) -> dict:
+    """Stream a create-only PUT without buffering the complete file in this process."""
+    target = safe_path(path)
+    headers = {"If-None-Match": "*", "Content-Type": content_type}
+    if content_length is not None:
+        headers["Content-Length"] = str(content_length)
+    response = await client.put(
+        files_url(creds, target),
+        content=data,
+        headers=headers,
+        auth=creds.auth(),
+    )
+    _check_write(response, target)
+    return {
+        "path": target,
+        "etag": response.headers.get("etag", ""),
+        "created": True,
+    }
 
 def uploads_url(creds: Credentials, upload_id: str, part: str | None = None, *, path: str) -> str:
     """Isolate connector uploads by sandbox and destination, including on retries.

@@ -20,9 +20,13 @@ could turn it into a replace is refused before the request or by Nextcloud itsel
 import asyncio
 import base64
 import re
+import tempfile
 import uuid
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from typing import Any
+from urllib.parse import urlsplit
+
+import httpx
 
 from .. import config, documents, ids, paging
 from ..documents import detect as document_detect
@@ -103,6 +107,18 @@ DEFAULT_CONTENT_TYPE = "text/markdown"
 # above all no control characters that could split the request header.
 _CONTENT_TYPE_RE = re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]+/[A-Za-z0-9!#$%&'*+.^_`|~-]+$")
 _UPLOAD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+# Restrict multi-tenant Azure to the verified OpenAI account from a live upload.
+_OPENAI_FILE_HOST_SUFFIXES = ("oaiusercontent.com",)
+_OPENAI_AZURE_HOSTS = frozenset({"oaisdmntprdenmarkeast.blob.core.windows.net"})
+_OPENAI_FILE_TIMEOUT = httpx.Timeout(120.0, connect=10.0)
+_OPENAI_TOTAL_SECONDS = 300.0
+MAX_ATTACHMENT_BYTES = 512 * 1024 * 1024
+
+# One staged attachment per process (including its PUT and temporary-file cleanup).
+# This bounds cumulative staging disk use even with concurrent MCP requests.
+_ATTACHMENT_STAGING_SEMAPHORE = asyncio.Semaphore(1)
+
 
 _FILE_TARGET_HINT = (
     "Give the full path of the new file, for example /Docs/meeting-notes.md. "
@@ -636,6 +652,172 @@ async def upload(
 
     await _writable(clients, target)
     return await dav.put_new_file(clients.client, clients.creds, target, data, content_type)
+
+
+def _openai_download_url(value: str) -> str:
+    """Validate a ChatGPT file-parameter URL before any network request is made."""
+    raw = (value or "").strip()
+    try:
+        parsed = urlsplit(raw)
+        port = parsed.port
+    except ValueError:
+        parsed = None
+        port = None
+    host = (parsed.hostname or "").lower() if parsed is not None else ""
+    trusted_host = host in _OPENAI_AZURE_HOSTS or any(
+        host == suffix or host.endswith(f".{suffix}")
+        for suffix in _OPENAI_FILE_HOST_SUFFIXES
+    )
+    if (
+        parsed is None
+        or parsed.scheme != "https"
+        or not trusted_host
+        or parsed.username is not None
+        or parsed.password is not None
+        or (port is not None and port != 443)
+        or bool(parsed.fragment)
+    ):
+        label = host or "<missing>"
+        raise ToolError(
+            message=f"The attachment download host {label!r} is not an allowed ChatGPT file host.",
+            hint="Attach the file to the ChatGPT message and retry the upload.",
+        )
+    return raw
+
+
+def _attachment_content_type(declared: str, response: httpx.Response) -> str:
+    """Choose one bare MIME type without copying an unchecked header value to Nextcloud."""
+    supplied = (declared or "").strip()
+    if supplied:
+        if not _CONTENT_TYPE_RE.fullmatch(supplied):
+            raise ToolError(
+                message=f"{supplied!r} is not a plain mimetype.",
+                hint="Retry the attachment; ChatGPT should provide a bare type/subtype.",
+            )
+        return supplied
+    header = response.headers.get("Content-Type", "").split(";", 1)[0].strip()
+    return header if _CONTENT_TYPE_RE.fullmatch(header) else "application/octet-stream"
+
+
+async def upload_attachment(
+    clients: NcClients,
+    path: str,
+    download_url: str,
+    file_id: str,
+    mime_type: str = "",
+) -> dict[str, Any]:
+    """Validate ChatGPT bytes before the create-only PUT to Nextcloud.
+
+    A bounded temporary file ensures that source-stream errors cannot leave
+    partially downloaded content at the final destination.
+    """
+    if (path or "").strip().endswith("/"):
+        raise ToolError(message=f"{path!r} names a folder, not a file.", hint=_FILE_TARGET_HINT)
+    target = dav.safe_path(path)
+    if target == config.files_root():
+        raise ToolError(
+            message="The upload target is the root folder, not a file.",
+            hint=_FILE_TARGET_HINT,
+        )
+    if not (file_id or "").strip():
+        raise ToolError(
+            message="The ChatGPT attachment has no file id.",
+            hint="Attach the file to ChatGPT and retry.",
+        )
+    source_url = _openai_download_url(download_url)
+    await _writable(clients, target)
+    async with _ATTACHMENT_STAGING_SEMAPHORE:
+        return await _stage_attachment(clients, target, source_url, mime_type)
+
+
+async def _stage_attachment(
+    clients: NcClients, target: str, source_url: str, mime_type: str
+) -> dict[str, Any]:
+    """Stage a single attachment under the process-wide disk usage guard."""
+    with tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024, mode="w+b") as staged:
+        seen = 0
+        try:
+            async with asyncio.timeout(_OPENAI_TOTAL_SECONDS):
+                async with (
+                    httpx.AsyncClient(
+                        follow_redirects=False, timeout=_OPENAI_FILE_TIMEOUT
+                    ) as source_client,
+                    source_client.stream(
+                        "GET", source_url, headers={"Accept-Encoding": "identity"}
+                    ) as source,
+                ):
+                    if 300 <= source.status_code < 400:
+                        raise ToolError(
+                            message="The ChatGPT attachment download redirected unexpectedly.",
+                            hint="Retry the original attachment.",
+                        )
+                    if source.status_code in (401, 403, 404):
+                        raise ToolError(
+                            message="The ChatGPT attachment link is unavailable or expired.",
+                            hint="Retry the original attachment.",
+                        )
+                    if source.status_code != 200:
+                        raise ToolError(
+                            message=(
+                                f"The attachment download failed with HTTP "
+                                f"{source.status_code}."
+                            ),
+                            hint="Retry the original attachment.",
+                        )
+                    raw_length = source.headers.get("Content-Length", "").strip()
+                    content_length = (
+                        int(raw_length)
+                        if raw_length.isascii() and raw_length.isdigit()
+                        else None
+                    )
+                    if content_length is not None and content_length > MAX_ATTACHMENT_BYTES:
+                        raise ToolError(
+                            message="The attachment exceeds the maximum supported upload size.",
+                            hint="Upload a smaller attachment.",
+                        )
+                    content_type = _attachment_content_type(mime_type, source)
+                    async for chunk in source.aiter_raw():
+                        seen += len(chunk)
+                        if seen > MAX_ATTACHMENT_BYTES:
+                            raise ToolError(
+                                message="The attachment exceeds the maximum supported upload size.",
+                                hint="Upload a smaller attachment.",
+                            )
+                        if content_length is not None and seen > content_length:
+                            raise ToolError(
+                                message="The attachment body is larger than its declared size.",
+                                hint="Retry the original attachment.",
+                            )
+                        staged.write(chunk)
+                    if content_length is not None and seen != content_length:
+                        raise ToolError(
+                            message="The attachment download ended before its declared size.",
+                            hint="Retry the original attachment.",
+                        )
+        except TimeoutError:
+            raise ToolError(
+                message="The attachment download exceeded its total time limit.",
+                hint="Retry with a smaller attachment.",
+            ) from None
+
+        staged.seek(0)
+
+        async def body() -> AsyncIterator[bytes]:
+            while True:
+                chunk = await asyncio.to_thread(staged.read, 1024 * 1024)
+                if not chunk:
+                    return
+                yield chunk
+
+        result = await dav.put_new_file_stream(
+            clients.client,
+            clients.creds,
+            target,
+            body(),
+            content_type,
+            content_length=seen,
+        )
+        return {**result, "bytes": seen, "content_type": content_type}
 
 
 async def upload_binary(

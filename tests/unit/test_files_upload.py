@@ -9,6 +9,7 @@ app password, server error, path traversal, empty content and a payload that is 
 encodable as UTF-8.
 """
 
+import asyncio
 import base64
 
 import guard_routes
@@ -29,6 +30,7 @@ FILES_ROOT = f"{BASE}/remote.php/dav/files/{USER}"
 TARGET = "/Docs/new-note.md"
 TARGET_URL = f"{FILES_ROOT}/Docs/new-note.md"
 CONTENT = "# Neue Notiz\nZeile zwei\n"
+OPENAI_FILE_URL = "https://files.oaiusercontent.com/file-test?sig=test"
 UPLOAD_ID = "upload-test"
 UPLOAD_FOLDER_URL = dav.uploads_url(Credentials(BASE, USER, SECRET), UPLOAD_ID, path=TARGET)
 
@@ -350,3 +352,251 @@ async def test_binary_upload_rejects_invalid_base64_before_network(clients: NcCl
         assert len(mock.calls) == 0
 
     assert "base64" in excinfo.value.message.lower()
+
+
+class _OneShotStream(httpx.AsyncByteStream):
+    def __init__(self, data: bytes) -> None:
+        self.data = data
+
+    async def __aiter__(self):
+        yield self.data
+
+
+@pytest.mark.anyio
+async def test_chatgpt_attachment_streams_to_create_only_put(clients: NcClients) -> None:
+    pdf = b"%PDF-1.7\nattachment\n"
+    with respx.mock(assert_all_called=True) as mock:
+        source = mock.get(OPENAI_FILE_URL).mock(
+            return_value=httpx.Response(
+                200,
+                stream=_OneShotStream(pdf),
+                headers={"Content-Length": str(len(pdf)), "Content-Type": "application/pdf"},
+            )
+        )
+        put = mock.route(method="PUT", url=TARGET_URL).mock(
+            return_value=httpx.Response(201, headers={"etag": '"attachment-etag"'})
+        )
+        result = await files_tools.upload_attachment(
+            clients,
+            path=TARGET,
+            download_url=OPENAI_FILE_URL,
+            file_id="file_test",
+            mime_type="application/pdf",
+        )
+
+    assert source.call_count == 1
+    request = put.calls[0].request
+    assert request.headers["if-none-match"] == "*"
+    assert request.headers["content-type"] == "application/pdf"
+    assert request.headers["content-length"] == str(len(pdf))
+    assert request.content == pdf
+    assert result == {
+        "path": TARGET,
+        "etag": '"attachment-etag"',
+        "created": True,
+        "bytes": len(pdf),
+        "content_type": "application/pdf",
+    }
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://files.oaiusercontent.com/file-test",
+        "https://example.com/file-test",
+        "https://files.oaiusercontent.com.evil.test/file-test",
+        "https://blob.core.windows.net.evil.test/file-test",
+        "https://attacker.blob.core.windows.net/file-test",
+        "https://oaifakeaccount.blob.core.windows.net/file-test",
+        "https://files.chatgpt.com/file-test",
+        "https://files.openai.com/file-test",
+        "https://community.openai.com/file-test",
+        "https://user@files.oaiusercontent.com/file-test",
+        "https://files.oaiusercontent.com:444/file-test",
+    ],
+)
+async def test_chatgpt_attachment_rejects_untrusted_download_urls_before_network(
+    clients: NcClients, url: str
+) -> None:
+    with respx.mock as mock:
+        with pytest.raises(ToolError, match="allowed ChatGPT file host"):
+            await files_tools.upload_attachment(
+                clients,
+                path=TARGET,
+                download_url=url,
+                file_id="file_test",
+                mime_type="application/pdf",
+            )
+        assert not mock.calls
+
+
+@pytest.mark.anyio
+async def test_chatgpt_attachment_expired_url_never_writes_nextcloud(clients: NcClients) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        source = mock.get(OPENAI_FILE_URL).mock(return_value=httpx.Response(403))
+        with pytest.raises(ToolError, match="unavailable or expired"):
+            await files_tools.upload_attachment(
+                clients,
+                path=TARGET,
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+                mime_type="application/pdf",
+            )
+
+        assert source.call_count == 1
+        assert all(call.request.url != httpx.URL(TARGET_URL) for call in mock.calls)
+
+
+@pytest.mark.anyio
+async def test_chatgpt_attachment_does_not_follow_redirects(clients: NcClients) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        source = mock.get(OPENAI_FILE_URL).mock(
+            return_value=httpx.Response(302, headers={"Location": "https://example.com/file"})
+        )
+        with pytest.raises(ToolError, match="redirected unexpectedly"):
+            await files_tools.upload_attachment(
+                clients,
+                path=TARGET,
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+            )
+
+        assert source.call_count == 1
+        assert len(mock.calls) == 1
+
+
+@pytest.mark.anyio
+async def test_chatgpt_attachment_size_header_is_bounded_before_nextcloud_write(
+    clients: NcClients, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(files_tools, "MAX_ATTACHMENT_BYTES", 3)
+    with respx.mock(assert_all_called=True) as mock:
+        source = mock.get(OPENAI_FILE_URL).mock(
+            return_value=httpx.Response(200, content=b"abcd", headers={"Content-Length": "4"})
+        )
+        with pytest.raises(ToolError, match="maximum supported upload size"):
+            await files_tools.upload_attachment(
+                clients,
+                path=TARGET,
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+            )
+
+        assert source.call_count == 1
+        assert len(mock.calls) == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://files.oaiusercontent.com/file-test?sig=test",
+        "https://oaisdmntprdenmarkeast.blob.core.windows.net/chatgpt-upload/file-test?sig=test",
+    ],
+)
+async def test_chatgpt_attachment_accepts_documented_chatgpt_domains(
+    clients: NcClients, url: str
+) -> None:
+    payload = b"attachment"
+    with respx.mock(assert_all_called=True) as mock:
+        source = mock.get(url).mock(
+            return_value=httpx.Response(
+                200,
+                stream=_OneShotStream(payload),
+                headers={"Content-Length": str(len(payload))},
+            )
+        )
+        put = mock.route(method="PUT", url=TARGET_URL).mock(
+            return_value=httpx.Response(201)
+        )
+        result = await files_tools.upload_attachment(
+            clients,
+            path=TARGET,
+            download_url=url,
+            file_id="file_test",
+        )
+
+    assert source.call_count == 1
+    assert put.call_count == 1
+    assert result["bytes"] == len(payload)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("parts", "declared", "limit", "expected"),
+    [
+        ([b"ab", b"cd"], "4", 3, "maximum supported upload size"),
+        ([b"abcd"], "3", 99, "larger than its declared size"),
+        ([b"ab"], "5", 99, "ended before its declared size"),
+    ],
+)
+async def test_attachment_source_stream_error_never_starts_put(
+    clients: NcClients,
+    monkeypatch: pytest.MonkeyPatch,
+    parts: list[bytes],
+    declared: str,
+    limit: int,
+    expected: str,
+) -> None:
+    monkeypatch.setattr(files_tools, "MAX_ATTACHMENT_BYTES", limit)
+
+    class Parts(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            for part in parts:
+                yield part
+
+    with respx.mock(assert_all_called=True) as mock:
+        source = mock.get(OPENAI_FILE_URL).mock(
+            return_value=httpx.Response(
+                200, stream=Parts(), headers={"Content-Length": declared}
+            )
+        )
+        with pytest.raises(ToolError, match=expected):
+            await files_tools.upload_attachment(
+                clients, path=TARGET, download_url=OPENAI_FILE_URL, file_id="file_test"
+            )
+        assert source.call_count == 1
+        assert [call.request.method for call in mock.calls] == ["GET"]
+
+@pytest.mark.anyio
+async def test_attachment_staging_is_serialized(
+    clients: NcClients, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    entered = asyncio.Event()
+    release = asyncio.Event()
+    second_entered = asyncio.Event()
+    calls = 0
+
+    async def writable(*args: object) -> None:
+        return None
+
+    async def staged(*args: object) -> dict[str, object]:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            entered.set()
+            await release.wait()
+        else:
+            second_entered.set()
+        return {"created": True}
+
+    monkeypatch.setattr(files_tools, "_writable", writable)
+    monkeypatch.setattr(files_tools, "_stage_attachment", staged)
+
+    async def one(path: str) -> dict[str, object]:
+        return await files_tools.upload_attachment(
+            clients, path=path, download_url=OPENAI_FILE_URL, file_id="file_test"
+        )
+
+    first = asyncio.create_task(one("/Docs/first.pdf"))
+    await asyncio.wait_for(entered.wait(), timeout=1)
+    second = asyncio.create_task(one("/Docs/second.pdf"))
+    try:
+        await asyncio.sleep(0)
+        assert not second_entered.is_set()
+    finally:
+        release.set()
+    await asyncio.gather(first, second)
+    assert calls == 2
+
