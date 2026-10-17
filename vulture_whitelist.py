@@ -20,6 +20,7 @@ files_search
 files_list
 files_read
 files_upload
+files_update
 files_download
 files_read_as_markdown
 calendar_list_events

@@ -16,7 +16,9 @@ named in one place.
 
 import importlib.util
 import json
+import os
 import re
+import subprocess
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -64,8 +66,8 @@ EXPECTED_TOOLS = {
     "fetch",
 }
 
-# The six write paths. Everything else in EXPECTED_TOOLS only reads (D-16). The set is
-# unchanged by phase 10, and that is a statement rather than an omission: the Mail family adds
+# The create-only paths. files_update is separately gated and uses conditional overwrite.
+# Mail adds
 # one tool and not one write path, so the number of ways this server can put something into
 # somebody's Nextcloud stays six while the number of pure reads grows to fifteen.
 CREATE_TOOLS = {
@@ -746,7 +748,11 @@ async def test_every_tool_carries_honest_annotations() -> None:
         assert annotations.open_world_hint is False, (
             f"{name} talks to one known Nextcloud, never to the open web"
         )
-        if name in CREATE_TOOLS:
+        if name == "files_update":
+            assert annotations.read_only_hint is False
+            assert annotations.destructive_hint is True
+            assert annotations.idempotent_hint is False
+        elif name in CREATE_TOOLS:
             assert annotations.read_only_hint is False, f"{name} writes and must say so"
             assert annotations.destructive_hint is False, (
                 f"{name} can only create, never replace or delete"
@@ -806,15 +812,23 @@ async def test_the_readme_permission_table_matches_the_live_registry() -> None:
         if not line.startswith("| `"):
             continue
         cells = [cell.strip() for cell in line.strip("|").split("|")]
-        if len(cells) < 2 or cells[1] not in ("read", "create-only"):
+        if len(cells) < 2 or cells[1] not in ("read", "create-only", "conditional-update"):
             continue
         documented[cells[0].strip("`")] = cells[1]
 
-    assert set(documented) == set(tools), (
-        "the README tool table and the registry must list the same names"
+    optional_tools = {"files_update"}
+    assert set(documented) - optional_tools == set(tools), (
+        "the README's always-available tools must match the default registry"
     )
+    assert optional_tools <= set(documented), "the README must document optional tools too"
     for name, level in sorted(documented.items()):
-        expected = "create-only" if name in CREATE_TOOLS else "read"
+        expected = (
+            "conditional-update"
+            if name == "files_update"
+            else "create-only"
+            if name in CREATE_TOOLS
+            else "read"
+        )
         assert level == expected, f"README calls {name} {level}, the registry says {expected}"
 
 
@@ -851,6 +865,35 @@ def _counted_tools(text: str) -> Iterator[tuple[int, str]]:
     for line in text.splitlines():
         for match in counts.finditer(line):
             yield int(match.group(1) or match.group(2)), line
+
+
+def test_files_update_registration_respects_feature_flag():
+    code = (
+        "from mcp_connector.server import mcp; "
+        "print(any(t.name == 'files_update' "
+        "for t in mcp._tool_manager.list_tools()))"
+    )
+
+    env = os.environ.copy()
+    env.pop("NC_MCP_FILES_UPDATE", None)
+    disabled = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+    assert disabled.stdout.strip() == "False"
+
+    env["NC_MCP_FILES_UPDATE"] = "true"
+    enabled = subprocess.run(  # noqa: S603
+        [sys.executable, "-c", code],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+    assert enabled.stdout.strip() == "True"
 
 
 @pytest.mark.anyio

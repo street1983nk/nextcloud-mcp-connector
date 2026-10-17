@@ -48,7 +48,7 @@ ACTING_PARTY = "kc-client-of-another-realm"
 #: U+202E. Inside an output line it turns the reading direction of everything after it
 #: round, which is why the cleaning rule of this project names a character class instead of
 #: listing the C0 range (R-18-06).
-RIGHT_TO_LEFT_OVERRIDE = "‮"
+RIGHT_TO_LEFT_OVERRIDE = "\u202e"
 
 #: The value the third case hunts for. It is not a word of any column name, so a hit is a
 #: leak and never a coincidence.
@@ -426,3 +426,27 @@ async def test_a_hostile_acting_party_is_cleaned_and_cut_before_it_is_written(
     assert RIGHT_TO_LEFT_OVERRIDE not in stored
     assert len(stored) <= ACTOR_LIMIT
     assert stored.startswith("kc client")
+
+
+@pytest.mark.anyio
+async def test_file_update_wrapper_records_path_and_both_etags(
+    recorder: Recorder, audit_file: Path
+) -> None:
+    from mcp_connector.audit.record import record_file_update
+
+    ctx = FakeContext(recorder=recorder)
+
+    await record_file_update(
+        ctx,
+        path="/documents/report.txt",
+        old_etag='"old-etag"',
+        new_etag='"new-etag"',
+    )
+
+    connection = sqlite3.connect(audit_file)
+    try:
+        row = connection.execute("SELECT path, old_etag, new_etag FROM file_updates").fetchone()
+    finally:
+        connection.close()
+
+    assert row == ("/documents/report.txt", '"old-etag"', '"new-etag"')

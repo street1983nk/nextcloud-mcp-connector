@@ -434,6 +434,53 @@ def test_the_production_code_contains_no_destructive_request() -> None:
     assert findings == [], "destructive call found:\n" + "\n".join(findings)
 
 
+def test_file_updates_keep_create_and_compare_and_swap_puts_distinct() -> None:
+    """A file update must stay compare-and-swap while file creation stays create-only."""
+    path = SRC / "nextcloud" / "clients" / "dav.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+    functions = {node.name: node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)}
+
+    create = ast.unparse(functions["put_new_file"])
+    update = ast.unparse(functions["update_file"])
+
+    assert "If-None-Match" in create
+    assert "*" in create
+    assert ".put(" in create
+
+    assert "If-Match" in update
+    assert "etag" in update
+    assert ".put(" in update
+
+
+def test_every_file_route_put_has_a_conditional_header() -> None:
+    """Every PUT to the files DAV route must prevent an unconditional overwrite."""
+    path = SRC / "nextcloud" / "clients" / "dav.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if not isinstance(node.func, ast.Attribute) or node.func.attr != "put":
+            continue
+
+        # Only inspect PUTs whose target is the normal files DAV route.
+        target = ast.unparse(node.args[0]) if node.args else ""
+        if "files_url(" not in target:
+            continue
+
+        headers = next(
+            (keyword.value for keyword in node.keywords if keyword.arg == "headers"),
+            None,
+        )
+        header_source = ast.unparse(headers) if headers is not None else ""
+
+        assert "If-Match" in header_source or "If-None-Match" in header_source, (
+            f"Unconditional file-route PUT at line {node.lineno}: "
+            "expected If-Match or If-None-Match"
+        )
+
+
 def _is_own_sql(relative: str, text: str) -> bool:
     """True for a statement against our own store file, false for anything else."""
     return relative in FILES_WITH_OWN_SQL and any(form in text for form in SQL_DELETE_FORMS)

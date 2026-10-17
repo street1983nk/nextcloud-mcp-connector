@@ -48,6 +48,7 @@ ENV_DISABLE_DNS_REBINDING = "NC_MCP_DISABLE_DNS_REBINDING_PROTECTION"
 ENV_PUBLIC_URL = "NC_MCP_PUBLIC_URL"
 ENV_TALK_SEND = "NC_MCP_TALK_SEND"
 ENV_FILES_ROOT = "NC_MCP_FILES_ROOT"
+ENV_FILES_UPDATE = "NC_MCP_FILES_UPDATE"
 # Comma separated tool bundle names whose tools are not registered (issue #15).
 ENV_DISABLED_TOOLS = "NC_MCP_DISABLED_TOOLS"
 
@@ -706,6 +707,29 @@ def audit_log_enabled(env: Mapping[str, str] | None = None) -> bool:
     logger.warning(
         "%s is neither on nor off, so the audit log stays off (understood are %s and %s).",
         ENV_AUDIT_LOG,
+        ", ".join(sorted(_TRUE_VALUES)),
+        ", ".join(sorted(_FALSE_VALUES)),
+    )
+    return False
+
+
+def files_update_enabled(env: Mapping[str, str] | None = None) -> bool:
+    """Whether the files_update tool is available at all (Issue #9).
+
+    The shipped state is off. An unset, blank or unrecognised value therefore keeps
+    the capability disabled. Only an explicitly understood true value enables it.
+    """
+    source = os.environ if env is None else env
+    value = (source.get(ENV_FILES_UPDATE) or "").strip().lower()
+    if not value:
+        return False
+    if value in _TRUE_VALUES:
+        return True
+    if value in _FALSE_VALUES:
+        return False
+    logger.warning(
+        "%s is neither on nor off, so files_update stays disabled (understood are %s and %s).",
+        ENV_FILES_UPDATE,
         ", ".join(sorted(_TRUE_VALUES)),
         ", ".join(sorted(_FALSE_VALUES)),
     )

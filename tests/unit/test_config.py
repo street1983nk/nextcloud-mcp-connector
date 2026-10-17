@@ -367,6 +367,58 @@ def test_the_switch_spellings_are_the_ones_the_form_and_the_registry_understand(
     assert config._FALSE_VALUES == registry._FALSE_VALUES
 
 
+# --- the switch that enables editing existing files (Issue #9) -------------------
+
+
+def test_the_files_update_switch_carries_the_expected_name() -> None:
+    assert config.ENV_FILES_UPDATE == "NC_MCP_FILES_UPDATE"
+
+
+@pytest.mark.parametrize("raw", sorted(config._TRUE_VALUES))
+def test_every_understood_on_spelling_enables_files_update(raw: str) -> None:
+    assert config.files_update_enabled({config.ENV_FILES_UPDATE: raw}) is True
+
+
+@pytest.mark.parametrize("raw", sorted(config._FALSE_VALUES))
+def test_every_understood_off_spelling_disables_files_update(raw: str) -> None:
+    assert config.files_update_enabled({config.ENV_FILES_UPDATE: raw}) is False
+
+
+@pytest.mark.parametrize("raw", ["ON", "True", "YES", "  on  ", "\tTRUE\n"])
+def test_files_update_switch_reads_on_spelling_without_regard_to_case_or_padding(
+    raw: str,
+) -> None:
+    assert config.files_update_enabled({config.ENV_FILES_UPDATE: raw}) is True
+
+
+def test_without_the_files_update_variable_editing_is_disabled() -> None:
+    """Issue #9 requires the new editing capability to be opt-in."""
+    assert config.files_update_enabled({}) is False
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\t\n"])
+def test_a_blank_files_update_value_counts_as_disabled(blank: str) -> None:
+    assert config.files_update_enabled({config.ENV_FILES_UPDATE: blank}) is False
+
+
+@pytest.mark.parametrize("raw", ["vielleicht", "maybe", "enabled", "2", "-1", "onoff"])
+def test_an_unrecognised_files_update_value_keeps_editing_disabled(raw: str) -> None:
+    assert config.files_update_enabled({config.ENV_FILES_UPDATE: raw}) is False
+
+
+def test_files_update_switch_reads_the_process_environment_when_no_mapping_is_given(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(config.ENV_FILES_UPDATE, config_values.SWITCH_ON)
+    assert config.files_update_enabled() is True
+
+    monkeypatch.setenv(config.ENV_FILES_UPDATE, config_values.SWITCH_OFF)
+    assert config.files_update_enabled() is False
+
+    monkeypatch.delenv(config.ENV_FILES_UPDATE)
+    assert config.files_update_enabled() is False
+
+
 # --- the three variables of the audit log (D-09, D-14, AUDIT-03) ------------------
 
 

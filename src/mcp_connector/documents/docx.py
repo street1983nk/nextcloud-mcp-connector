@@ -68,33 +68,72 @@ def _table_lines_capped(table: Any) -> list[str]:
     return lines
 
 
+_W_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+
+
+def _paragraph_text(paragraph) -> str:
+    parts: list[str] = []
+
+    for child in paragraph.iterchildren():
+        if child.tag == _W_NS + "r":
+            runs = (child,)
+        elif child.tag == _W_NS + "hyperlink":
+            runs = child.iterchildren(_W_NS + "r")
+        else:
+            continue
+
+        for run in runs:
+            for item in run.iterchildren():
+                if item.tag == _W_NS + "t":
+                    parts.append(item.text or "")
+                elif item.tag == _W_NS + "tab":
+                    parts.append("\t")
+                elif item.tag in (_W_NS + "br", _W_NS + "cr"):
+                    parts.append("\n")
+                elif item.tag == _W_NS + "noBreakHyphen":
+                    parts.append("\u2011")
+                elif item.tag == _W_NS + "softHyphen":
+                    parts.append("\u00ad")
+
+    return "".join(parts)
+
+
 def to_markdown(data: bytes) -> str:
     import docx
+    from docx.oxml.table import CT_Tbl
+    from docx.oxml.text.paragraph import CT_P
     from docx.table import Table
-    from docx.text.paragraph import Paragraph
 
     document = docx.Document(io.BytesIO(data))
     style_names = {style.style_id: style.name or "" for style in document.styles}
     out = Output()
-    for block in document.iter_inner_content():
+    style_prefixes: dict[str, str] = {}
+    for block in document.element.body.iterchildren():
         if out.full:
             break
-        if isinstance(block, Paragraph):
-            text = block.text.strip()
+        if isinstance(block, CT_P):
+            text = _paragraph_text(block).strip()
             if not text:
                 continue
-            p_pr = block._p.pPr
+            p_pr = block.pPr
             style_id = p_pr.style if p_pr is not None else None
-            style = style_names.get(style_id, "") if style_id else ""
-            prefix = _heading_prefix(style)
-            if prefix:
-                out.add(f"{prefix} {text}")
-            elif style.startswith("List"):
+            prefix = ""
+            if style_id:
+                if style_id not in style_prefixes:
+                    style = style_names.get(style_id, "")
+                    style_prefixes[style_id] = _heading_prefix(style) or (
+                        "- " if style.startswith("List") else ""
+                    )
+                prefix = style_prefixes[style_id]
+            if prefix == "- ":
                 out.add(f"- {text}")
+            elif prefix:
+                out.add(f"{prefix} {text}")
             else:
                 out.add(text)
+
             out.add("")
-        elif isinstance(block, Table):
-            out.extend(_table_lines_capped(block))
+        elif isinstance(block, CT_Tbl):
+            out.extend(_table_lines_capped(Table(block, document._body)))
             out.add("")
     return out.text()

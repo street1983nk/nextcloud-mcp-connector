@@ -142,8 +142,9 @@ assemble it themselves:
    text in front of the model, without ever being invited.
 3. **An outgoing channel.** `talk_send`, the one tool of this server that puts a
    message directly in front of other people. It is the widest way out, not the only
-   one: a create-only write can leave content in a shared container, and the
-   countermeasures below treat the two separately.
+   one: writes can leave content in a shared container through creation or
+   conditional replacement, and the countermeasures below treat the two
+   separately.
 
 Those three together are what Simon Willison calls the
 [lethal trifecta](https://simonwillison.net/2025/Jun/16/the-lethal-trifecta/):
@@ -174,12 +175,17 @@ protection incident.
   a narrower and less reliable way out than a message, and it is one. An operator
   who needs every path closed also reviews which folders, boards and tables the
   connected accounts share.
+- A conditional replacement can change content visible to people who share
+  a file. The `versioned` result is true only when Nextcloud confirms a
+  retained previous version; false means retention could not be confirmed.
 - **Mail is read only.** There is no way in this app to send a mail, to create a
   draft, to move, flag or delete a message, and the attachment route of the Mail app
   is never called. The new family adds reach into private data and untrusted
   content, and it deliberately adds no second way out.
-- There are no destructive write paths at all. Nothing is deleted, overwritten,
-  moved or re-shared, and the write tools that exist can only create.
+- No tool deletes, moves or re-shares files. Uploads remain create-only.
+  When `NC_MCP_FILES_UPDATE` is enabled, `files_update` can replace an
+  existing UTF-8 text file only with a matching ETag. Stale or deleted
+  targets are refused as conflicts.
 - The assistant never sees more than the signed in user. Every request runs under
   that identity, so Nextcloud's own permissions decide what an injection could
   reach at most.
@@ -195,8 +201,9 @@ checkable: there is no code path in this app that sends, drafts, moves, flags or
 deletes a mail, and a contract test asserts it against the source of the two mail
 modules on every run. An operator who wants the direct messaging channel closed sets
 `NC_MCP_TALK_SEND` to off; one who needs every way out closed also reviews what the
-connected accounts share, because a create-only write into a shared container
-remains a path outwards that no switch of this app removes.
+connected accounts share, because creating a file or conditionally replacing
+its content in a shared container remains a path outwards. Disabling
+`NC_MCP_FILES_UPDATE` closes the replacement path, but not the create-only path.
 
 ## Deletion and user control
 

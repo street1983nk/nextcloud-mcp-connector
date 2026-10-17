@@ -136,7 +136,7 @@ async def test_the_admin_form_sits_in_the_admin_section() -> None:
 
 @pytest.mark.anyio
 @respx.mock
-async def test_the_seven_fields_are_the_seven_config_keys_in_order() -> None:
+async def test_the_eight_fields_are_the_eight_config_keys_in_order() -> None:
     """The field id IS the configuration key, so form and read path cannot drift apart.
 
     Five since the audit of the v1.0 milestone: ``NC_MCP_OAUTH_CIMD`` existed as a deploy
@@ -162,6 +162,7 @@ async def test_the_seven_fields_are_the_seven_config_keys_in_order() -> None:
         "oauth_allowed_clients",
         "talk_send",
         "audit_log",
+        "files_update",
     ]
     assert tuple(field["id"] for field in fields) == config_values.CONFIG_KEYS
     assert [field["type"] for field in fields] == [
@@ -170,6 +171,7 @@ async def test_the_seven_fields_are_the_seven_config_keys_in_order() -> None:
         "checkbox",
         "checkbox",
         "text",
+        "checkbox",
         "checkbox",
         "checkbox",
     ]
@@ -326,13 +328,30 @@ async def test_the_audit_log_field_is_a_checkbox_that_ships_off() -> None:
     await admin_settings.register_admin_form(env=ENV)
 
     fields = json.loads(route.calls.last.request.content)["formScheme"]["fields"]
-    audit_log = fields[-1]
+    audit_log = next(field for field in fields if field["id"] == "audit_log")
     assert audit_log["id"] == "audit_log"
     assert audit_log["type"] == "checkbox"
     assert audit_log["default"] is False
     assert audit_log["title"] == strings.ADMIN_FIELD_AUDIT_LOG_LABEL
     assert audit_log["description"] == strings.ADMIN_FIELD_AUDIT_LOG_DESCRIPTION
     assert "sensitive" not in json.dumps(audit_log).lower()
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_the_files_update_field_is_a_checkbox_that_ships_off() -> None:
+    """The files update switch is opt-in and therefore ships disabled."""
+    route = respx.post(SETTINGS_URL).mock(return_value=httpx.Response(200, json={}))
+
+    await admin_settings.register_admin_form(env=ENV)
+
+    fields = json.loads(route.calls.last.request.content)["formScheme"]["fields"]
+    files_update = next(field for field in fields if field["id"] == "files_update")
+    assert files_update["type"] == "checkbox"
+    assert files_update["default"] is False
+    assert files_update["title"] == strings.ADMIN_FIELD_FILES_UPDATE_LABEL
+    assert files_update["description"] == strings.ADMIN_FIELD_FILES_UPDATE_DESCRIPTION
+    assert "sensitive" not in json.dumps(files_update).lower()
 
 
 @pytest.mark.anyio
@@ -429,7 +448,7 @@ async def test_no_field_of_the_form_offers_a_level_of_recording() -> None:
     await admin_settings.register_admin_form(env=ENV)
 
     fields = json.loads(route.calls.last.request.content)["formScheme"]["fields"]
-    assert len(fields) == 7, "every field of the form is walked, not a subset of it"
+    assert len(fields) == 8, "every field of the form is walked, not a subset of it"
     for field in fields:
         assert LEVEL_WORD.search(json.dumps(field).lower()) is None, (
             f"{field['id']} offers a level of recording this app cannot deliver"

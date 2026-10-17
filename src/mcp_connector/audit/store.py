@@ -325,6 +325,14 @@ CREATE TABLE IF NOT EXISTS entries (
   hash        BLOB NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS file_updates (
+  seq       INTEGER PRIMARY KEY AUTOINCREMENT,
+  at        INTEGER NOT NULL,
+  path      TEXT NOT NULL,
+  old_etag  TEXT NOT NULL,
+  new_etag  TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS entries_chain_seq ON entries(chain, seq);
 CREATE INDEX IF NOT EXISTS entries_at ON entries(at);
 """
@@ -983,6 +991,30 @@ class AuditStore:
             return seq
 
         return await self._transaction(work)
+
+    async def record_file_update(
+        self,
+        *,
+        path: str,
+        old_etag: str,
+        new_etag: str,
+        moment: int | None = None,
+    ) -> None:
+        def work(conn):
+            conn.execute(
+                """
+                INSERT INTO file_updates (at, path, old_etag, new_etag)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    int(time.time()) if moment is None else moment,
+                    path,
+                    old_etag,
+                    new_etag,
+                ),
+            )
+
+        await self._write(work)
 
     async def sweep(
         self,

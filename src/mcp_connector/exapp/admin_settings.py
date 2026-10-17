@@ -109,6 +109,7 @@ def form_scheme(env: Mapping[str, str] | None = None) -> dict[str, Any]:
         allowed_field,
         talk_send_field,
         audit_log_field,
+        files_update_field,
     ) = CONFIG_KEYS
     return {
         "id": ADMIN_FORM_ID,
@@ -185,6 +186,13 @@ def form_scheme(env: Mapping[str, str] | None = None) -> dict[str, Any]:
                 # administrator has to be able to decide about. So the box is unticked, which
                 # is what ``config.audit_log_enabled`` answers for an unset value, and an
                 # installation that never opens this form records nothing at all.
+                "default": False,
+            },
+            {
+                "id": files_update_field,
+                "title": strings.ADMIN_FIELD_FILES_UPDATE_LABEL,
+                "description": strings.ADMIN_FIELD_FILES_UPDATE_DESCRIPTION,
+                "type": "checkbox",
                 "default": False,
             },
         ],

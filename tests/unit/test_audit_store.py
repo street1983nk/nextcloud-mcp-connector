@@ -362,7 +362,7 @@ async def test_an_acting_party_is_cleaned_on_the_same_rule_as_a_client_name(
     its own idea of what is printable is how R-18-06 happened once already.
     """
     subject = open_store(tmp_path)
-    hostile = "kc\nclient‮" + "x" * 200
+    hostile = "kc\nclient\u202e" + "x" * 200
     await subject.append(
         store.Entry(
             chain=ALICE,
@@ -378,7 +378,7 @@ async def test_an_acting_party_is_cleaned_on_the_same_rule_as_a_client_name(
     (row,) = rows(tmp_path)
     actor, client_name = row[4], row[9]
     assert "\n" not in actor
-    assert "‮" not in actor
+    assert "\u202e" not in actor
     assert len(actor) <= store.ACTOR_LIMIT
     assert actor == client_name[: store.ACTOR_LIMIT], "one rule, applied twice, not two rules"
 
@@ -1204,3 +1204,27 @@ async def test_the_account_check_is_never_offered_the_refusal_chain(tmp_path: Pa
     await write_calls(subject, ALICE, [silent])
 
     assert await subject.silent_users(moment=moment) == ["alice"]
+
+
+async def test_file_update_audit_records_path_and_both_etags(tmp_path: Path) -> None:
+    audit_store = open_store(tmp_path)
+
+    await audit_store.record_file_update(
+        path="/documents/report.txt",
+        old_etag='"old-etag"',
+        new_etag='"new-etag"',
+        moment=1_800_000_000,
+    )
+
+    conn = sqlite3.connect(tmp_path / store.AUDIT_FILENAME)
+    try:
+        row = conn.execute("SELECT at, path, old_etag, new_etag FROM file_updates").fetchone()
+    finally:
+        conn.close()
+
+    assert row == (
+        1_800_000_000,
+        "/documents/report.txt",
+        '"old-etag"',
+        '"new-etag"',
+    )

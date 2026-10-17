@@ -113,7 +113,7 @@ class AppMissingError(ToolError):
 
 
 class ConflictError(ToolError):
-    """The target already exists. This server never overwrites (TOOL-09)."""
+    """The requested operation conflicts with the target's current state."""
 
 
 class IssuerRefused(ToolError):

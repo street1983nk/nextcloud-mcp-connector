@@ -44,6 +44,8 @@ __all__ = [
     "ADMIN_FIELD_CIMD_LABEL",
     "ADMIN_FIELD_DCR_DESCRIPTION",
     "ADMIN_FIELD_DCR_LABEL",
+    "ADMIN_FIELD_FILES_UPDATE_DESCRIPTION",
+    "ADMIN_FIELD_FILES_UPDATE_LABEL",
     "ADMIN_FIELD_PUBLIC_URL_DESCRIPTION",
     "ADMIN_FIELD_PUBLIC_URL_LABEL",
     "ADMIN_FIELD_TALK_SEND_DESCRIPTION",
@@ -697,6 +699,7 @@ ADMIN_FIELD_PUBLIC_URL_DESCRIPTION = (
     "change takes effect after you disable and enable this app again."
 )
 
+
 ADMIN_FIELD_DCR_LABEL = "Let assistant apps register themselves"
 
 ADMIN_FIELD_DCR_DESCRIPTION = (
@@ -793,6 +796,23 @@ ADMIN_FIELD_AUDIT_LOG_DESCRIPTION = (
     "of this app deletes the record with it. This is off unless you switch it on, and a "
     "change takes effect after you disable and enable this app again."
 )
+
+ADMIN_FIELD_FILES_UPDATE_LABEL = "Allow editing existing text files"
+
+#: The form half of ``NC_MCP_FILES_UPDATE``. This is an opt-in write capability: an update
+#: replaces the whole UTF-8 text file only when the caller presents the ETag it read before
+#: editing. A changed or deleted file therefore becomes a conflict rather than an overwrite.
+#: The switch does not create, delete, move or rename files, and follows the same activation
+#: cycle as the other administration switches.
+ADMIN_FIELD_FILES_UPDATE_DESCRIPTION = (
+    "With this on, assistant apps can replace the contents of an existing UTF-8 text file "
+    "through this connector when they present the ETag they read before the edit. If the "
+    "file changed or was deleted in the meantime, the update is rejected and the client must "
+    "read it again and decide what to do. Updates replace the whole file; they cannot create, "
+    "delete, move or rename files. Creating files remains available through the upload tool. "
+    "A change takes effect after you disable and enable this app again."
+)
+
 
 # --- The setup state a missing public address produces (consumed by plan 05-04) -----------
 #

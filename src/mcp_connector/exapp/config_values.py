@@ -123,6 +123,7 @@ CONFIG_KEYS: tuple[str, ...] = (
     "oauth_allowed_clients",
     "talk_send",
     "audit_log",
+    "files_update",
 )
 
 #: The variable each key stands for. The overlay speaks the language of the deploy
@@ -135,6 +136,7 @@ KEY_TO_ENV: Mapping[str, str] = {
     "oauth_allowed_clients": registry.ENV_ALLOWED_CLIENTS,
     "talk_send": config.ENV_TALK_SEND,
     "audit_log": config.ENV_AUDIT_LOG,
+    "files_update": config.ENV_FILES_UPDATE,
 }
 
 #: The keys that carry a checkbox, named once so the validation cannot drift from the form.
@@ -143,7 +145,7 @@ KEY_TO_ENV: Mapping[str, str] = {
 #: the key out of the overlay, so the deploy variable and then the default in code decide,
 #: and that default is off (``config.audit_log_enabled``).
 SWITCH_KEYS: frozenset[str] = frozenset(
-    {"oauth_dcr", "oauth_cimd", "oauth_allowlist_only", "talk_send", "audit_log"}
+    {"oauth_dcr", "oauth_cimd", "oauth_allowlist_only", "talk_send", "audit_log", "files_update"}
 )
 
 #: The spellings a switch may arrive in. Aligned with the two sets of ``oauth/registry.py``

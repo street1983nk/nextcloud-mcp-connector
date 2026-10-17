@@ -278,6 +278,29 @@ async def note(
         logger.error("the audit log did not record a call: %s", type(exc).__name__)
 
 
+async def record_file_update(
+    ctx: Any,
+    *,
+    path: str,
+    old_etag: str,
+    new_etag: str,
+) -> None:
+    """Record a successful file update separately from the value-free call chain."""
+    recorder = _recorder_of(ctx)
+    if recorder is None:
+        return
+
+    try:
+        audit_store = await recorder.store_provider()
+        await audit_store.record_file_update(
+            path=path,
+            old_etag=old_etag,
+            new_etag=new_etag,
+        )
+    except Exception as exc:
+        logger.error("the audit log did not record a file update: %s", type(exc).__name__)
+
+
 async def note_switch(audit_store: AuditStore, *, enabled: bool, moment: int) -> None:
     """Write the switching of the log itself into the chain of instance events (D-15).
 

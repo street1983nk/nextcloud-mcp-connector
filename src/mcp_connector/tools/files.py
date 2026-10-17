@@ -26,7 +26,7 @@ from typing import Any
 
 from .. import config, documents, ids, paging
 from ..documents import detect as document_detect
-from ..errors import REASON_GUARD_TRIPPED, ToolError
+from ..errors import REASON_GUARD_TRIPPED, REASON_UNKNOWN_ID, ConflictError, ToolError
 from ..nextcloud import NcClients
 from ..nextcloud.clients import dav
 from ..nextcloud.exclusion import TagScope
@@ -368,6 +368,7 @@ async def read(
         )
 
     target = dav.safe_path(path)
+
     info = await _visible_stat(clients, target, known)
 
     if info["is_collection"]:
@@ -638,6 +639,60 @@ async def upload(
     return await dav.put_new_file(clients.client, clients.creds, target, data, content_type)
 
 
+async def update(
+    clients: NcClients,
+    path: str,
+    content: str,
+    etag: str,
+) -> dict:
+    """Replace an existing UTF-8 text file when its ETag still matches."""
+    if (path or "").strip().endswith("/"):
+        raise ToolError(
+            message=f"{path!r} names a folder, not a file.",
+            hint=_FILE_TARGET_HINT,
+        )
+
+    target = dav.safe_path(path)
+
+    info = await _visible_stat(clients, target, missing_as_conflict=True)
+
+    if info["is_collection"]:
+        raise ToolError(
+            message=f"{target} is a folder, not a file.",
+            hint="Use files_list to see what is inside a folder.",
+        )
+
+    content_type = info["content_type"] or "application/octet-stream"
+    if not _is_text(content_type):
+        raise ToolError(
+            message=f"{target} is {content_type} and not text.",
+            hint="files_update only replaces UTF-8 text files in v1.",
+        )
+
+    try:
+        data = content.encode("utf-8")
+    except UnicodeEncodeError:
+        raise ToolError(
+            message="The content is not valid UTF-8 text.",
+            hint="Send plain text; this tool does not update binary content.",
+        ) from None
+
+    if len(data) > HARD_MAX_BYTES:
+        raise ToolError(
+            message="The replacement content exceeds the maximum supported size.",
+            hint=f"Keep the replacement at or below {HARD_MAX_BYTES} bytes.",
+        )
+
+    return await dav.update_file(
+        clients.client,
+        clients.creds,
+        target,
+        data,
+        content_type,
+        etag,
+    )
+
+
 async def upload_binary(
     clients: NcClients,
     path: str,
@@ -835,7 +890,11 @@ async def _writable(clients: NcClients, target: str) -> None:
 
 
 async def _visible_stat(
-    clients: NcClients, target: str, known: Mapping[str, Any] | None = None
+    clients: NcClients,
+    target: str,
+    known: Mapping[str, Any] | None = None,
+    *,
+    missing_as_conflict: bool = False,
 ) -> dict[str, Any]:
     """``dav.stat`` of ``target``, or the error a path that does not exist would get.
 
@@ -875,6 +934,13 @@ async def _visible_stat(
     if scope.state == "unverifiable":
         raise withhold.unavailable_error()
     if isinstance(info, BaseException):
+        if missing_as_conflict and isinstance(info, ToolError) and info.reason == REASON_UNKNOWN_ID:
+            if scope.excludes(path=target):
+                raise dav.not_found(target)
+            raise ConflictError(
+                message=f"The file {target!r} changed or was deleted before it could be updated.",
+                hint="Re-read the file and decide whether to retry.",
+            ) from None
         raise info
     if scope.excludes(path=target, fileid=str(info.get("fileid") or "") or None):
         raise dav.not_found(target)

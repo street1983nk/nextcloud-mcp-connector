@@ -12,10 +12,11 @@ from mcp.server.mcpserver import Context
 from mcp.types import BlobResourceContents, EmbeddedResource, TextContent
 from pydantic import Field
 
-from .. import deps
+from .. import config, deps
+from ..audit import record as audit_record
 from ..errors import ToolError
 from ..tools import files as files_tools
-from . import CREATE_ONLY, READ_ONLY, compact, graceful, mcp
+from . import CREATE_ONLY, READ_ONLY, UPDATE_EXISTING, compact, graceful, mcp
 
 
 @mcp.tool(annotations=READ_ONLY, structured_output=False)
@@ -185,3 +186,37 @@ async def files_upload(
             hint="For a PDF, encode one chunk of its bytes as base64.",
         )
     return compact(await files_tools.upload(clients, path=path, content=content))
+
+
+if config.files_update_enabled():
+
+    @mcp.tool(annotations=UPDATE_EXISTING, structured_output=False)
+    @graceful
+    async def files_update(
+        path: Annotated[str, Field(description="Existing text file path; must already exist")],
+        content: Annotated[str, Field(description="Complete replacement content as UTF-8 text")],
+        etag: Annotated[str, Field(description="ETag returned when the file was read")],
+        ctx: Context | None = None,
+    ) -> str:
+        """Replace an existing UTF-8 text file only when its ETag still matches.
+
+        This is a whole-file replacement: it cannot create, delete, move or rename
+        files. If the file changed or was deleted, the update is rejected and the
+        client must read it again and decide what to do. Version history is not
+        guaranteed for every Nextcloud storage backend.
+        """
+
+        clients = deps.resolve_clients(ctx)
+        result = await files_tools.update(
+            clients,
+            path=path,
+            content=content,
+            etag=etag,
+        )
+        await audit_record.record_file_update(
+            ctx,
+            path=path,
+            old_etag=etag,
+            new_etag=result["etag"],
+        )
+        return compact(result)

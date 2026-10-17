@@ -350,3 +350,90 @@ async def test_binary_upload_rejects_invalid_base64_before_network(clients: NcCl
         assert len(mock.calls) == 0
 
     assert "base64" in excinfo.value.message.lower()
+
+
+@pytest.mark.anyio
+async def test_update_replaces_text_file_with_caller_etag(clients: NcClients) -> None:
+    current_etag = '"caller-etag"'
+    new_etag = '"new-etag"'
+    stat_xml = """<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
+  <d:response>
+    <d:propstat>
+      <d:prop>
+        <oc:fileid>123</oc:fileid>
+        <d:getcontentlength>13</d:getcontentlength>
+        <d:getcontenttype>text/markdown</d:getcontenttype>
+        <d:getlastmodified>Thu, 08 Oct 2026 10:00:00 GMT</d:getlastmodified>
+        <d:getetag>"new-etag"</d:getetag>
+        <d:resourcetype/>
+      </d:prop>
+      <d:status>HTTP/1.1 200 OK</d:status>
+    </d:propstat>
+  </d:response>
+</d:multistatus>"""
+    with respx.mock(assert_all_called=True) as mock:
+        put = mock.route(method="PUT", url=TARGET_URL).mock(return_value=httpx.Response(204))
+        mock.route(method="PROPFIND", url=TARGET_URL).mock(
+            return_value=httpx.Response(207, text=stat_xml)
+        )
+
+        mock.route(
+            method="GET",
+            url__regex=r".*/ocs/v2\.php/apps/files_versions/api/v1/versions/123(?:\?.*)?$",
+        ).mock(
+            return_value=httpx.Response(
+                200,
+                json={"ocs": {"data": [{"id": 1}]}},
+            )
+        )
+
+        result = await files_tools.update(
+            clients,
+            path=TARGET,
+            content="# Updated\n",
+            etag=current_etag,
+        )
+
+    assert put.calls[0].request.headers["if-match"] == current_etag
+    assert put.calls[0].request.content == b"# Updated\n"
+    assert put.calls[0].request.headers["content-type"] == "text/markdown"
+    assert result == {
+        "path": TARGET,
+        "etag": new_etag,
+        "size": 13,
+        "mtime": "Thu, 08 Oct 2026 10:00:00 GMT",
+        "versioned": True,
+    }
+
+
+@pytest.mark.anyio
+async def test_update_stale_etag_is_final_conflict_without_retry(clients: NcClients) -> None:
+    stat_xml = """<?xml version="1.0" encoding="utf-8"?>
+<d:multistatus xmlns:d="DAV:">
+  <d:response><d:propstat><d:prop>
+    <d:getcontentlength>10</d:getcontentlength>
+    <d:getcontenttype>text/markdown</d:getcontenttype>
+    <d:getlastmodified>Thu, 08 Oct 2026 10:00:00 GMT</d:getlastmodified>
+    <d:getetag>"current-etag"</d:getetag>
+    <d:resourcetype/>
+  </d:prop></d:propstat></d:response>
+</d:multistatus>"""
+    with respx.mock as mock:
+        mock.route(method="PROPFIND", url=TARGET_URL).mock(
+            return_value=httpx.Response(207, text=stat_xml)
+        )
+        put = mock.route(method="PUT", url=TARGET_URL).mock(return_value=httpx.Response(412))
+
+        with pytest.raises(ConflictError) as excinfo:
+            await files_tools.update(
+                clients,
+                path=TARGET,
+                content="# Unsafe update\n",
+                etag='"stale-etag"',
+            )
+
+    assert put.call_count == 1
+    text = f"{excinfo.value.message} {excinfo.value.hint}"
+    assert "changed or was deleted" in text
+    assert "Re-read the file" in text

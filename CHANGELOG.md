@@ -162,6 +162,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Optional `files_update`, disabled by default and registered only when
+  `NC_MCP_FILES_UPDATE` is enabled by an administrator. It replaces existing UTF-8 text files
+  using mandatory `If-Match` ETag checks and rejects stale or deleted files without retrying.
+  Each successful update records the path and old/new ETags in a dedicated audit table.
+  Previous-version retention depends on the Nextcloud storage backend.
+
 - `files_download` returns Nextcloud files as embedded MCP binary resources. It applies the
   caller's existing Nextcloud permissions, refuses folders and supports files of any total
   size through bounded 8 MiB chunks linked by `next_offset`.

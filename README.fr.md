@@ -1,4 +1,4 @@
-[English](README.md) | [Deutsch](README.de.md) | **Français**
+﻿[English](README.md) | [Deutsch](README.de.md) | **Français**
 
 > Le README anglais (README.md) fait foi ; cette traduction est mise à jour ensuite.
 
@@ -48,9 +48,8 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
 
 - Rien supprimer : aucun outil n'émet de DELETE sur des fichiers, événements, notes, cartes
   ou contacts
-- Rien écraser : les écritures sont en création seule, et `files_upload` refuse un chemin
-  existant par une erreur claire au lieu de le remplacer ; les fichiers binaires sont envoyés
-  en blocs Base64 de taille totale quelconque
+* Pas d’écrasement inconditionnel : `files_upload` refuse les chemins existants. `files_update` est désactivé par défaut et n’est disponible
+  que si l’administrateur active `NC_MCP_FILES_UPDATE`. Il peut remplacer un fichier texte UTF-8 existant uniquement si son ETag correspond à celui lu précédemment ; les fichiers modifiés ou supprimés sont refusés. L’historique des versions dépend du backend de stockage.
 - Aucun déplacement, aucun renommage, aucune modification de partage ni de permission
 - Mail est strictement en lecture seule : aucun envoi, aucun brouillon, aucun déplacement,
   aucun marquage, aucune suppression, aucun téléchargement de pièce jointe

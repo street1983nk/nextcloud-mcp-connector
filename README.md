@@ -40,8 +40,10 @@ You bring the model, and no content leaves your server.
 ## What this server cannot do
 
 - No deleting: no tool issues a DELETE against files, events, notes, cards or contacts
-- No overwriting: writes are create-only, and `files_upload` refuses an existing path with a
-  clear error instead of replacing it
+- No unconditional overwriting: `files_upload` refuses existing paths. If the admin enables
+  `NC_MCP_FILES_UPDATE`, `files_update` can replace an existing UTF-8 text file only when its
+  ETag matches the value read earlier; stale or deleted files are rejected. Version history
+  depends on the Nextcloud storage backend.
 - No user-visible moving or renaming, no share changes and no permission changes; binary
   uploads use Nextcloud's private chunk assembly and still refuse an existing destination
 - Mail is strictly read only: no sending, no draft, no move, no flag, no delete, and no
@@ -67,6 +69,7 @@ the live registry and fails if a name or a level disagrees with it.
 | `files_download` | read | Any-size file as bounded embedded-resource chunks |
 | `files_read_as_markdown` | read | A DOCX, XLSX, PPTX or PDF file converted to Markdown, in slices |
 | `files_upload` | create-only | A new text file or any-size binary upload in base64 chunks; an existing path is refused, never overwritten |
+| `files_update` | conditional-update | Replaces an existing UTF-8 text file only with its previously read ETag; available only when the admin enables `NC_MCP_FILES_UPDATE` |
 | `calendar_list_events` | read | Events in an explicit time range, with an explicit time zone |
 | `calendar_create_event` | create-only | A new event; existing events are never changed |
 | `notes_search` | read | Notes by title and content, via the Nextcloud notes search provider |

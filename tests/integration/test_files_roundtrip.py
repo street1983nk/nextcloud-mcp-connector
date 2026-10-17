@@ -16,6 +16,7 @@ green on a machine without Docker.
 
 import time
 import uuid
+from urllib.parse import quote
 
 import httpx
 import pytest
@@ -107,3 +108,77 @@ async def test_read_of_a_missing_file_reports_not_found(clients: NcClients) -> N
 
     assert "not found" in excinfo.value.message.lower()
     assert excinfo.value.hint
+
+
+async def test_stale_if_match_returns_412_and_preserves_content(
+    clients: NcClients,
+) -> None:
+    path = _unique_path()
+    await files_tools.upload(clients, path=path, content="original\n")
+    stale_etag = (await dav.stat(clients.client, clients.creds, path))["etag"]
+    await files_tools.update(clients, path=path, content="updated\n", etag=stale_etag)
+
+    raw = await clients.client.put(
+        dav.files_url(clients.creds, path),
+        content=b"stale overwrite\n",
+        headers={"If-Match": stale_etag, "Content-Type": "text/markdown"},
+        auth=httpx.BasicAuth(clients.creds.user, clients.creds.secret),
+    )
+    assert raw.status_code == 412
+    assert (await files_tools.read(clients, path=path))["content"] == "updated\n"
+
+
+async def test_correct_if_match_returns_204_and_replaces_content(
+    clients: NcClients,
+) -> None:
+    path = _unique_path()
+    await files_tools.upload(clients, path=path, content="before\n")
+    etag = (await dav.stat(clients.client, clients.creds, path))["etag"]
+
+    raw = await clients.client.put(
+        dav.files_url(clients.creds, path),
+        content=b"after\n",
+        headers={"If-Match": etag, "Content-Type": "text/markdown"},
+        auth=httpx.BasicAuth(clients.creds.user, clients.creds.secret),
+    )
+    assert raw.status_code == 204
+    assert (await files_tools.read(clients, path=path))["content"] == "after\n"
+
+
+async def test_update_retains_previous_version(clients: NcClients) -> None:
+    path = _unique_path()
+    original = "previous version\n"
+    await files_tools.upload(clients, path=path, content=original)
+    etag = (await dav.stat(clients.client, clients.creds, path))["etag"]
+
+    await files_tools.update(clients, path=path, content="replacement\n", etag=etag)
+
+    info = await dav.stat(clients.client, clients.creds, path)
+    response = await clients.client.get(
+        f"{clients.creds.base_url}/ocs/v2.php/apps/files_versions/api/v1/versions/{info['fileid']}",
+        params={"format": "json"},
+        headers={"OCS-APIRequest": "true"},
+        auth=httpx.BasicAuth(clients.creds.user, clients.creds.secret),
+    )
+    response.raise_for_status()
+    versions = response.json()["ocs"]["data"]
+    assert versions, "Nextcloud should retain a previous version after replacement"
+
+    previous = next(
+        (version for version in versions if version.get("timestamp") or version.get("version")),
+        None,
+    )
+    assert previous is not None, "a retained version must identify its revision"
+    revision = previous.get("timestamp") or previous.get("version")
+
+    version_url = (
+        f"{clients.creds.base_url}/remote.php/dav/versions/"
+        f"{quote(clients.creds.user, safe='')}/versions/"
+        f"{info['fileid']}/{quote(str(revision), safe='')}"
+    )
+    download = await clients.client.get(
+        version_url,
+        auth=httpx.BasicAuth(clients.creds.user, clients.creds.secret),
+    )
+    download.raise_for_status()
+    assert download.text == original

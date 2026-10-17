@@ -145,11 +145,11 @@ decision for the operator, see privacy.md, not a vulnerability).
 
 - There is no admin surface: the connector acts as one user, and a
   connection made by a restricted account stays restricted.
-- No tool deletes, overwrites, moves, renames, re-shares or changes
-  permissions; writes are create-only.
-  `tests/contract/test_no_destructive_calls.py` reads the modules and
-  fails on the first destructive call, and
-  `tests/contract/test_tool_classes.py` keeps every tool classified.
+- No tool deletes, moves, renames, re-shares or changes permissions.
+  `files_upload` remains create-only. When `NC_MCP_FILES_UPDATE` is
+  enabled, `files_update` can replace existing UTF-8 text files only
+  with a matching ETag. Contract tests guard conditional file writes,
+  and `tests/contract/test_tool_classes.py` keeps every tool classified.
 - Mail is strictly read only, asserted the same way: the family that adds
   the widest untrusted input adds no capability in return.
 
@@ -157,21 +157,26 @@ decision for the operator, see privacy.md, not a vulnerability).
 
 A1 through A4 meet here: untrusted content carries an instruction, the
 model follows it, and the question is only what the instruction can reach.
-No known method prevents the injection itself. This project bounds the
-blast radius instead: the user's own rights as ceiling, no destructive
-calls, the one direct outgoing channel (`talk_send`) switchable off
-instance-wide, mail with deliberately no way out, provenance returned as
-structured fields. The full chain, including the honest remainder about
-create-only writes into shared containers, is in privacy.md; the
-operator's checklist against it is hardening.md.
+No known method prevents the injection itself. This project bounds
+the blast radius instead: the user's own rights as ceiling, no tool
+for deleting, moving, renaming or re-sharing files, optional `files_update`
+replacements protected by a matching ETag, the one direct outgoing channel
+(`talk_send`) switchable off instance-wide, mail with deliberately no outgoing
+channel, and provenance returned as structured fields. The full chain,
+including the honest remainder about writes into shared containers and
+conditional replacements, is in privacy.md; the operator's checklist
+against it is hardening.md.
 
 ## Residual risks, in plain sentences
 
 1. **Prompt injection is reduced, not removed.** A model with a live grant
-   can still be talked into misusing the read tools and the create-only
-   writes within the user's rights.
-2. **A create-only write into a shared container is a way out.** No switch
-   of this app removes it; reviewing what connected accounts share does.
+   can still misuse read tools and create-only writes within the user's
+   rights. When `NC_MCP_FILES_UPDATE` is enabled, it can also request
+   ETag-protected replacement of existing UTF-8 text files.
+2. **Writes into shared containers can expose content.** Created files and
+   conditionally replaced file content may be visible to other people with
+   access. Review which folders, boards and tables the connected accounts
+   share, and disable `NC_MCP_FILES_UPDATE` when replacements are not needed.
 3. **A tag above a share root does not protect the recipient's view.**
    Measured, documented, and testable per instance, but it stays the
    deployment mistake this design permits.

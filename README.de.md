@@ -1,4 +1,4 @@
-[English](README.md) | **Deutsch** | [Français](README.fr.md)
+﻿[English](README.md) | **Deutsch** | [Français](README.fr.md)
 
 > Die englische README (README.md) ist die maßgebliche Fassung; diese Übersetzung wird nachgezogen.
 
@@ -47,9 +47,8 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
 
 - Nichts löschen: kein Tool setzt ein DELETE auf Dateien, Termine, Notizen, Karten oder
   Kontakte ab
-- Nichts überschreiben: Schreiben legt nur neu an, und `files_upload` lehnt einen vorhandenen
-  Pfad mit klarem Fehler ab, statt ihn zu ersetzen; Binärdateien werden in Base64-Blöcken
-  beliebiger Gesamtgröße hochgeladen
+* Kein bedingungsloses Überschreiben: `files_upload` lehnt bereits vorhandene Pfade ab. `files_update` ist standardmäßig deaktiviert und wird
+  nur registriert, wenn ein Administrator `NC_MCP_FILES_UPDATE` aktiviert. Bestehende UTF-8-Textdateien werden nur ersetzt, wenn der zuvor gelesene ETag übereinstimmt. Geänderte oder gelöschte Dateien werden abgelehnt; der Versionsverlauf hängt vom Speicher-Backend ab.
 - Kein Verschieben, kein Umbenennen, keine Änderung von Freigaben oder Berechtigungen
 - Mail ist strikt lesend: kein Senden, kein Entwurf, kein Verschieben, kein Markieren, kein
   Löschen, kein Anhang-Download

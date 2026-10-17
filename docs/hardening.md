@@ -65,9 +65,11 @@ and a language model does not reliably separate data from instructions. There
 is no known complete defence. What this server does instead is bound the
 damage:
 
-- no tool deletes, overwrites, moves, renames or changes shares or
-  permissions; writes are create-only, and a contract test fails on the first
-  destructive call,
+- no tool deletes, moves, renames or changes shares or
+  permissions; `files_upload` remains create-only. When
+  `NC_MCP_FILES_UPDATE` is enabled, `files_update` can replace an
+  existing UTF-8 text file only with a matching ETag; contract tests
+  require conditional headers on file PUT routes,
 - content is returned with its origin as structured fields, so the client can
   tell where text came from,
 - the outgoing channel can be closed instance-wide (section 4).

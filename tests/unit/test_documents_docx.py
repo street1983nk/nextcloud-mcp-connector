@@ -102,8 +102,10 @@ def test_twenty_thousand_paragraphs_convert_quickly() -> None:
     for _ in range(19999):
         body.append(copy.deepcopy(paragraph))
 
+    data = _saved(document)
+
     started = time.perf_counter()
-    text = docx_conv.to_markdown(_saved(document))
+    text = docx_conv.to_markdown(data)
     elapsed = time.perf_counter() - started
     assert text.startswith("# Top\n")
     assert text.count("line") == 20000
