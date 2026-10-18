@@ -47,6 +47,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   as `pyproject.toml` and the repository licence file.
 - Dependency lift after a pip-audit pass: httpx2 2.13.1 (PYSEC-2026-3846,
   -3848, -3849) and PyJWT 2.15.1 (PYSEC-2026-4141, -4183).
+- Dependency lift after a pip-audit pass: mcp 2.3.0 (CVE-2026-59951, session
+  accumulation in the stateful Streamable HTTP transport; this server runs the
+  stateless leg, so the lift closes the audit finding rather than a live
+  exposure). The SDK now surfaces only its own `ToolError` to the model and
+  masks every other exception as a generic crash, so the graceful wrapper
+  raises that type; the one honest sentence per error reaches the model
+  unchanged.
 
 ### Fixed
 

@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from mcp.server.mcpserver.exceptions import ToolError as McpToolError
 from starlette.requests import Request
 
 from mcp_connector.audit import AUDIT_STATE_ATTR
@@ -246,7 +247,7 @@ async def test_a_refusal_is_recorded_with_its_identifier_and_never_with_its_sent
     context = FakeContext(params=call_of(path="/notes"), recorder=recorder, who=identity())
     refused = ToolError(REFUSAL_MESSAGE, REFUSAL_HINT, reason=REASON_PERMISSION_DENIED)
 
-    with pytest.raises(ValueError, match="No permission to write"):
+    with pytest.raises(McpToolError, match="No permission to write"):
         await refusing(ctx=context, error=refused)
 
     row = one_row(audit_file)
@@ -263,7 +264,7 @@ async def test_a_refusal_without_an_identifier_stays_unspecified(
     """D-17: the roughly 223 untouched raise sites read as "not determined", not as a guess."""
     context = FakeContext(params=call_of(path="/notes"), recorder=recorder, who=identity())
 
-    with pytest.raises(ValueError, match="Nothing to see"):
+    with pytest.raises(McpToolError, match="Nothing to see"):
         await refusing(ctx=context, error=ToolError("Nothing to see.", "Try another path."))
 
     row = one_row(audit_file)
