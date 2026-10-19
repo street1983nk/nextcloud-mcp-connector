@@ -17,7 +17,7 @@
 # 3.13-slim moves, the digest does not, and dependabot's docker pass moves the digest
 # deliberately instead of a rebuild moving it silently. The digest is the multi-arch
 # index, so amd64 and arm64 both resolve under it.
-FROM python:3.13-slim@sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c AS build
+FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170 AS build
 
 # A pinned uv release from the official image instead of a curl-pipe-shell installer: the
 # image tag is what resolves the dependency set, and a moving "latest" would make the
@@ -44,7 +44,7 @@ RUN uv sync --frozen --no-dev --no-editable --extra documents
 # --------------------------------------------------------------------------------------
 # Same digest as the build stage, and it has to stay the same value: two stages on two
 # different base snapshots would ship a runtime libc the build never saw.
-FROM python:3.13-slim@sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c AS runtime
+FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170 AS runtime
 
 # Provenance in the image itself, so a later security response does not have to guess
 # where this thing came from (T-02-26). A cosign signature belongs to the store
