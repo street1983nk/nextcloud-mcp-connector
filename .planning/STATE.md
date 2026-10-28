@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.7
-milestone_name: Ausschluss-Tag kein-ki
-status: Awaiting next milestone
-stopped_at: Milestone v1.7 complete (Phasenordner 25-29 bleiben in .planning/phases/, weil docs/exclusion*.md, Tests und src/ darauf verlinken)
-last_updated: "2026-10-01T12:37:43.330Z"
-last_activity: 2026-10-01, Milestone v1.7 abgeschlossen und archiviert; vorher Push 5a89219 mit CI-Lauf 36861555478 grün (SBX-01, canary-nc35), secure-phase 29 (31/31)
+milestone: v1.8
+milestone_name: Tasks-Bundle und Store-Sichtbarkeit (Release 0.7.0)
+status: planning
+last_updated: "2026-10-28T07:25:59.219Z"
+last_activity: 2026-10-28
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 38
-  completed_plans: 38
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-10-01)
 
 ## Current Position
 
-Phase: Milestone v1.7 complete (Phasen 25-29)
-Plan: keiner
-Status: Awaiting next milestone
-Last activity: 2026-10-19, Quick-Task 261019-ojn: Bootstrap-Validatoren newline-sicher (PR-26-Nachtest DaniW42)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-10-28 — Milestone v1.8 started
 
 ## Performance Metrics
 

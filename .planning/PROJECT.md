@@ -8,9 +8,16 @@ Ein schlankes MCP-only-ExApp für Nextcloud: Nutzer installieren es per Klick au
 
 Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer. Seit v1.7 auf Wunsch weniger: was das System-Tag `kein-ki` trägt, sieht er gar nicht.
 
-## Current Milestone
+## Current Milestone: v1.8 Tasks-Bundle und Store-Sichtbarkeit (Release 0.7.0)
 
-Keiner aktiv. v1.7 wurde am 2026-10-01 abgeschlossen; der nächste Zyklus startet mit `/gsd:new-milestone`, sobald das Owner-Thema feststeht. Vorher geplant: Release 0.4.0 nach dem Merge von PR #14 (andrewyager, files_read_as_markdown), nur mit Owner-Freigabe.
+**Goal:** Der Connector kann Nextcloud-Aufgaben lesen, suchen und anlegen, die Store-Auffindbarkeit steigt (mehrsprachige Summary, Forum-Thread, Cross-Promo), und am Ende steht Release 0.7.0 im Store (Submit nur mit Owner-Freigabe).
+
+**Target features:**
+- Tasks-Bundle (Issue #32): `tasks_search`, `tasks_read`, `tasks_create` über CalDAV VTODO, nach dem Muster des Kalender-Bundles (kuratiert, create-only, keine destruktiven Writes)
+- Store-Strategie vom 24.10.: Summaries en/de/fr in info.xml, `<discussion>`-Link auf einen eigenen Forum-Thread (Entwurf hier, Owner postet), Cross-Promo-Satz zu Findling
+- Release 0.7.0: Changelog, Tag, Store-Submit nur mit Owner-Freigabe; der gemergte PR #17 (ChatGPT-Attachments, ivankhokhryakov) reist mit
+
+**Key context:** Owner-Ansage 28.10.: Connector-Release vor Findling 1.6 vor Gameworld Phase 6. Die v1.7-Phasenordner 25-29 bleiben in .planning/phases/ liegen (docs/exclusion*.md, Tests und src/ verlinken darauf, Entscheid beim v1.7-Abschluss).
 
 ## Current State
 
@@ -179,4 +186,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-01 nach Abschluss von Milestone v1.7*
+*Last updated: 2026-10-28 zum Start von Milestone v1.8*
