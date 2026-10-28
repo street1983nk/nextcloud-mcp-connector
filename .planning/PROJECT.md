@@ -15,7 +15,8 @@ Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick install
 **Target features:**
 - Tasks-Bundle (Issue #32): `tasks_search`, `tasks_read`, `tasks_create` über CalDAV VTODO, nach dem Muster des Kalender-Bundles (kuratiert, create-only, keine destruktiven Writes)
 - Store-Strategie vom 24.10.: Summaries en/de/fr in info.xml, `<discussion>`-Link auf einen eigenen Forum-Thread (Entwurf hier, Owner postet), Cross-Promo-Satz zu Findling
-- Release 0.7.0: Changelog, Tag, Store-Submit nur mit Owner-Freigabe; der gemergte PR #17 (ChatGPT-Attachments, ivankhokhryakov) reist mit
+- Release 0.7.0 (Owner-Entscheid 28.10.: HEUTE, ohne Tasks): PR #17 (ChatGPT-Attachments, ivankhokhryakov), Dependency-/Security-Bumps und die Store-Texte; Submit nur mit Owner-Freigabe
+- Das Tasks-Bundle reist danach als Release 0.8.0 im selben Milestone
 
 **Key context:** Owner-Ansage 28.10.: Connector-Release vor Findling 1.6 vor Gameworld Phase 6. Die v1.7-Phasenordner 25-29 bleiben in .planning/phases/ liegen (docs/exclusion*.md, Tests und src/ verlinken darauf, Entscheid beim v1.7-Abschluss).
 

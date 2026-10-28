@@ -34,8 +34,8 @@ from mcp_connector.nextcloud.clients.xml import hardened_parser
 ROOT = Path(__file__).resolve().parents[2]
 INFO_XML = ROOT / "appinfo" / "info.xml"
 
-FROZEN_AT = "release 0.6.0"
-EXPECTED_SHA256 = "b66bbff4a403110e8343abf705edcd01a24dd95345e15f7b59ba66bc7f82fbea"
+FROZEN_AT = "release 0.7.0"
+EXPECTED_SHA256 = "bc1dbc16ae2bbbb796ef1565540205520f0e29096d053285b01713ee02a8b96a"
 EXPECTED_COUNT = 6
 
 _STORE_TAGS = ("summary", "description")

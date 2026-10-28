@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -605,7 +605,7 @@ wheels = [
 
 [[package]]
 name = "nextcloud-mcp-connector"
-version = "0.6.2"
+version = "0.7.0"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },

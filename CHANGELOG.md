@@ -11,12 +11,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-28
+
 ### Added
 
 - Native ChatGPT file attachments in `files_upload` (`openai/fileParams`): trusted
   OpenAI download hosts, bounded temporary staging, and create-only WebDAV PUT.
   Validation completes before the destination write, preventing truncated source
   streams from creating partial files. Text/base64 modes remain compatible.
+  Thanks to @ivankhokhryakov (#17).
+
+### Security
+
+- Dependency bumps over the lock file: ruff 0.17.2 and the pinned GitHub
+  Actions raised to their current patch releases. pip-audit over the shipped
+  set is clean.
 
 ## [0.6.2] - 2026-10-22
 
@@ -1037,7 +1046,8 @@ First release, submitted to the Nextcloud App Store.
   never sees more than that user sees in the web interface.
 - A privacy and data flow description, see [docs/privacy.md](docs/privacy.md).
 
-[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.6.2...v0.7.0
 [0.6.2]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.6.1...v0.6.2
 [0.6.1]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.5.1...v0.6.0
