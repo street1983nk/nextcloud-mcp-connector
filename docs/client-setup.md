@@ -192,6 +192,15 @@ still apply. Upload staging is isolated by destination and configured root; afte
 from the original chunk-upload implementation, restart any unfinished uploads with a new
 upload ID. Existing completed files are unaffected.
 
+ChatGPT file attachments can be passed as an optional `file` parameter to
+`files_upload` (advertised through `_meta["openai/fileParams"]`). Source URLs are
+restricted to `*.oaiusercontent.com` and the observed signed Azure Blob
+account `oaisdmntprdenmarkeast.blob.core.windows.net`; other tenants and redirects
+are refused. Downloaded bytes are checked in a size-bounded temporary file (never
+buffered as a complete blob in RAM) **before** the create-only WebDAV PUT begins.
+This prevents truncated or oversized source streams from creating partial files.
+The user-provided `path` is the only destination, and existing files are untouched.
+
 Each bare name is expanded into two entries, `example.com` and `example.com:*`, because a
 client that was given a port puts the port into the `Host` header. A name that already
 carries a port or a wildcard is taken exactly as written.

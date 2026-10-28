@@ -334,6 +334,9 @@ _._decode_payload
 # degraded_entry as well (plan 27-05), and unavailable_error is raised by fetch(file) (plan
 # 27-03) and by talk.one_room for a file conversation (plan 27-05).
 
+# OpenAI's file schema mandates file_name, but the destination uses only path.
+file_name
+
 # --- Issue #33 ------------------------------------------------------------------------
 # Starlette reads Response.background after the answer is sent; the enable hook sets it so
 # the restart runs only once AppAPI has its answer (exapp/lifecycle.py).

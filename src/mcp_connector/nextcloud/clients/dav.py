@@ -15,7 +15,7 @@ foreign host or vanish).
 import asyncio
 import hashlib
 import re
-from collections.abc import Sequence
+from collections.abc import AsyncIterable, Sequence
 from posixpath import dirname
 from typing import Any
 from urllib.parse import quote, unquote, urlsplit
@@ -789,6 +789,33 @@ async def put_new_file(
         files_url(creds, target),
         content=data,
         headers={"If-None-Match": "*", "Content-Type": content_type},
+        auth=creds.auth(),
+    )
+    _check_write(response, target)
+    return {
+        "path": target,
+        "etag": response.headers.get("etag", ""),
+        "created": True,
+    }
+
+
+async def put_new_file_stream(
+    client: httpx.AsyncClient,
+    creds: Credentials,
+    path: str,
+    data: AsyncIterable[bytes],
+    content_type: str,
+    content_length: int | None = None,
+) -> dict:
+    """Stream a create-only PUT without buffering the complete file in this process."""
+    target = safe_path(path)
+    # The headers stay one literal dict so the no-destructive-calls gate can read the
+    # If-None-Match precondition straight off this call site.
+    length = {} if content_length is None else {"Content-Length": str(content_length)}
+    response = await client.put(
+        files_url(creds, target),
+        content=data,
+        headers={"If-None-Match": "*", "Content-Type": content_type, **length},
         auth=creds.auth(),
     )
     _check_write(response, target)

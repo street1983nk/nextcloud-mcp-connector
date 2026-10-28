@@ -477,7 +477,7 @@ UNCONDITIONAL_PUTS = {
 
 #: Every PUT call in the production code, counted. A new PUT that this gate somehow does
 #: not flag still changes the count, so it cannot slip in silently.
-EXPECTED_PUT_CALLS = 5
+EXPECTED_PUT_CALLS = 6
 
 
 def _usable_precondition(call: ast.Call) -> bool:
