@@ -30,3 +30,10 @@ build/
 # The OAuth store of the --manual development mode: encrypted app passwords and token
 # hashes of whoever authorized against a local Nextcloud (config.DEV_STORAGE_DIR).
 .nc-mcp-dev-storage/
+
+# Impeccable: per-developer hook settings, never commit
+.impeccable/config.local.json
+.impeccable/hook.cache.json
+.impeccable/hook.pending.json
+.claude/settings.local.json
+.claude/skills/impeccable

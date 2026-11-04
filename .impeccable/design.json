@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-04T12:00:00Z",
+  "title": "Design System: MCP Connector for Nextcloud",
+  "extensions": {
+    "colorMeta": {
+      "ink-navy": { "role": "primary", "displayName": "Ink Navy", "canonical": "#1F3A5F", "tonalRamp": ["#0b1522", "#132539", "#1f3a5f", "#2f5482", "#4a6f9e", "#7593bb", "#a8bcd6", "#dde5ef"] },
+      "page-mist": { "role": "neutral", "displayName": "Page Mist", "canonical": "#F5F6F7" },
+      "card-white": { "role": "neutral", "displayName": "Card White", "canonical": "#FFFFFF" },
+      "text-ink": { "role": "neutral", "displayName": "Text Ink", "canonical": "#1A1A1A" },
+      "text-muted": { "role": "neutral", "displayName": "Text Muted", "canonical": "#5A6270" },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#D5D8DD" },
+      "error-red": { "role": "status", "displayName": "Error Red", "canonical": "#B3261E" },
+      "success-green": { "role": "status", "displayName": "Success Green", "canonical": "#1E6B3A" },
+      "warning-amber": { "role": "status", "displayName": "Warning Amber", "canonical": "#8A5A00" },
+      "warning-wash": { "role": "status", "displayName": "Warning Wash", "canonical": "#FFF8E6" }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "The one h1 of every page." },
+      "title": { "displayName": "Title", "purpose": "Section headings." },
+      "body": { "displayName": "Body", "purpose": "Sentences, lists, buttons." },
+      "label": { "displayName": "Label", "purpose": "Wordmark, definition terms, callout titles." },
+      "mono": { "displayName": "Mono", "purpose": "Client ids, redirect URIs, literal values." }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [{ "name": "wide", "value": "min-width: 600px" }]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one primary action of a page; on the consent page the grant.",
+      "html": "<button class=\"ds-btn-primary\">Allow access</button>",
+      "css": ".ds-btn-primary { font: 600 16px system-ui, sans-serif; min-height: 44px; min-width: 44px; padding: 8px 24px; border: 1px solid #1F3A5F; border-radius: 8px; background: #1F3A5F; color: #FFFFFF; cursor: pointer; } .ds-btn-primary:focus-visible { outline: 3px solid #1F3A5F; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "The alternative choice, for example Deny on the consent page.",
+      "html": "<button class=\"ds-btn-secondary\">Deny</button>",
+      "css": ".ds-btn-secondary { font: 600 16px system-ui, sans-serif; min-height: 44px; min-width: 44px; padding: 8px 24px; border: 1px solid #1F3A5F; border-radius: 8px; background: #FFFFFF; color: #1F3A5F; cursor: pointer; } .ds-btn-secondary:focus-visible { outline: 3px solid #1F3A5F; outline-offset: 2px; }"
+    },
+    {
+      "name": "Warning Callout",
+      "kind": "card",
+      "refersTo": "callout-warning",
+      "description": "Asks the user to slow down, for example an unverified client.",
+      "html": "<div class=\"ds-callout\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M10 2.5 1.5 17.5h17L10 2.5Z\"/><path d=\"M10 8v3.5\"/><path d=\"M10 14.8h0.01\"/></svg><div><p class=\"ds-callout-title\">Unverified client</p><p>This client registered itself. Only continue if you started this connection.</p></div></div>",
+      "css": ".ds-callout { display: flex; gap: 8px; padding: 16px; border: 1px solid #8A5A00; border-radius: 8px; background: #FFF8E6; color: #8A5A00; font: 400 16px/1.5 system-ui, sans-serif; } .ds-callout svg { flex: none; } .ds-callout p { margin: 0; } .ds-callout-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }"
+    },
+    {
+      "name": "Page Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The single bordered card that holds every page's content.",
+      "html": "<div class=\"ds-card\"><h1 class=\"ds-h1\">Allow access?</h1><p>Claude Desktop wants to access your Nextcloud as you.</p></div>",
+      "css": ".ds-card { max-width: 560px; background: #FFFFFF; border: 1px solid #D5D8DD; border-radius: 8px; padding: 24px; color: #1A1A1A; font: 400 16px/1.5 system-ui, sans-serif; } .ds-h1 { font-size: 28px; font-weight: 600; line-height: 1.2; margin: 0 0 24px; }"
+    },
+    {
+      "name": "Header Bar",
+      "kind": "nav",
+      "refersTo": "card",
+      "description": "Wordmark and configured public host above a navy rule.",
+      "html": "<header class=\"ds-bar\"><span class=\"ds-wordmark\">MCP Connector for Nextcloud</span> <span class=\"ds-host\">cloud.example.org</span></header>",
+      "css": ".ds-bar { max-width: 560px; border-bottom: 2px solid #1F3A5F; padding-bottom: 8px; font-family: system-ui, sans-serif; } .ds-wordmark { font-size: 14px; font-weight: 600; color: #1A1A1A; } .ds-host { font-size: 14px; color: #5A6270; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Sealed Envelope",
+    "overview": "The connector has two UI surfaces with opposite rules. Its own OAuth and connection pages are deliberately not styled like Nextcloud (threat T-03-23), so a user can tell them apart from Nextcloud's own password prompt. The Declarative Settings signpost is rendered entirely by Nextcloud and follows Nextcloud theming.",
+    "keyCharacteristics": [
+      "One self-contained stylesheet, no external asset, no script, no web font, no icon package.",
+      "A 560 px content column holding one white card on a pale grey page.",
+      "One accent (ink navy) for the header rule, links, primary button and focus ring.",
+      "Light only (color-scheme: light); no dark mode on the connector's own pages.",
+      "Three inline stroke icons (warning, cross, check), 20 px, currentColor, always beside a word.",
+      "English only in v1; all copy lives in exapp/ui/strings.py."
+    ],
+    "rules": [
+      { "name": "The Visibly-Ours Rule", "body": "The connector's own pages never borrow Nextcloud's palette, logo or variables (T-03-23).", "section": "colors" },
+      { "name": "The One Accent Rule", "body": "Ink Navy is the only accent. Status colours appear only together with an icon and a word.", "section": "colors" },
+      { "name": "The Four Sizes Rule", "body": "28, 20, 16 and 14 px, nothing else. Rank beyond that is carried by weight 600.", "section": "typography" },
+      { "name": "The Flat Card Rule", "body": "One card per page, bordered, never shadowed, never nested.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do build every new page through layout.page() and its component functions, so the four security headers and the escaping always apply.",
+      "Do keep all copy in strings.py: every error says what happened and what to do next, no error codes, no exclamation marks, no emoji, never \"click here\".",
+      "Do keep 44 px targets, the 3 px focus ring and one primary action per page.",
+      "Do follow the nextcloud-ui skill (Nextcloud components, CSS variables, MDI icons, theming) for anything rendered inside Nextcloud, such as the Declarative Settings form."
+    ],
+    "donts": [
+      "Don't use Nextcloud colours, CSS variables, logos or fonts on the connector's own pages (T-03-23).",
+      "Don't add external stylesheets, scripts, fonts or icon packages; the CSP is default-src 'none' with a style nonce only.",
+      "Don't add shadows, gradients, a second accent or a nested card.",
+      "Don't add a dark mode by inventing a second palette without an owner decision; the pages are light only today."
+    ]
+  }
+}
