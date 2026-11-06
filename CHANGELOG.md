@@ -11,6 +11,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The ten `NC_MCP_EXCHANGE_*` variables are declared in `appinfo/info.xml`. Before,
+  the deploy daemon dropped them without a word, so an installation from the app store
+  could not arm the token exchange path: `occ app_api:app:register --env` accepted them
+  and the container never saw them (#42). A test now holds the declarations equal to the
+  list the code reads them from.
+
 ## [0.7.1] - 2026-11-02
 
 ### Security

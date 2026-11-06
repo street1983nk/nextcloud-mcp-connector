@@ -99,6 +99,12 @@ maintenance that goes stale without anybody noticing.
 | `NC_MCP_EXCHANGE_MAPPING` | Which mapping profile turns the checked claim into the canonical Nextcloud principal. |
 | `NC_MCP_EXCHANGE_OIDC_PROVIDER_ID` | Belongs to the `user_oidc_unique_uid_sub_v1` profile alone: the numeric id of the `user_oidc` provider its derivation is keyed with. Set while the other profile is in force, it is refused rather than ignored. |
 
+**How to set them in the ExApp deployment.** Pass them to `occ app_api:app:register` with
+one `--env "NAME=value"` per variable. They are declared in `appinfo/info.xml` since 0.7.2;
+the deploy daemon drops an undeclared variable without a word, so on 0.7.1 and earlier they
+never reached the container. After the register call the start of the app logs whether the
+path is armed.
+
 **Where the defaults live.** In the module docstring of
 `src/mcp_connector/oauth/chain.py`, one entry per variable, each with the reasoning for the
 value it defaults to and for the two that deliberately default to nothing. That docstring is
