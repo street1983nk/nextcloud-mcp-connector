@@ -2481,6 +2481,11 @@ def test_every_variable_the_code_reads_is_declared_in_the_manifest(
 
     Ten became eleven with ``NC_MCP_DISABLED_TOOLS`` (issue #15), declared together with
     the code that reads it, so the lesson of issue #12 is not learned a second time.
+
+    It was learned a third time anyway: the ten variables of the token exchange path were
+    read since 0.3.0 but never declared, so a store installation could not arm the path
+    (issue #42). They join through ``config.EXCHANGE_VARIABLES``, the one list the code
+    reads them from, so a variable added there and forgotten here turns this gate red.
     """
     declared = {
         (variable.findtext("name") or "").strip()
@@ -2500,6 +2505,7 @@ def test_every_variable_the_code_reads_is_declared_in_the_manifest(
         config.ENV_AUDIT_LOG,
         config.ENV_AUDIT_RETENTION_DAYS,
         config.ENV_AUDIT_MAX_BYTES,
+        *config.EXCHANGE_VARIABLES,
     }
 
 

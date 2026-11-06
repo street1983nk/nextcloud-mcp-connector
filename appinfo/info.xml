@@ -526,6 +526,12 @@ Prérequis :
 		  - NC_MCP_DISABLED_TOOLS joins them for issue #15, declared from the start for the
 		  - same reason. No default, the code defaults to every bundle on, and the start of
 		  - the app logs which bundles are switched off.
+		  -
+		  - The ten NC_MCP_EXCHANGE_ variables join them with 0.7.2 (issue #42). The token
+		  - exchange path came with 0.3.0 and was documented, but without these declarations a
+		  - store installation could not arm it: the register command accepted the variables
+		  - and the container never saw them. No defaults here, the code holds them
+		  - (oauth/chain.py), and a test holds this list equal to config.EXCHANGE_VARIABLES.
 		-->
 		<environment-variables>
 			<variable>
@@ -577,6 +583,46 @@ Prérequis :
 				<name>NC_MCP_AUDIT_MAX_BYTES</name>
 				<display-name>Largest size of the record</display-name>
 				<description>The upper bound of the file the record is kept in, in bytes. 100000000, which is 100 MB, unless set otherwise, and a value below 1000000 is refused so that a mistyped size cannot sweep away every entry the moment it is written. When the bound is reached, the oldest entries make way for the new ones.</description>			</variable>
+			<variable>
+				<name>NC_MCP_EXCHANGE_ENABLED</name>
+				<display-name>Token exchange: switch</display-name>
+				<description>Off unless set to on, yes, true or 1. Arms the token exchange path, on which a service of your organization exchanges a token at its own identity provider (RFC 8693) and calls this app in a user's name. While it is off, no other NC_MCP_EXCHANGE_ variable is read; set while it is off, they stop the app at start. See docs/token-exchange.md. The value is read when the app starts.</description>			</variable>
+			<variable>
+				<name>NC_MCP_EXCHANGE_ISSUER</name>
+				<display-name>Token exchange: issuer</display-name>
+				<description>Required once the path is on. The realm URL of the identity provider, https, without a trailing slash, for example https://idp.example.com/realms/example. It decides whose signatures this app trusts.</description>			</variable>
+			<variable>
+				<name>NC_MCP_EXCHANGE_AZP</name>
+				<display-name>Token exchange: allowed acting parties</display-name>
+				<description>Required once the path is on. Comma separated client ids (azp) that may act on this app with an exchanged token.</description>			</variable>
+			<variable>
+				<name>NC_MCP_EXCHANGE_AUDIENCE</name>
+				<display-name>Token exchange: audience</display-name>
+				<description>The aud value an exchanged token has to carry, exactly one string. Unset, it is the resource URL of this app derived from NC_MCP_PUBLIC_URL; without either the armed path refuses to start.</description>			</variable>
+			<variable>
+				<name>NC_MCP_EXCHANGE_ACCOUNT_CLAIM</name>
+				<display-name>Token exchange: account claim</display-name>
+				<description>The claim of the checked token that names the Nextcloud account. Unset means sub.</description>			</variable>
+			<variable>
+				<name>NC_MCP_EXCHANGE_MAPPING</name>
+				<display-name>Token exchange: mapping profile</display-name>
+				<description>How the account claim becomes the Nextcloud account: account_id_v1 (the claim value is the account id, the default) or user_oidc_unique_uid_sub_v1 (the derivation of user_oidc with unique user id on, needs NC_MCP_EXCHANGE_OIDC_PROVIDER_ID).</description>			</variable>
+			<variable>
+				<name>NC_MCP_EXCHANGE_OIDC_PROVIDER_ID</name>
+				<display-name>Token exchange: user_oidc provider id</display-name>
+				<description>Only for the mapping profile user_oidc_unique_uid_sub_v1: the numeric id of the user_oidc provider. Set with the other profile, it stops the app at start.</description>			</variable>
+			<variable>
+				<name>NC_MCP_EXCHANGE_ALGORITHMS</name>
+				<display-name>Token exchange: signing algorithms</display-name>
+				<description>Comma separated signing algorithms an exchanged token may use. Unset means the default of this app.</description>			</variable>
+			<variable>
+				<name>NC_MCP_EXCHANGE_JWKS_URI</name>
+				<display-name>Token exchange: key set URL</display-name>
+				<description>Where the key set of the identity provider is fetched, for a provider that does not publish it under the standard path. Unset means the issuer plus the standard path.</description>			</variable>
+			<variable>
+				<name>NC_MCP_EXCHANGE_JWKS_ORIGIN</name>
+				<display-name>Token exchange: key set origin</display-name>
+				<description>Only for a split network that serves the key set from another origin than the issuer. Unset keeps the key set on the origin of the issuer.</description>			</variable>
 		</environment-variables>
 	</external-app>
 </info>
