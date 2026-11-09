@@ -38,10 +38,15 @@ STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
 # Assemble the top level folder the store expects. Keep it lean: the metadata the
-# store reads, plus the changelog and license it lists.
+# store reads, plus the changelog and license it lists. The store reads
+# CHANGELOG.<code>.md per language, and the app management in Nextcloud shows
+# the entry in the language of the signed-in user, so the German and French
+# changelog travel next to the English one.
 mkdir -p "$STAGE/$APP_ID/appinfo"
 cp "$ROOT/appinfo/info.xml" "$STAGE/$APP_ID/appinfo/info.xml"
 [[ -f "$ROOT/CHANGELOG.md" ]] && cp "$ROOT/CHANGELOG.md" "$STAGE/$APP_ID/CHANGELOG.md"
+[[ -f "$ROOT/CHANGELOG.de.md" ]] && cp "$ROOT/CHANGELOG.de.md" "$STAGE/$APP_ID/CHANGELOG.de.md"
+[[ -f "$ROOT/CHANGELOG.fr.md" ]] && cp "$ROOT/CHANGELOG.fr.md" "$STAGE/$APP_ID/CHANGELOG.fr.md"
 [[ -f "$ROOT/LICENSE" ]] && cp "$ROOT/LICENSE" "$STAGE/$APP_ID/LICENSE"
 [[ -f "$ROOT/README.md" ]] && cp "$ROOT/README.md" "$STAGE/$APP_ID/README.md"
 
