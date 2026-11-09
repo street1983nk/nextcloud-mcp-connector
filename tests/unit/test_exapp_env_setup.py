@@ -2120,6 +2120,8 @@ PUBLIC_MARKDOWN = (
     ROOT / "README.de.md",
     ROOT / "README.fr.md",
     ROOT / "CHANGELOG.md",
+    ROOT / "CHANGELOG.de.md",
+    ROOT / "CHANGELOG.fr.md",
 )
 
 #: The one page exempt by name. Internal release documentation that does not travel in the
