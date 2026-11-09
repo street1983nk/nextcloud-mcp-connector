@@ -161,9 +161,13 @@ def _reaches(source: str, relative: str) -> list[str]:
             for alias in node.names:
                 if _is_private(alias.name):
                     hits.append((node.lineno, f"from {base} import {alias.name}"))
-        elif isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
-            if node.value.id in aliases and _is_private(node.attr):
-                hits.append((node.lineno, f"{node.value.id}.{node.attr}"))
+        elif (
+            isinstance(node, ast.Attribute)
+            and isinstance(node.value, ast.Name)
+            and node.value.id in aliases
+            and _is_private(node.attr)
+        ):
+            hits.append((node.lineno, f"{node.value.id}.{node.attr}"))
     return [f"{relative}:{line}: {reach}" for line, reach in sorted(hits)]
 
 
