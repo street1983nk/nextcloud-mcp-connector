@@ -215,9 +215,10 @@ def _oauth_imports(relative: str, source: str) -> list[str]:
             names = [segment for alias in node.names for segment in alias.name.split(".")]
             if OAUTH in module or OAUTH in names:
                 findings.append(f"{relative}:{node.lineno}: imports out of {OAUTH}")
-        elif isinstance(node, ast.Import):
-            if any(OAUTH in alias.name.split(".") for alias in node.names):
-                findings.append(f"{relative}:{node.lineno}: imports out of {OAUTH}")
+        elif isinstance(node, ast.Import) and any(
+            OAUTH in alias.name.split(".") for alias in node.names
+        ):
+            findings.append(f"{relative}:{node.lineno}: imports out of {OAUTH}")
     return findings
 
 
