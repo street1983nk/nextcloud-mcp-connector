@@ -3470,8 +3470,8 @@ class Rule:
 PROMISE_WORDS = re.compile(
     r"create-only|create only|read and create|never delet|no delet|not delet|cannot delete|"
     r"deleting|deletes|never overwr|overwrit|nothing destructive|destructive|"
-    r"\bmov(?:e|es|ing)\b|renam|gelöscht|lösch|überschr|destruktiv|verschieb|"
-    r"umbenenn|nur anlegen|jamais|destructi|supprim|écras|déplac|renomm",
+    r"\bmov(?:e|es|ing)\b|renam|gel\u00f6scht|l\u00f6sch|\u00fcberschr|destruktiv|verschieb|"
+    r"umbenenn|nur anlegen|jamais|destructi|supprim|\u00e9cras|d\u00e9plac|renomm",
     re.IGNORECASE,
 )
 #: Pattern 2, the technical side: constants of the gates, method literals, test names, and
@@ -3647,16 +3647,22 @@ INVENTORY_RULES: tuple[Rule, ...] = (
     ),
     Rule(
         r"^README",
-        r"[Mm]ail|Anhang|pièce|private chunk|chunk assembly|Blöcke|blocs",
+        r"[Mm]ail|Anhang|pi\u00e8ce|private chunk|chunk assembly|Bl\u00f6cke|blocs",
         "ausgeschlossen",
         "",
         "Mail oder Datei-Upload, kein Aufgaben-Zugriff",
     ),
     Rule(r"^README", r"DELETE", "zusage-doku", "DELETE", "Phase 34"),
-    Rule(r"^README", r"overwriting|Überschreiben|écrasement", "zusage-doku", "PUT", "Phase 34"),
     Rule(
         r"^README",
-        r"moving|renaming|Verschieben|Umbenennen|déplacement|renommage",
+        r"overwriting|\u00dcberschreiben|\u00e9crasement",
+        "zusage-doku",
+        "PUT",
+        "Phase 34",
+    ),
+    Rule(
+        r"^README",
+        r"moving|renaming|Verschieben|Umbenennen|d\u00e9placement|renommage",
         "zusage-doku",
         "MOVE",
         "Phase 34",
