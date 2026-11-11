@@ -1,0 +1,282 @@
+
+# Lauf blocks=delete-matrix start=2026-11-11T16:57:25Z (neue Datei)
+
+== delete-matrix nc-tag=33.0.9-apache, start 2026-11-11T16:57:25Z ==
+
+== vorbedingungen ==
+RAM frei_host_gb=3.44 schwelle=4.0 ergebnis=zu wenig
+gameworld-dev-gameworld-docker-proxy-1  mem 13.6MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+RUN FAILED | RunFailed: RAM gate shut: 3.44 GB free (needs 4.0), foreign runs: []; nothing was stopped
+
+# Lauf blocks=delete-matrix start=2026-11-11T17:04:01Z (angehaengt an bestehende Datei)
+
+== delete-matrix nc-tag=33.0.9-apache, start 2026-11-11T17:04:01Z ==
+
+== vorbedingungen ==
+RAM frei_host_gb=4.12 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 13.61MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+VORBEDINGUNG Container nc-spike-tags vorhanden: nein
+VORBEDINGUNG Volume nc-mcp-spike-tags_nc-spike-tags-data vorhanden: nein
+
+== aufbau ==
+docker compose up -d --wait: 21.7 s
+Container nc-spike-tags Starting / Container nc-spike-tags Started / Container nc-spike-tags Waiting / Container nc-spike-tags Healthy
+nc-spike-tags: installed (attempt 1)
+Installation abgewartet: 0.3 s
+bruteforce protection aus (Wegwerf-Instanz) -> System config value auth.bruteforce.protection.enabled set to boolean false
+- installed: true
+  - version: 33.0.9.1
+  - versionstring: 33.0.9
+  - edition: 
+  - maintenance: false
+  - needsDbUpgrade: false
+  - productname: Nextcloud
+  - extendedSupport: false
+VERSION OF RECORD 33.0.9
+dbtype: sqlite3
+memcache.local: \OC\Memcache\APCu
+nc-spike-tags  mem 231.1MiB / 5.786GiB  cpu 0.01%
+gameworld-dev-gameworld-docker-proxy-1  mem 13.61MiB / 5.786GiB  cpu 0.00%
+occ user:add --password-from-env alice (password via stdin)
+BEFUND occ user:auth-tokens:add --name scheitert auf dieser Version (docker exec -i -u www-data nc-spike-tags exited 1: The "login-name" option does not exist. user:auth-tokens:add [--password-from-env] [--name NAME] [--] <user>); Rueckfall GET /ocs/v2.php/core/getapppassword
+GET /ocs/v2.php/core/getapppassword als alice -> HTTP 200 (kept)
+occ user:add --password-from-env bob (password via stdin)
+BEFUND occ user:auth-tokens:add --name scheitert auf dieser Version (docker exec -i -u www-data nc-spike-tags exited 1: The "login-name" option does not exist. user:auth-tokens:add [--password-from-env] [--name NAME] [--] <user>); Rueckfall GET /ocs/v2.php/core/getapppassword
+GET /ocs/v2.php/core/getapppassword als bob -> HTTP 200 (kept)
+
+== quelle ==
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:17 | public const RETENTION_CONFIG_KEY = 'calendarRetentionObligation';
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:18 | private const DEFAULT_RETENTION_SECONDS = 30 * 24 * 60 * 60;
+QUELLE apps/dav/lib/CalDAV/Trashbin/TrashbinHome.php:27 | public const NAME = 'trashbin';
+QUELLE apps/dav/lib/CalDAV/Trashbin/DeletedCalendarObjectsCollection.php:25 | public const NAME = 'objects';
+QUELLE apps/dav/lib/CalDAV/Trashbin/DeletedCalendarObjectsCollection.php:38 | throw new NotImplemented();
+QUELLE apps/dav/lib/CalDAV/Trashbin/DeletedCalendarObjectsCollection.php:100 | public function calendarQuery(array $filters) {
+QUELLE apps/dav/lib/CalDAV/Trashbin/RestoreTarget.php:19 | public const NAME = 'restore';
+QUELLE apps/dav/lib/CalDAV/Trashbin/RestoreTarget.php:41 | public function moveInto($targetName, $sourcePath, INode $sourceNode): bool {
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:32 | public const PROPERTY_RETENTION_DURATION = '{http://nextcloud.com/ns}trash-bin-retention-duration';
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:45 | $this->disableTrashbin = $request->getHeader('X-NC-CalDAV-No-Trashbin') === '1';
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:121 | return ['nc-calendar-trashbin'];
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:125 | return 'nc-calendar-trashbin';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:941 | $trashbinDisabled = $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1673 | public function moveCalendarObject(string $sourcePrincipalUri, int $sourceObjectId, string $targetPrincipalUri, int $targetCalendarId, string $tragetObjectUri, int $calendarType = self::CALENDAR_TYPE_CALENDAR): bool {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1737 | public function deleteCalendarObject($calendarId, $objectUri, $calendarType = self::CALENDAR_TYPE_CALENDAR, bool $forceDeletePermanently = false) {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1747 | if ($forceDeletePermanently || $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0') {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1821 | public function restoreCalendarObject(array $objectData): void {
+QUELLE apps/dav/lib/CalDAV/CalendarHome.php:107 | $objects[] = new TrashbinHome($this->caldavBackend, $this->principalInfo);
+QUELLE apps/dav/lib/CalDAV/CalendarHome.php:159 | return new TrashbinHome($this->caldavBackend, $this->principalInfo);
+QUELLE apps/dav/lib/Command/RetentionCleanupCommand.php:20 | parent::__construct('dav:retention:clean-up');
+QUELLE occ list dav | dav:retention:clean-up
+QUELLE BESTAETIGT schluessel=calendarRetentionObligation standard_sekunden=2592000 aus_wert=0 sammlung=trashbin/objects wiederherstellung=Verschieben nach trashbin/restore/<name> eigenschaft={http://nextcloud.com/ns}trash-bin-retention-duration aufraeumen=occ dav:retention:clean-up
+
+== frist ==
+FRIST konfiguriert=leer standard_laut_quelle=2592000 einheit=Sekunden (occ config:app:get dav calendarRetentionObligation; leer heisst Standard; Einheit gelesen aus der Konstante DEFAULT_RETENTION_SECONDS, gemessen im Abschnitt aufraeumen)
+
+== an-eigen ==
+2026-11-11T17:04:43Z | SETUP MKCALENDAR liste=spike30-eigen nutzer=alice auth=basic status=201 komponenten=VTODO
+2026-11-11T17:04:43Z | SETUP PUT create-only spike30-eigen/s30-an-eigen-170442.ics nutzer=alice auth=basic status=201 | 
+2026-11-11T17:04:43Z | SETUP PUT create-only spike30-eigen/s30-an-nachbar-170442.ics nutzer=alice auth=basic status=201 | 
+2026-11-11T17:04:43Z | LOESCHEN an-eigen status=204 im_papierkorb=ja db_deleted_at=gesetzt | nutzer=alice auth=basic if_match=ja papierkorb_name=7.ics datenbank=alice/spike30-eigen/s30-an-eigen-170442-deleted.ics:deleted_at_gesetzt:0b9ef0fd9ae3
+    HTTP 204 No Content
+    date: Wed, 11 Nov 2026 17:04:43 GMT
+    server: Apache/2.4.68 (Debian)
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-robots-tag: noindex, nofollow
+    referrer-policy: no-referrer
+    x-powered-by: PHP/8.4.26
+    content-security-policy: default-src 'none';
+    x-user-id: alice
+    x-request-id: S3tk1hSxRJuePWY6kkms
+    keep-alive: timeout=5, max=94
+    connection: Keep-Alive
+    (no body)
+KONTROLLE an-eigen nachbar_im_papierkorb=nein nachbar_lesbar=ja gegriffen=ja
+2026-11-11T17:04:46Z | WIEDERHERSTELLUNG an-eigen status=201 uid_gleich=ja inhalt_gleich=ja | get_danach=200 sha256_vorher=0b9ef0fd9ae3 sha256_nachher=0b9ef0fd9ae3 db_deleted_at=leer am_alten_ort=ja datenbank=alice/spike30-eigen/s30-an-eigen-170442.ics:deleted_at_leer:0b9ef0fd9ae3
+    HTTP 201 Created
+    date: Wed, 11 Nov 2026 17:04:45 GMT
+    server: Apache/2.4.68 (Debian)
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-robots-tag: noindex, nofollow
+    referrer-policy: no-referrer
+    x-powered-by: PHP/8.4.26
+    content-security-policy: default-src 'none';
+    x-user-id: alice
+    content-length: 0
+    x-request-id: I0KEZMnCYE2KvUIFsXOJ
+    keep-alive: timeout=5, max=91
+    connection: Keep-Alive
+    content-type: text/html; charset=UTF-8
+    (no body)
+
+== an-geteilt ==
+2026-11-11T17:04:46Z | SETUP MKCALENDAR liste=spike30-geteilt-rw nutzer=bob auth=basic status=201 komponenten=VTODO
+2026-11-11T17:04:46Z | FREIGABE liste=spike30-geteilt-rw an=alice schreibrecht=ja nutzer=bob auth=basic status=200
+2026-11-11T17:04:46Z | SETUP MKCALENDAR liste=spike30-geteilt-ro nutzer=bob auth=basic status=201 komponenten=VTODO
+2026-11-11T17:04:46Z | FREIGABE liste=spike30-geteilt-ro an=alice schreibrecht=nein nutzer=bob auth=basic status=200
+  DISCOVERY liste=personal name=Personal komponenten=VEVENT
+  DISCOVERY liste=contact_birthdays name=Contact birthdays komponenten=VEVENT
+  DISCOVERY liste=spike30-eigen name=spike30-eigen komponenten=VTODO
+  DISCOVERY liste=spike30-geteilt-rw_shared_by_bob name=spike30-geteilt-rw (bob) komponenten=VTODO
+  DISCOVERY liste=spike30-geteilt-ro_shared_by_bob name=spike30-geteilt-ro (bob) komponenten=VTODO
+2026-11-11T17:04:46Z | SETUP PUT create-only spike30-geteilt-rw/s30-an-geteilt-170442.ics nutzer=bob auth=basic status=201 | 
+2026-11-11T17:04:46Z | GELOESCHT an-geteilt status=204 nutzer=alice auth=basic if_match=ja papierkorb_von=beide db_deleted_at=gesetzt datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-170442-deleted.ics:deleted_at_gesetzt:613d8ca35842
+    HTTP 204 No Content
+    date: Wed, 11 Nov 2026 17:04:46 GMT
+    server: Apache/2.4.68 (Debian)
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-robots-tag: noindex, nofollow
+    referrer-policy: no-referrer
+    x-powered-by: PHP/8.4.26
+    content-security-policy: default-src 'none';
+    x-user-id: alice
+    x-request-id: LhcV8ggDpz4j8j50kVU6
+    keep-alive: timeout=5, max=82
+    connection: Keep-Alive
+    (no body)
+2026-11-11T17:04:47Z | WIEDERHERSTELLUNG an-geteilt versuch=loeschender status=201 uid_gleich=ja inhalt_gleich=ja | nutzer=alice get_als_eigentuemer=200 db_deleted_at=leer datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-170442.ics:deleted_at_leer:613d8ca35842
+    HTTP 201 Created
+    date: Wed, 11 Nov 2026 17:04:47 GMT
+    server: Apache/2.4.68 (Debian)
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-robots-tag: noindex, nofollow
+    referrer-policy: no-referrer
+    x-powered-by: PHP/8.4.26
+    content-security-policy: default-src 'none';
+    x-user-id: alice
+    content-length: 0
+    x-request-id: xx6jud1ZXvYLv1mDtwol
+    keep-alive: timeout=5, max=78
+    connection: Keep-Alive
+    content-type: text/html; charset=UTF-8
+    (no body)
+LOESCHEN an-geteilt status=204 papierkorb_von=beide wiederhergestellt_durch=loeschender | db_deleted_at_nach_dem_loeschen=gesetzt
+2026-11-11T17:04:47Z | SETUP PUT create-only spike30-geteilt-rw/s30-an-geteilt-eigentuemer-170442.ics nutzer=bob auth=basic status=201 | 
+2026-11-11T17:04:47Z | WIEDERHERSTELLUNG an-geteilt-eigentuemer status=201 uid_gleich=ja inhalt_gleich=ja | geloescht_von=alice (204) wiederhergestellt_von=bob get_danach=200 datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-eigentuemer-170442.ics:deleted_at_leer:6b0b5a9c2d0c
+2026-11-11T17:04:47Z | SETUP PUT create-only spike30-geteilt-ro/s30-an-geteilt-ro-170442.ics nutzer=bob auth=basic status=201 | 
+2026-11-11T17:04:48Z | LOESCHEN an-geteilt-ro status=404 objekt_unveraendert=ja | nutzer=alice auth=basic lesen_vorher=200 datenbank=bob/spike30-geteilt-ro/s30-an-geteilt-ro-170442.ics:deleted_at_leer:4dee74d3117a Sabre\DAV\Exception\NotFound Calendar with name 'spike30-geteilt-ro_shared_by_bob' could not be found
+    HTTP 404 Not Found
+    date: Wed, 11 Nov 2026 17:04:48 GMT
+    server: Apache/2.4.68 (Debian)
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-robots-tag: noindex, nofollow
+    referrer-policy: no-referrer
+    x-powered-by: PHP/8.4.26
+    content-security-policy: default-src 'none';
+    x-user-id: alice
+    content-length: 264
+    keep-alive: timeout=5, max=67
+    connection: Keep-Alive
+    content-type: application/xml; charset=utf-8
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\NotFound</s:exception>
+      <s:message>Calendar with name 'spike30-geteilt-ro_shared_by_bob' could not be found</s:message>
+    </d:error>
+
+== vorabtest-an ==
+VORABTEST papierkorb-propfind zustand=an wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=an wert=2592000 zeigt=an
+VORABTEST frist-eigenschaft-home zustand=an wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=an wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=an wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=an wert=ja zeigt=an
+
+== unterauftrag ==
+2026-11-11T17:04:48Z | SETUP PUT create-only spike30-eigen/s30-eltern-170442.ics nutzer=alice auth=basic status=201 | 
+2026-11-11T17:04:48Z | SETUP PUT create-only spike30-eigen/s30-kind-170442.ics nutzer=alice auth=basic status=201 | 
+2026-11-11T17:04:49Z | UNTERAUFGABE loeschen vorhanden=ja unveraendert=ja eltern_status=204 nutzer=alice auth=basic | datenbank kind=alice/spike30-eigen/s30-kind-170442.ics:deleted_at_leer:4eccb10b508e eltern=alice/spike30-eigen/s30-eltern-170442-deleted.ics:deleted_at_gesetzt:979afbd6b46d
+
+== aus ==
+SCHALTER aus occ config:app:set dav calendarRetentionObligation --value=0 -> Config value 'calendarRetentionObligation' for app 'dav' is now set to '0', stored as mixed in fast cache
+nc-spike-tags: installed (attempt 1)
+SCHALTER aus occ config:app:get dav calendarRetentionObligation vor_neustart=0 nach_neustart=0 (docker restart nc-spike-tags)
+
+== aus-eigen ==
+2026-11-11T17:04:53Z | SETUP PUT create-only spike30-eigen/s30-aus-eigen-170442.ics nutzer=alice auth=basic status=201 | 
+2026-11-11T17:04:55Z | LOESCHEN aus-eigen status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich | nutzer=alice auth=basic if_match=ja get_danach=404 papierkorb_eintraege=1 datenbank=keine
+    HTTP 204 No Content
+    date: Wed, 11 Nov 2026 17:04:53 GMT
+    server: Apache/2.4.68 (Debian)
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-robots-tag: noindex, nofollow
+    referrer-policy: no-referrer
+    x-powered-by: PHP/8.4.26
+    content-security-policy: default-src 'none';
+    x-user-id: alice
+    x-request-id: 08cFqPsHrxjgeeeYloaQ
+    keep-alive: timeout=5, max=98
+    connection: Keep-Alive
+    (no body)
+
+== aus-geteilt ==
+2026-11-11T17:04:55Z | SETUP PUT create-only spike30-geteilt-rw/s30-aus-geteilt-170442.ics nutzer=bob auth=basic status=201 | 
+2026-11-11T17:04:56Z | LOESCHEN aus-geteilt status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich | geloescht_von=alice auth=basic get_als_eigentuemer_danach=404 papierkorb_von=keinem datenbank=keine
+    HTTP 204 No Content
+    date: Wed, 11 Nov 2026 17:04:55 GMT
+    server: Apache/2.4.68 (Debian)
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-robots-tag: noindex, nofollow
+    referrer-policy: no-referrer
+    x-powered-by: PHP/8.4.26
+    content-security-policy: default-src 'none';
+    x-user-id: alice
+    x-request-id: 4CfanjQXbgFw2CLZUIsA
+    keep-alive: timeout=5, max=93
+    connection: Keep-Alive
+    (no body)
+
+== vorabtest-aus ==
+VORABTEST papierkorb-propfind zustand=aus wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=aus wert=0 zeigt=aus
+VORABTEST frist-eigenschaft-home zustand=aus wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=aus wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=aus wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=aus wert=ja zeigt=an
+VORABTEST ERGEBNIS unterscheidet=ja kandidat=frist-eigenschaft
+KONTROLLE vorabtest zustand_am_verhalten_belegt=ja (an: wiederhergestellt=ja, aus: endgueltig geloescht=ja)
+
+== aufraeumen ==
+SCHALTER standard occ config:app:delete dav calendarRetentionObligation -> Config value calendarRetentionObligation of app dav deleted
+nc-spike-tags: installed (attempt 1)
+SCHALTER standard occ config:app:get dav calendarRetentionObligation vor_neustart=leer nach_neustart=leer (docker restart nc-spike-tags)
+2026-11-11T17:05:00Z | SETUP PUT create-only spike30-eigen/s30-frist-170442.ics nutzer=alice auth=basic status=201 | 
+2026-11-11T17:05:01Z | AUFRAEUMEN standardfrist geloescht=204 occ dav:retention:clean-up -> (keine Ausgabe) | datenbank vorher=alice/spike30-eigen/s30-frist-170442-deleted.ics:deleted_at_gesetzt:999f08d14b61 nachher=alice/spike30-eigen/s30-frist-170442-deleted.ics:deleted_at_gesetzt:999f08d14b61
+SCHALTER frist-1s occ config:app:set dav calendarRetentionObligation --value=1 -> Config value 'calendarRetentionObligation' for app 'dav' is now set to '1', stored as mixed in fast cache
+nc-spike-tags: installed (attempt 1)
+SCHALTER frist-1s occ config:app:get dav calendarRetentionObligation vor_neustart=1 nach_neustart=1 (docker restart nc-spike-tags)
+VORABTEST papierkorb-propfind zustand=frist-1s wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=frist-1s wert=1 zeigt=an
+VORABTEST frist-eigenschaft-home zustand=frist-1s wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=frist-1s wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=frist-1s wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=frist-1s wert=ja zeigt=an
+2026-11-11T17:05:10Z | AUFRAEUMEN frist=1 nach 3 s occ dav:retention:clean-up -> (keine Ausgabe) | datenbank nachher=keine
+FRIST AUFRAEUMEN standard=bleibt frist_1s=weg
+
+== ergebnis ==
+KONTROLLEN {"an-eigen": "ja", "an-geteilt": "ja", "unterauftrag": "ja", "aus-eigen": "ja", "aus-geteilt": "ja", "vorabtest": "ja", "aufraeumen": "ja"} ungemessen=keine
+LOESCHEN VERSION 33.0.9 g=ja w1=ja w2=ja w3=nein w4=ja wer=loeschender
+nc-spike-tags  mem 82.7MiB / 5.786GiB  cpu 0.01%
+gameworld-dev-gameworld-docker-proxy-1  mem 13.61MiB / 5.786GiB  cpu 0.00%
+
+== abbau ==
+Network nc-mcp-spike-tags_default Removing / Volume nc-mcp-spike-tags_nc-spike-tags-data Removing / Network nc-mcp-spike-tags_default Removed / Volume nc-mcp-spike-tags_nc-spike-tags-data Removed
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 73 s; ENDE 2026-11-11T17:05:17Z

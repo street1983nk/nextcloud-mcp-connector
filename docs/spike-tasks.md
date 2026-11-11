@@ -1,8 +1,8 @@
 # Mess-Spike Aufgaben und Ordner (MESS-01 bis MESS-06)
 
-**Status:** läuft. Die Abschnitte 1 (MESS-01) und 2 (MESS-02) sind gemessen, das Abbruchkriterium zu MESS-01 ist nicht ausgelöst. Abschnitt 3 (MESS-05) ist gemessen, beide Abbruchkriterien zu MESS-05 sind nicht ausgelöst, und Abschnitt 7 trägt das Inventar der Gates und Zusagen (A17). Aus Abschnitt 4 (MESS-06) sind 4.1 und 4.2 gemessen: `MOVE` unter Impersonation und das Verhalten der Unteraufgaben, das Abbruchkriterium zu MESS-06 für das Verschieben ist nicht ausgelöst; das Löschen auf Nextcloud 32 bis 35 (4.3 bis 4.5) steht noch aus. Die Abschnitte 5, 6 und 8 bis 10 sind offen
+**Status:** läuft. Die Abschnitte 1 (MESS-01) und 2 (MESS-02) sind gemessen, das Abbruchkriterium zu MESS-01 ist nicht ausgelöst. Abschnitt 3 (MESS-05) ist gemessen, beide Abbruchkriterien zu MESS-05 sind nicht ausgelöst, und Abschnitt 7 trägt das Inventar der Gates und Zusagen (A17). Aus Abschnitt 4 (MESS-06) sind 4.1 und 4.2 gemessen: `MOVE` unter Impersonation und das Verhalten der Unteraufgaben, das Abbruchkriterium zu MESS-06 für das Verschieben ist nicht ausgelöst; das Löschen ist auf Nextcloud 32 bis 35 gemessen (4.3 bis 4.5) und trägt das Ergebniswort "wiederherstellbar". Abschnitt 4 (MESS-06) ist damit gemessen. Die Abschnitte 5, 6 und 8 bis 10 sind offen
 **Messzeitraum:** ab 2026-11-11 (erster Messlauf 11:55 UTC), Ende offen
-**Nextcloud:** 35.0.0 (Build 35.0.0.10), gelesen mit `occ status` am 2026-11-11 aus dem laufenden Container `nc35-nc`. Das Image heißt `nextcloud:35.0.0-apache-local` und ist lokal aus dem veröffentlichten Quellpaket gebaut (`compose.nc35.yml`, Kopfkommentar)
+**Nextcloud:** 35.0.0 (Build 35.0.0.10), gelesen mit `occ status` am 2026-11-11 aus dem laufenden Container `nc35-nc`. Das Image heißt `nextcloud:35.0.0-apache-local` und ist lokal aus dem veröffentlichten Quellpaket gebaut (`compose.nc35.yml`, Kopfkommentar). Für die Löschmatrix (Abschnitt 4.3) liefen am 2026-11-11 nacheinander vier Wegwerf-Instanzen aus `compose.spike-tags.yml` mit den offiziellen Images; ihre Fassungen of record, je gelesen mit `occ status` in der laufenden Instanz, sind 32.0.15, 33.0.9, 34.0.4, 35.0.2 (Zeile `VERSION OF RECORD` in `raw/loeschen-32.txt` bis `raw/loeschen-35.txt`)
 **AppAPI:** `app_api` 35.0.0, gelesen mit `occ app:list --output=json` derselben Instanz am 2026-11-11
 **Diese ExApp:** 0.3.2, gelesen mit `occ app_api:app:list` am 2026-11-11. In der Topologie ist also ein älterer Stand registriert als der Arbeitsbaum. Für die Messung zählt das an zwei Stellen: die Impersonation läuft mit dem Secret dieser Registrierung, und der Produktionsweg (Abschnitt 1.2) läuft im Container dieses Images. Kein Werkzeug der App wird gemessen, nur ihr Zugang zu Nextcloud
 **groupfolders:** 23.0.1, gelesen mit `occ app:list --output=json` am 2026-11-11 nach `occ app:install groupfolders` in der laufenden Instanz (Protokollzeile `GRUPPENORDNER version=23.0.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)`). Die App wurde für die Messung aus dem App Store geladen und danach wieder entfernt. `files_external` 2.0.0-dev.0 gehört zum Server und war nur für die Messung eingeschaltet
@@ -415,6 +415,77 @@ Server und Tasks-App sind getrennt belegt: die Serverseite durch Aufrufe dieses 
 
 A21 ist damit für beide Seiten belegt. Der Server tut von sich aus nichts mit der Unteraufgabe, weder beim Verschieben noch beim Löschen der Elternaufgabe; die Tasks-App nimmt sie in beiden Fällen mit einem eigenen Aufruf mit. Nach dem Wortlaut von A21 ("ziehen die Kinder in der Tasks-App mit, folgt der Connector dem Gemessenen") bleibt die Vorgabe "ablehnen" also nicht bestehen: gemessen ist, dass die Kinder mitziehen und mitgelöscht werden. Gemessen ist auch der Preis: Mitnehmen heißt ein eigener Aufruf je Objekt ohne gemeinsame Transaktion, und ein Aufruf, der nur die Elternaufgabe bewegt, hinterlässt einen Zustand, den die App nie herstellt (Unteraufgabe in einer anderen Liste als ihre Elternaufgabe, oder Unteraufgabe einer gelöschten Elternaufgabe). Wie Phase 33 das Mitnehmen baut (Reihenfolge, Verhalten bei einem Teilfehler, `If-Match` je Objekt), ist dort zu planen; die Übergabe an die Phasen und an den Owner-Checkpoint steht in Plan 30-05.
 
+### 4.3 Löschen und Papierkorb auf Nextcloud 32 bis 35
+
+Gemessen am 2026-11-11 auf vier Wegwerf-Instanzen aus `compose.spike-tags.yml` (offizielles Image, SQLite, Loopback `http://127.0.0.1:8083`), eine nach der anderen, jede von der leeren Maschine bis `down -v`: Block delete-matrix, Rohbelege `raw/loeschen-32.txt` bis `raw/loeschen-35.txt`, Auszug in 12.7. Die Fassungen of record aus `occ status` sind 32.0.15, 33.0.9, 34.0.4, 35.0.2. Die Konten sind `alice` (löscht) und `bob` (Eigentümer der geteilten Listen), je mit App-Passwort: auf den Wegwerf-Instanzen gibt es keine ExApp, das Löschen unter Impersonation ist in 4.1 auf der Strecke nc35 gemessen (M4.8). Vor der ersten Nutzung hat jeder Lauf Schlüssel, Pfade und Aufräumkommando an der Quelle seiner Instanz gelesen (Zeilen `QUELLE`); keine Version weicht von der Erwartung ab, in keinem Lauf steht eine Zeile `QUELLE ABWEICHUNG`. Kein Abschnitt endete als ungemessen, jede Positivkontrolle hat gegriffen.
+
+Jede Zelle zitiert die Protokollzeile bis zum ersten Trennstrich; die Gegenproben (Datenbankzeile mit `deleted_at`, sha256 vor und nach der Wiederherstellung) stehen in derselben Zeile der Rohdatei dahinter.
+
+| Fassung of record | Papierkorb an, eigene Liste | Papierkorb an, geteilte Liste | Papierkorb aus, eigene Liste | Papierkorb aus, geteilte Liste | Vorab-Test | Frist und Einheit | Aufräumlauf | Rohdatei |
+|---|---|---|---|---|---|---|---|---|
+| 32.0.15 (`VERSION OF RECORD 32.0.15`) | `LOESCHEN an-eigen status=204 im_papierkorb=ja db_deleted_at=gesetzt` und `WIEDERHERSTELLUNG an-eigen status=201 uid_gleich=ja inhalt_gleich=ja` | `LOESCHEN an-geteilt status=204 papierkorb_von=beide wiederhergestellt_durch=loeschender`; der Eigentümer kann es auch: `WIEDERHERSTELLUNG an-geteilt-eigentuemer status=201 uid_gleich=ja inhalt_gleich=ja`; ohne Schreibrecht: `LOESCHEN an-geteilt-ro status=404 objekt_unveraendert=ja` | `LOESCHEN aus-eigen status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich` | `LOESCHEN aus-geteilt status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich` | `VORABTEST ERGEBNIS unterscheidet=ja kandidat=frist-eigenschaft` | `FRIST konfiguriert=leer standard_laut_quelle=2592000 einheit=Sekunden` | `FRIST AUFRAEUMEN standard=bleibt frist_1s=weg` | `raw/loeschen-32.txt` |
+| 33.0.9 (`VERSION OF RECORD 33.0.9`) | `LOESCHEN an-eigen status=204 im_papierkorb=ja db_deleted_at=gesetzt` und `WIEDERHERSTELLUNG an-eigen status=201 uid_gleich=ja inhalt_gleich=ja` | `LOESCHEN an-geteilt status=204 papierkorb_von=beide wiederhergestellt_durch=loeschender`; der Eigentümer kann es auch: `WIEDERHERSTELLUNG an-geteilt-eigentuemer status=201 uid_gleich=ja inhalt_gleich=ja`; ohne Schreibrecht: `LOESCHEN an-geteilt-ro status=404 objekt_unveraendert=ja` | `LOESCHEN aus-eigen status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich` | `LOESCHEN aus-geteilt status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich` | `VORABTEST ERGEBNIS unterscheidet=ja kandidat=frist-eigenschaft` | `FRIST konfiguriert=leer standard_laut_quelle=2592000 einheit=Sekunden` | `FRIST AUFRAEUMEN standard=bleibt frist_1s=weg` | `raw/loeschen-33.txt` |
+| 34.0.4 (`VERSION OF RECORD 34.0.4`) | `LOESCHEN an-eigen status=204 im_papierkorb=ja db_deleted_at=gesetzt` und `WIEDERHERSTELLUNG an-eigen status=201 uid_gleich=ja inhalt_gleich=ja` | `LOESCHEN an-geteilt status=204 papierkorb_von=beide wiederhergestellt_durch=loeschender`; der Eigentümer kann es auch: `WIEDERHERSTELLUNG an-geteilt-eigentuemer status=201 uid_gleich=ja inhalt_gleich=ja`; ohne Schreibrecht: `LOESCHEN an-geteilt-ro status=404 objekt_unveraendert=ja` | `LOESCHEN aus-eigen status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich` | `LOESCHEN aus-geteilt status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich` | `VORABTEST ERGEBNIS unterscheidet=ja kandidat=frist-eigenschaft` | `FRIST konfiguriert=leer standard_laut_quelle=2592000 einheit=Sekunden` | `FRIST AUFRAEUMEN standard=bleibt frist_1s=weg` | `raw/loeschen-34.txt` |
+| 35.0.2 (`VERSION OF RECORD 35.0.2`) | `LOESCHEN an-eigen status=204 im_papierkorb=ja db_deleted_at=gesetzt` und `WIEDERHERSTELLUNG an-eigen status=201 uid_gleich=ja inhalt_gleich=ja` | `LOESCHEN an-geteilt status=204 papierkorb_von=beide wiederhergestellt_durch=loeschender`; der Eigentümer kann es auch: `WIEDERHERSTELLUNG an-geteilt-eigentuemer status=201 uid_gleich=ja inhalt_gleich=ja`; ohne Schreibrecht: `LOESCHEN an-geteilt-ro status=404 objekt_unveraendert=ja` | `LOESCHEN aus-eigen status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich` | `LOESCHEN aus-geteilt status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich` | `VORABTEST ERGEBNIS unterscheidet=ja kandidat=frist-eigenschaft` | `FRIST konfiguriert=leer standard_laut_quelle=2592000 einheit=Sekunden` | `FRIST AUFRAEUMEN standard=bleibt frist_1s=weg` | `raw/loeschen-35.txt` |
+
+Was die Tabelle auf allen vier Versionen gleich zeigt:
+
+- **Papierkorb an, eigene Liste (M4.9, W1):** `DELETE` mit `If-Match` antwortet 204, die Aufgabe steht in der Auflistung des Papierkorbs (`REPORT calendar-query` auf `trashbin/objects`) unter `<id>.ics`, die Datenbankzeile trägt `deleted_at`. Die Wiederherstellung (`MOVE` auf `trashbin/restore/file`) antwortet 201; danach steht die Aufgabe am alten Ort mit gleicher UID und gleichem sha256, `deleted_at` ist wieder leer. Positivkontrolle: das nicht gelöschte Nachbarobjekt steht nicht im Papierkorb und ist lesbar.
+- **Papierkorb an, geteilte Liste (M4.10, W2):** löscht die Empfängerin mit Schreibrecht, steht die Aufgabe im Papierkorb beider Konten (`papierkorb_von=beide`). Wiederherstellen kann das löschende Konto, und an einem zweiten Objekt gemessen auch der Eigentümer. Die Empfängerin ohne Schreibrecht wird mit 404 abgelehnt, das Objekt ist unverändert.
+- **Unteraufgabe (A21, Serverseite je Version):** nach dem Löschen der Elternaufgabe ist die Unteraufgabe unverändert vorhanden, zum Beispiel auf 35.0.2: `UNTERAUFGABE loeschen vorhanden=ja unveraendert=ja eltern_status=204 nutzer=alice auth=basic`.
+- **Aufbewahrungsfrist (M4.13):** der Schlüssel `calendarRetentionObligation` der App `dav` ist im Auslieferungszustand nicht gesetzt; der Standard laut Quelle sind 2592000 Sekunden, also 30 Tage. Gemessen ist die Einheit so: mit dem Standard lässt `occ dav:retention:clean-up` ein gelöschtes Objekt stehen, mit dem Wert 1 ist es drei Sekunden später endgültig entfernt (`FRIST AUFRAEUMEN standard=bleibt frist_1s=weg`).
+
+**Vorab-Test (M4.12, W4).** Sechs Kandidaten, die ein Konto selbst per DAV oder OCS stellen kann, je bei eingeschaltetem und bei abgeschaltetem Papierkorb gefragt; die Lesart stand vor der Messung fest. Die Werte von Nextcloud 35.0.2, die drei anderen Versionen zeigen dieselben:
+
+| Kandidat | Papierkorb an | Papierkorb aus | Ergebnis |
+|---|---|---|---|
+| papierkorb-propfind | `VORABTEST papierkorb-propfind zustand=an wert=207 zeigt=an` | `VORABTEST papierkorb-propfind zustand=aus wert=207 zeigt=an` | zählt nicht: die Sammlung antwortet in beiden Zuständen 207 |
+| frist-eigenschaft | `VORABTEST frist-eigenschaft zustand=an wert=2592000 zeigt=an` | `VORABTEST frist-eigenschaft zustand=aus wert=0 zeigt=aus` | zählt: die Eigenschaft nennt bei eingeschaltetem Papierkorb die Frist in Sekunden und bei abgeschaltetem 0 |
+| frist-eigenschaft-home | `VORABTEST frist-eigenschaft-home zustand=an wert=fehlt zeigt=unklar` | `VORABTEST frist-eigenschaft-home zustand=aus wert=fehlt zeigt=unklar` | zählt nicht: am Kalender-Home gibt es die Eigenschaft nicht |
+| home-kind-trashbin | `VORABTEST home-kind-trashbin zustand=an wert=ja zeigt=an` | `VORABTEST home-kind-trashbin zustand=aus wert=ja zeigt=an` | zählt nicht: die Sammlung ist in beiden Zuständen da |
+| capabilities-dav | `VORABTEST capabilities-dav zustand=an wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_s` | `VORABTEST capabilities-dav zustand=aus wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_` | zählt nicht: die Capabilities nennen den Papierkorb nicht |
+| dav-kopf | `VORABTEST dav-kopf zustand=an wert=ja zeigt=an` | `VORABTEST dav-kopf zustand=aus wert=ja zeigt=an` | zählt nicht: das Merkmal steht in beiden Zuständen im Antwortkopf |
+
+Genau ein Kandidat unterscheidet die beiden Zustände in beiden Richtungen richtig, auf allen vier Versionen derselbe: ein `PROPFIND` mit `Depth: 0` auf `/remote.php/dav/calendars/<konto>/trashbin/` nach der Eigenschaft `{http://nextcloud.com/ns}trash-bin-retention-duration`. Die Positivkontrolle dazu ist das Verhalten, nicht der Schalter: bei "an" kam die Aufgabe zurück, bei "aus" war die Datenbankzeile weg (`KONTROLLE vorabtest zustand_am_verhalten_belegt=ja (an: wiederhergestellt=ja, aus: endgueltig geloescht=ja)`). Der zweite Kandidat anderer Art, die Existenz der Sammlung, taugt nicht: der Papierkorb bleibt als Sammlung sichtbar, auch wenn er abgeschaltet ist. Die Eigenschaft nennt zugleich die Frist: mit dem Wert 1 zeigt sie 1 (`VORABTEST frist-eigenschaft zustand=frist-1s wert=1 zeigt=an`), und ein so kurz gehaltener Papierkorb ist nach dem nächsten Aufräumlauf leer.
+
+Der Schalter wurde je Lauf mit `occ config:app:set` gesetzt, mit `occ config:app:get` belegt und nach einem Neustart des Containers erneut gelesen, bevor gemessen wurde (Zeilen `SCHALTER`); auf der Strecke nc35 wurde er nie verändert.
+
+### 4.4 Rohbefund bei abgeschaltetem Papierkorb
+
+Dieser Unterabschnitt steht eigens da, weil die Entscheidungsregel der Lesart nach TMOD-07 folgt (Owner-Entscheid vom 11.11.2026, oben bei der Regel): im Aus-Zustand muss nicht "wiederherstellbar" herauskommen, der Vorab-Test muss den Aus-Zustand sicher erkennen. Der Rohbefund selbst ist auf allen vier Versionen derselbe: mit `calendarRetentionObligation` gleich 0 löscht ein `DELETE` endgültig.
+
+- Nextcloud 32.0.15: nach dem `DELETE` (204) steht die Aufgabe in keinem Papierkorb, die Zeile in `calendarobjects` ist weg, eine Wiederherstellung ist nicht möglich. Eigene Liste: `LOESCHEN aus-eigen status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich`; geteilte Liste: `LOESCHEN aus-geteilt status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich`.
+- Nextcloud 33.0.9: nach dem `DELETE` (204) steht die Aufgabe in keinem Papierkorb, die Zeile in `calendarobjects` ist weg, eine Wiederherstellung ist nicht möglich. Eigene Liste: `LOESCHEN aus-eigen status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich`; geteilte Liste: `LOESCHEN aus-geteilt status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich`.
+- Nextcloud 34.0.4: nach dem `DELETE` (204) steht die Aufgabe in keinem Papierkorb, die Zeile in `calendarobjects` ist weg, eine Wiederherstellung ist nicht möglich. Eigene Liste: `LOESCHEN aus-eigen status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich`; geteilte Liste: `LOESCHEN aus-geteilt status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich`.
+- Nextcloud 35.0.2: nach dem `DELETE` (204) steht die Aufgabe in keinem Papierkorb, die Zeile in `calendarobjects` ist weg, eine Wiederherstellung ist nicht möglich. Eigene Liste: `LOESCHEN aus-eigen status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich`; geteilte Liste: `LOESCHEN aus-geteilt status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich`.
+
+Nach der wörtlichen Lesart von E13 ("wiederherstellbar bleibt, auch mit abgeschaltetem Papierkorb") wäre das Ergebnis also "nicht wiederherstellbar". Nach der geltenden Lesart zählt, dass der Vorab-Test diesen Zustand vor dem Löschen anzeigt (W4), und das tut er auf allen vier Versionen mit dem Wert 0.
+
+### 4.5 Ergebnis
+
+Die Sammelzeilen der vier Läufe, darunter die beiden Zeilen, die der Block delete-verdict aus ihnen bildet (`delete_verdict()` über die Zeilen `LOESCHEN VERSION` der vier Rohdateien):
+
+```
+LOESCHEN VERSION 32.0.15 g=ja w1=ja w2=ja w3=nein w4=ja wer=loeschender
+LOESCHEN VERSION 33.0.9 g=ja w1=ja w2=ja w3=nein w4=ja wer=loeschender
+LOESCHEN VERSION 34.0.4 g=ja w1=ja w2=ja w3=nein w4=ja wer=loeschender
+LOESCHEN VERSION 35.0.2 g=ja w1=ja w2=ja w3=nein w4=ja wer=loeschender
+ERGEBNIS LOESCHEN (E13): wiederherstellbar
+KONSEQUENZ: TMOD-07 ist planbar (Phase 33), mit den Auflagen aus den Messwerten: Vorab-Test vor dem Löschen, wer wiederherstellen kann, Aufbewahrungsfrist.
+```
+
+Auflagen für TMOD-07 aus den Messwerten:
+
+- **Vorab-Test vor jedem Löschen:** `PROPFIND` mit `Depth: 0` auf die Papierkorb-Sammlung des Kontos nach `{http://nextcloud.com/ns}trash-bin-retention-duration`. Nur eine Zahl größer 0 heißt, dass der Papierkorb wirkt. Der Wert 0, eine fehlende Eigenschaft oder eine andere Antwort als 207 heißt ablehnen. Die Existenz der Sammlung, der Antwortkopf `DAV` und die Capabilities sagen nichts über den Zustand.
+- **Frist nennen:** der Wert der Eigenschaft ist die Aufbewahrungsfrist in Sekunden, im Auslieferungszustand 2592000 (30 Tage). Die Antwort des Werkzeugs kann sie nennen. Ob das Werkzeug eine Mindestfrist verlangt, ist in Phase 33 zu entscheiden: gemessen ist, dass ein Papierkorb mit der Frist 1 als "an" erscheint und beim nächsten Aufräumlauf leer ist.
+- **Wer wiederherstellen kann:** bei einer eigenen Liste das Konto selbst; bei einer geteilten Liste mit Schreibrecht das löschende Konto und der Eigentümer, die Aufgabe steht im Papierkorb beider.
+- **Kein Schreibrecht:** das Löschen in einer nur lesbaren geteilten Liste lehnt der Server mit 404 ab, wie `PUT` (3.3) und `MOVE` (4.1).
+- **ETag:** `DELETE` mit `If-Match` auf die gelesene ETag antwortet 204; mit einer veralteten ETag 412 bei unverändertem Objekt (gemessen auf nc35, 4.1).
+- **Elternaufgaben:** der Server löscht eine Unteraufgabe nicht mit, sie bleibt mit einem Verweis auf die gelöschte Elternaufgabe zurück; die Tasks-App löscht sie mit einem eigenen Aufruf mit, und beide liegen dann im Papierkorb (4.2).
+- **Nie senden:** die Quelle nennt eine Kopfzeile `X-NC-CalDAV-No-Trashbin`, die den Papierkorb für eine Anfrage umgeht (gelesen, nicht gemessen, Zeile `QUELLE` in 12.7). Der Connector darf sie nie setzen.
+
+`.planning/REQUIREMENTS.md` wird in diesem Plan nicht geändert; die Übernahme des Ergebnisses in die Requirements und an den Owner-Checkpoint geschieht gesammelt in Plan 30-05.
+
 ## 5. Discovery und Objekte (MESS-03)
 
 Offen, füllt Plan 30-04.
@@ -654,6 +725,26 @@ Ergänzt durch Plan 30-02 (2026-11-11):
 | Tasks-App in anderen Fassungen als 0.18.1, andere Clients (Thunderbird, DAVx5, Apple) | ungemessen | eine Fassung der App in einem Browser |
 | Wortlaut der Fehler in der Konsole des Browsers | ungemessen | die Hauptsitzung hat die Zahl notiert (vier in Runde A, einer in Runde B), nicht den Text; die beiden 500 stehen im Zugriffsprotokoll |
 | Zusagen in einem Wortlaut, den keines der beiden Suchmuster trifft | ungemessen | Grenze des Inventars, siehe 7.4 |
+
+Ergänzt durch Plan 30-03 (2026-11-11):
+
+| Punkt | Stand | Grund |
+|-------|-------|-------|
+| `MOVE` und `DELETE` unter Impersonation auf Nextcloud 32, 33 und 34 | ungemessen | Impersonation gibt es nur auf der Strecke nc35 (35.0.0); die Wegwerf-Instanzen haben keine ExApp. Auf 32 bis 35 ist das Löschen mit App-Passwort gemessen, auf nc35 verhielten sich beide Anmeldewege beim `MOVE` gleich |
+| `DELETE` mit veralteter ETag auf Nextcloud 32, 33 und 34 | ungemessen | gemessen nur auf nc35 (412); die Löschmatrix löscht immer mit der gelesenen ETag |
+| Verschieben und Löschen auf PostgreSQL oder MySQL | ungemessen | alle Instanzen dieses Plans laufen mit SQLite |
+| Zustand des Papierkorbs unmittelbar nach `occ config:app:set`, ohne Neustart des Containers | ungemessen | jede Messung liegt nach einem Neustart; ob Vorab-Test und Löschverhalten in der Zwischenzeit auseinanderlaufen können, ist offen. Beide lesen laut Quelle denselben Wert in derselben Anfrage (gelesen) |
+| Negativer Wert des Schalters, Kopfzeile `X-NC-CalDAV-No-Trashbin` | ungemessen | nur gelesen: ein negativer Wert ergibt laut Quelle die Frist 0 in der Eigenschaft, schaltet den Papierkorb aber nicht ab (der Vorab-Test lehnt dann ab, obwohl der Papierkorb wirkt); die Kopfzeile umgeht den Papierkorb je Anfrage |
+| Hintergrundjob der Aufbewahrung | ungemessen | gemessen ist `occ dav:retention:clean-up`; dass der zeitgesteuerte Job denselben Dienst ruft, ist gelesen |
+| Wiederherstellen, wenn am alten Ort inzwischen ein Objekt gleichen Namens liegt | ungemessen | laut Quelle lehnt der Server das ab (gelesen) |
+| Wiederherstellen in einer Oberfläche (Kalender-App, Tasks-App) | ungemessen | gemessen ist der DAV-Weg; ob und wo ein Nutzer eine gelöschte Aufgabe in der Oberfläche zurückholt, war nicht Teil des Plans |
+| Löschen in einem Kalender mit `VEVENT` und `VTODO` (etwa `personal`) | ungemessen | gemessen sind Listen mit dem Komponenten-Set genau `VTODO` |
+| Geteilte Liste aus einer Freigabe an eine Gruppe oder ein Team | ungemessen | hergestellt wurde eine Freigabe an ein einzelnes Konto |
+| `MOVE` aus einem Deck-Kalender heraus | ungemessen | gemessen ist der Deck-Kalender nur als Ziel (403); das Board war leer |
+| `MOVE` mit `Overwrite: T`, `MOVE` einer wiederkehrenden Aufgabe, `MOVE` in die Liste eines anderen Kontos ohne Freigabe | ungemessen | nicht Teil des Plans; gemessen sind `Overwrite: F` und der Aufruf ohne Kopfzeile |
+| Belegtes Ziel ohne `Overwrite` bei abgeschaltetem Papierkorb | ungemessen | auf nc35 wird der Schalter nie verändert; dort lag das verdrängte Objekt im Papierkorb. Im Aus-Zustand wäre es nach 4.4 endgültig weg (abgeleitet, nicht gemessen) |
+| Unteraufgaben über mehrere Ebenen, Unteraufgabe in einer anderen Liste als die Elternaufgabe | ungemessen | gemessen ist eine Unteraufgabe in derselben Liste |
+| Mitnehmen der Unteraufgaben durch den Connector (Reihenfolge, Teilfehler) | ungemessen | gemessen ist, was Server und Tasks-App tun; der Connector hat noch kein Werkzeug dafür |
 
 Zum Rückbau gehört eine Grenze, die keine Messlücke ist, aber benannt sein muss: `occ app:remove groupfolders` nimmt den Code der App weg, nicht ihre Tabellen in der Datenbank, und auch `files_external` behält seine Tabellen nach dem Ausschalten. Die Baseline (Apps, Konten, Gruppen, Dateien, Kalender) ist nach dem Lauf in allen zwölf Feldern gleich; die leeren Tabellen beider Apps bleiben in der Instanz nc35 zurück.
 
@@ -1550,3 +1641,275 @@ x-user-id: spike30a
 ```
 
 Rückbau: 12 von 12 Zeilen `BASELINE` enden auf `gleich=ja`, keine auf gleich=nein; die vier Container sind gestoppt.
+
+### 12.7 raw/loeschen-32.txt bis raw/loeschen-35.txt
+
+Vier Läufe des Blocks delete-matrix vom 2026-11-11, je Version die Messzeilen in der Reihenfolge des Protokolls, ohne die Aufbauzeilen (`SETUP`) und ohne die Rohantworten. Läufe, die schon am RAM-Tor endeten, haben nichts gemessen und stehen als `RUN FAILED` in der jeweiligen Rohdatei.
+
+Nextcloud 32.0.15 (Rohdatei loeschen-32.txt):
+
+```
+VERSION OF RECORD 32.0.15
+dbtype: sqlite3
+memcache.local: \OC\Memcache\APCu
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:17 | public const RETENTION_CONFIG_KEY = 'calendarRetentionObligation';
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:18 | private const DEFAULT_RETENTION_SECONDS = 30 * 24 * 60 * 60;
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:32 | public const PROPERTY_RETENTION_DURATION = '{http://nextcloud.com/ns}trash-bin-retention-duration';
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:45 | $this->disableTrashbin = $request->getHeader('X-NC-CalDAV-No-Trashbin') === '1';
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:121 | return ['nc-calendar-trashbin'];
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:125 | return 'nc-calendar-trashbin';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:941 | $trashbinDisabled = $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1737 | public function deleteCalendarObject($calendarId, $objectUri, $calendarType = self::CALENDAR_TYPE_CALENDAR, bool $forceDeletePermanently = false) {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1747 | if ($forceDeletePermanently || $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0') {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1821 | public function restoreCalendarObject(array $objectData): void {
+QUELLE apps/dav/lib/Command/RetentionCleanupCommand.php:20 | parent::__construct('dav:retention:clean-up');
+QUELLE occ list dav | dav:retention:clean-up
+QUELLE BESTAETIGT schluessel=calendarRetentionObligation standard_sekunden=2592000 aus_wert=0 sammlung=trashbin/objects wiederherstellung=Verschieben nach trashbin/restore/<name> eigenschaft={http://nextcloud.com/ns}trash-bin-retention-duration aufraeumen=occ dav:retention:clean-up
+FRIST konfiguriert=leer standard_laut_quelle=2592000 einheit=Sekunden (occ config:app:get dav calendarRetentionObligation; leer heisst Standard; Einheit gelesen aus der Konstante DEFAULT_RETENTION_SECONDS, gemessen im Abschnitt aufraeumen)
+2026-11-11T16:56:45Z | LOESCHEN an-eigen status=204 im_papierkorb=ja db_deleted_at=gesetzt | nutzer=alice auth=basic if_match=ja papierkorb_name=7.ics datenbank=alice/spike30-eigen/s30-an-eigen-165644-deleted.ics:deleted_at_gesetzt:3da81d4d68a5
+KONTROLLE an-eigen nachbar_im_papierkorb=nein nachbar_lesbar=ja gegriffen=ja
+2026-11-11T16:56:45Z | WIEDERHERSTELLUNG an-eigen status=201 uid_gleich=ja inhalt_gleich=ja | get_danach=200 sha256_vorher=3da81d4d68a5 sha256_nachher=3da81d4d68a5 db_deleted_at=leer am_alten_ort=ja datenbank=alice/spike30-eigen/s30-an-eigen-165644.ics:deleted_at_leer:3da81d4d68a5
+2026-11-11T16:56:46Z | GELOESCHT an-geteilt status=204 nutzer=alice auth=basic if_match=ja papierkorb_von=beide db_deleted_at=gesetzt datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-165644-deleted.ics:deleted_at_gesetzt:addc51e8f9d1
+2026-11-11T16:56:46Z | WIEDERHERSTELLUNG an-geteilt versuch=loeschender status=201 uid_gleich=ja inhalt_gleich=ja | nutzer=alice get_als_eigentuemer=200 db_deleted_at=leer datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-165644.ics:deleted_at_leer:addc51e8f9d1
+LOESCHEN an-geteilt status=204 papierkorb_von=beide wiederhergestellt_durch=loeschender | db_deleted_at_nach_dem_loeschen=gesetzt
+2026-11-11T16:56:47Z | WIEDERHERSTELLUNG an-geteilt-eigentuemer status=201 uid_gleich=ja inhalt_gleich=ja | geloescht_von=alice (204) wiederhergestellt_von=bob get_danach=200 datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-eigentuemer-165644.ics:deleted_at_leer:52e695cb202b
+2026-11-11T16:56:47Z | LOESCHEN an-geteilt-ro status=404 objekt_unveraendert=ja | nutzer=alice auth=basic lesen_vorher=200 datenbank=bob/spike30-geteilt-ro/s30-an-geteilt-ro-165644.ics:deleted_at_leer:f52414e9e3fd Sabre\DAV\Exception\NotFound Calendar with name 'spike30-geteilt-ro_shared_by_bob' could not be found
+VORABTEST papierkorb-propfind zustand=an wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=an wert=2592000 zeigt=an
+VORABTEST frist-eigenschaft-home zustand=an wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=an wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=an wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=an wert=ja zeigt=an
+2026-11-11T16:56:48Z | UNTERAUFGABE loeschen vorhanden=ja unveraendert=ja eltern_status=204 nutzer=alice auth=basic | datenbank kind=alice/spike30-eigen/s30-kind-165644.ics:deleted_at_leer:22a66f508753 eltern=alice/spike30-eigen/s30-eltern-165644-deleted.ics:deleted_at_gesetzt:3f49e7f6f809
+SCHALTER aus occ config:app:set dav calendarRetentionObligation --value=0 -> Config value 'calendarRetentionObligation' for app 'dav' is now set to '0', stored as mixed in fast cache
+SCHALTER aus occ config:app:get dav calendarRetentionObligation vor_neustart=0 nach_neustart=0 (docker restart nc-spike-tags)
+2026-11-11T16:56:52Z | LOESCHEN aus-eigen status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich | nutzer=alice auth=basic if_match=ja get_danach=404 papierkorb_eintraege=1 datenbank=keine
+2026-11-11T16:56:53Z | LOESCHEN aus-geteilt status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich | geloescht_von=alice auth=basic get_als_eigentuemer_danach=404 papierkorb_von=keinem datenbank=keine
+VORABTEST papierkorb-propfind zustand=aus wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=aus wert=0 zeigt=aus
+VORABTEST frist-eigenschaft-home zustand=aus wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=aus wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=aus wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=aus wert=ja zeigt=an
+VORABTEST ERGEBNIS unterscheidet=ja kandidat=frist-eigenschaft
+KONTROLLE vorabtest zustand_am_verhalten_belegt=ja (an: wiederhergestellt=ja, aus: endgueltig geloescht=ja)
+SCHALTER standard occ config:app:delete dav calendarRetentionObligation -> Config value calendarRetentionObligation of app dav deleted
+SCHALTER standard occ config:app:get dav calendarRetentionObligation vor_neustart=leer nach_neustart=leer (docker restart nc-spike-tags)
+2026-11-11T16:57:00Z | AUFRAEUMEN standardfrist geloescht=204 occ dav:retention:clean-up -> (keine Ausgabe) | datenbank vorher=alice/spike30-eigen/s30-frist-165644-deleted.ics:deleted_at_gesetzt:12b470548a20 nachher=alice/spike30-eigen/s30-frist-165644-deleted.ics:deleted_at_gesetzt:12b470548a20
+SCHALTER frist-1s occ config:app:set dav calendarRetentionObligation --value=1 -> Config value 'calendarRetentionObligation' for app 'dav' is now set to '1', stored as mixed in fast cache
+SCHALTER frist-1s occ config:app:get dav calendarRetentionObligation vor_neustart=1 nach_neustart=1 (docker restart nc-spike-tags)
+VORABTEST papierkorb-propfind zustand=frist-1s wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=frist-1s wert=1 zeigt=an
+VORABTEST frist-eigenschaft-home zustand=frist-1s wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=frist-1s wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=frist-1s wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=frist-1s wert=ja zeigt=an
+2026-11-11T16:57:08Z | AUFRAEUMEN frist=1 nach 3 s occ dav:retention:clean-up -> (keine Ausgabe) | datenbank nachher=keine
+FRIST AUFRAEUMEN standard=bleibt frist_1s=weg
+KONTROLLEN {"an-eigen": "ja", "an-geteilt": "ja", "unterauftrag": "ja", "aus-eigen": "ja", "aus-geteilt": "ja", "vorabtest": "ja", "aufraeumen": "ja"} ungemessen=keine
+LOESCHEN VERSION 32.0.15 g=ja w1=ja w2=ja w3=nein w4=ja wer=loeschender
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 67 s; ENDE 2026-11-11T16:57:12Z
+```
+
+Nextcloud 33.0.9 (Rohdatei loeschen-33.txt):
+
+```
+VERSION OF RECORD 33.0.9
+dbtype: sqlite3
+memcache.local: \OC\Memcache\APCu
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:17 | public const RETENTION_CONFIG_KEY = 'calendarRetentionObligation';
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:18 | private const DEFAULT_RETENTION_SECONDS = 30 * 24 * 60 * 60;
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:32 | public const PROPERTY_RETENTION_DURATION = '{http://nextcloud.com/ns}trash-bin-retention-duration';
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:45 | $this->disableTrashbin = $request->getHeader('X-NC-CalDAV-No-Trashbin') === '1';
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:121 | return ['nc-calendar-trashbin'];
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:125 | return 'nc-calendar-trashbin';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:941 | $trashbinDisabled = $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1737 | public function deleteCalendarObject($calendarId, $objectUri, $calendarType = self::CALENDAR_TYPE_CALENDAR, bool $forceDeletePermanently = false) {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1747 | if ($forceDeletePermanently || $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0') {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1821 | public function restoreCalendarObject(array $objectData): void {
+QUELLE apps/dav/lib/Command/RetentionCleanupCommand.php:20 | parent::__construct('dav:retention:clean-up');
+QUELLE occ list dav | dav:retention:clean-up
+QUELLE BESTAETIGT schluessel=calendarRetentionObligation standard_sekunden=2592000 aus_wert=0 sammlung=trashbin/objects wiederherstellung=Verschieben nach trashbin/restore/<name> eigenschaft={http://nextcloud.com/ns}trash-bin-retention-duration aufraeumen=occ dav:retention:clean-up
+FRIST konfiguriert=leer standard_laut_quelle=2592000 einheit=Sekunden (occ config:app:get dav calendarRetentionObligation; leer heisst Standard; Einheit gelesen aus der Konstante DEFAULT_RETENTION_SECONDS, gemessen im Abschnitt aufraeumen)
+2026-11-11T17:04:43Z | LOESCHEN an-eigen status=204 im_papierkorb=ja db_deleted_at=gesetzt | nutzer=alice auth=basic if_match=ja papierkorb_name=7.ics datenbank=alice/spike30-eigen/s30-an-eigen-170442-deleted.ics:deleted_at_gesetzt:0b9ef0fd9ae3
+KONTROLLE an-eigen nachbar_im_papierkorb=nein nachbar_lesbar=ja gegriffen=ja
+2026-11-11T17:04:46Z | WIEDERHERSTELLUNG an-eigen status=201 uid_gleich=ja inhalt_gleich=ja | get_danach=200 sha256_vorher=0b9ef0fd9ae3 sha256_nachher=0b9ef0fd9ae3 db_deleted_at=leer am_alten_ort=ja datenbank=alice/spike30-eigen/s30-an-eigen-170442.ics:deleted_at_leer:0b9ef0fd9ae3
+2026-11-11T17:04:46Z | GELOESCHT an-geteilt status=204 nutzer=alice auth=basic if_match=ja papierkorb_von=beide db_deleted_at=gesetzt datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-170442-deleted.ics:deleted_at_gesetzt:613d8ca35842
+2026-11-11T17:04:47Z | WIEDERHERSTELLUNG an-geteilt versuch=loeschender status=201 uid_gleich=ja inhalt_gleich=ja | nutzer=alice get_als_eigentuemer=200 db_deleted_at=leer datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-170442.ics:deleted_at_leer:613d8ca35842
+LOESCHEN an-geteilt status=204 papierkorb_von=beide wiederhergestellt_durch=loeschender | db_deleted_at_nach_dem_loeschen=gesetzt
+2026-11-11T17:04:47Z | WIEDERHERSTELLUNG an-geteilt-eigentuemer status=201 uid_gleich=ja inhalt_gleich=ja | geloescht_von=alice (204) wiederhergestellt_von=bob get_danach=200 datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-eigentuemer-170442.ics:deleted_at_leer:6b0b5a9c2d0c
+2026-11-11T17:04:48Z | LOESCHEN an-geteilt-ro status=404 objekt_unveraendert=ja | nutzer=alice auth=basic lesen_vorher=200 datenbank=bob/spike30-geteilt-ro/s30-an-geteilt-ro-170442.ics:deleted_at_leer:4dee74d3117a Sabre\DAV\Exception\NotFound Calendar with name 'spike30-geteilt-ro_shared_by_bob' could not be found
+VORABTEST papierkorb-propfind zustand=an wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=an wert=2592000 zeigt=an
+VORABTEST frist-eigenschaft-home zustand=an wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=an wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=an wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=an wert=ja zeigt=an
+2026-11-11T17:04:49Z | UNTERAUFGABE loeschen vorhanden=ja unveraendert=ja eltern_status=204 nutzer=alice auth=basic | datenbank kind=alice/spike30-eigen/s30-kind-170442.ics:deleted_at_leer:4eccb10b508e eltern=alice/spike30-eigen/s30-eltern-170442-deleted.ics:deleted_at_gesetzt:979afbd6b46d
+SCHALTER aus occ config:app:set dav calendarRetentionObligation --value=0 -> Config value 'calendarRetentionObligation' for app 'dav' is now set to '0', stored as mixed in fast cache
+SCHALTER aus occ config:app:get dav calendarRetentionObligation vor_neustart=0 nach_neustart=0 (docker restart nc-spike-tags)
+2026-11-11T17:04:55Z | LOESCHEN aus-eigen status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich | nutzer=alice auth=basic if_match=ja get_danach=404 papierkorb_eintraege=1 datenbank=keine
+2026-11-11T17:04:56Z | LOESCHEN aus-geteilt status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich | geloescht_von=alice auth=basic get_als_eigentuemer_danach=404 papierkorb_von=keinem datenbank=keine
+VORABTEST papierkorb-propfind zustand=aus wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=aus wert=0 zeigt=aus
+VORABTEST frist-eigenschaft-home zustand=aus wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=aus wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=aus wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=aus wert=ja zeigt=an
+VORABTEST ERGEBNIS unterscheidet=ja kandidat=frist-eigenschaft
+KONTROLLE vorabtest zustand_am_verhalten_belegt=ja (an: wiederhergestellt=ja, aus: endgueltig geloescht=ja)
+SCHALTER standard occ config:app:delete dav calendarRetentionObligation -> Config value calendarRetentionObligation of app dav deleted
+SCHALTER standard occ config:app:get dav calendarRetentionObligation vor_neustart=leer nach_neustart=leer (docker restart nc-spike-tags)
+2026-11-11T17:05:01Z | AUFRAEUMEN standardfrist geloescht=204 occ dav:retention:clean-up -> (keine Ausgabe) | datenbank vorher=alice/spike30-eigen/s30-frist-170442-deleted.ics:deleted_at_gesetzt:999f08d14b61 nachher=alice/spike30-eigen/s30-frist-170442-deleted.ics:deleted_at_gesetzt:999f08d14b61
+SCHALTER frist-1s occ config:app:set dav calendarRetentionObligation --value=1 -> Config value 'calendarRetentionObligation' for app 'dav' is now set to '1', stored as mixed in fast cache
+SCHALTER frist-1s occ config:app:get dav calendarRetentionObligation vor_neustart=1 nach_neustart=1 (docker restart nc-spike-tags)
+VORABTEST papierkorb-propfind zustand=frist-1s wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=frist-1s wert=1 zeigt=an
+VORABTEST frist-eigenschaft-home zustand=frist-1s wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=frist-1s wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=frist-1s wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=frist-1s wert=ja zeigt=an
+2026-11-11T17:05:10Z | AUFRAEUMEN frist=1 nach 3 s occ dav:retention:clean-up -> (keine Ausgabe) | datenbank nachher=keine
+FRIST AUFRAEUMEN standard=bleibt frist_1s=weg
+KONTROLLEN {"an-eigen": "ja", "an-geteilt": "ja", "unterauftrag": "ja", "aus-eigen": "ja", "aus-geteilt": "ja", "vorabtest": "ja", "aufraeumen": "ja"} ungemessen=keine
+LOESCHEN VERSION 33.0.9 g=ja w1=ja w2=ja w3=nein w4=ja wer=loeschender
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 73 s; ENDE 2026-11-11T17:05:17Z
+```
+
+Nextcloud 34.0.4 (Rohdatei loeschen-34.txt):
+
+```
+VERSION OF RECORD 34.0.4
+dbtype: sqlite3
+memcache.local: \OC\Memcache\APCu
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:17 | public const RETENTION_CONFIG_KEY = 'calendarRetentionObligation';
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:18 | private const DEFAULT_RETENTION_SECONDS = 30 * 24 * 60 * 60;
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:32 | public const PROPERTY_RETENTION_DURATION = '{http://nextcloud.com/ns}trash-bin-retention-duration';
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:45 | $this->disableTrashbin = $request->getHeader('X-NC-CalDAV-No-Trashbin') === '1';
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:123 | return ['nc-calendar-trashbin'];
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:128 | return 'nc-calendar-trashbin';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:947 | $trashbinDisabled = $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1769 | public function deleteCalendarObject($calendarId, $objectUri, $calendarType = self::CALENDAR_TYPE_CALENDAR, bool $forceDeletePermanently = false) {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1779 | if ($forceDeletePermanently || $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0') {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1853 | public function restoreCalendarObject(array $objectData): void {
+QUELLE apps/dav/lib/Command/RetentionCleanupCommand.php:20 | parent::__construct('dav:retention:clean-up');
+QUELLE occ list dav | dav:retention:clean-up
+QUELLE BESTAETIGT schluessel=calendarRetentionObligation standard_sekunden=2592000 aus_wert=0 sammlung=trashbin/objects wiederherstellung=Verschieben nach trashbin/restore/<name> eigenschaft={http://nextcloud.com/ns}trash-bin-retention-duration aufraeumen=occ dav:retention:clean-up
+FRIST konfiguriert=leer standard_laut_quelle=2592000 einheit=Sekunden (occ config:app:get dav calendarRetentionObligation; leer heisst Standard; Einheit gelesen aus der Konstante DEFAULT_RETENTION_SECONDS, gemessen im Abschnitt aufraeumen)
+2026-11-11T17:15:56Z | LOESCHEN an-eigen status=204 im_papierkorb=ja db_deleted_at=gesetzt | nutzer=alice auth=basic if_match=ja papierkorb_name=3.ics datenbank=alice/spike30-eigen/s30-an-eigen-171554-deleted.ics:deleted_at_gesetzt:c645213b7f99
+KONTROLLE an-eigen nachbar_im_papierkorb=nein nachbar_lesbar=ja gegriffen=ja
+2026-11-11T17:15:56Z | WIEDERHERSTELLUNG an-eigen status=201 uid_gleich=ja inhalt_gleich=ja | get_danach=200 sha256_vorher=c645213b7f99 sha256_nachher=c645213b7f99 db_deleted_at=leer am_alten_ort=ja datenbank=alice/spike30-eigen/s30-an-eigen-171554.ics:deleted_at_leer:c645213b7f99
+2026-11-11T17:15:57Z | GELOESCHT an-geteilt status=204 nutzer=alice auth=basic if_match=ja papierkorb_von=beide db_deleted_at=gesetzt datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-171554-deleted.ics:deleted_at_gesetzt:0dbc8d3c9507
+2026-11-11T17:15:57Z | WIEDERHERSTELLUNG an-geteilt versuch=loeschender status=201 uid_gleich=ja inhalt_gleich=ja | nutzer=alice get_als_eigentuemer=200 db_deleted_at=leer datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-171554.ics:deleted_at_leer:0dbc8d3c9507
+LOESCHEN an-geteilt status=204 papierkorb_von=beide wiederhergestellt_durch=loeschender | db_deleted_at_nach_dem_loeschen=gesetzt
+2026-11-11T17:15:58Z | WIEDERHERSTELLUNG an-geteilt-eigentuemer status=201 uid_gleich=ja inhalt_gleich=ja | geloescht_von=alice (204) wiederhergestellt_von=bob get_danach=200 datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-eigentuemer-171554.ics:deleted_at_leer:5e6e6ab2886c
+2026-11-11T17:15:58Z | LOESCHEN an-geteilt-ro status=404 objekt_unveraendert=ja | nutzer=alice auth=basic lesen_vorher=200 datenbank=bob/spike30-geteilt-ro/s30-an-geteilt-ro-171554.ics:deleted_at_leer:d4732f04a995 Sabre\DAV\Exception\NotFound Calendar with name 'spike30-geteilt-ro_shared_by_bob' could not be found
+VORABTEST papierkorb-propfind zustand=an wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=an wert=2592000 zeigt=an
+VORABTEST frist-eigenschaft-home zustand=an wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=an wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=an wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=an wert=ja zeigt=an
+2026-11-11T17:16:03Z | UNTERAUFGABE loeschen vorhanden=ja unveraendert=ja eltern_status=204 nutzer=alice auth=basic | datenbank kind=alice/spike30-eigen/s30-kind-171554.ics:deleted_at_leer:e697172612f0 eltern=alice/spike30-eigen/s30-eltern-171554-deleted.ics:deleted_at_gesetzt:36df225862c2
+SCHALTER aus occ config:app:set dav calendarRetentionObligation --value=0 -> Config value 'calendarRetentionObligation' for app 'dav' is now set to '0', stored as mixed in fast cache
+SCHALTER aus occ config:app:get dav calendarRetentionObligation vor_neustart=0 nach_neustart=0 (docker restart nc-spike-tags)
+2026-11-11T17:16:07Z | LOESCHEN aus-eigen status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich | nutzer=alice auth=basic if_match=ja get_danach=404 papierkorb_eintraege=1 datenbank=keine
+2026-11-11T17:16:07Z | LOESCHEN aus-geteilt status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich | geloescht_von=alice auth=basic get_als_eigentuemer_danach=404 papierkorb_von=keinem datenbank=keine
+VORABTEST papierkorb-propfind zustand=aus wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=aus wert=0 zeigt=aus
+VORABTEST frist-eigenschaft-home zustand=aus wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=aus wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=aus wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=aus wert=ja zeigt=an
+VORABTEST ERGEBNIS unterscheidet=ja kandidat=frist-eigenschaft
+KONTROLLE vorabtest zustand_am_verhalten_belegt=ja (an: wiederhergestellt=ja, aus: endgueltig geloescht=ja)
+SCHALTER standard occ config:app:delete dav calendarRetentionObligation -> Config value calendarRetentionObligation of app dav deleted
+SCHALTER standard occ config:app:get dav calendarRetentionObligation vor_neustart=leer nach_neustart=leer (docker restart nc-spike-tags)
+2026-11-11T17:16:14Z | AUFRAEUMEN standardfrist geloescht=204 occ dav:retention:clean-up -> (keine Ausgabe) | datenbank vorher=alice/spike30-eigen/s30-frist-171554-deleted.ics:deleted_at_gesetzt:68630f488585 nachher=alice/spike30-eigen/s30-frist-171554-deleted.ics:deleted_at_gesetzt:68630f488585
+SCHALTER frist-1s occ config:app:set dav calendarRetentionObligation --value=1 -> Config value 'calendarRetentionObligation' for app 'dav' is now set to '1', stored as mixed in fast cache
+SCHALTER frist-1s occ config:app:get dav calendarRetentionObligation vor_neustart=1 nach_neustart=1 (docker restart nc-spike-tags)
+VORABTEST papierkorb-propfind zustand=frist-1s wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=frist-1s wert=1 zeigt=an
+VORABTEST frist-eigenschaft-home zustand=frist-1s wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=frist-1s wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=frist-1s wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=frist-1s wert=ja zeigt=an
+2026-11-11T17:16:23Z | AUFRAEUMEN frist=1 nach 3 s occ dav:retention:clean-up -> (keine Ausgabe) | datenbank nachher=keine
+FRIST AUFRAEUMEN standard=bleibt frist_1s=weg
+KONTROLLEN {"an-eigen": "ja", "an-geteilt": "ja", "unterauftrag": "ja", "aus-eigen": "ja", "aus-geteilt": "ja", "vorabtest": "ja", "aufraeumen": "ja"} ungemessen=keine
+LOESCHEN VERSION 34.0.4 g=ja w1=ja w2=ja w3=nein w4=ja wer=loeschender
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 76 s; ENDE 2026-11-11T17:16:28Z
+```
+
+Nextcloud 35.0.2 (Rohdatei loeschen-35.txt):
+
+```
+VERSION OF RECORD 35.0.2
+dbtype: sqlite3
+memcache.local: \OC\Memcache\APCu
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:18 | public const RETENTION_CONFIG_KEY = 'calendarRetentionObligation';
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:19 | private const int DEFAULT_RETENTION_SECONDS = 30 * 24 * 60 * 60;
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:33 | public const PROPERTY_RETENTION_DURATION = '{http://nextcloud.com/ns}trash-bin-retention-duration';
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:46 | $this->disableTrashbin = $request->getHeader('X-NC-CalDAV-No-Trashbin') === '1';
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:124 | return ['nc-calendar-trashbin'];
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:129 | return 'nc-calendar-trashbin';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:946 | $trashbinDisabled = $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1768 | public function deleteCalendarObject($calendarId, $objectUri, $calendarType = self::CALENDAR_TYPE_CALENDAR, bool $forceDeletePermanently = false) {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1778 | if ($forceDeletePermanently || $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0') {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1856 | public function restoreCalendarObject(array $objectData): void {
+QUELLE apps/dav/lib/Command/RetentionCleanupCommand.php:21 | parent::__construct('dav:retention:clean-up');
+QUELLE occ list dav | dav:retention:clean-up
+QUELLE BESTAETIGT schluessel=calendarRetentionObligation standard_sekunden=2592000 aus_wert=0 sammlung=trashbin/objects wiederherstellung=Verschieben nach trashbin/restore/<name> eigenschaft={http://nextcloud.com/ns}trash-bin-retention-duration aufraeumen=occ dav:retention:clean-up
+FRIST konfiguriert=leer standard_laut_quelle=2592000 einheit=Sekunden (occ config:app:get dav calendarRetentionObligation; leer heisst Standard; Einheit gelesen aus der Konstante DEFAULT_RETENTION_SECONDS, gemessen im Abschnitt aufraeumen)
+2026-11-11T17:27:23Z | LOESCHEN an-eigen status=204 im_papierkorb=ja db_deleted_at=gesetzt | nutzer=alice auth=basic if_match=ja papierkorb_name=3.ics datenbank=alice/spike30-eigen/s30-an-eigen-172721-deleted.ics:deleted_at_gesetzt:43760fa09c9b
+KONTROLLE an-eigen nachbar_im_papierkorb=nein nachbar_lesbar=ja gegriffen=ja
+2026-11-11T17:27:23Z | WIEDERHERSTELLUNG an-eigen status=201 uid_gleich=ja inhalt_gleich=ja | get_danach=200 sha256_vorher=43760fa09c9b sha256_nachher=43760fa09c9b db_deleted_at=leer am_alten_ort=ja datenbank=alice/spike30-eigen/s30-an-eigen-172721.ics:deleted_at_leer:43760fa09c9b
+2026-11-11T17:27:24Z | GELOESCHT an-geteilt status=204 nutzer=alice auth=basic if_match=ja papierkorb_von=beide db_deleted_at=gesetzt datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-172721-deleted.ics:deleted_at_gesetzt:1040e8a23149
+2026-11-11T17:27:25Z | WIEDERHERSTELLUNG an-geteilt versuch=loeschender status=201 uid_gleich=ja inhalt_gleich=ja | nutzer=alice get_als_eigentuemer=200 db_deleted_at=leer datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-172721.ics:deleted_at_leer:1040e8a23149
+LOESCHEN an-geteilt status=204 papierkorb_von=beide wiederhergestellt_durch=loeschender | db_deleted_at_nach_dem_loeschen=gesetzt
+2026-11-11T17:27:25Z | WIEDERHERSTELLUNG an-geteilt-eigentuemer status=201 uid_gleich=ja inhalt_gleich=ja | geloescht_von=alice (204) wiederhergestellt_von=bob get_danach=200 datenbank=bob/spike30-geteilt-rw/s30-an-geteilt-eigentuemer-172721.ics:deleted_at_leer:edf9edc5d065
+2026-11-11T17:27:26Z | LOESCHEN an-geteilt-ro status=404 objekt_unveraendert=ja | nutzer=alice auth=basic lesen_vorher=200 datenbank=bob/spike30-geteilt-ro/s30-an-geteilt-ro-172721.ics:deleted_at_leer:58c6ca0c259c Sabre\DAV\Exception\NotFound Calendar with name 'spike30-geteilt-ro_shared_by_bob' could not be found
+VORABTEST papierkorb-propfind zustand=an wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=an wert=2592000 zeigt=an
+VORABTEST frist-eigenschaft-home zustand=an wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=an wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=an wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=an wert=ja zeigt=an
+2026-11-11T17:27:27Z | UNTERAUFGABE loeschen vorhanden=ja unveraendert=ja eltern_status=204 nutzer=alice auth=basic | datenbank kind=alice/spike30-eigen/s30-kind-172721.ics:deleted_at_leer:31cc70d664c1 eltern=alice/spike30-eigen/s30-eltern-172721-deleted.ics:deleted_at_gesetzt:13b84850a376
+SCHALTER aus occ config:app:set dav calendarRetentionObligation --value=0 -> Config value 'calendarRetentionObligation' for app 'dav' is now set to '0', stored as mixed in fast cache
+SCHALTER aus occ config:app:get dav calendarRetentionObligation vor_neustart=0 nach_neustart=0 (docker restart nc-spike-tags)
+2026-11-11T17:27:32Z | LOESCHEN aus-eigen status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich | nutzer=alice auth=basic if_match=ja get_danach=404 papierkorb_eintraege=1 datenbank=keine
+2026-11-11T17:27:33Z | LOESCHEN aus-geteilt status=204 im_papierkorb=nein db_zeile=weg wiederherstellung=nicht moeglich | geloescht_von=alice auth=basic get_als_eigentuemer_danach=404 papierkorb_von=keinem datenbank=keine
+VORABTEST papierkorb-propfind zustand=aus wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=aus wert=0 zeigt=aus
+VORABTEST frist-eigenschaft-home zustand=aus wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=aus wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=aus wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=aus wert=ja zeigt=an
+VORABTEST ERGEBNIS unterscheidet=ja kandidat=frist-eigenschaft
+KONTROLLE vorabtest zustand_am_verhalten_belegt=ja (an: wiederhergestellt=ja, aus: endgueltig geloescht=ja)
+SCHALTER standard occ config:app:delete dav calendarRetentionObligation -> Config value calendarRetentionObligation of app dav deleted
+SCHALTER standard occ config:app:get dav calendarRetentionObligation vor_neustart=leer nach_neustart=leer (docker restart nc-spike-tags)
+2026-11-11T17:27:40Z | AUFRAEUMEN standardfrist geloescht=204 occ dav:retention:clean-up -> (keine Ausgabe) | datenbank vorher=alice/spike30-eigen/s30-frist-172721-deleted.ics:deleted_at_gesetzt:3fb26d28d35a nachher=alice/spike30-eigen/s30-frist-172721-deleted.ics:deleted_at_gesetzt:3fb26d28d35a
+SCHALTER frist-1s occ config:app:set dav calendarRetentionObligation --value=1 -> Config value 'calendarRetentionObligation' for app 'dav' is now set to '1', stored as mixed in fast cache
+SCHALTER frist-1s occ config:app:get dav calendarRetentionObligation vor_neustart=1 nach_neustart=1 (docker restart nc-spike-tags)
+VORABTEST papierkorb-propfind zustand=frist-1s wert=207 zeigt=an
+VORABTEST frist-eigenschaft zustand=frist-1s wert=1 zeigt=an
+VORABTEST frist-eigenschaft-home zustand=frist-1s wert=fehlt zeigt=unklar
+VORABTEST home-kind-trashbin zustand=frist-1s wert=ja zeigt=an
+VORABTEST capabilities-dav zustand=frist-1s wert={"absence-replacement": true, "absence-supported": true, "bulkupload": "1.0", "chunking": "1.0", "public_shares_chunking": true, "search_supports_creation_time": true, "search_supports_last_activity": true, "search_supports_upload_time": true} zeigt=unklar
+VORABTEST dav-kopf zustand=frist-1s wert=ja zeigt=an
+2026-11-11T17:27:48Z | AUFRAEUMEN frist=1 nach 3 s occ dav:retention:clean-up -> (keine Ausgabe) | datenbank nachher=keine
+FRIST AUFRAEUMEN standard=bleibt frist_1s=weg
+KONTROLLEN {"an-eigen": "ja", "an-geteilt": "ja", "unterauftrag": "ja", "aus-eigen": "ja", "aus-geteilt": "ja", "vorabtest": "ja", "aufraeumen": "ja"} ungemessen=keine
+LOESCHEN VERSION 35.0.2 g=ja w1=ja w2=ja w3=nein w4=ja wer=loeschender
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 69 s; ENDE 2026-11-11T17:27:52Z
+```
