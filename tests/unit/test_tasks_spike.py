@@ -723,14 +723,16 @@ def test_inventory_line_has_the_agreed_form_for_a_kept_and_an_excluded_hit() -> 
 
 
 def test_positive_control_names_each_of_the_six_places_a_hit_stands_in() -> None:
+    gate = spike.GATE_FILE
+    anchors = {"EXPECTED_PUT_CALLS": [480, 571], "FORBIDDEN": [86]}
     hits = [
-        ("tests/contract/test_no_destructive_calls.py", 86, "FORBIDDEN: dict[str, str] = {"),
-        ("tests/contract/test_no_destructive_calls.py", 480, "EXPECTED_PUT_CALLS = 6"),
+        (gate, 88, '"MOVE": "no tool may move or rename anything",'),
+        (gate, 560, "No PUT anywhere in the production code may overwrite unconditionally."),
         ("README.md", 60, "**create-only** means it can create new objects"),
         ("docs/threat-model.md", 149, "`files_upload` remains create-only."),
         ("appinfo/info.xml", 69, "- Nothing destructive: no delete, no move, no share"),
     ]
-    assert spike.positive_control(hits) == [
+    assert spike.positive_control(hits, anchors) == [
         "EXPECTED_PUT_CALLS",
         "FORBIDDEN",
         "README-Rechtetabelle",
@@ -738,4 +740,6 @@ def test_positive_control_names_each_of_the_six_places_a_hit_stands_in() -> None
         "Store-Text",
     ]
     hits.append(("src/mcp_connector/server/__init__.py", 63, "Files are never deleted"))
-    assert spike.positive_control(hits) == list(spike.CONTROL_PLACES)
+    assert spike.positive_control(hits, anchors) == list(spike.CONTROL_PLACES)
+    far = [(gate, 300, "a destructive call far from both constants")]
+    assert spike.positive_control(far, anchors) == []

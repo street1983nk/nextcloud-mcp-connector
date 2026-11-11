@@ -348,6 +348,5 @@ background
 # fitted to the numbers. Empty again, as announced: the five names of the mkcol block
 # (MKCOL_KEYS, abort_mess01, same_status, raw_answer, dir_exists) left this list with task 2,
 # and GF_KEYS left it with the groupfolder block of task 3.
-# Plan 30-02 task 1 pins value_form with the other helpers of the modifying access; its
-# only caller is the block ui-evaluate, which follows in task 3 after the browser session.
-value_form
+# value_form sat here between task 1 and task 3 of plan 30-02 and left with the block
+# ui-evaluate, its caller.

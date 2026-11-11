@@ -108,8 +108,7 @@ SABRE = "http://sabredav.org/ns"
 DAV_FILES = "/remote.php/dav/files/"
 TIMEOUT = httpx.Timeout(60.0)
 
-#: Further blocks follow in plans 30-03 to 30-05; ui-evaluate and inventory
-#: follow in task 3 of plan 30-02.
+#: Further blocks follow in plans 30-03 to 30-05.
 BLOCKS = (
     "nc35-up",
     "controls",
@@ -119,6 +118,9 @@ BLOCKS = (
     "modify",
     "ui-prepare",
     "ui-snapshot",
+    "ui-log",
+    "ui-evaluate",
+    "inventory",
     "ui-teardown",
     "nc35-stop",
     "secret-scan",
@@ -3041,6 +3043,36 @@ async def ui_seed_recurring(
     )
 
 
+async def ui_compare(session: Session) -> None:
+    """The comparison object of M3.8: a task the script itself checks off with one PUT.
+
+    Whatever differs afterwards beyond the three lines the script sent is maintained by the
+    server; everything else the browser session shows is therefore written by the Tasks app.
+    It lives in a list of USER_A, so the account of the browser session stays untouched.
+    """
+    creds = session.appapi(USER_A)
+    name = f"s30-vergleich-{datetime.now(UTC).strftime('%H%M%S')}.ics"
+    url = caldav.object_url(creds, LIST_A, name)
+    text = simple_todo(name.removesuffix(".ics"), "s30 vergleich skript")
+    made = await put_object(session, creds, url, text, if_none_match="*")
+    _, etag0, text0 = await get_object(session, creds, url)
+    done = complete_todo(text0, datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"))
+    put = await put_object(session, creds, url, done, if_match=etag0)
+    _, etag1, text1 = await get_object(session, creds, url)
+    added, removed, changed = line_diff(done, text1)
+    maintained = sorted(changed | {property_name(line.split(":", 1)[1]) for line in added})
+    sent, _, _ = line_diff(text0, done)
+    note(
+        f"{now_stamp()} | VERGLEICH skript_put pflegefelder_server="
+        f"{','.join(maintained) or 'keine'} anlegen={made.status} abhaken={put.status} "
+        f"etag_vorher={short_etag(etag0)} etag_nachher={short_etag(etag1)} "
+        f"gesendet_hinzu={[line.split(':', 1)[1] for line in sent]} "
+        f"vom_server_entfernt={removed or 'keine'} "
+        f"woertlich_gespeichert={yes_no(db_hash(name) == f'1 {sha_of(done)}')} "
+        f"auth=appapi nutzer={USER_A} liste={LIST_A} objekt={name}"
+    )
+
+
 async def block_ui_snapshot(session: Session, label: str, seed: bool, ui_file: Path) -> None:
     """Every object of the browser account as one file below ``raw/ui-<label>/``.
 
@@ -3121,6 +3153,736 @@ async def block_ui_snapshot(session: Session, label: str, seed: bool, ui_file: P
         for name in missing_names(summaries):
             note(f"UI-FEHLT name={name}")
         note(f"UI-WIEDERKEHREND vorhanden={yes_no(UI_RECURRING in summaries)}")
+    else:
+        await ui_compare(session)
+
+
+# --- plan 30-02 task 3: evaluation of the browser session -------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class SnapshotEntry:
+    """One object of a written snapshot: its file name, its text, and whether it is trash."""
+
+    file: str
+    text: str
+    trashed: bool
+
+
+def load_snapshot(directory: Path) -> dict[str, SnapshotEntry]:
+    """The objects of ``raw/ui-<label>/`` keyed by UID.
+
+    The UID is what stays the same when the Tasks app moves an object to another list or the
+    server renames it on its way into the trash bin; the file name does not.
+    """
+    entries: dict[str, SnapshotEntry] = {}
+    for path in sorted(directory.glob("*.ics")):
+        text = path.read_bytes().decode("utf-8", errors="replace")
+        uid = property_value(text, "UID") or path.name
+        entries[uid] = SnapshotEntry(path.name, text, path.name.startswith("trash-"))
+    return entries
+
+
+def snapshot_lists(protocol: str, label: str) -> dict[str, str]:
+    """File name to list for one state, from the ``UI-OBJEKT`` lines of the session protocol.
+
+    A later run under the same label replaces the state, so a later line wins.
+    """
+    lists: dict[str, str] = {}
+    pattern = re.compile(rf"^UI-OBJEKT stand={label} liste=(\S+) name=(\S+) ")
+    for line in protocol.splitlines():
+        match = pattern.match(line)
+        if match:
+            lists[match[2]] = match[1]
+    return lists
+
+
+def _names(lines: Iterable[str]) -> list[str]:
+    """The property names of ``<component path>:<line>`` entries, sorted and unique."""
+    return sorted({property_name(line.split(":", 1)[1]) for line in lines})
+
+
+def field_diff(before: str, after: str) -> str:
+    """``hinzu=.. entfernt=.. geaendert=..`` by property name, or ``leer`` for no difference."""
+    added, removed, changed = line_diff(before, after)
+    if not added and not removed and not changed:
+        return "leer"
+    return (
+        f"hinzu={','.join(_names(added)) or 'keine'} "
+        f"entfernt={','.join(_names(removed)) or 'keine'} "
+        f"geaendert={','.join(sorted(changed)) or 'keine'}"
+    )
+
+
+def _line_of(text: str, name: str) -> str:
+    """The first unfolded content line of the property ``name``, or empty."""
+    for line in unfold(text).split("\n"):
+        if property_name(line) == name:
+            return line
+    return ""
+
+
+def _added_lines(before: str, after: str) -> list[str]:
+    added, _, _ = line_diff(before, after)
+    return [line.split(":", 1)[1] for line in added]
+
+
+def evaluate_snapshots(
+    before: Mapping[str, SnapshotEntry],
+    after: Mapping[str, SnapshotEntry],
+    lists_before: Mapping[str, str],
+    lists_after: Mapping[str, str],
+) -> list[str]:
+    """The lines of ui-evaluate: what the Tasks app wrote between state a and state b.
+
+    Objects are matched by UID. A task the evaluation needs and does not find in both states
+    gives an ``ungemessen`` line with the reason, never a guessed value.
+    """
+    by_name = {property_value(entry.text, "SUMMARY"): uid for uid, entry in before.items()}
+    lines: list[str] = []
+
+    def pair(name: str) -> tuple[SnapshotEntry, SnapshotEntry] | None:
+        uid = by_name.get(name)
+        if uid is None or uid not in after:
+            return None
+        return before[uid], after[uid]
+
+    def missing(label: str, name: str) -> str:
+        return f"{label} ungemessen grund=das Objekt {name} fehlt in Stand a oder in Stand b"
+
+    checked = pair("s30 abhaken")
+    checked_names: list[str] = []
+    if checked is None:
+        lines.append(missing("ABHAKEN FELDER", "s30 abhaken"))
+    else:
+        old, new = checked
+        completed = _line_of(new.text, "COMPLETED")
+        checked_names = _names(line_diff(old.text, new.text)[0])
+        lines.append(
+            f"ABHAKEN FELDER {field_diff(old.text, new.text)} "
+            f"zeitform_completed={value_form(completed) if completed else 'fehlt'}"
+        )
+        lines.append(f"  ABHAKEN zeilen_hinzu={_added_lines(old.text, new.text) or 'keine'}")
+
+    reopened = pair("s30 wieder-oeffnen")
+    if reopened is None:
+        lines.append(missing("WIEDEROEFFNEN FELDER", "s30 wieder-oeffnen"))
+    else:
+        old, new = reopened
+        present = {property_name(line) for _, line in ics_line_set(new.text)}
+        gone = [name for name in checked_names if name not in present]
+        lines.append(f"WIEDEROEFFNEN FELDER {field_diff(old.text, new.text)}")
+        lines.append(
+            f"  WIEDEROEFFNEN zeilen_hinzu={_added_lines(old.text, new.text) or 'keine'} "
+            f"abhaken_felder_danach_fehlend={','.join(gone) or 'keine'} "
+            f"status_danach={property_value(new.text, 'STATUS') or 'fehlt'}"
+        )
+
+    parent, child = pair("s30 eltern-abhaken"), pair("s30 kind-abhaken")
+    if parent is None or child is None:
+        lines.append(missing("ELTERN ABHAKEN", "s30 eltern-abhaken oder s30 kind-abhaken"))
+    else:
+        child_diff = field_diff(child[0].text, child[1].text)
+        parent_diff = field_diff(parent[0].text, parent[1].text)
+        lines.append(
+            f"ELTERN ABHAKEN kind_geaendert={yes_no(child_diff != 'leer')} "
+            f"kind_differenz={child_diff} | eltern_geaendert={yes_no(parent_diff != 'leer')} "
+            f"eltern_differenz={parent_diff}"
+        )
+        lines.append(
+            f"  ELTERN ABHAKEN kind_zeilen_hinzu="
+            f"{_added_lines(child[0].text, child[1].text) or 'keine'} "
+            f"eltern_status_stand_b={property_value(parent[1].text, 'STATUS') or 'fehlt'}"
+        )
+
+    new_uids = sorted(uid for uid in after if uid not in before)
+    gone_uids = sorted(uid for uid in before if uid not in after)
+    recurring = pair(UI_RECURRING)
+    if recurring is None:
+        lines.append(missing("WIEDERKEHREND app", UI_RECURRING))
+    else:
+        old, new = recurring
+        lines.append(
+            f"WIEDERKEHREND app differenz {field_diff(old.text, new.text)} "
+            f"due_vorher={property_value(old.text, 'DUE') or 'fehlt'} "
+            f"due_nachher={property_value(new.text, 'DUE') or 'fehlt'} "
+            f"rrule_nachher={property_value(new.text, 'RRULE') or 'fehlt'} "
+            f"status_nachher={property_value(new.text, 'STATUS') or 'fehlt'} "
+            f"completed_nachher={property_value(new.text, 'COMPLETED') or 'fehlt'} "
+            f"neue_objekte={len(new_uids)}"
+        )
+
+    control = pair("s30 unberuehrt")
+    if control is None:
+        lines.append(missing("KONTROLLE unberuehrt", "s30 unberuehrt"))
+    else:
+        lines.append(
+            f"KONTROLLE unberuehrt differenz={field_diff(control[0].text, control[1].text)}"
+        )
+
+    moved = []
+    for uid, new in sorted(after.items(), key=lambda item: item[1].file):
+        if new.trashed or uid not in before:
+            continue
+        old = before[uid]
+        source, target = lists_before.get(old.file, "?"), lists_after.get(new.file, "?")
+        if source != target:
+            moved.append(
+                f"UI-UMZUG objekt={property_value(new.text, 'SUMMARY')} von={source} "
+                f"nach={target} dateiname_gleich={yes_no(old.file == new.file)} "
+                f"inhalt_gleich={yes_no(old.text == new.text)}"
+            )
+    second = sorted(name for name, target in lists_after.items() if target.endswith("-liste-2"))
+    lines.append(f"UI-UMZUG objekte_in_liste_2={len(second)} verschoben={len(moved)}")
+    lines.extend(moved)
+
+    trash = [(uid, entry) for uid, entry in sorted(after.items()) if entry.trashed]
+    lines.append(f"UI-PAPIERKORB objekte={len(trash)}")
+    for uid, entry in trash:
+        same = uid in before and before[uid].text == entry.text
+        lines.append(
+            f"UI-PAPIERKORB objekt={property_value(entry.text, 'SUMMARY')} datei={entry.file} "
+            f"datei_stand_a={before[uid].file if uid in before else 'fehlt'} "
+            f"inhalt_gleich_stand_a={yes_no(same)}"
+        )
+
+    lines.append(f"UI-NEU objekte={len(new_uids)} uids={new_uids or 'keine'}")
+    lines.append(f"UI-VERSCHWUNDEN objekte={len(gone_uids)} uids={gone_uids or 'keine'}")
+    for uid, old in sorted(
+        before.items(), key=lambda item: property_value(item[1].text, "SUMMARY")
+    ):
+        if uid in after:
+            lines.append(
+                f"UI-DIFFERENZ name={property_value(old.text, 'SUMMARY')} "
+                f"differenz={field_diff(old.text, after[uid].text)}"
+            )
+    for label, state in (("a", before), ("b", after)):
+        for _, entry in sorted(
+            state.items(), key=lambda item: property_value(item[1].text, "SUMMARY")
+        ):
+            forms = [
+                f"{name}={value_form(_line_of(entry.text, name))}"
+                for name in ("DTSTART", "DUE", "COMPLETED", "CREATED", "LAST-MODIFIED", "DTSTAMP")
+                if _line_of(entry.text, name)
+            ]
+            lines.append(
+                f"ZEITFORM stand={label} name={property_value(entry.text, 'SUMMARY')} "
+                f"{' '.join(forms)}"
+            )
+    return lines
+
+
+_ACCESS_WRITE = re.compile(
+    r'\[([^\]]+)\] "(PUT|MOVE|DELETE|MKCOL|MKCALENDAR|PROPPATCH|COPY) '
+    r'/remote\.php/dav/calendars/([^/ ]+)/(\S*) HTTP/[^"]*" (\d{3})'
+)
+
+
+def access_writes(log: str, user: str) -> list[tuple[str, str, str, int]]:
+    """``(time, method, path below the calendar home, status)`` of every writing request.
+
+    Read from the access log of the web server, which is not what the Tasks app shows and
+    not what DAV answers later: the third way of knowing what the browser session wrote.
+    """
+    rows = []
+    for line in log.splitlines():
+        match = _ACCESS_WRITE.search(line)
+        if match and match[3] == user:
+            rows.append((match[1], match[2], match[4], int(match[5])))
+    return rows
+
+
+def block_ui_log(session: Session, ui: "UiOptions") -> None:
+    """The writing requests of the browser account and the server errors behind a 5xx."""
+    section("ui-log")
+    ram_gate(NC35_CONTAINERS)
+    user, password, _ = read_ui_file(ui.file())
+    remember_secret(f"PASSWORD_{user}", password)
+    log = docker("logs", "--tail", "60000", NC_CONTAINER, check=False)
+    rows = access_writes(log, user)
+    note(f"UI-ZUGRIFFE nutzer={user} schreibende_anfragen={len(rows)} (Zugriffsprotokoll)")
+    for stamp, method, path, status in rows:
+        note(f"UI-ZUGRIFF {stamp} {method} {path} status={status}")
+    failed = [row for row in rows if row[3] >= 400]
+    note(f"UI-ZUGRIFFE mit_fehlerstatus={len(failed)}")
+    server_log = docker(
+        "exec", NC_CONTAINER, "tail", "-n", "4000", f"{DATA_DIR}/nextcloud.log", check=False
+    )
+    for line in server_log.splitlines():
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(record, dict) or record.get("user") != user:
+            continue
+        if int(record.get("level", 0)) < 3 or record.get("method") not in ("PUT", "MOVE", "DELETE"):
+            continue
+        message = record.get("message")
+        text = message if isinstance(message, str) else json.dumps(message)
+        note(
+            f"UI-SERVERFEHLER {record.get('time')} {record.get('method')} "
+            f"{str(record.get('url'))[-70:]} | {_one_line(text)[:200]}"
+        )
+
+
+def block_ui_evaluate(ui: "UiOptions") -> None:
+    """Read ``raw/ui-a`` and ``raw/ui-b`` and write what differs; needs no instance."""
+    section("ui-evaluate")
+    if ui.out is None or not ui.out.is_file():
+        raise RunFailed("ui-evaluate appends to the protocol of the snapshots; --out names it")
+    protocol = ui.out.read_text(encoding="utf-8")
+    before, after = load_snapshot(RAW_DIR / "ui-a"), load_snapshot(RAW_DIR / "ui-b")
+    note(f"UI-AUSWERTUNG stand_a_objekte={len(before)} stand_b_objekte={len(after)} (nach UID)")
+    lists_a, lists_b = snapshot_lists(protocol, "a"), snapshot_lists(protocol, "b")
+    for line in evaluate_snapshots(before, after, lists_a, lists_b):
+        note(line)
+
+
+# --- plan 30-02 task 3: inventory of gates and promises (A17) ----------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class Hit:
+    """One line a search pattern found: file, line number, wording, and which pattern."""
+
+    file: str
+    line: int
+    text: str
+    patterns: str
+
+
+@dataclass(frozen=True, slots=True)
+class Rule:
+    """One hand written verdict: the first rule whose two patterns match a hit decides.
+
+    ``klasse`` is a class of the inventory or ``ausgeschlossen``; ``target`` is then the
+    phase that has to deal with the place, or the reason for leaving it out.
+    """
+
+    path: str
+    text: str
+    klasse: str
+    methods: str
+    target: str
+
+
+#: Pattern 1: the wording of the promise in English, German and French.
+PROMISE_WORDS = re.compile(
+    r"create-only|create only|read and create|never delet|no delet|not delet|cannot delete|"
+    r"deleting|deletes|never overwr|overwrit|nothing destructive|destructive|"
+    r"\bmov(?:e|es|ing)\b|renam|gelöscht|lösch|überschr|destruktiv|verschieb|"
+    r"umbenenn|nur anlegen|jamais|destructi|supprim|écras|déplac|renomm",
+    re.IGNORECASE,
+)
+#: Pattern 2, the technical side: constants of the gates, method literals, test names, and
+#: the HTTP vocabulary in the public texts, which does not depend on the language.
+GATE_NAMES = re.compile(
+    r"\b(?:EXPECTED_PUT_CALLS|FORBIDDEN|CHUNK_ASSEMBLY_MOVE|CREATE_TOOLS|destructive_hint|"
+    r"idempotent_hint|MUST_REFUSE|FILE_WRITERS|PARAM_ALLOWLIST)\b"
+)
+METHOD_LITERALS = re.compile(r'"(?:PUT|MOVE|DELETE|PROPPATCH|COPY|MKCOL)"|client\.(?:put|delete)\(')
+TEST_NAMES = re.compile(r"def test_\w*(?:create|destructive|overwrit|readonly|read_only)")
+HTTP_WORDS = re.compile(
+    r"\b(?:PUT|DELETE|MOVE|MKCOL|PROPPATCH|If-None-Match|If-Match)\b|Papierkorb|corbeille|\btrash"
+)
+
+PUBLIC_TEXTS = (
+    "README.md",
+    "README.de.md",
+    "README.fr.md",
+    "appinfo/info.xml",
+    ".planning/PROJECT.md",
+    "CHANGELOG*.md",
+    "docs/**/*.md",
+)
+GATE_FILE = "tests/contract/test_no_destructive_calls.py"
+#: The report of this phase quotes the promises it inventories and is left out of both.
+INVENTORY_SKIP = ("docs/spike-tasks.md",)
+
+#: How far from a gate constant a hit of pattern 1 may stand to count as reaching it.
+CONTROL_REACH = 12
+#: The six places the research named; pattern 1 has to find each of them.
+CONTROL_PLACES = (
+    "EXPECTED_PUT_CALLS",
+    "FORBIDDEN",
+    "README-Rechtetabelle",
+    "threat-model",
+    "Store-Text",
+    "Server-Instruktion",
+)
+
+_ALL = "PUT,MOVE,DELETE"
+_OLD_TOOL = "Aussage ueber ein bestehendes Werkzeug, das unveraendert bleibt"
+_OTHER = "anderes Thema, keine Aussage ueber schreibende Werkzeuge"
+_REPORT = "Messbericht oder Anleitung zu einem anderen Thema, keine Zusage ueber Werkzeuge"
+_HISTORY = "Historie eines frueheren Release, wird nicht umgeschrieben"
+_V18 = "beschreibt schon den geplanten Stand von v1.8 oder ist Verfahrenstext"
+
+#: Written after reading every hit of both patterns on the commit named in the raw file.
+INVENTORY_RULES: tuple[Rule, ...] = (
+    # --- the destructive gate ---
+    Rule(
+        GATE_FILE,
+        r"TALK_ROUTES|MAIL_ROUTES|SYSTEMTAGS|Talk segments|Mail segments|tag needle|"
+        r"path forms exist|mail_modules|Tables|read marker|draft|thread|[Mm]ail|renames it or|"
+        r"login flow|app password|purge|exemption would|pin somebody|ordinary prose",
+        "ausgeschlossen",
+        "",
+        "Nadeln und Ausnahmen fuer Talk, Mail, Tables, Tags oder den Login-Flow, kein "
+        "Aufgaben-Zugriff",
+    ),
+    Rule(
+        GATE_FILE,
+        r"EXPECTED_PUT_CALLS|compare-and-swap|compare_and_swap|could overwrite|"
+        r"overwrite unconditionally|"
+        r"init-progress|Every PUT",
+        "gate",
+        "PUT",
+        "Phase 33",
+    ),
+    Rule(
+        GATE_FILE,
+        r"CHUNK_ASSEMBLY_MOVE|user-facing move|chunk-assembly|MOVE exemption|"
+        r"one MOVE|final MOVE",
+        "gate",
+        "MOVE",
+        "Phase 33",
+    ),
+    Rule(GATE_FILE, r"never delete, overwrite", "gate", _ALL, "Phase 33"),
+    Rule(GATE_FILE, r"", "gate", "MOVE,DELETE", "Phase 33"),
+    # --- other contract tests ---
+    Rule(
+        r"^tests/contract/test_tool_surface\.py$",
+        r'"it can only|"a second call|def test_',
+        "ausgeschlossen",
+        "",
+        _OLD_TOOL,
+    ),
+    Rule(
+        r"^tests/contract/test_tool_surface\.py$",
+        r"FORBIDDEN_PROPERTIES",
+        "ausgeschlossen",
+        "",
+        _OTHER,
+    ),
+    Rule(r"^tests/contract/test_tool_surface\.py$", r"", "gate", _ALL, "Phase 33"),
+    Rule(r"^tests/contract/(tool_classes|test_tool_classes)\.py$", r"", "gate", _ALL, "Phase 33"),
+    Rule(r"^tests/contract/test_audit_surface\.py$", r"PARAM_ALLOWLIST", "audit", _ALL, "Phase 33"),
+    Rule(r"^src/mcp_connector/audit/", r"PARAM_ALLOWLIST", "audit", _ALL, "Phase 33"),
+    Rule(r"^tests/integration/test_canary\.py$", r"MUST_REFUSE", "kanarie", _ALL, "Phase 33"),
+    Rule(
+        r"^tests/",
+        r"",
+        "ausgeschlossen",
+        "",
+        "Test eines bestehenden Werkzeugs oder eines anderen Themas, vom Aufgaben-Zugriff "
+        "nicht beruehrt",
+    ),
+    # --- the server ---
+    Rule(
+        r"^src/mcp_connector/server/__init__\.py$",
+        r"Read and create|never deleted",
+        "zusage-server",
+        _ALL,
+        "Phase 34",
+    ),
+    Rule(r"^src/mcp_connector/server/__init__\.py$", r"_hint", "annotation", _ALL, "Phase 33"),
+    Rule(r"^src/mcp_connector/server/", r"", "ausgeschlossen", "", _OLD_TOOL),
+    Rule(
+        r"^src/mcp_connector/nextcloud/clients/",
+        r'"MOVE"',
+        "ausgeschlossen",
+        "",
+        "die Ausnahme CHUNK_ASSEMBLY_MOVE des Datei-Uploads, bleibt",
+    ),
+    Rule(
+        r"^src/mcp_connector/nextcloud/clients/",
+        r"",
+        "ausgeschlossen",
+        "",
+        "bestehender Aufruf, den EXPECTED_PUT_CALLS zaehlt oder eine eigene Nadel haelt; "
+        "selbst keine Zusage",
+    ),
+    Rule(r"^src/", r"", "ausgeschlossen", "", _OTHER),
+    # --- store text ---
+    Rule(
+        r"^appinfo/info\.xml$",
+        r"Nothing destructive|Nichts Destruktives|Rien de destructif",
+        "zusage-store",
+        _ALL,
+        "Phase 34",
+    ),
+    Rule(
+        r"^appinfo/info\.xml$",
+        r"",
+        "ausgeschlossen",
+        "",
+        "Datei-Upload oder Route der Einstellungsseite, kein Aufgaben-Zugriff",
+    ),
+    # --- changelogs and planning ---
+    Rule(r"^CHANGELOG", r"", "ausgeschlossen", "", _HISTORY),
+    Rule(
+        r"^\.planning/PROJECT\.md$",
+        r"Schreibzusage|destruktive Ops|Destruktive Operationen|"
+        r"keine destruktiven Writes",
+        "zusage-doku",
+        _ALL,
+        "Phase 34",
+    ),
+    Rule(r"^\.planning/PROJECT\.md$", r"", "ausgeschlossen", "", _V18),
+    # --- the three READMEs ---
+    Rule(
+        r"^README",
+        r"NC_MCP_FILES_UPDATE|files_update|ETag",
+        "ausgeschlossen",
+        "",
+        "beschreibt files_update, das unveraendert bleibt",
+    ),
+    Rule(
+        r"^README",
+        r"^\| `",
+        "ausgeschlossen",
+        "",
+        "Tabellenzeile eines bestehenden Werkzeugs; die Tabelle bekommt neue Zeilen, diese bleibt",
+    ),
+    Rule(
+        r"^README",
+        r"[Mm]ail|Anhang|pièce|private chunk|chunk assembly|Blöcke|blocs",
+        "ausgeschlossen",
+        "",
+        "Mail oder Datei-Upload, kein Aufgaben-Zugriff",
+    ),
+    Rule(r"^README", r"DELETE", "zusage-doku", "DELETE", "Phase 34"),
+    Rule(r"^README", r"overwriting|Überschreiben|écrasement", "zusage-doku", "PUT", "Phase 34"),
+    Rule(
+        r"^README",
+        r"moving|renaming|Verschieben|Umbenennen|déplacement|renommage",
+        "zusage-doku",
+        "MOVE",
+        "Phase 34",
+    ),
+    Rule(
+        r"^README",
+        r"create-only\*\*|test_no_destructive_calls|destructive call|destruktiven|"
+        r"destructif|ne supprime jamais|modifies or removes",
+        "zusage-doku",
+        _ALL,
+        "Phase 34",
+    ),
+    Rule(r"^README", r"", "ausgeschlossen", "", _OTHER),
+    # --- docs ---
+    Rule(
+        r"^docs/(hardening|threat-model|privacy|faq)",
+        r"jamais (voir|un|avec)|kein-ki|[Mm]ail|"
+        r"message|volume|encryption key|app data|its data|the record|trifecta|chunks|"
+        r"RETENTION|draft|flags",
+        "ausgeschlossen",
+        "",
+        "Mail, Deinstallation, Audit-Protokoll oder anderes Thema, kein Aufgaben-Zugriff",
+    ),
+    Rule(r"^docs/(hardening|threat-model|privacy|faq)", r"", "zusage-doku", _ALL, "Phase 34"),
+    Rule(r"^docs/n8n-setup\.md$", r"delete", "zusage-doku", "DELETE", "Phase 34"),
+    Rule(r"^docs/conference-", r"no delete|No delete", "zusage-doku", "MOVE,DELETE", "Phase 34"),
+    Rule(r"^docs/exapp-install\.md$", r"Read and create", "zusage-doku", _ALL, "Phase 34"),
+    Rule(r"^docs/client-setup\.md$", r"Nothing here deletes", "zusage-doku", _ALL, "Phase 34"),
+    Rule(r"^docs/", r"", "ausgeschlossen", "", _REPORT),
+)
+
+
+def _files(root: Path, globs: Iterable[str]) -> list[Path]:
+    found: list[Path] = []
+    for pattern in globs:
+        found.extend(
+            path
+            for path in sorted(root.glob(pattern))
+            if path.is_file() and "__pycache__" not in path.parts
+        )
+    return found
+
+
+def search(
+    root: Path, globs: Iterable[str], pattern: re.Pattern[str]
+) -> list[tuple[str, int, str]]:
+    """``(file, line number, stripped line)`` for every line ``pattern`` finds below ``root``."""
+    hits = []
+    for path in _files(root, globs):
+        relative = path.relative_to(root).as_posix()
+        if relative in INVENTORY_SKIP:
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for number, line in enumerate(text.splitlines(), start=1):
+            if pattern.search(line):
+                hits.append((relative, number, line.strip()))
+    return hits
+
+
+def inventory_hits(root: Path) -> tuple[list[tuple[str, int, str]], list[tuple[str, int, str]]]:
+    """The hits of pattern 1 and of pattern 2, two searches that share no search term."""
+    first = search(
+        root, (*PUBLIC_TEXTS, "src/mcp_connector/server/**/*.py", GATE_FILE), PROMISE_WORDS
+    )
+    second = [
+        *search(root, ("tests/**/*.py", "src/**/*.py"), GATE_NAMES),
+        *search(root, ("src/mcp_connector/nextcloud/clients/*.py",), METHOD_LITERALS),
+        *search(root, ("tests/**/*.py",), TEST_NAMES),
+        *search(root, PUBLIC_TEXTS, HTTP_WORDS),
+    ]
+    return first, second
+
+
+def merge_hits(
+    first: Iterable[tuple[str, int, str]], second: Iterable[tuple[str, int, str]]
+) -> list[Hit]:
+    """Both hit lists as one, sorted; a line both patterns found carries ``1+2``."""
+    found: dict[tuple[str, int], tuple[str, set[str]]] = {}
+    for label, hits in (("1", first), ("2", second)):
+        for file, line, text in hits:
+            found.setdefault((file, line), (text, set()))[1].add(label)
+    return [
+        Hit(file, line, text, "+".join(sorted(labels)))
+        for (file, line), (text, labels) in sorted(found.items())
+    ]
+
+
+def classify(hit: Hit, rules: Sequence[Rule]) -> tuple[str, str, str]:
+    """``(klasse, methods, target)`` of the first matching rule, else ``ungeklaert``."""
+    for rule in rules:
+        if re.search(rule.path, hit.file) and re.search(rule.text, hit.text):
+            return rule.klasse, rule.methods, rule.target
+    return "ungeklaert", "", ""
+
+
+def inventory_line(hit: Hit, verdict: tuple[str, str, str]) -> str:
+    """One line of ``raw/inventar.txt`` for a kept or an excluded hit."""
+    klasse, methods, target = verdict
+    head = f"INVENTAR {klasse} {hit.file}:{hit.line} | {hit.text[:200]} | "
+    if klasse == "ausgeschlossen":
+        return f"{head}grund={target} | muster={hit.patterns}"
+    return f"{head}beruehrt_von={methods} | abzuarbeiten_in={target} | muster={hit.patterns}"
+
+
+def gate_anchors(root: Path) -> dict[str, list[int]]:
+    """The line numbers of the two gate constants in the destructive gate."""
+    anchors: dict[str, list[int]] = {"EXPECTED_PUT_CALLS": [], "FORBIDDEN": []}
+    path = root / GATE_FILE
+    lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+    for number, line in enumerate(lines, start=1):
+        for name, numbers in anchors.items():
+            if re.search(rf"\b{name}\b", line):
+                numbers.append(number)
+    return anchors
+
+
+def positive_control(
+    hits: Iterable[tuple[str, int, str]], anchors: Mapping[str, Sequence[int]]
+) -> list[str]:
+    """Which of the six researched places the hits of pattern 1 reach, in the fixed order.
+
+    Pattern 1 searches wording, so it cannot name a constant. A gate constant counts as
+    reached if a hit of pattern 1 stands in the gate file within ``CONTROL_REACH`` lines of
+    it: the sentence that says what the constant guards.
+    """
+    found = set()
+    for file, line, text in hits:
+        if file == GATE_FILE:
+            for name, numbers in anchors.items():
+                if any(abs(line - number) <= CONTROL_REACH for number in numbers):
+                    found.add(name)
+        elif file == "README.md" and "create-only" in text:
+            found.add("README-Rechtetabelle")
+        elif file == "docs/threat-model.md":
+            found.add("threat-model")
+        elif file == "appinfo/info.xml" and "destructive" in text.lower():
+            found.add("Store-Text")
+        elif file == "src/mcp_connector/server/__init__.py" and "never deleted" in text:
+            found.add("Server-Instruktion")
+    return [place for place in CONTROL_PLACES if place in found]
+
+
+E15_NAMES = re.compile(r"NC_MCP_FILES_UPDATE|files_update_enabled|ENV_FILES_UPDATE")
+
+
+def block_inventory() -> int:
+    """A17: every gate and every promise an overwriting PUT, a MOVE and a DELETE touch."""
+    section("inventory")
+    commit = run(["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"], check=False).strip()
+    dirty = run(
+        [
+            "git",
+            "-C",
+            str(REPO_ROOT),
+            "status",
+            "--porcelain",
+            "--",
+            "src",
+            "tests",
+            "appinfo",
+            "README.md",
+            "README.de.md",
+            "README.fr.md",
+            "docs",
+            "CHANGELOG.md",
+            ".planning/PROJECT.md",
+        ],
+        check=False,
+    ).strip()
+    note(f"INVENTAR commit={commit} (die Zeilennummern gelten auf diesem Commit)")
+    note(
+        "INVENTAR arbeitsbaum_abweichend="
+        f"{[line for line in dirty.splitlines() if 'spike-tasks.md' not in line] or 'nein'} "
+        f"ausgelassen={list(INVENTORY_SKIP)} (der Bericht dieser Phase zitiert die Zusagen selbst)"
+    )
+    first, second = inventory_hits(REPO_ROOT)
+    reached = positive_control(first, gate_anchors(REPO_ROOT))
+    note(f"INVENTAR MUSTER 1 treffer={len(first)} | MUSTER 2 treffer={len(second)}")
+    note(
+        f"INVENTAR POSITIVKONTROLLE gefunden={len(reached)}/{len(CONTROL_PLACES)} "
+        f"stellen={reached} fehlend={[p for p in CONTROL_PLACES if p not in reached] or 'keine'}"
+    )
+    merged = merge_hits(first, second)
+    verdicts = [(hit, classify(hit, INVENTORY_RULES)) for hit in merged]
+    order = (
+        "gate",
+        "annotation",
+        "audit",
+        "kanarie",
+        "zusage-server",
+        "zusage-store",
+        "zusage-doku",
+        "ungeklaert",
+        "ausgeschlossen",
+    )
+    for klasse in order:
+        for hit, verdict in verdicts:
+            if verdict[0] == klasse:
+                note(inventory_line(hit, verdict))
+    counts = {klasse: sum(1 for _, v in verdicts if v[0] == klasse) for klasse in order}
+    only_second = [
+        hit for hit, verdict in verdicts if hit.patterns == "2" and verdict[0] != "ausgeschlossen"
+    ]
+    note(f"INVENTAR SUMME treffer={len(merged)} {' '.join(f'{k}={n}' for k, n in counts.items())}")
+    note(
+        f"INVENTAR GEGENPROBE nur_muster_2_im_inventar={len(only_second)} "
+        "(Stellen, die Muster 1 nicht fand und die trotzdem im Inventar stehen)"
+    )
+    section("inventory e15")
+    chain = search(
+        REPO_ROOT, ("src/**/*.py", "appinfo/info.xml", "scripts/*.sh", "compose*.yml"), E15_NAMES
+    )
+    for file, line, text in chain:
+        note(f"E15-KETTE {file}:{line} | {text[:160]}")
+    tests: dict[str, int] = {}
+    for file, _, _ in search(REPO_ROOT, ("tests/**/*.py",), E15_NAMES):
+        tests[file] = tests.get(file, 0) + 1
+    for file, count in sorted(tests.items()):
+        note(f"E15-KETTE-TEST {file} treffer={count}")
+    public = search(REPO_ROOT, PUBLIC_TEXTS, E15_NAMES)
+    note(
+        f"E15-KETTE SUMME quelltext={len(chain)} testdateien={len(tests)} "
+        f"testtreffer={sum(tests.values())} oeffentliche_texte={len(public)} "
+        f"dateien_oeffentlich={sorted({file for file, _, _ in public})}"
+    )
+    return 1 if counts["ungeklaert"] or len(reached) != len(CONTROL_PLACES) else 0
 
 
 def block_ui_teardown(session: Session, ui: "UiOptions") -> None:
@@ -3188,6 +3950,12 @@ async def run_blocks(env: Mapping[str, str], blocks: Sequence[str], ui: UiOption
                     await block_ui_snapshot(session, ui.label, ui.seed_recurring, ui.file())
                 elif name == "ui-teardown":
                     block_ui_teardown(session, ui)
+                elif name == "ui-log":
+                    block_ui_log(session, ui)
+                elif name == "ui-evaluate":
+                    block_ui_evaluate(ui)
+                elif name == "inventory" and block_inventory():
+                    raise RunFailed("inventory incomplete: an unruled hit or a missed place")
             keep = any(name in KEEP_BLOCKS for name in blocks)
         finally:
             try:
@@ -3276,8 +4044,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--out is required for a measuring block")
     if "nc35-stop" in blocks and blocks[-1] != "nc35-stop":
         parser.error("nc35-stop has to be the last block")
-    if {"ui-prepare", "ui-snapshot"} & set(blocks) and not options.ui_file:
-        parser.error("--ui-file is required for ui-prepare and ui-snapshot")
+    if {"ui-prepare", "ui-snapshot", "ui-log"} & set(blocks) and not options.ui_file:
+        parser.error("--ui-file is required for ui-prepare, ui-snapshot and ui-log")
     if "ui-snapshot" in blocks and not options.label:
         parser.error("--label is required for ui-snapshot")
     ui = UiOptions(
