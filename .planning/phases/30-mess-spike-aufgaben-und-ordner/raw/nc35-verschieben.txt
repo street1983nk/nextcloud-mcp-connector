@@ -1,0 +1,578 @@
+
+# Lauf blocks=nc35-up,controls,move,ui-evaluate-move,nc35-stop start=2026-11-11T16:39:52Z (neue Datei)
+
+== nc35-up ==
+RAM frei_host_gb=4.81 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 13.63MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+docker start nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+docker start nc35-harp -> nc35-harp
+docker start nc35-caddy -> nc35-caddy
+docker start nc_app_mcp_connector -> nc_app_mcp_connector
+GET http://127.0.0.1:8082/status.php -> HTTP 200
+- installed: true
+  - version: 35.0.0.10
+  - versionstring: 35.0.0
+  - edition: 
+  - maintenance: false
+  - needsDbUpgrade: false
+  - productname: Nextcloud
+  - extendedSupport: false
+VERSION OF RECORD 35.0.0
+dbtype: sqlite3
+APP app_api version=35.0.0 (occ app:list)
+occ app_api:app:list:
+  ExApps:
+  mcp_connector (MCP Connector): 0.3.2 [enabled]
+CONTAINER nc35-nc laeuft=true StartedAt=2026-11-11T16:39:56.358058344Z image=nextcloud:35.0.0-apache-local
+CONTAINER nc35-harp laeuft=true StartedAt=2026-11-11T16:39:57.625781555Z image=ghcr.io/nextcloud/nextcloud-appapi-harp:release
+CONTAINER nc35-caddy laeuft=true StartedAt=2026-11-11T16:39:57.932814748Z image=caddy:2
+CONTAINER nc_app_mcp_connector laeuft=true StartedAt=2026-11-11T16:39:58.271267505Z image=127.0.0.1:5000/mcp_connector:0.3.2
+EXAPP-CONTAINER laeuft=ja
+
+== controls ==
+RAM frei_host_gb=4.33 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 13.63MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 76.79MiB / 5.786GiB  cpu 0.12%
+nc35-caddy  mem 11.12MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 65.92MiB / 5.786GiB  cpu 0.02%
+nc35-nc  mem 121.6MiB / 5.786GiB  cpu 7.28%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+BASELINE-START apps_an={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"}
+BASELINE-START apps_aus={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"}
+BASELINE-START nutzer={"admin":"admin","alice":"alice","bob":"bob"}
+BASELINE-START gruppen={"admin":["admin"]}
+BASELINE-START dateien_alice=275
+BASELINE-START papierkorb_alice=0
+BASELINE-START kalender_alice=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+
+BASELINE-START kalender_bob=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+
+BASELINE-START geloeschte_kalenderobjekte=0
+BASELINE-START geloeschte_kalender=0
+BASELINE-START calendar_retention=
+BASELINE-START quota_alice=The setting does not exist for user "alice".
+occ user:add --password-from-env spike30a (password via stdin) -> The account "spike30a" was created successfully
+occ user:auth-tokens:add spike30a --password-from-env --name spike30 (token kept)
+2026-11-11T16:40:12Z | controls | PROPFIND Depth 0 home of spike30a (app password) | HTTP 207 | home
+occ user:add --password-from-env spike30b (password via stdin) -> The account "spike30b" was created successfully
+occ user:auth-tokens:add spike30b --password-from-env --name spike30 (token kept)
+2026-11-11T16:40:14Z | controls | PROPFIND Depth 0 home of spike30b (app password) | HTTP 207 | home
+2026-11-11T16:40:15Z | controls | a: GET /ocs/v2.php/cloud/user (AppAPI as spike30a) | HTTP 200 | id=spike30a erwartet=spike30a gleich=ja
+2026-11-11T16:40:15Z | controls | b: GET /ocs/v2.php/cloud/user (AppAPI as spike30a, wrong APP_SECRET) | HTTP 401 | abgelehnt=ja
+KONTROLLE c: exapp_impersonation.log, GET-Zeilen von spike30a seit 2026-11-11T16:40:14Z: 1
+  {"reqId":"RkDNEsZEI7mByPnFIwNa","level":2,"time":"2026-11-11T16:40:15+00:00","remoteAddr":"172.30.42.128","user":"spike30a","app":"mcp_connector","method":"GET","url":"/ocs/v2.php/cloud/user","scriptName":"/ocs/v2.php","message":"impersonation request","userAgent":"python-httpx/0.28.1","version":"35
+
+== move ==
+RAM frei_host_gb=4.14 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 13.63MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 85.04MiB / 5.786GiB  cpu 0.16%
+nc35-caddy  mem 11.19MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 72.41MiB / 5.786GiB  cpu 5.89%
+nc35-nc  mem 203.3MiB / 5.786GiB  cpu 0.01%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:18 | public const RETENTION_CONFIG_KEY = 'calendarRetentionObligation';
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:19 | private const int DEFAULT_RETENTION_SECONDS = 30 * 24 * 60 * 60;
+QUELLE apps/dav/lib/CalDAV/Trashbin/TrashbinHome.php:28 | public const NAME = 'trashbin';
+QUELLE apps/dav/lib/CalDAV/Trashbin/DeletedCalendarObjectsCollection.php:26 | public const NAME = 'objects';
+QUELLE apps/dav/lib/CalDAV/Trashbin/DeletedCalendarObjectsCollection.php:40 | throw new NotImplemented();
+QUELLE apps/dav/lib/CalDAV/Trashbin/DeletedCalendarObjectsCollection.php:111 | public function calendarQuery(array $filters) {
+QUELLE apps/dav/lib/CalDAV/Trashbin/RestoreTarget.php:20 | public const NAME = 'restore';
+QUELLE apps/dav/lib/CalDAV/Trashbin/RestoreTarget.php:48 | public function moveInto($targetName, $sourcePath, INode $sourceNode): bool {
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:33 | public const PROPERTY_RETENTION_DURATION = '{http://nextcloud.com/ns}trash-bin-retention-duration';
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:46 | $this->disableTrashbin = $request->getHeader('X-NC-CalDAV-No-Trashbin') === '1';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:946 | $trashbinDisabled = $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1703 | public function moveCalendarObject(string $sourcePrincipalUri, int $sourceObjectId, string $targetPrincipalUri, int $targetCalendarId, string $tragetObjectUri, int $calendarType = self::CALENDAR_TYPE_CALENDAR): bool {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1768 | public function deleteCalendarObject($calendarId, $objectUri, $calendarType = self::CALENDAR_TYPE_CALENDAR, bool $forceDeletePermanently = false) {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1778 | if ($forceDeletePermanently || $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0') {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1856 | public function restoreCalendarObject(array $objectData): void {
+QUELLE apps/dav/lib/CalDAV/CalendarHome.php:111 | $objects[] = new TrashbinHome($this->caldavBackend, $this->principalInfo);
+QUELLE apps/dav/lib/CalDAV/CalendarHome.php:164 | return new TrashbinHome($this->caldavBackend, $this->principalInfo);
+QUELLE apps/dav/lib/Command/RetentionCleanupCommand.php:21 | parent::__construct('dav:retention:clean-up');
+QUELLE occ list dav | dav:retention:clean-up
+QUELLE BESTAETIGT schluessel=calendarRetentionObligation standard_sekunden=2592000 aus_wert=0 sammlung=trashbin/objects wiederherstellung=Verschieben nach trashbin/restore/<name> eigenschaft={http://nextcloud.com/ns}trash-bin-retention-duration aufraeumen=occ dav:retention:clean-up
+2026-11-11T16:40:22Z | MKCALENDAR auth=appapi status=201 liste=spike30-a nutzer=spike30a komponenten=VTODO | 
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 16:40:22 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: ia9jLyaokVltiU6IW57x
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T16:40:22Z | MKCALENDAR auth=appapi status=201 liste=spike30-b nutzer=spike30a komponenten=VTODO | 
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 16:40:22 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: xWAkyr1RH83KJtWLim7J
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+KONTROLLE exapp_impersonation.log, MKCALENDAR-Zeilen von spike30a: 2
+  {"reqId":"ia9jLyaokVltiU6IW57x","level":2,"time":"2026-11-11T16:40:22+00:00","remoteAddr":"172.30.42.128","user":"spike30a","app":"mcp_connector","method":"MKCALENDAR","url":"/remote.php/dav/calendars/spike30a/spike30-a/","scriptName":"/remote.php","message":"impersonation request","userAgent":"python-httpx/0.28.1","version":"35.0.0.10","data":{"app":"mcp_connector"}}
+  {"reqId":"xWAkyr1RH83KJtWLim7J","level":2,"time":"2026-11-11T16:40:22+00:00","remoteAddr":"172.30.42.128","user":"spike30a","app":"mcp_connector","method":"MKCALENDAR","url":"/remote.php/dav/calendars/spike30a/spike30-b/","scriptName":"/remote.php","message":"impersonation request","userAgent":"python-httpx/0.28.1","version":"35.0.0.10","data":{"app":"mcp_connector"}}
+2026-11-11T16:40:22Z | SETUP MKCALENDAR liste=spike30-b-ro nutzer=spike30b auth=basic status=201
+2026-11-11T16:40:22Z | FREIGABE liste=spike30-b-ro an=spike30a schreibrecht=nein nutzer=spike30b auth=basic status=200 (POST mit dem share-Dokument, Namensraum http://owncloud.org/ns)
+    HTTP 200 OK
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 16:40:22 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: rQOqOTEVN6S04M03gsZO
+    x-robots-tag: noindex, nofollow
+    x-sabre-status: everything-went-well
+    x-user-id: spike30b
+    (no body)
+2026-11-11T16:40:23Z | SETUP MKCALENDAR liste=spike30-b-rw nutzer=spike30b auth=basic status=201
+2026-11-11T16:40:23Z | FREIGABE liste=spike30-b-rw an=spike30a schreibrecht=ja nutzer=spike30b auth=basic status=200 (POST mit dem share-Dokument, Namensraum http://owncloud.org/ns)
+    HTTP 200 OK
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 16:40:23 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: rYfCDKt37eL7Ff0pu36H
+    x-robots-tag: noindex, nofollow
+    x-sabre-status: everything-went-well
+    x-user-id: spike30b
+    (no body)
+2026-11-11T16:40:23Z | DISCOVERY PROPFIND Depth 1 auth=appapi nutzer=spike30a 207
+  DISCOVERY liste=spike30-a name=spike30-a komponenten=VTODO
+  DISCOVERY liste=spike30-b name=spike30-b komponenten=VTODO
+  DISCOVERY liste=spike30-b-ro_shared_by_spike30b name=spike30-b-ro (spike30b) komponenten=VTODO
+  DISCOVERY liste=spike30-b-rw_shared_by_spike30b name=spike30-b-rw (spike30b) komponenten=VTODO
+2026-11-11T16:40:23Z | SETUP MKCALENDAR liste=spike30-nur-termine nutzer=spike30a auth=appapi status=201 komponenten=VEVENT
+2026-11-11T16:40:23Z | SETUP DECK POST /index.php/apps/deck/api/v1.0/boards titel=spike30-board nutzer=spike30a auth=basic status=200 board_id=65
+  DISCOVERY liste=spike30-a name=spike30-a komponenten=VTODO
+  DISCOVERY liste=spike30-b name=spike30-b komponenten=VTODO
+  DISCOVERY liste=spike30-nur-termine name=spike30-nur-termine komponenten=VEVENT
+  DISCOVERY liste=spike30-b-ro_shared_by_spike30b name=spike30-b-ro (spike30b) komponenten=VTODO
+  DISCOVERY liste=spike30-b-rw_shared_by_spike30b name=spike30-b-rw (spike30b) komponenten=VTODO
+  DISCOVERY liste=app-generated--deck--board-64 name=Deck: Welcome to Nextcloud Deck! komponenten=VTODO
+  DISCOVERY liste=app-generated--deck--board-65 name=Deck: spike30-board komponenten=VTODO
+DECK-KALENDER in_der_discovery=ja uri=app-generated--deck--board-65
+2026-11-11T16:40:23Z | SETUP PUT create-only spike30-a/s30-eigen-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:25Z | MOVE eigen auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=5aa17592e862 etag_nachher=5aa17592e862 | inhalt_gleich=ja
+ABBRUCHKRITERIUM MESS-06 MOVE ausgeloest=nein grund=keiner
+  Aufruf: Methode wie in der Zeile darueber, Quelle /remote.php/dav/calendars/spike30a/spike30-a/s30-eigen-164021.ics, Destination http://127.0.0.1:8082/remote.php/dav/calendars/spike30a/spike30-b/s30-eigen-164021.ics, keine weitere Kopfzeile
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 16:40:25 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: cFhYVptjRsQibF0cvVsZ
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+KONTROLLE exapp_impersonation.log, Zeilen der Methode von spike30a: 1
+  {"reqId":"cFhYVptjRsQibF0cvVsZ","level":2,"time":"2026-11-11T16:40:25+00:00","remoteAddr":"172.30.42.128","user":"spike30a","app":"mcp_connector","method":"MOVE","url":"/remote.php/dav/calendars/spike30a/spike30-a/s30-eigen-164021.ics","scriptName":"/remote.php","message":"impersonation request","userAgent":"python-httpx/0.28.1","version":"35.0.0.10","data":{"app":"mcp_connector"}}
+2026-11-11T16:40:25Z | GEGENPROBE eigen auflistung REPORT calendar-query auth=basic nutzer=spike30a in_spike30-a=nein in_spike30-b=ja | datenbank=spike30a/spike30-b/s30-eigen-164021.ics:deleted_at_leer:da0341633dd5 db_gleich_gesendet=ja
+2026-11-11T16:40:25Z | SETUP PUT create-only spike30-a/s30-eigen-falsches-secret-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:25Z | GEGENPROBE eigen falsches-secret status=401 datenbank=spike30a/spike30-a/s30-eigen-falsches-secret-164021.ics:deleted_at_leer:0f2fd581fefc | Sabre\DAV\Exception\NotAuthenticated No public access to this resource., AppAPIAuth has not passed, This request is not for a federated calendar, No 'Authorization: Basic' header found. Either the cli
+2026-11-11T16:40:26Z | SETUP PUT create-only spike30-a/s30-eigen-basic-164021.ics nutzer=spike30a auth=basic status=201 | 
+2026-11-11T16:40:26Z | MOVE eigen auth=basic status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=37aacc6ac782 etag_nachher=37aacc6ac782 | inhalt_gleich=ja
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 16:40:26 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: Ce4JF1nnddNlYG9CwjdS
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+MOVE GLEICH appapi_basic=ja appapi=(201, 404, 200, 'ja', True) basic=(201, 404, 200, 'ja', True) (status, quelle danach, ziel danach, uid gleich, inhalt gleich)
+2026-11-11T16:40:26Z | SETUP PUT create-only spike30-a/s30-produktion-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:27Z | PRODUKTIONSWEG MOVE status=201 verschoben=ja nutzer=spike30a datenbank=spike30a/spike30-b/s30-produktion-164021.ics:deleted_at_leer:b0b4556d51cf (aus nc_app_mcp_connector gegen http://caddy, Destination auf http://caddy, Overwrite F; lauf=164021)
+2026-11-11T16:40:27Z | SETUP PUT create-only spike30-a/s30-ziel-nur-pfad-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:27Z | MOVE ziel-nur-pfad auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=6d27080af9b7 etag_nachher=6d27080af9b7 | inhalt_gleich=ja destination_basis=(keine, nur Pfad)
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 16:40:27 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: wgvTuTryjcaZab4ZZ74J
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T16:40:27Z | SETUP PUT create-only spike30-a/s30-ziel-fremder-host-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:27Z | MOVE ziel-fremder-host auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=5df513c84dc8 etag_nachher=5df513c84dc8 | inhalt_gleich=ja destination_basis=http://spike30.invalid
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 16:40:27 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: L1RTZM13fFK0x0hsTt6M
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T16:40:27Z | SETUP PUT create-only spike30-a/s30-belegt-overwrite-f-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:27Z | SETUP PUT create-only spike30-b/s30-belegt-overwrite-f-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:28Z | MOVE belegt-overwrite-f auth=appapi status=412 quelle_danach=200 ziel_danach=200 uid_gleich=nein etag_vorher=100e358f27b0 etag_nachher=b9c63f0abe75 | inhalt_gleich=nein ueberschrieben=nein altes_ziel=unveraendert quelle_unveraendert=ja Sabre\DAV\Exception\PreconditionFailed The destination node already exists, and the overwrite header is set to false
+  HASH ziel vorher=spike30a/spike30-b/s30-belegt-overwrite-f-164021.ics:deleted_at_leer:ffab0ee66a48 nachher=spike30a/spike30-b/s30-belegt-overwrite-f-164021.ics:deleted_at_leer:ffab0ee66a48 | quelle vorher=spike30a/spike30-a/s30-belegt-overwrite-f-164021.ics:deleted_at_leer:c3d8eafc4734 nachher=spike30a/spike30-a/s30-belegt-overwrite-f-164021.ics:deleted_at_leer:c3d8eafc4734
+    HTTP 412 Precondition Failed
+    content-length: 312
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 16:40:28 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\PreconditionFailed</s:exception>
+      <s:message>The destination node already exists, and the overwrite header is set to false</s:message>
+      <s:header>Overwrite</s:header>
+    </d:error>
+2026-11-11T16:40:28Z | SETUP PUT create-only spike30-a/s30-belegt-ohne-kopf-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:28Z | SETUP PUT create-only spike30-b/s30-belegt-ohne-kopf-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:29Z | MOVE belegt-ohne-kopf auth=appapi status=204 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=d6ff3c8bf3ee etag_nachher=d6ff3c8bf3ee | inhalt_gleich=ja ueberschrieben=ja altes_ziel=papierkorb quelle_unveraendert=nein
+  HASH ziel vorher=spike30a/spike30-b/s30-belegt-ohne-kopf-164021.ics:deleted_at_leer:61315ea61035 nachher=spike30a/spike30-b/s30-belegt-ohne-kopf-164021-deleted.ics:deleted_at_gesetzt:61315ea61035 | quelle vorher=spike30a/spike30-a/s30-belegt-ohne-kopf-164021.ics:deleted_at_leer:a29150696f89 nachher=spike30a/spike30-b/s30-belegt-ohne-kopf-164021.ics:deleted_at_leer:a29150696f89
+    HTTP 204 No Content
+    content-security-policy: default-src 'none';
+    date: Wed, 11 Nov 2026 16:40:29 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: UfnOTRV011TxGpq8cMdD
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T16:40:29Z | SETUP PUT create-only spike30-a/s30-gleiche-uid-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:29Z | SETUP PUT create-only spike30-b/s30-gleiche-uid-ziel-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:30Z | MOVE gleiche-uid auth=appapi status=409 quelle_danach=200 ziel_danach=404 uid_gleich=- etag_vorher=3dc5a45b4baa etag_nachher=- | inhalt_gleich=nein datenbank_unveraendert=ja OCA\DAV\Exception\UidConflict Calendar object with uid already exists in this calendar collection.
+  DATENBANK uid=s30-gleiche-uid-164021 vorher=spike30a/spike30-a/s30-gleiche-uid-164021.ics:deleted_at_leer:4ab71018b634,spike30a/spike30-b/s30-gleiche-uid-ziel-164021.ics:deleted_at_leer:2bff0299eb13 nachher=spike30a/spike30-a/s30-gleiche-uid-164021.ics:deleted_at_leer:4ab71018b634,spike30a/spike30-b/s30-gleiche-uid-ziel-164021.ics:deleted_at_leer:2bff0299eb13
+    HTTP 409 Conflict
+    content-length: 465
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 16:40:30 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>OCA\DAV\Exception\UidConflict</s:exception>
+      <s:message>Calendar object with uid already exists in this calendar collection.</s:message>
+      <cal:no-uid-conflict xmlns:cal="urn:ietf:params:xml:ns:caldav">
+        <d:href xmlns:d="DAV:">/remote.php/dav/calendars/spike30a/spike30-b/s30-gleiche-uid-ziel-164021.ics</d:href>
+      </cal:no-uid-conflict>
+    </d:error>
+2026-11-11T16:40:30Z | GEGENPROBE gleiche-uid auflistung auth=basic nutzer=spike30a spike30-a=['s30-gleiche-uid-164021.ics'] spike30-b=['s30-gleiche-uid-ziel-164021.ics']
+2026-11-11T16:40:30Z | SETUP PUT create-only spike30-a/s30-geteilt-rw-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:31Z | MOVE geteilt-rw auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=62145898d076 etag_nachher=62145898d076 | inhalt_gleich=ja ziel=spike30-b-rw_shared_by_spike30b quelle_unveraendert=nein datenbank_nachher=spike30b/spike30-b-rw/s30-geteilt-rw-164021.ics:deleted_at_leer:604857aed7ea
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 16:40:30 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: RayuhuwxZF78LDlIoSLV
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T16:40:31Z | GEGENPROBE geteilt-rw lesen als Eigentuemer nutzer=spike30b auth=basic liste=spike30-b-rw status=200
+2026-11-11T16:40:31Z | SETUP PUT create-only spike30-a/s30-geteilt-ro-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:31Z | MOVE geteilt-ro auth=appapi status=404 quelle_danach=200 ziel_danach=404 uid_gleich=- etag_vorher=802d38bf8901 etag_nachher=- | inhalt_gleich=nein ziel=spike30-b-ro_shared_by_spike30b quelle_unveraendert=ja datenbank_nachher=spike30a/spike30-a/s30-geteilt-ro-164021.ics:deleted_at_leer:b1137ca0957e Sabre\DAV\Exception\NotFound Calendar with name 'spike30-b-ro_shared_by_spike30b' could not be found
+    HTTP 404 Not Found
+    content-length: 263
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 16:40:31 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\NotFound</s:exception>
+      <s:message>Calendar with name 'spike30-b-ro_shared_by_spike30b' could not be found</s:message>
+    </d:error>
+2026-11-11T16:40:31Z | GEGENPROBE geteilt-ro lesen als Eigentuemer nutzer=spike30b auth=basic liste=spike30-b-ro status=404
+2026-11-11T16:40:32Z | SETUP PUT create-only spike30-a/s30-deck-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:32Z | MOVE deck auth=appapi status=403 quelle_danach=200 ziel_danach=404 uid_gleich=- etag_vorher=c39b032e5bc0 etag_nachher=- | inhalt_gleich=nein ziel=app-generated--deck--board-65 quelle_unveraendert=ja datenbank_nachher=spike30a/spike30-a/s30-deck-164021.ics:deleted_at_leer:d0298ad1d8c9 Sabre\DAV\Exception\Forbidden Access denied
+    HTTP 403 Forbidden
+    content-length: 206
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 16:40:32 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Forbidden</s:exception>
+      <s:message>Access denied</s:message>
+    </d:error>
+2026-11-11T16:40:32Z | SETUP PUT create-only spike30-a/s30-nur-termine-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:33Z | MOVE nur-termine auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=9ad966a72ca4 etag_nachher=9ad966a72ca4 | inhalt_gleich=ja ziel=spike30-nur-termine quelle_unveraendert=nein datenbank_nachher=spike30a/spike30-nur-termine/s30-nur-termine-164021.ics:deleted_at_leer:f370e491fe3d
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 16:40:32 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: 07gDKIOITWuAj2CamJDu
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T16:40:33Z | SETUP PUT create-only spike30-a/s30-if-match-aktuell-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:33Z | MOVE if-match-aktuell auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=b0db695c5f7a etag_nachher=b0db695c5f7a | inhalt_gleich=ja if_match=b0db695c5f7a datenbank_unveraendert=nein auflistung_basic_in_spike30-b=ja
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 16:40:33 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: XGoTYZFRgEK88xYySqjc
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T16:40:34Z | SETUP PUT create-only spike30-a/s30-if-match-veraltet-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:34Z | SETUP PUT aendert s30-if-match-veraltet-164021.ics, die gelesene ETag ist danach veraltet status=204
+2026-11-11T16:40:34Z | MOVE if-match-veraltet auth=appapi status=412 quelle_danach=200 ziel_danach=404 uid_gleich=- etag_vorher=e322ec2af6ef etag_nachher=- | inhalt_gleich=nein if_match=20a904a9f4ec datenbank_unveraendert=ja auflistung_basic_in_spike30-b=nein Sabre\DAV\Exception\PreconditionFailed An If-Match header was specified, but none of the specified ETags matched.
+    HTTP 412 Precondition Failed
+    content-length: 308
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 16:40:34 GMT
+    etag: "e322ec2af6efd8aa8657adb200ec1425"
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\PreconditionFailed</s:exception>
+      <s:message>An If-Match header was specified, but none of the specified ETags matched.</s:message>
+      <s:header>If-Match</s:header>
+    </d:error>
+2026-11-11T16:40:34Z | SETUP PUT create-only spike30-a/s30-eltern-verschieben-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:34Z | SETUP PUT create-only spike30-a/s30-kind-verschieben-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:35Z | UNTERAUFGABE server-verschieben ort=spike30-a unveraendert=ja eltern_status=201 eltern_verschoben=ja kind_get=200 kind_etag_vorher=78a77dd363a6 kind_etag_nachher=78a77dd363a6 auth=appapi nutzer=spike30a | datenbank kind vorher=spike30a/spike30-a/s30-kind-verschieben-164021.ics:deleted_at_leer:30ac349154d8 nachher=spike30a/spike30-a/s30-kind-verschieben-164021.ics:deleted_at_leer:30ac349154d8 eltern=spike30a/spike30-b/s30-eltern-verschieben-164021.ics:deleted_at_leer:a5ebb8db1c6f
+2026-11-11T16:40:35Z | SETUP PUT create-only spike30-a/s30-eltern-loeschen-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:35Z | SETUP PUT create-only spike30-a/s30-kind-loeschen-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:36Z | UNTERAUFGABE server-loeschen vorhanden=ja unveraendert=ja eltern_status=204 eltern_geloescht=ja kind_get=200 kind_etag_vorher=c6f927905036 kind_etag_nachher=c6f927905036 auth=appapi nutzer=spike30a | datenbank kind vorher=spike30a/spike30-a/s30-kind-loeschen-164021.ics:deleted_at_leer:61ffff0bc981 nachher=spike30a/spike30-a/s30-kind-loeschen-164021.ics:deleted_at_leer:61ffff0bc981 eltern=spike30a/spike30-a/s30-eltern-loeschen-164021-deleted.ics:deleted_at_gesetzt:9d57b68b41ab
+PAPIERKORB zustand=leer (occ config:app:get dav calendarRetentionObligation; leer heisst Standard, laut Quelle 2592000 Sekunden; auf nc35 wird der Schalter nie veraendert)
+2026-11-11T16:40:37Z | SETUP PUT create-only spike30-a/s30-loeschen-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:38Z | DELETE impersonation status=204 auth=appapi nutzer=spike30a if_match=78c0e9fa9584 get_danach=404 | 
+    HTTP 204 No Content
+    content-security-policy: default-src 'none';
+    date: Wed, 11 Nov 2026 16:40:38 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: D8O1PCGbYtqmO4kpXwaN
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+KONTROLLE exapp_impersonation.log, DELETE-Zeilen von spike30a: 1
+  {"reqId":"D8O1PCGbYtqmO4kpXwaN","level":2,"time":"2026-11-11T16:40:38+00:00","remoteAddr":"172.30.42.128","user":"spike30a","app":"mcp_connector","method":"DELETE","url":"/remote.php/dav/calendars/spike30a/spike30-a/s30-loeschen-164021.ics","scriptName":"/remote.php","message":"impersonation request","userAgent":"python-httpx/0.28.1","version":"35.0.0.10","data":{"app":"mcp_connector"}}
+2026-11-11T16:40:38Z | SETUP PUT create-only spike30-a/s30-loeschen-veraltet-164021.ics nutzer=spike30a auth=appapi status=201 | 
+2026-11-11T16:40:39Z | DELETE veraltet status=412 objekt_unveraendert=ja auth=appapi nutzer=spike30a | datenbank vorher=spike30a/spike30-a/s30-loeschen-veraltet-164021.ics:deleted_at_leer:897af59ad68e nachher=spike30a/spike30-a/s30-loeschen-veraltet-164021.ics:deleted_at_leer:897af59ad68e | Sabre\DAV\Exception\PreconditionFailed An If-Match header was specified, but none of the specified ETags matched.
+    HTTP 412 Precondition Failed
+    content-length: 308
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 16:40:38 GMT
+    etag: "d7217d4401c460d50fc806304d910c44"
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\PreconditionFailed</s:exception>
+      <s:message>An If-Match header was specified, but none of the specified ETags matched.</s:message>
+      <s:header>If-Match</s:header>
+    </d:error>
+2026-11-11T16:40:39Z | PAPIERKORB PROPFIND Depth 1 trashbin/objects status=501 | Sabre\DAV\Exception\NotImplemented
+2026-11-11T16:40:39Z | PAPIERKORB eintrag=ja name=166.ics eintraege=3 (REPORT calendar-query, auth=appapi nutzer=spike30a) | GEGENPROBE datenbank=spike30a/spike30-a/s30-loeschen-164021-deleted.ics:deleted_at_gesetzt:1e007df35cec
+2026-11-11T16:40:39Z | WIEDERHERSTELLUNG status=201 uid_gleich=ja inhalt_gleich=ja get_danach=200 auth=appapi nutzer=spike30a | GEGENPROBE datenbank=spike30a/spike30-a/s30-loeschen-164021.ics:deleted_at_leer:1e007df35cec | 
+  Aufruf: Verschieben von trashbin/objects/166.ics mit Destination trashbin/restore/file
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 16:40:39 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: SoEBela4E5bGkIdqik3v
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+RUECKBAU DECK DELETE boards/65 status=200
+RUECKBAU PAPIERKORB spike30a 164.ics endgueltig status=204
+RUECKBAU PAPIERKORB spike30a 153.ics endgueltig status=204
+RUECKBAU PAPIERKORB spike30a eintraege_vorher=2
+RUECKBAU PAPIERKORB spike30b eintraege_vorher=0
+
+== ui-evaluate-move ==
+APP AUSWERTUNG quelle=raw/ui-a (15 Objekte) und raw/ui-b (15 Objekte), Listen aus den Zeilen UI-OBJEKT in raw/ui-sitzung.txt; nur gelesen, kein Aufruf gegen eine Instanz
+APP VERSCHIEBEN eltern=s30 eltern-umzug kind=zieht mit eltern_uid_gleich=ja eltern_ort_danach=spike30-liste-2 kind_ort_danach=spike30-liste-2
+APP LOESCHEN eltern=s30 eltern-loeschen kind=kind im papierkorb eltern_ort_danach=trashbin kind_ort_danach=trashbin
+APP VERSCHIEBEN einzeln uid_gleich=ja dateiname_gleich=ja inhalt_gleich=ja von=spike30-liste-1 nach=spike30-liste-2 positivkontrolle_umzug_stattgefunden=ja
+KONTROLLE unberuehrt differenz=leer ort_gleich=ja
+GEGENPROBE objektzahl stand=a {"spike30-liste-1": 15}
+GEGENPROBE objektzahl stand=b {"spike30-liste-1": 10, "spike30-liste-2": 3, "trashbin": 2}
+
+== rueckbau ==
+rm -rf /var/www/html/data/spike30ext -> entfernt
+rm -rf /var/www/html/data/__groupfolders (Dateien darin vorher: fehlt) -> entfernt
+occ user:delete spike30a -> The specified user was deleted
+occ user:delete spike30b -> The specified user was deleted
+RUECKBAU reste_mit_praefix_spike30=keine
+RUECKBAU occ user:list -> - admin: admin - alice: alice - bob: bob
+RUECKBAU occ app:list groupfolders_vorhanden=nein files_external_an=nein
+RUECKBAU deck_boards_mit_praefix_spike30=0 (Tabelle deck_boards, per PHP)
+BASELINE apps_an vorher={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"} nachher={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"} gleich=ja
+BASELINE apps_aus vorher={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"} nachher={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"} gleich=ja
+BASELINE nutzer vorher={"admin":"admin","alice":"alice","bob":"bob"} nachher={"admin":"admin","alice":"alice","bob":"bob"} gleich=ja
+BASELINE gruppen vorher={"admin":["admin"]} nachher={"admin":["admin"]} gleich=ja
+BASELINE dateien_alice vorher=275 nachher=275 gleich=ja
+BASELINE papierkorb_alice vorher=0 nachher=0 gleich=ja
+BASELINE kalender_alice vorher=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+ nachher=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+ gleich=ja
+BASELINE kalender_bob vorher=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+ nachher=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+ gleich=ja
+BASELINE geloeschte_kalenderobjekte vorher=0 nachher=0 gleich=ja
+BASELINE geloeschte_kalender vorher=0 nachher=0 gleich=ja
+BASELINE calendar_retention vorher= nachher= gleich=ja
+BASELINE quota_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
+
+== nc35-stop ==
+RAM frei_host_gb=4.15 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 13.63MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 92.34MiB / 5.786GiB  cpu 0.11%
+nc35-caddy  mem 13.27MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 72.18MiB / 5.786GiB  cpu 0.11%
+nc35-nc  mem 225.9MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
+docker stop nc_app_mcp_connector -> nc_app_mcp_connector | laeuft=false

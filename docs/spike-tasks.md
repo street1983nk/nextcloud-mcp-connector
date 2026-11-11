@@ -1,6 +1,6 @@
 # Mess-Spike Aufgaben und Ordner (MESS-01 bis MESS-06)
 
-**Status:** läuft. Die Abschnitte 1 (MESS-01) und 2 (MESS-02) sind gemessen, das Abbruchkriterium zu MESS-01 ist nicht ausgelöst. Abschnitt 3 (MESS-05) ist gemessen, beide Abbruchkriterien zu MESS-05 sind nicht ausgelöst, und Abschnitt 7 trägt das Inventar der Gates und Zusagen (A17); die Abschnitte 4 bis 6 und 8 bis 10 sind offen
+**Status:** läuft. Die Abschnitte 1 (MESS-01) und 2 (MESS-02) sind gemessen, das Abbruchkriterium zu MESS-01 ist nicht ausgelöst. Abschnitt 3 (MESS-05) ist gemessen, beide Abbruchkriterien zu MESS-05 sind nicht ausgelöst, und Abschnitt 7 trägt das Inventar der Gates und Zusagen (A17). Aus Abschnitt 4 (MESS-06) sind 4.1 und 4.2 gemessen: `MOVE` unter Impersonation und das Verhalten der Unteraufgaben, das Abbruchkriterium zu MESS-06 für das Verschieben ist nicht ausgelöst; das Löschen auf Nextcloud 32 bis 35 (4.3 bis 4.5) steht noch aus. Die Abschnitte 5, 6 und 8 bis 10 sind offen
 **Messzeitraum:** ab 2026-11-11 (erster Messlauf 11:55 UTC), Ende offen
 **Nextcloud:** 35.0.0 (Build 35.0.0.10), gelesen mit `occ status` am 2026-11-11 aus dem laufenden Container `nc35-nc`. Das Image heißt `nextcloud:35.0.0-apache-local` und ist lokal aus dem veröffentlichten Quellpaket gebaut (`compose.nc35.yml`, Kopfkommentar)
 **AppAPI:** `app_api` 35.0.0, gelesen mit `occ app:list --output=json` derselben Instanz am 2026-11-11
@@ -339,7 +339,73 @@ Zwei Nebenbefunde für Phase 33: ein 5xx auf einen `PUT` darf nie als Erfolg gem
 
 ## 4. Verschieben und Löschen (MESS-06)
 
-Offen, füllt Plan 30-03.
+Gemessen am 2026-11-11 auf der Strecke nc35 (Nextcloud 35.0.0, SQLite), Blöcke nc35-up, controls, move, ui-evaluate-move und nc35-stop in einem Aufruf; Rohbeleg `raw/nc35-verschieben.txt`, Auszug in 12.6. Die Messkonten sind `spike30a` (verschiebt, löscht, liest) und `spike30b` (Eigentümer der geteilten Listen). Die Listen `spike30-a` und `spike30-b` tragen das Komponenten-Set genau `VTODO`, `spike30-nur-termine` genau `VEVENT`; der Deck-Kalender gehört zu einem Board, das `spike30a` über die REST-Schnittstelle von Deck 1.19.0 angelegt hat (Fassung gelesen mit `occ app:list --output=json`, Zeile `BASELINE-START apps_an` desselben Protokolls). Die Messschritte liefen nacheinander; außer der schon aus Plan 30-02 bekannten Antwort 501 auf `PROPFIND` im Papierkorb trat in keinem Schritt ein Statuscode 5xx auf.
+
+Bevor ein Pfad oder ein Schalter des Kalender-Papierkorbs benutzt wurde, hat der Block die Quelle der laufenden Instanz gelesen und als `QUELLE`-Zeilen ins Protokoll geschrieben (12.6). Das Ergebnis in einer Zeile: `QUELLE BESTAETIGT schluessel=calendarRetentionObligation standard_sekunden=2592000 aus_wert=0 sammlung=trashbin/objects wiederherstellung=Verschieben nach trashbin/restore/<name> eigenschaft={http://nextcloud.com/ns}trash-bin-retention-duration aufraeumen=occ dav:retention:clean-up`. Diese Werte sind gelesen; gemessen ist, was die Tabellen darunter nennen.
+
+Das Abbruchkriterium von MESS-06 für das Verschieben ist nicht ausgelöst:
+
+- `ABBRUCHKRITERIUM MESS-06 MOVE ausgeloest=nein grund=keiner`
+
+TMOD-08 darf damit geplant werden. "überschrieben", "unverändert" und der Ort eines Objekts stammen in jeder Zeile aus der Tabelle `calendarobjects` (Zeile je UID mit Kalender, Objektname, `deleted_at` und sha256 des Textes), nicht aus dem Statuscode.
+
+### 4.1 MOVE unter Impersonation
+
+| Befund | Aufruf | Nutzer | Rohwert wörtlich | Deutung |
+|--------|--------|--------|------------------|---------|
+| M4.1: MOVE von eigener Liste in eigene Liste | `MOVE` auf das Objekt in `spike30-a`, `Destination` auf denselben Objektnamen in `spike30-b`, keine weitere Kopfzeile | spike30a, appapi | `MOVE eigen auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=5aa17592e862 etag_nachher=5aa17592e862 \| inhalt_gleich=ja` | 201, die Quelle antwortet danach 404, das Ziel 200, UID und Text sind byte-gleich, und auch die ETag ist dieselbe wie vor dem Umzug. A19, erster Teil: belegt |
+| Positivkontrolle | `exapp_impersonation.log` | spike30a | `KONTROLLE exapp_impersonation.log, Zeilen der Methode von spike30a: 1` | Nextcloud selbst nennt das Konto und die App `mcp_connector` für den `MOVE` (Rohzeile in 12.6) |
+| Gegenprobe, anderer Weg | `REPORT calendar-query` auf beide Listen mit App-Passwort, dazu die Datenbankzeile | spike30a, basic | `GEGENPROBE eigen auflistung REPORT calendar-query auth=basic nutzer=spike30a in_spike30-a=nein in_spike30-b=ja \| datenbank=spike30a/spike30-b/s30-eigen-164021.ics:deleted_at_leer:da0341633dd5 db_gleich_gesendet=ja` | die Quellliste nennt das Objekt nicht mehr, die Zielliste nennt es; in der Datenbank steht genau eine Zeile, im Zielkalender, mit dem Hash des gesendeten Textes |
+| Gegenprobe, falsches Secret | derselbe `MOVE` mit falschem APP_SECRET | spike30a | `GEGENPROBE eigen falsches-secret status=401 datenbank=spike30a/spike30-a/s30-eigen-falsches-secret-164021.ics:deleted_at_leer:0f2fd581fefc \| Sabre\DAV\Exception\NotAuthenticated No public ac` | 401, das Objekt liegt weiter in der Quellliste |
+| Vergleich der Anmeldewege | dieselbe Folge mit App-Passwort | spike30a, basic | `MOVE GLEICH appapi_basic=ja appapi=(201, 404, 200, 'ja', True) basic=(201, 404, 200, 'ja', True) (status, quelle danach, ziel danach, uid gleich, inhalt gleich)` | Impersonation und App-Passwort verhalten sich gleich |
+| Produktionsweg | `MOVE` aus dem ExApp-Container gegen `http://caddy`, `Destination` auf `http://caddy`, `Overwrite: F` | spike30a, appapi | `PRODUKTIONSWEG MOVE status=201 verschoben=ja nutzer=spike30a datenbank=spike30a/spike30-b/s30-produktion-164021.ics:deleted_at_leer:b0b4556d51cf (aus nc_app_mcp_connector gegen http://caddy, Destination auf http://caddy, Overwrite F; lauf=164021)` | auch auf dem Weg, den die App in Produktion nimmt, 201 und verschoben |
+| `Destination` nur als Pfad | wie M4.1, `Destination` ohne Schema und Host | spike30a, appapi | `MOVE ziel-nur-pfad auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=6d27080af9b7 etag_nachher=6d27080af9b7 \| inhalt_gleich=ja destination_basis=(keine, nur Pfad)` | der Server nimmt den bloßen Pfad an |
+| `Destination` mit fremdem Host | wie M4.1, `Destination` auf `http://spike30.invalid` plus Pfad | spike30a, appapi | `MOVE ziel-fremder-host auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=5df513c84dc8 etag_nachher=5df513c84dc8 \| inhalt_gleich=ja destination_basis=http://spike30.invalid` | der Server wertet nur den Pfad aus, der Hostname im Kopf spielt keine Rolle; das Objekt liegt danach in der Zielliste derselben Instanz |
+| M4.2: belegtes Ziel mit `Overwrite: F` | `MOVE` auf einen Namen, unter dem in der Zielliste schon ein anderes Objekt liegt, mit `Overwrite: F` | spike30a, appapi | `MOVE belegt-overwrite-f auth=appapi status=412 quelle_danach=200 ziel_danach=200 uid_gleich=nein etag_vorher=100e358f27b0 etag_nachher=b9c63f0abe75 \| inhalt_gleich=nein ueberschrieben=nein altes_ziel=unveraendert quelle_unveraendert=ja Sabre\DAV\Exception\PreconditionFailed The destination node already exists, and the overwrite header is set to false` | 412, Quelle und Ziel unverändert (Hashvergleich: `HASH ziel vorher=spike30a/spike30-b/s30-belegt-overwrite-f-164021.ics:deleted_at_leer:ffab0ee66a48 nachher=spike30a/spike30-b/s30-belegt-overwrite-f-164021.ics:deleted_at_leer:ffab0ee66a48 \| quelle vorher=spike30a/s`) |
+| M4.2: belegtes Ziel ohne Kopfzeile | derselbe Aufruf ohne `Overwrite` | spike30a, appapi | `MOVE belegt-ohne-kopf auth=appapi status=204 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=d6ff3c8bf3ee etag_nachher=d6ff3c8bf3ee \| inhalt_gleich=ja ueberschrieben=ja altes_ziel=papierkorb quelle_unveraendert=nein` | 204: der Server überschreibt. Das bisherige Zielobjekt ist danach nicht mehr in der Liste, es steht mit gesetztem `deleted_at` im Papierkorb (`HASH ziel vorher=spike30a/spike30-b/s30-belegt-ohne-kopf-164021.ics:deleted_at_leer:61315ea61035 nachher=spike30a/spike30-b/s30-belegt-ohne-kopf-164021-deleted.ics:deleted_at_gesetzt:61315ea61035 \| quelle vorher=spike30a/spike30-a`). A19, dritter Teil ("überschreibt kein belegtes Ziel"): widerlegt für den Aufruf ohne Kopfzeile, belegt mit `Overwrite: F` |
+| M4.3: gleiche UID schon in der Zielliste | `MOVE` eines Objekts, dessen UID in der Zielliste unter einem anderen Dateinamen schon vorkommt | spike30a, appapi | `MOVE gleiche-uid auth=appapi status=409 quelle_danach=200 ziel_danach=404 uid_gleich=- etag_vorher=3dc5a45b4baa etag_nachher=- \| inhalt_gleich=nein datenbank_unveraendert=ja OCA\DAV\Exception\UidConflict Calendar object with uid already exists in this calendar collection.` | 409 `UidConflict`, beide Objekte unverändert (`GEGENPROBE gleiche-uid auflistung auth=basic nutzer=spike30a spike30-a=['s30-gleiche-uid-164021.ics'] spike30-b=['s30-gleiche-uid-ziel-164021.ics']`) |
+| M4.4: geteilte Liste mit Schreibrecht | `MOVE` in `spike30-b-rw_shared_by_spike30b` | spike30a, appapi | `MOVE geteilt-rw auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=62145898d076 etag_nachher=62145898d076 \| inhalt_gleich=ja ziel=spike30-b-rw_shared_by_spike30b quelle_unveraendert=nein datenbank_nachher=spike30b/spike30-b-rw/s30-geteilt-rw-164021.ics:deleted_at_leer:604857aed7ea` | 201; das Objekt liegt danach im Kalender des Eigentümers `spike30b` (`GEGENPROBE geteilt-rw lesen als Eigentuemer nutzer=spike30b auth=basic liste=spike30-b-rw status=200`) |
+| M4.4: geteilte Liste ohne Schreibrecht | `MOVE` in `spike30-b-ro_shared_by_spike30b` | spike30a, appapi | `MOVE geteilt-ro auth=appapi status=404 quelle_danach=200 ziel_danach=404 uid_gleich=- etag_vorher=802d38bf8901 etag_nachher=- \| inhalt_gleich=nein ziel=spike30-b-ro_shared_by_spike30b quelle_unveraendert=ja datenbank_nachher=spike30a/spike30-a/s30-geteilt-ro-164021.ics:deleted_at_leer:b1137ca0957e Sabre\DAV\Exception\NotFound Calendar with name 'spike30-b-ro_shared_by_spike30b' could not be found` | 404 mit der Meldung, der Kalender sei nicht zu finden, nicht 403; die Quelle ist unverändert (`GEGENPROBE geteilt-ro lesen als Eigentuemer nutzer=spike30b auth=basic liste=spike30-b-ro status=404`). Dasselbe Bild wie beim `PUT` in 3.3 |
+| M4.4: Deck-Kalender als Ziel | `MOVE` in `app-generated--deck--board-65` | spike30a, appapi | `MOVE deck auth=appapi status=403 quelle_danach=200 ziel_danach=404 uid_gleich=- etag_vorher=c39b032e5bc0 etag_nachher=- \| inhalt_gleich=nein ziel=app-generated--deck--board-65 quelle_unveraendert=ja datenbank_nachher=spike30a/spike30-a/s30-deck-164021.ics:deleted_at_leer:d0298ad1d8c9 Sabre\DAV\Exception\Forbidden Access denied` | 403 `Access denied`, die Quelle ist unverändert |
+| M4.4: Kalender ohne `VTODO` als Ziel | `MOVE` in `spike30-nur-termine` (Komponenten-Set genau `VEVENT`) | spike30a, appapi | `MOVE nur-termine auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=9ad966a72ca4 etag_nachher=9ad966a72ca4 \| inhalt_gleich=ja ziel=spike30-nur-termine quelle_unveraendert=nein datenbank_nachher=spike30a/spike30-nur-termine/s30-nur-termine-164021.ics:deleted_at_leer:f370e491fe3d` | 201: der Server prüft das Komponenten-Set des Ziels beim `MOVE` nicht, die Aufgabe liegt danach in einem Kalender, der nur Termine führen soll |
+| M4.5: `If-Match` mit aktueller ETag | `MOVE` mit `If-Match` auf die gelesene ETag | spike30a, appapi | `MOVE if-match-aktuell auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=b0db695c5f7a etag_nachher=b0db695c5f7a \| inhalt_gleich=ja if_match=b0db695c5f7a datenbank_unveraendert=nein auflistung_basic_in_spike30-b=ja` | 201, verschoben |
+| M4.5: `If-Match` mit veralteter ETag | `MOVE` mit der ETag von vor einer Änderung | spike30a, appapi | `MOVE if-match-veraltet auth=appapi status=412 quelle_danach=200 ziel_danach=404 uid_gleich=- etag_vorher=e322ec2af6ef etag_nachher=- \| inhalt_gleich=nein if_match=20a904a9f4ec datenbank_unveraendert=ja auflistung_basic_in_spike30-b=nein Sabre\DAV\Exception\PreconditionFailed An If-Match header was specified, but none of the specified ETags matched.` | 412, nichts verschoben: `If-Match` wirkt bei `MOVE` wie bei `PUT` |
+
+**DELETE unter Impersonation, Papierkorb im Auslieferungszustand (M4.8).** Der Schalter wurde auf nc35 nur gelesen: `PAPIERKORB zustand=leer (occ config:app:get dav calendarRetentionObligation; leer heisst Standard, laut Quelle 2592000 Sekunden; auf nc35 wird der Schalter nie veraendert)`.
+
+| Befund | Aufruf | Nutzer | Rohwert wörtlich | Deutung |
+|--------|--------|--------|------------------|---------|
+| DELETE mit gelesener ETag | `DELETE` mit `If-Match` | spike30a, appapi | `DELETE impersonation status=204 auth=appapi nutzer=spike30a if_match=78c0e9fa9584 get_danach=404 \|` | 204, das Objekt antwortet danach 404 |
+| Positivkontrolle | `exapp_impersonation.log` | spike30a | `KONTROLLE exapp_impersonation.log, DELETE-Zeilen von spike30a: 1` | Nextcloud nennt Konto und App für den `DELETE` |
+| DELETE mit veralteter ETag | `DELETE` mit der ETag von vor einer Änderung | spike30a, appapi | `DELETE veraltet status=412 objekt_unveraendert=ja auth=appapi nutzer=spike30a \| datenbank vorher=spike30a/spike30-a/s30-loeschen-veraltet-164021.ics:deleted_at_leer:897af59ad68e nachher=spike30a/spike30-a/s30-loeschen-veraltet-164021.ics:deleted_at_leer:897af59ad68e \| Sabre\DAV\Exception\PreconditionFailed An If-Match header was specified, but none of the specified ETags matched.` | 412, das Objekt ist unverändert: `If-Match` wirkt auch bei `DELETE` |
+| Auflistung des Papierkorbs | `PROPFIND` und `REPORT calendar-query` auf `trashbin/objects` | spike30a, appapi | `PAPIERKORB PROPFIND Depth 1 trashbin/objects status=501 \| Sabre\DAV\Exception\NotImplemented` und `PAPIERKORB eintrag=ja name=166.ics eintraege=3 (REPORT calendar-query, auth=appapi nutzer=spike30a) \| GEGENPROBE datenbank=spike30a/spike30-a/s30-loeschen-164021-deleted.ics:deleted_at_gesetzt:1e007df35cec` | `PROPFIND` antwortet 501 (wie in 30-02), der `REPORT` listet das Objekt unter `<id>.ics`. Gegenprobe ohne DAV: die Datenbankzeile trägt `deleted_at` und den Namen mit dem Zusatz `-deleted` |
+| Wiederherstellung | `MOVE` des Papierkorb-Eintrags auf `trashbin/restore/file` | spike30a, appapi | `WIEDERHERSTELLUNG status=201 uid_gleich=ja inhalt_gleich=ja get_danach=200 auth=appapi nutzer=spike30a \| GEGENPROBE datenbank=spike30a/spike30-a/s30-loeschen-164021.ics:deleted_at_leer:1e007df35cec \|` | 201, das Objekt ist am alten Ort mit gleicher UID und byte-gleichem Text zurück; in der Datenbank ist `deleted_at` wieder leer und der alte Name wieder da |
+
+Was Phase 33 für TMOD-08 daraus übernimmt:
+
+- `MOVE` zwischen zwei Aufgabenlisten trägt unter Impersonation, auch auf dem Produktionsweg. UID, Text und ETag bleiben erhalten; der Objektname ist frei wählbar und blieb in der Messung derselbe.
+- Der Kopf `Overwrite: F` ist Pflicht. Ohne ihn überschreibt der Server ein belegtes Ziel mit 204; das verdrängte Objekt liegt dann im Papierkorb des Kalenders. Mit `Overwrite: F` antwortet er 412 und ändert nichts.
+- `If-Match` wirkt bei `MOVE`: mit einer veralteten ETag 412, nichts verschoben. Die Schreibschiene aus TMOD-01 (gelesene ETag) gilt damit auch für das Verschieben.
+- Eine gleiche UID in der Zielliste beantwortet der Server selbst mit 409.
+- Eine geteilte Liste ohne Schreibrecht lehnt mit 404 ab, ein Deck-Kalender mit 403. Der Connector kann sich für die Meldung "kein Schreibrecht" nicht auf 403 stützen.
+- Der Server prüft beim `MOVE` nicht, ob das Ziel Aufgaben führen darf. Die Regel "Ziel ist eine beschreibbare Aufgabenliste" muss der Connector vor dem Aufruf aus der Discovery durchsetzen; der Server tut es nicht.
+- Der Hostname im Kopf `Destination` wird nicht ausgewertet, nur der Pfad. Der Connector baut den Kopf aus der Basis-URL, unter der er Nextcloud erreicht.
+
+### 4.2 Unteraufgaben beim Verschieben und Löschen
+
+Server und Tasks-App sind getrennt belegt: die Serverseite durch Aufrufe dieses Plans unter Impersonation (M4.6), die App durch die Rohobjekte der Browser-Sitzung aus Plan 30-02, in diesem Plan nur gelesen und ausgewertet (M4.7; `APP AUSWERTUNG quelle=raw/ui-a (15 Objekte) und raw/ui-b (15 Objekte), Listen aus den Zeilen UI-OBJEKT in raw/ui-sitzung.txt; nur gelesen, kein Aufruf gegen eine Instanz`).
+
+| Befund | Aufruf | Nutzer | Rohwert wörtlich | Deutung |
+|--------|--------|--------|------------------|---------|
+| M4.6 Server: nur die Elternaufgabe wird verschoben | `MOVE` der Elternaufgabe nach `spike30-b`; die Unteraufgabe (`RELATED-TO` auf die UID der Elternaufgabe) wird nicht angefasst | spike30a, appapi | `UNTERAUFGABE server-verschieben ort=spike30-a unveraendert=ja eltern_status=201 eltern_verschoben=ja kind_get=200 kind_etag_vorher=78a77dd363a6 kind_etag_nachher=78a77dd363a6 auth=appapi nutzer=spike30a \| datenbank kind vorher=spike30a` | der Server nimmt die Unteraufgabe nicht mit: sie liegt unverändert in der Quellliste (ETag, Text und Datenbankzeile gleich), die Elternaufgabe in der Zielliste |
+| M4.6 Server: nur die Elternaufgabe wird gelöscht | `DELETE` der Elternaufgabe mit `If-Match` | spike30a, appapi | `UNTERAUFGABE server-loeschen vorhanden=ja unveraendert=ja eltern_status=204 eltern_geloescht=ja kind_get=200 kind_etag_vorher=c6f927905036 kind_etag_nachher=c6f927905036 auth=appapi nutzer=spike30a \| datenbank kind vorher=spike30a/spik` | der Server löscht die Unteraufgabe nicht mit: sie bleibt unverändert in der Liste und verweist auf eine Elternaufgabe, die im Papierkorb liegt |
+| M4.7 App: Elternaufgabe wechselt die Liste | Stand a gegen Stand b der Browser-Sitzung | spike30ui (Browser, 30-02) | `APP VERSCHIEBEN eltern=s30 eltern-umzug kind=zieht mit eltern_uid_gleich=ja eltern_ort_danach=spike30-liste-2 kind_ort_danach=spike30-liste-2` | die Tasks-App 0.18.1 nimmt die Unteraufgabe mit; im Zugriffsprotokoll der Sitzung stehen dafür zwei `MOVE`, einer je Objekt, beide 201 (`raw/ui-sitzung.txt`, Zeilen `UI-ZUGRIFF`) |
+| M4.7 App: Elternaufgabe wird gelöscht | Stand a gegen Stand b | spike30ui (Browser, 30-02) | `APP LOESCHEN eltern=s30 eltern-loeschen kind=kind im papierkorb eltern_ort_danach=trashbin kind_ort_danach=trashbin` | die App löscht die Unteraufgabe mit, zwei `DELETE` mit 204 (`raw/ui-sitzung.txt`, Zeilen `UI-ZUGRIFF`); beide liegen im Papierkorb des Kalenders |
+| M4.7 App: einzelne Aufgabe | Stand a gegen Stand b | spike30ui (Browser, 30-02) | `APP VERSCHIEBEN einzeln uid_gleich=ja dateiname_gleich=ja inhalt_gleich=ja von=spike30-liste-1 nach=spike30-liste-2 positivkontrolle_umzug_stattgefunden=ja` | UID, Dateiname und Inhalt bleiben beim Umzug gleich |
+| Positivkontrolle | nicht angefasstes Objekt | spike30ui (Browser, 30-02) | `KONTROLLE unberuehrt differenz=leer ort_gleich=ja` | das Verfahren meldet für ein unberührtes Objekt keine Differenz und keinen Ortswechsel |
+| Gegenprobe, andere Zählung | Objektzahl je Liste aus den Zeilen `UI-OBJEKT` | spike30ui (Browser, 30-02) | `GEGENPROBE objektzahl stand=a {"spike30-liste-1": 15}` und `GEGENPROBE objektzahl stand=b {"spike30-liste-1": 10, "spike30-liste-2": 3, "trashbin": 2}` | 15 Objekte in beiden Ständen: drei sind umgezogen, zwei liegen im Papierkorb, keines ist verschwunden |
+
+A21 ist damit für beide Seiten belegt. Der Server tut von sich aus nichts mit der Unteraufgabe, weder beim Verschieben noch beim Löschen der Elternaufgabe; die Tasks-App nimmt sie in beiden Fällen mit einem eigenen Aufruf mit. Nach dem Wortlaut von A21 ("ziehen die Kinder in der Tasks-App mit, folgt der Connector dem Gemessenen") bleibt die Vorgabe "ablehnen" also nicht bestehen: gemessen ist, dass die Kinder mitziehen und mitgelöscht werden. Gemessen ist auch der Preis: Mitnehmen heißt ein eigener Aufruf je Objekt ohne gemeinsame Transaktion, und ein Aufruf, der nur die Elternaufgabe bewegt, hinterlässt einen Zustand, den die App nie herstellt (Unteraufgabe in einer anderen Liste als ihre Elternaufgabe, oder Unteraufgabe einer gelöschten Elternaufgabe). Wie Phase 33 das Mitnehmen baut (Reihenfolge, Verhalten bei einem Teilfehler, `If-Match` je Objekt), ist dort zu planen; die Übergabe an die Phasen und an den Owner-Checkpoint steht in Plan 30-05.
 
 ## 5. Discovery und Objekte (MESS-03)
 
@@ -1304,3 +1370,175 @@ E15-KETTE-TEST tests/unit/test_exapp_files_update_switch.py treffer=4
 E15-KETTE-TEST tests/unit/test_exapp_lifecycle.py treffer=5
 E15-KETTE SUMME quelltext=12 testdateien=7 testtreffer=38 oeffentliche_texte=15 dateien_oeffentlich=['CHANGELOG.md', 'README.de.md', 'README.fr.md', 'README.md', 'appinfo/info.xml', 'docs/client-setup.md', 'docs/hardening.md', 'docs/privacy.md', 'docs/threat-model.md']
 ```
+
+### 12.6 raw/nc35-verschieben.txt
+
+Lauf vom 2026-11-11, Blöcke nc35-up, controls, move, ui-evaluate-move und nc35-stop in einem Aufruf. Die Messzeilen in der Reihenfolge des Protokolls, ohne die Aufbauzeilen (`SETUP`) und ohne die Rohantworten; die Zeilen `QUELLE` sind die Bestätigung an der Quelle der laufenden Instanz vor dem ersten Aufruf.
+
+```
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:18 | public const RETENTION_CONFIG_KEY = 'calendarRetentionObligation';
+QUELLE apps/dav/lib/CalDAV/RetentionService.php:19 | private const int DEFAULT_RETENTION_SECONDS = 30 * 24 * 60 * 60;
+QUELLE apps/dav/lib/CalDAV/Trashbin/TrashbinHome.php:28 | public const NAME = 'trashbin';
+QUELLE apps/dav/lib/CalDAV/Trashbin/DeletedCalendarObjectsCollection.php:26 | public const NAME = 'objects';
+QUELLE apps/dav/lib/CalDAV/Trashbin/DeletedCalendarObjectsCollection.php:40 | throw new NotImplemented();
+QUELLE apps/dav/lib/CalDAV/Trashbin/DeletedCalendarObjectsCollection.php:111 | public function calendarQuery(array $filters) {
+QUELLE apps/dav/lib/CalDAV/Trashbin/RestoreTarget.php:20 | public const NAME = 'restore';
+QUELLE apps/dav/lib/CalDAV/Trashbin/RestoreTarget.php:48 | public function moveInto($targetName, $sourcePath, INode $sourceNode): bool {
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:33 | public const PROPERTY_RETENTION_DURATION = '{http://nextcloud.com/ns}trash-bin-retention-duration';
+QUELLE apps/dav/lib/CalDAV/Trashbin/Plugin.php:46 | $this->disableTrashbin = $request->getHeader('X-NC-CalDAV-No-Trashbin') === '1';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:946 | $trashbinDisabled = $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0';
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1703 | public function moveCalendarObject(string $sourcePrincipalUri, int $sourceObjectId, string $targetPrincipalUri, int $targetCalendarId, string $tragetObjectUri, int $calendarType = self::CALENDAR_TYPE_CALENDAR): bool {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1768 | public function deleteCalendarObject($calendarId, $objectUri, $calendarType = self::CALENDAR_TYPE_CALENDAR, bool $forceDeletePermanently = false) {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1778 | if ($forceDeletePermanently || $this->config->getAppValue(Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0') {
+QUELLE apps/dav/lib/CalDAV/CalDavBackend.php:1856 | public function restoreCalendarObject(array $objectData): void {
+QUELLE apps/dav/lib/CalDAV/CalendarHome.php:111 | $objects[] = new TrashbinHome($this->caldavBackend, $this->principalInfo);
+QUELLE apps/dav/lib/CalDAV/CalendarHome.php:164 | return new TrashbinHome($this->caldavBackend, $this->principalInfo);
+QUELLE apps/dav/lib/Command/RetentionCleanupCommand.php:21 | parent::__construct('dav:retention:clean-up');
+QUELLE occ list dav | dav:retention:clean-up
+QUELLE BESTAETIGT schluessel=calendarRetentionObligation standard_sekunden=2592000 aus_wert=0 sammlung=trashbin/objects wiederherstellung=Verschieben nach trashbin/restore/<name> eigenschaft={http://nextcloud.com/ns}trash-bin-retention-duration aufraeumen=occ dav:retention:clean-up
+DECK-KALENDER in_der_discovery=ja uri=app-generated--deck--board-65
+2026-11-11T16:40:25Z | MOVE eigen auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=5aa17592e862 etag_nachher=5aa17592e862 | inhalt_gleich=ja
+ABBRUCHKRITERIUM MESS-06 MOVE ausgeloest=nein grund=keiner
+KONTROLLE exapp_impersonation.log, Zeilen der Methode von spike30a: 1
+{"reqId":"cFhYVptjRsQibF0cvVsZ","level":2,"time":"2026-11-11T16:40:25+00:00","remoteAddr":"172.30.42.128","user":"spike30a","app":"mcp_connector","method":"MOVE","url":"/remote.php/dav/calendars/spike30a/spike30-a/s30-eigen-164021.ics","scriptName":"/remote.php","message":"impersonation request","userAgent":"python-httpx/0.28.1","version":"35.0.0.10","data":{"app":"mcp_connector"}}
+2026-11-11T16:40:25Z | GEGENPROBE eigen auflistung REPORT calendar-query auth=basic nutzer=spike30a in_spike30-a=nein in_spike30-b=ja | datenbank=spike30a/spike30-b/s30-eigen-164021.ics:deleted_at_leer:da0341633dd5 db_gleich_gesendet=ja
+2026-11-11T16:40:25Z | GEGENPROBE eigen falsches-secret status=401 datenbank=spike30a/spike30-a/s30-eigen-falsches-secret-164021.ics:deleted_at_leer:0f2fd581fefc | Sabre\DAV\Exception\NotAuthenticated No public access to this resource., AppAPIAuth has not passed, This request is not for a federated calendar, No 'Authorization: Basic' header found. Either the cli
+2026-11-11T16:40:26Z | MOVE eigen auth=basic status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=37aacc6ac782 etag_nachher=37aacc6ac782 | inhalt_gleich=ja
+MOVE GLEICH appapi_basic=ja appapi=(201, 404, 200, 'ja', True) basic=(201, 404, 200, 'ja', True) (status, quelle danach, ziel danach, uid gleich, inhalt gleich)
+2026-11-11T16:40:27Z | PRODUKTIONSWEG MOVE status=201 verschoben=ja nutzer=spike30a datenbank=spike30a/spike30-b/s30-produktion-164021.ics:deleted_at_leer:b0b4556d51cf (aus nc_app_mcp_connector gegen http://caddy, Destination auf http://caddy, Overwrite F; lauf=164021)
+2026-11-11T16:40:27Z | MOVE ziel-nur-pfad auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=6d27080af9b7 etag_nachher=6d27080af9b7 | inhalt_gleich=ja destination_basis=(keine, nur Pfad)
+2026-11-11T16:40:27Z | MOVE ziel-fremder-host auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=5df513c84dc8 etag_nachher=5df513c84dc8 | inhalt_gleich=ja destination_basis=http://spike30.invalid
+2026-11-11T16:40:28Z | MOVE belegt-overwrite-f auth=appapi status=412 quelle_danach=200 ziel_danach=200 uid_gleich=nein etag_vorher=100e358f27b0 etag_nachher=b9c63f0abe75 | inhalt_gleich=nein ueberschrieben=nein altes_ziel=unveraendert quelle_unveraendert=ja Sabre\DAV\Exception\PreconditionFailed The destination node already exists, and the overwrite header is set to false
+HASH ziel vorher=spike30a/spike30-b/s30-belegt-overwrite-f-164021.ics:deleted_at_leer:ffab0ee66a48 nachher=spike30a/spike30-b/s30-belegt-overwrite-f-164021.ics:deleted_at_leer:ffab0ee66a48 | quelle vorher=spike30a/spike30-a/s30-belegt-overwrite-f-164021.ics:deleted_at_leer:c3d8eafc4734 nachher=spike30a/spike30-a/s30-belegt-overwrite-f-164021.ics:deleted_at_leer:c3d8eafc4734
+2026-11-11T16:40:29Z | MOVE belegt-ohne-kopf auth=appapi status=204 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=d6ff3c8bf3ee etag_nachher=d6ff3c8bf3ee | inhalt_gleich=ja ueberschrieben=ja altes_ziel=papierkorb quelle_unveraendert=nein
+HASH ziel vorher=spike30a/spike30-b/s30-belegt-ohne-kopf-164021.ics:deleted_at_leer:61315ea61035 nachher=spike30a/spike30-b/s30-belegt-ohne-kopf-164021-deleted.ics:deleted_at_gesetzt:61315ea61035 | quelle vorher=spike30a/spike30-a/s30-belegt-ohne-kopf-164021.ics:deleted_at_leer:a29150696f89 nachher=spike30a/spike30-b/s30-belegt-ohne-kopf-164021.ics:deleted_at_leer:a29150696f89
+2026-11-11T16:40:30Z | MOVE gleiche-uid auth=appapi status=409 quelle_danach=200 ziel_danach=404 uid_gleich=- etag_vorher=3dc5a45b4baa etag_nachher=- | inhalt_gleich=nein datenbank_unveraendert=ja OCA\DAV\Exception\UidConflict Calendar object with uid already exists in this calendar collection.
+DATENBANK uid=s30-gleiche-uid-164021 vorher=spike30a/spike30-a/s30-gleiche-uid-164021.ics:deleted_at_leer:4ab71018b634,spike30a/spike30-b/s30-gleiche-uid-ziel-164021.ics:deleted_at_leer:2bff0299eb13 nachher=spike30a/spike30-a/s30-gleiche-uid-164021.ics:deleted_at_leer:4ab71018b634,spike30a/spike30-b/s30-gleiche-uid-ziel-164021.ics:deleted_at_leer:2bff0299eb13
+2026-11-11T16:40:30Z | GEGENPROBE gleiche-uid auflistung auth=basic nutzer=spike30a spike30-a=['s30-gleiche-uid-164021.ics'] spike30-b=['s30-gleiche-uid-ziel-164021.ics']
+2026-11-11T16:40:31Z | MOVE geteilt-rw auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=62145898d076 etag_nachher=62145898d076 | inhalt_gleich=ja ziel=spike30-b-rw_shared_by_spike30b quelle_unveraendert=nein datenbank_nachher=spike30b/spike30-b-rw/s30-geteilt-rw-164021.ics:deleted_at_leer:604857aed7ea
+2026-11-11T16:40:31Z | GEGENPROBE geteilt-rw lesen als Eigentuemer nutzer=spike30b auth=basic liste=spike30-b-rw status=200
+2026-11-11T16:40:31Z | MOVE geteilt-ro auth=appapi status=404 quelle_danach=200 ziel_danach=404 uid_gleich=- etag_vorher=802d38bf8901 etag_nachher=- | inhalt_gleich=nein ziel=spike30-b-ro_shared_by_spike30b quelle_unveraendert=ja datenbank_nachher=spike30a/spike30-a/s30-geteilt-ro-164021.ics:deleted_at_leer:b1137ca0957e Sabre\DAV\Exception\NotFound Calendar with name 'spike30-b-ro_shared_by_spike30b' could not be found
+2026-11-11T16:40:31Z | GEGENPROBE geteilt-ro lesen als Eigentuemer nutzer=spike30b auth=basic liste=spike30-b-ro status=404
+2026-11-11T16:40:32Z | MOVE deck auth=appapi status=403 quelle_danach=200 ziel_danach=404 uid_gleich=- etag_vorher=c39b032e5bc0 etag_nachher=- | inhalt_gleich=nein ziel=app-generated--deck--board-65 quelle_unveraendert=ja datenbank_nachher=spike30a/spike30-a/s30-deck-164021.ics:deleted_at_leer:d0298ad1d8c9 Sabre\DAV\Exception\Forbidden Access denied
+2026-11-11T16:40:33Z | MOVE nur-termine auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=9ad966a72ca4 etag_nachher=9ad966a72ca4 | inhalt_gleich=ja ziel=spike30-nur-termine quelle_unveraendert=nein datenbank_nachher=spike30a/spike30-nur-termine/s30-nur-termine-164021.ics:deleted_at_leer:f370e491fe3d
+2026-11-11T16:40:33Z | MOVE if-match-aktuell auth=appapi status=201 quelle_danach=404 ziel_danach=200 uid_gleich=ja etag_vorher=b0db695c5f7a etag_nachher=b0db695c5f7a | inhalt_gleich=ja if_match=b0db695c5f7a datenbank_unveraendert=nein auflistung_basic_in_spike30-b=ja
+2026-11-11T16:40:34Z | MOVE if-match-veraltet auth=appapi status=412 quelle_danach=200 ziel_danach=404 uid_gleich=- etag_vorher=e322ec2af6ef etag_nachher=- | inhalt_gleich=nein if_match=20a904a9f4ec datenbank_unveraendert=ja auflistung_basic_in_spike30-b=nein Sabre\DAV\Exception\PreconditionFailed An If-Match header was specified, but none of the specified ETags matched.
+2026-11-11T16:40:35Z | UNTERAUFGABE server-verschieben ort=spike30-a unveraendert=ja eltern_status=201 eltern_verschoben=ja kind_get=200 kind_etag_vorher=78a77dd363a6 kind_etag_nachher=78a77dd363a6 auth=appapi nutzer=spike30a | datenbank kind vorher=spike30a/spike30-a/s30-kind-verschieben-164021.ics:deleted_at_leer:30ac349154d8 nachher=spike30a/spike30-a/s30-kind-verschieben-164021.ics:deleted_at_leer:30ac349154d8 eltern=spike30a/spike30-b/s30-eltern-verschieben-164021.ics:deleted_at_leer:a5ebb8db1c6f
+2026-11-11T16:40:36Z | UNTERAUFGABE server-loeschen vorhanden=ja unveraendert=ja eltern_status=204 eltern_geloescht=ja kind_get=200 kind_etag_vorher=c6f927905036 kind_etag_nachher=c6f927905036 auth=appapi nutzer=spike30a | datenbank kind vorher=spike30a/spike30-a/s30-kind-loeschen-164021.ics:deleted_at_leer:61ffff0bc981 nachher=spike30a/spike30-a/s30-kind-loeschen-164021.ics:deleted_at_leer:61ffff0bc981 eltern=spike30a/spike30-a/s30-eltern-loeschen-164021-deleted.ics:deleted_at_gesetzt:9d57b68b41ab
+PAPIERKORB zustand=leer (occ config:app:get dav calendarRetentionObligation; leer heisst Standard, laut Quelle 2592000 Sekunden; auf nc35 wird der Schalter nie veraendert)
+2026-11-11T16:40:38Z | DELETE impersonation status=204 auth=appapi nutzer=spike30a if_match=78c0e9fa9584 get_danach=404 |
+KONTROLLE exapp_impersonation.log, DELETE-Zeilen von spike30a: 1
+{"reqId":"D8O1PCGbYtqmO4kpXwaN","level":2,"time":"2026-11-11T16:40:38+00:00","remoteAddr":"172.30.42.128","user":"spike30a","app":"mcp_connector","method":"DELETE","url":"/remote.php/dav/calendars/spike30a/spike30-a/s30-loeschen-164021.ics","scriptName":"/remote.php","message":"impersonation request","userAgent":"python-httpx/0.28.1","version":"35.0.0.10","data":{"app":"mcp_connector"}}
+2026-11-11T16:40:39Z | DELETE veraltet status=412 objekt_unveraendert=ja auth=appapi nutzer=spike30a | datenbank vorher=spike30a/spike30-a/s30-loeschen-veraltet-164021.ics:deleted_at_leer:897af59ad68e nachher=spike30a/spike30-a/s30-loeschen-veraltet-164021.ics:deleted_at_leer:897af59ad68e | Sabre\DAV\Exception\PreconditionFailed An If-Match header was specified, but none of the specified ETags matched.
+2026-11-11T16:40:39Z | PAPIERKORB PROPFIND Depth 1 trashbin/objects status=501 | Sabre\DAV\Exception\NotImplemented
+2026-11-11T16:40:39Z | PAPIERKORB eintrag=ja name=166.ics eintraege=3 (REPORT calendar-query, auth=appapi nutzer=spike30a) | GEGENPROBE datenbank=spike30a/spike30-a/s30-loeschen-164021-deleted.ics:deleted_at_gesetzt:1e007df35cec
+2026-11-11T16:40:39Z | WIEDERHERSTELLUNG status=201 uid_gleich=ja inhalt_gleich=ja get_danach=200 auth=appapi nutzer=spike30a | GEGENPROBE datenbank=spike30a/spike30-a/s30-loeschen-164021.ics:deleted_at_leer:1e007df35cec |
+RUECKBAU DECK DELETE boards/65 status=200
+RUECKBAU PAPIERKORB spike30a 164.ics endgueltig status=204
+RUECKBAU PAPIERKORB spike30a 153.ics endgueltig status=204
+RUECKBAU PAPIERKORB spike30a eintraege_vorher=2
+RUECKBAU PAPIERKORB spike30b eintraege_vorher=0
+APP AUSWERTUNG quelle=raw/ui-a (15 Objekte) und raw/ui-b (15 Objekte), Listen aus den Zeilen UI-OBJEKT in raw/ui-sitzung.txt; nur gelesen, kein Aufruf gegen eine Instanz
+APP VERSCHIEBEN eltern=s30 eltern-umzug kind=zieht mit eltern_uid_gleich=ja eltern_ort_danach=spike30-liste-2 kind_ort_danach=spike30-liste-2
+APP LOESCHEN eltern=s30 eltern-loeschen kind=kind im papierkorb eltern_ort_danach=trashbin kind_ort_danach=trashbin
+APP VERSCHIEBEN einzeln uid_gleich=ja dateiname_gleich=ja inhalt_gleich=ja von=spike30-liste-1 nach=spike30-liste-2 positivkontrolle_umzug_stattgefunden=ja
+KONTROLLE unberuehrt differenz=leer ort_gleich=ja
+GEGENPROBE objektzahl stand=a {"spike30-liste-1": 15}
+GEGENPROBE objektzahl stand=b {"spike30-liste-1": 10, "spike30-liste-2": 3, "trashbin": 2}
+RUECKBAU reste_mit_praefix_spike30=keine
+RUECKBAU occ app:list groupfolders_vorhanden=nein files_external_an=nein
+RUECKBAU deck_boards_mit_praefix_spike30=0 (Tabelle deck_boards, per PHP)
+```
+
+Rohantwort zu `MOVE eigen auth=appapi`:
+
+```
+HTTP 201 Created
+content-length: 0
+content-security-policy: default-src 'none';
+content-type: text/html; charset=UTF-8
+date: Wed, 11 Nov 2026 16:40:25 GMT
+referrer-policy: no-referrer
+server: Apache/2.4.68 (Debian)
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-powered-by: PHP/8.5.9
+x-request-id: cFhYVptjRsQibF0cvVsZ
+x-robots-tag: noindex, nofollow
+x-user-id: spike30a
+(no body)
+```
+
+Rohantwort zu `MOVE belegt-overwrite-f`:
+
+```
+HTTP 412 Precondition Failed
+content-length: 312
+content-security-policy: default-src 'none';
+content-type: application/xml; charset=utf-8
+date: Wed, 11 Nov 2026 16:40:28 GMT
+referrer-policy: no-referrer
+server: Apache/2.4.68 (Debian)
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-powered-by: PHP/8.5.9
+x-robots-tag: noindex, nofollow
+x-user-id: spike30a
+(body)
+<?xml version="1.0" encoding="utf-8"?>
+<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+<s:exception>Sabre\DAV\Exception\PreconditionFailed</s:exception>
+<s:message>The destination node already exists, and the overwrite header is set to false</s:message>
+<s:header>Overwrite</s:header>
+</d:error>
+```
+
+Rohantwort zu `MOVE belegt-ohne-kopf`:
+
+```
+HTTP 204 No Content
+content-security-policy: default-src 'none';
+date: Wed, 11 Nov 2026 16:40:29 GMT
+referrer-policy: no-referrer
+server: Apache/2.4.68 (Debian)
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-powered-by: PHP/8.5.9
+x-request-id: UfnOTRV011TxGpq8cMdD
+x-robots-tag: noindex, nofollow
+x-user-id: spike30a
+(no body)
+```
+
+Rohantwort zu `MOVE geteilt-ro`:
+
+```
+HTTP 404 Not Found
+content-length: 263
+content-security-policy: default-src 'none';
+content-type: application/xml; charset=utf-8
+date: Wed, 11 Nov 2026 16:40:31 GMT
+referrer-policy: no-referrer
+server: Apache/2.4.68 (Debian)
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-powered-by: PHP/8.5.9
+x-robots-tag: noindex, nofollow
+x-user-id: spike30a
+(body)
+<?xml version="1.0" encoding="utf-8"?>
+<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+<s:exception>Sabre\DAV\Exception\NotFound</s:exception>
+<s:message>Calendar with name 'spike30-b-ro_shared_by_spike30b' could not be found</s:message>
+</d:error>
+```
+
+Rückbau: 12 von 12 Zeilen `BASELINE` enden auf `gleich=ja`, keine auf gleich=nein; die vier Container sind gestoppt.
