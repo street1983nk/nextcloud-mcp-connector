@@ -10,6 +10,7 @@
 - **v1.5 Vorlauf openDesk**: Phasen 16-19 (shipped 2026-08-31, Abschluss nachgetragen 2026-09-18; Release 0.1.11, openDesk-Spike, Audit-Log als erster Enterprise-Baustein)
 - **v1.6 F13 Token Exchange Identity Mapper**: Phasen 20-24 (shipped 2026-09-26; ein zweiter, ab Werk ausgeschalteter Prüfpfad nimmt ein nach RFC 8693 getauschtes Keycloak-Token an und handelt unter dem gemappten Nextcloud-Konto; die vier F13-Entscheidungen bleiben extern getaktet)
 - **v1.7 Ausschluss-Tag kein-ki**: Phasen 25-29 (shipped 2026-10-01; eine Datei oder ein Ordner mit dem System-Tag `kein-ki` erscheint in keiner Tool-Antwort mehr, fail-closed, ein REPORT je Antwort; noch nicht released, reist mit 0.4.0)
+- **v1.8 Tasks-Bundle und Ordner anlegen**: Phasen 30-34 (aufgesetzt 2026-10-28, Roadmap 2026-11-11; Releases 0.7.0 bis 0.7.2 sind im Milestone-Zeitraum erschienen; Ziel ist ein Release 0.8.0 mit Aufgaben suchen, lesen, anlegen, abhaken, ändern und verschieben nach Issue #32 und Ordner anlegen nach Issue #44)
 
 ## Phases
 
@@ -115,6 +116,105 @@ Kein Milestone-Audit (wie v1.5 und v1.6): Aussagen aus den fünf Phase-Verifikat
 
 </details>
 
+### v1.8 Tasks-Bundle und Ordner anlegen (Phasen 30-34), IN PLANUNG
+
+- [ ] **Phase 30: Mess-Spike Aufgaben und Ordner** - Alles, was Recherche und Planung nur annehmen, wird gegen echte Nextcloud-Instanzen gemessen, bevor Produktcode entsteht; zuerst `MKCOL` unter AppAPI-Impersonation, mit Abbruchkriterien
+- [ ] **Phase 31: Ordner anlegen** - `files_create_folder` legt Ordner an, wahlweise mit fehlenden Elternordnern, hinter der ganzen v1.7-Kette aus Ausschluss, Sandbox, Paartest, Kanarie und Audit; allein releasefähig
+- [ ] **Phase 32: Tasks-Bundle suchen, lesen, anlegen** - `tasks_search`, `tasks_read` und `tasks_create` über CalDAV VTODO als zehnte Familie, samt `task:`-Id über `fetch`; ohne Phase 33 releasefähig
+- [ ] **Phase 33: Aufgaben ändern** - Abhaken, Wiederöffnen, Felder ändern und Verschieben einer einzelnen Aufgabe, nur mit gelesener ETag; Löschen nur bei positivem Spike-Ergebnis; jeder Teil abtrennbar
+- [ ] **Phase 34: Doku, Store, Release 0.8.0** - Doku und Store-Text in drei Sprachen sagen den Endstand samt präzisierter Schreibzusage, Release 0.8.0 steht mit Owner-Freigabe im Store
+
+## Phase Details (v1.8)
+
+Grundlage: [research/v1.8-tasks-080-RESEARCH.md](research/v1.8-tasks-080-RESEARCH.md) (Commit 5ddaddf) und [REQUIREMENTS.md](REQUIREMENTS.md). Owner-Entscheide E1 bis E14 vom 11.11.2026 stehen in PROJECT.md (Key Decisions). Für jeden Plan aller Phasen gilt: er endet mit dem vollen Lauf `pytest tests/unit tests/contract` plus `scripts/check_tool_budget.py` und den Qualitätstoren (REQUIREMENTS.md, Regel R1); vor jedem Push, Merge oder Kommentar wird der Owner gefragt (R4).
+
+### Phase 30: Mess-Spike Aufgaben und Ordner
+
+**Goal**: Jede Annahme, auf der die Phasen 31 bis 33 stehen, ist gegen echte Nextcloud-Instanzen gemessen statt aus dem Quelltext gelesen; der Messbericht entscheidet über Abbruchkriterien, Deckel, Zeitbudget und den Umfang der ändernden Zugriffe
+**Depends on**: Nothing (erste Phase des Milestones; baut auf Release 0.7.2 auf)
+**Requirements**: MESS-01, MESS-02, MESS-03, MESS-04, MESS-05, MESS-06
+**Success Criteria** (what must be TRUE):
+
+  1. Als erster Messpunkt ist protokolliert, was `MKCOL` auf `files/` unter AppAPI-Impersonation in der ExApp-Topologie liefert, dazu die Statusmatrix (freier Name, vorhandener Ordner, vorhandene Datei, fehlender Elternordner, unzulässiger Name, geteilter Ordner ohne Schreibrecht, gesetzte Sandbox-Wurzel), je mit Statuscode und Rohantwort. Kommt für den freien Namen kein 201, ist Phase 31 gestoppt und der Befund liegt beim Owner
+  2. In einem Gruppenordner mit ACL ist gemessen: mit Schreibrecht entsteht der Ordner, ohne Schreibrecht wird abgelehnt (Negativtest), beides mit Statuscode im Protokoll (E12)
+  3. Auf mindestens Nextcloud 32 und 35 ist belegt, dass ein frisches Konto keine Aufgabenliste hat, wie Deck-Kalender, Papierkorb, geteilte und nur lesbare Listen in der Discovery aussehen, und von der Tasks-App geschriebene Objekte liegen als Fixtures vor; die Kosten der Suche bei 2000 Aufgaben stehen als Zahlen für SQLite und PostgreSQL im Protokoll
+  4. Für die ändernden Zugriffe ist gemessen, welche Felder die Tasks-App beim Abhaken und Wiederöffnen setzt, dass `PUT` mit `If-Match` unter AppAPI-Impersonation funktioniert und eine veraltete ETag abgelehnt wird, dass fremde Eigenschaften den `PUT` überstehen, und wie sich wiederkehrende Aufgaben und Unteraufgaben verhalten; ein Inventar nennt mit Datei und Zeile jedes Gate und jede Zusage, die ein überschreibender `PUT` berührt
+  5. Der Messbericht nennt für das Löschen auf Nextcloud 32 bis 35 genau eines der Ergebnisse "wiederherstellbar", "nicht wiederherstellbar" oder "nicht eindeutig" (auch mit abgeschaltetem Papierkorb und für geteilte Listen, mit Aufbewahrungsfrist), für `MOVE` unter Impersonation Statuscodes und das Verhalten der Unteraufgaben, und führt jede Annahme A1 bis A19 und A21 als belegt, widerlegt oder ungemessen; ein Owner-Checkpoint entscheidet E15 und jedes ausgelöste Abbruchkriterium
+
+**Plans**: TBD
+**Abbruchkriterien**: MESS-01 (kein 201 für `MKCOL` unter Impersonation: Phase 31 wird nicht geplant), MESS-05 (`If-Match` geht nicht oder fremde Eigenschaften gehen verloren: Owner entscheidet über Phase 33), MESS-06 (`MOVE` geht nicht: TMOD-08 wird nicht geplant; Löschen nicht eindeutig wiederherstellbar: TMOD-07 entfällt ohne Rückfrage)
+**Research flag**: ja (Live-Zugriff auf Nextcloud 32 bis 35, Tasks-App und Gruppenordner in der Testinstanz, PostgreSQL-Gegenmessung; schwere Läufe seriell, RAM vor Docker-Messungen prüfen). Ändernde Zugriffe, Verschieben und Löschen sind von der Recherche nicht abgedeckt
+**Hinweis**: Messskripte und Gegenproben liegen nie unter `src/`; ein messendes `DELETE` oder `MOVE` läuft nur aus dem Spike-Skript gegen die Wegwerf-Instanz
+
+### Phase 31: Ordner anlegen
+
+**Goal**: Ein Assistent kann über `files_create_folder` einen Ordner anlegen, auf Wunsch samt fehlender Elternordner, und der neue Schreiber der Dateifläche hält jede Grenze, die der Upload hält; die Phase ist für sich allein releasefähig
+**Depends on**: Phase 30 (MESS-01 und MESS-02)
+**Requirements**: FOLD-01, FOLD-02, FOLD-03, FOLD-04, FOLD-05, FOLD-06
+**Success Criteria** (what must be TRUE):
+
+  1. Gegen eine echte Nextcloud gemessen, auch unter AppAPI-Impersonation: ein freier Pfad wird angelegt (`created: true`), ein vorhandener Ordner antwortet als Erfolg mit `created: false`, eine Datei am Pfad ist ein Konflikt, ein fehlender Elternordner ohne `parents` ist `parent_missing`; mit `parents=true` entsteht die Kette, die Antwort nennt jeden angelegten Ordner, mehr als 10 neue Ordner je Aufruf entstehen nie, und ein Abbruch mittendrin nennt das bereits Angelegte
+  2. In einem mit `kein-ki` ausgeschlossenen Ordner und darunter wird nichts angelegt, und die Antwort ist byte-gleich zu "Elternordner fehlt" (Paartest als Unit- und Live-Paar); ist die Ausschlussprüfung nicht beantwortbar, geht kein `MKCOL` hinaus; mit gesetzter `NC_MCP_FILES_ROOT` wird weder die Wurzel noch etwas darüber angelegt
+  3. Ohne Schreibrecht wird nichts angelegt und die Meldung sagt "keine Rechte": belegt für einen geteilten Ordner und, mit der Rohantwort aus Phase 30, für einen Gruppenordner mit ACL; ein unzulässiger Name ergibt eine eigene Meldung statt "unexpected status"
+  4. Die Kanarie ruft `files_create_folder` wirklich auf und es steht in `MUST_REFUSE`; der Klassifikations-Freeze führt es unter `FILE_WRITERS` mit Paarfall; jeder Aufruf erzeugt einen Audit-Eintrag; `EXPECTED_PUT_CALLS` ist unverändert, eine Nadel hält `MKCOL` auf `dav.py` und ohne Body; das Budget der Werkzeugliste ist grün, ohne dass ein Werkzeug über 1400 Bytes liegt
+  5. Auf dem Stand ohne Phase 32 sind alle Gates grün, und Werkzeugliste, Rechtetabelle und Werkzeugzahl der drei READMEs, je ein Satz in `docs/exclusion.md`, `.de.md` und `.fr.md` sowie der Eintrag in `CHANGELOG.md`, `CHANGELOG.de.md` und `CHANGELOG.fr.md` nennen das Werkzeug
+
+**Plans**: TBD
+**Rückfallschnitt**: klemmt Phase 32, ist diese Phase allein als Release lieferbar (Owner-Entscheid)
+
+### Phase 32: Tasks-Bundle suchen, lesen, anlegen
+
+**Goal**: Ein Assistent kann Nextcloud-Aufgaben suchen, lesen und anlegen, als zehnte Familie `tasks`, ohne je in eine fremdsichtbare Liste zu schreiben, ohne Deck-Karten zu zeigen und ohne das Verhalten des Kalender-Bundles zu ändern; die Phase ist ohne Phase 33 releasefähig
+**Depends on**: Phase 30 (MESS-03 und MESS-04) und Phase 31 (beide Phasen ändern dieselben Gate-Dateien, deshalb nacheinander)
+**Requirements**: TASK-01, TASK-02, TASK-03, TASK-04, TASK-05, TASK-06, TASK-07, TASK-08, TASK-09
+**Success Criteria** (what must be TRUE):
+
+  1. Ein Konto ohne Aufgabenliste ist eigens getestet, mit Fixture und live gegen ein Konto, dessen einziger Kalender nur `VEVENT` trägt: `tasks_search` antwortet leer mit Hinweis, `tasks_create` mit einem Fehler samt Ausweg
+  2. Gegen eine echte Nextcloud mit Deck-Board und geteilter Liste gemessen: `tasks_search` liefert im Standard nur offene Aufgaben, eine Fälligkeitsgrenze liefert keine undatierten mit, keine Deck-Karte erscheint in irgendeiner Antwort des Bundles, eine ausgefallene Liste steht als `degraded`-Eintrag in der Antwort, und die Termin-Werkzeuge antworten byte-gleich wie vor der Phase
+  3. Eine mit "fällig am 20." angelegte Aufgabe steht in der Nextcloud am 20. (`DUE;VALUE=DATE`, kein Folgetag); Startdatum, Tags, Priorität und Elternaufgabe kommen so an, wie die Tasks-App sie liest; ohne `list` wird nur bei genau einer eigenen Liste geschrieben, sonst nennt der Fehler die Listennamen, und in eine geteilte Liste gelangt nichts ohne ausdrückliche Nennung
+  4. `tasks_read` und `fetch` lösen dieselbe `task:`-Id auf, ein Treffer des Suchproviders `tasks` führt auf diese Id; die Zeitmatrix (ganztägig, mit Zone, UTC, schwebend, ohne Datum) ist je als benannter Test grün, und Fremdtext aus einer geteilten Liste kommt gekappt und ohne Marker an
+  5. Die Registry zeigt 27 Werkzeuge in zehn Familien; `EXPECTED_PUT_CALLS` steht weiter bei 6; das Budget ist nach der Hausregel aus der Messung neu verankert und kein Werkzeug liegt über 1400 Bytes; die Kanarie ruft die drei Werkzeuge auf; READMEs, `docs/` und die drei Changelogs sind nachgezogen, sodass der Stand ohne Phase 33 alle Gates besteht
+
+**Plans**: TBD
+**Abtrennbar**: TASK-09 (`task:`-Id über `fetch` und Provider) ist ein eigener Plan und nur per Owner-Entscheid verschiebbar
+
+### Phase 33: Aufgaben ändern
+
+**Goal**: Ein Assistent kann eine einzelne Aufgabe abhaken, wieder öffnen, in den genannten Feldern ändern und in eine andere Liste verschieben, und zwar so, dass nie eine zwischenzeitliche Änderung überschrieben wird und nichts außer den genannten Feldern verloren geht; Löschen kommt nur dazu, wenn der Spike die Wiederherstellbarkeit belegt hat
+**Depends on**: Phase 32, dazu Phase 30 (MESS-05 und MESS-06 samt Owner-Checkpoint E15)
+**Requirements**: TMOD-01, TMOD-02, TMOD-03, TMOD-04, TMOD-05, TMOD-06, TMOD-07 (bedingt), TMOD-08
+**Success Criteria** (what must be TRUE):
+
+  1. Eine über den Connector abgehakte Aufgabe ist in der Nextcloud so gespeichert, wie die Tasks-App sie beim Abhaken schreibt, und lässt sich mit demselben Werkzeug wieder öffnen; eine schon erledigte Aufgabe abzuhaken ist ein Erfolg ohne einen einzigen `PUT`; Unteraufgaben bleiben dabei unberührt
+  2. Nach `tasks_update` unterscheidet sich das gespeicherte Objekt genau um die genannten Felder und die gemessenen Pflegefelder: der Rundlauf über die von der Tasks-App geschriebenen Fixtures erhält jede übrige Eigenschaft, `VALARM` und jede unbekannte `X-`Eigenschaft; ein Aufruf ohne Unterschied schreibt nicht
+  3. Wird die Aufgabe zwischen Lesen und Schreiben geändert, lehnt der Connector ab und das Objekt ist unverändert; ein zweites Konto mit nur lesender Freigabe kann weder abhaken, ändern noch verschieben (Zwei-Konten-Negativbeweis live, auch unter AppAPI-Impersonation); wiederkehrende Aufgaben und Deck-Karten sind über keines der ändernden Werkzeuge erreichbar
+  4. Eine Aufgabe lässt sich in eine ausdrücklich genannte, beschreibbare Liste verschieben, mit gleicher UID und ohne ein belegtes Ziel zu überschreiben; für Unteraufgaben gilt das in Phase 30 Gemessene. Nur bei Ergebnis "wiederherstellbar" aus Phase 30 gibt es das Löschen: es prüft vorher, dass der Papierkorb für das Konto wirkt, lehnt sonst ab, und die gelöschte Aufgabe ist danach aus dem Papierkorb wiederherstellbar
+  5. Jedes ändernde Werkzeug trägt ehrliche Annotationen und erzeugt je Aufruf einen Audit-Eintrag; überschreibender `PUT`, `MOVE` und gegebenenfalls `DELETE` haben je genau eine Aufrufstelle, die das Destruktiv-Gate als eng benannte Ausnahme mit eigener Gegenprobe führt, während jede andere Stelle rot bleibt; das Budget ist aus der Messung des Endstands verankert, und alle Gates sind grün
+
+**Plans**: TBD
+**Abtrennbare Teile, je ein eigener Plan**: Abhaken und Wiederöffnen (TMOD-03); Felder ändern (TMOD-04); Verschieben (TMOD-08); Löschen (TMOD-07, nur bei positivem Spike-Ergebnis). 0.8.0 bleibt ohne jeden dieser Teile releasefähig; ein Teil fällt nur per Owner-Entscheid heraus, außer dem Löschen, dessen Ausgang E13 vorab geregelt hat
+**Research flag**: ja. Die Recherche vom 11.11.2026 deckt ändernde Zugriffe nicht ab; die Planung dieser Phase stützt sich auf den Messbericht aus Phase 30 und braucht eine eigene kurze Recherche zum Erhalt fremder Eigenschaften mit `icalendar`
+**Offene Punkte für die discuss-phase (nicht entschieden)**:
+
+  - E15: eigener Admin-Schalter für die ändernden Werkzeuge oder nur die Abschaltung des Bundles `tasks` (Owner-Checkpoint in Phase 30)
+  - Reicht die im selben Aufruf gelesene ETag, oder gibt das Modell die ETag aus `tasks_read` mit (Präzedenz `files_update`)?
+  - Felder leeren (Fälligkeit entfernen, Elternbezug lösen) und der endgültige Name von `tasks_complete`
+
+### Phase 34: Doku, Store, Release 0.8.0
+
+**Goal**: Was 0.8.0 kann und was nicht, steht in drei Sprachen wahr und knapp in READMEs, Doku und Store-Text, die Schreibzusage ist auf das Ausgelieferte präzisiert, und Release 0.8.0 ist mit Owner-Freigabe im Store
+**Depends on**: Phase 31, Phase 32, Phase 33 (fällt Phase 33 oder ein Teil davon per Owner-Entscheid heraus, beschreibt diese Phase den tatsächlich gebauten Stand)
+**Requirements**: DOC-04, DOC-05, EXAPP-13, EXAPP-14, EXAPP-15
+**Success Criteria** (what must be TRUE):
+
+  1. `README.md`, `README.de.md`, `README.fr.md` und `docs/` nennen dieselbe Werkzeug- und Familienzahl wie die Registry, die Rechtetabelle führt jedes neue Werkzeug mit seiner Stufe, `docs/threat-model.md` nennt die Aufgabenfamilie samt Fremdtext aus geteilten Listen, und die Zähl- und Wahrheitstests der Doku sind grün
+  2. Die Zusage "create-only, keine destruktiven Writes" ist an jeder Stelle des Inventars aus Phase 30 auf das Ausgelieferte präzisiert (eine einzelne Aufgabe abhaken, wieder öffnen, ändern, verschieben, nur mit gelesener ETag; Löschen nur, wenn gebaut, sonst als bewusste Grenze benannt), auch in `.planning/PROJECT.md`, und ein Test hält die Aussage gegen die Registry
+  3. Der Store-Text liegt in drei Sprachen als kurze Faktenliste vor, der Owner hat den Entwurf vor dem Release gesehen und freigegeben, und erst danach ist der SHA-256-Pin erneuert
+  4. Release 0.8.0 ist im Store: `CHANGELOG.md`, `CHANGELOG.de.md` und `CHANGELOG.fr.md` tragen denselben 0.8.0-Block, der Gesamtlauf aller Gates ist lokal und im CI einschließlich `canary-nc35` grün, die Nachweiszeilen des Runbooks sind geschlossen; Push, Tag und Submit sind je mit Owner-Freigabe geschehen
+  5. Für #32 und #44 liegen kurze Antwortentwürfe ohne schließende Schlüsselwörter vor; gepostet ist bis zum Store-Release nichts
+
+**Plans**: TBD
+
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
@@ -148,10 +248,56 @@ Kein Milestone-Audit (wie v1.5 und v1.6): Aussagen aus den fünf Phase-Verifikat
 | 27. Familien-Anschluss und Sandbox-Parität | v1.7 | 10/10 | Complete    | 2026-09-28 |
 | 28. Gates und Beweise | v1.7 | 12/12 | Complete    | 2026-10-01 |
 | 29. Prüfkommando und Doku | v1.7 | 9/9 | Complete    | 2026-10-01 |
+| 30. Mess-Spike Aufgaben und Ordner | v1.8 | 0/TBD | Not started | - |
+| 31. Ordner anlegen | v1.8 | 0/TBD | Not started | - |
+| 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 0/TBD | Not started | - |
+| 33. Aufgaben ändern | v1.8 | 0/TBD | Not started | - |
+| 34. Doku, Store, Release 0.8.0 | v1.8 | 0/TBD | Not started | - |
+
+## Coverage v1.8
+
+| Requirement | Phase |
+|-------------|-------|
+| MESS-01 | Phase 30 |
+| MESS-02 | Phase 30 |
+| MESS-03 | Phase 30 |
+| MESS-04 | Phase 30 |
+| MESS-05 | Phase 30 |
+| MESS-06 | Phase 30 |
+| FOLD-01 | Phase 31 |
+| FOLD-02 | Phase 31 |
+| FOLD-03 | Phase 31 |
+| FOLD-04 | Phase 31 |
+| FOLD-05 | Phase 31 |
+| FOLD-06 | Phase 31 |
+| TASK-01 | Phase 32 |
+| TASK-02 | Phase 32 |
+| TASK-03 | Phase 32 |
+| TASK-04 | Phase 32 |
+| TASK-05 | Phase 32 |
+| TASK-06 | Phase 32 |
+| TASK-07 | Phase 32 |
+| TASK-08 | Phase 32 |
+| TASK-09 | Phase 32 |
+| TMOD-01 | Phase 33 |
+| TMOD-02 | Phase 33 |
+| TMOD-03 | Phase 33 |
+| TMOD-04 | Phase 33 |
+| TMOD-05 | Phase 33 |
+| TMOD-06 | Phase 33 |
+| TMOD-07 | Phase 33 (bedingt, nur bei positivem Ergebnis von MESS-06) |
+| TMOD-08 | Phase 33 |
+| DOC-04 | Phase 34 |
+| DOC-05 | Phase 34 |
+| EXAPP-13 | Phase 34 |
+| EXAPP-14 | Phase 34 |
+| EXAPP-15 | Phase 34 |
+
+Zugeordnet: 34/34 (Phase 30: 6, Phase 31: 6, Phase 32: 9, Phase 33: 8, Phase 34: 5), keine Waisen, keine Doppelungen. Der Mess-Spike trägt anders als in v1.7 eigene Requirements, weil E12 eine Messung verlangt und Abbruchkriterien an ihm hängen. Jede Annahme aus REQUIREMENTS.md (A1 bis A19, A21) ist einer Phase zur Klärung zugeordnet, bis auf A10 alle Phase 30.
 
 ## Next
 
-Kein aktiver Milestone. Der nächste Zyklus startet mit `/gsd:new-milestone`, sobald das Owner-Thema feststeht. Geplant ist zuerst Release 0.4.0 (nach dem Merge von PR #14, andrewyager, files_read_as_markdown): es bündelt den kein-ki-Filter aus v1.7 und die Store-Text-Erwähnung des Tags (EXCL-F02). files_update bleibt extern getaktet (Community-PR nach Design-Issue #9), die F13-Spur ruht bis zu den vier Antworten (milestones/v1.6-REQUIREMENTS.md).
+Aktiver Milestone: v1.8. Nächster Schritt ist die Planung von Phase 30 mit `/gsd:plan-phase 30`. Reihenfolge: 30, 31, 32, 33, 34; Phase 31 ist allein releasefähig, Phase 32 ohne Phase 33. Unverändert außerhalb dieses Milestones: files_update-Weiterentwicklung und die F13-Spur (milestones/v1.6-REQUIREMENTS.md).
 
 ---
-*Roadmap created: 2026-08-14 (granularity: coarse, mode: mvp); v1.0 abgeschlossen: 2026-08-20; v1.1 abgeschlossen: 2026-08-20 (Phase 7 deferred); v1.2 abgeschlossen: 2026-08-25 (Release 0.1.8 live); v1.3 abgeschlossen: 2026-08-26 (Release 0.1.9 live); v1.4 abgeschlossen: 2026-08-28 (Release 0.1.10 live); v1.5 abgeschlossen: 2026-08-31 (Release 0.1.11, openDesk-Spike, Audit-Log; Abschluss nachgetragen 2026-09-18); v1.6 aufgesetzt: 2026-09-18 (Phasen 20-24, 15 Requirements, granularity coarse); v1.6 abgeschlossen: 2026-09-26 (Token-Exchange-Pfad komplett, 15/15 Requirements, kein Release); v1.7 aufgesetzt: 2026-09-26 (Phasen 25-29, 14 Requirements, granularity coarse); v1.7 abgeschlossen: 2026-10-01 (kein-ki-Filter komplett, 14/14 Requirements, kein Release; Release 0.4.0 nach PR #14)*
+*Roadmap created: 2026-08-14 (granularity: coarse, mode: mvp); v1.0 abgeschlossen: 2026-08-20; v1.1 abgeschlossen: 2026-08-20 (Phase 7 deferred); v1.2 abgeschlossen: 2026-08-25 (Release 0.1.8 live); v1.3 abgeschlossen: 2026-08-26 (Release 0.1.9 live); v1.4 abgeschlossen: 2026-08-28 (Release 0.1.10 live); v1.5 abgeschlossen: 2026-08-31 (Release 0.1.11, openDesk-Spike, Audit-Log; Abschluss nachgetragen 2026-09-18); v1.6 aufgesetzt: 2026-09-18 (Phasen 20-24, 15 Requirements, granularity coarse); v1.6 abgeschlossen: 2026-09-26 (Token-Exchange-Pfad komplett, 15/15 Requirements, kein Release); v1.7 aufgesetzt: 2026-09-26 (Phasen 25-29, 14 Requirements, granularity coarse); v1.7 abgeschlossen: 2026-10-01 (kein-ki-Filter komplett, 14/14 Requirements, kein Release; Release 0.4.0 nach PR #14); v1.8 Roadmap geschrieben: 2026-11-11 (Phasen 30-34, 34 Requirements, granularity coarse; Owner-Entscheide E1 bis E14)*

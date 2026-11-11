@@ -1,12 +1,12 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.8
-milestone_name: Tasks-Bundle und Store-Sichtbarkeit (Release 0.7.0)
+milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: planning
-last_updated: "2026-10-28T07:25:59.219Z"
-last_activity: 2026-10-28
+last_updated: "2026-11-11T11:12:36.000Z"
+last_activity: 2026-11-11
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -17,17 +17,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-01)
+See: .planning/PROJECT.md (updated 2026-11-11)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** Kein aktiver Milestone. Geplant: Release 0.4.0 nach dem Merge von PR #14 (andrewyager, files_read_as_markdown), nur mit Owner-Freigabe; danach /gsd:new-milestone.
+**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, als Nächstes wird Phase 30 (Mess-Spike) geplant.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-10-28 — Milestone v1.8 started
+Phase: 30 von 30 bis 34 (Mess-Spike Aufgaben und Ordner), noch nicht geplant
+Plan: keiner
+Status: Roadmap für v1.8 geschrieben, nächster Schritt Planung Phase 30
+Last activity: 2026-11-11, Anforderungen (34) und Roadmap (Phasen 30 bis 34) für Release 0.8.0 geschrieben, Owner-Entscheide E1 bis E14 in PROJECT.md festgehalten
 
 ## Performance Metrics
 
@@ -773,6 +773,10 @@ Recent decisions affecting current work:
 - [Phase 29]: 29-07: Doku-Wahrheitstest prüft Link-Auflösung ohne die Schwester-Sprachseiten (eigener Test plus Existenztest), damit EN/DE vor FR grün sind
 - [Phase 29]: 29-08: FR-Seite mit Menüpfad "Paramètres d'administration > Paramètres de base > Étiquettes collaboratives" (M9); README-Abschnitt je Sprache vier Zeilen vor der Sicherheits-Überschrift; DOC-03 erst mit 29-09 abhaken
 - [Phase 29]: 29-09: Store-Texte per SHA-256 seit ca157b4 gepinnt; Doku-Wortlaut nach vier Owner-Korrekturen am 2026-10-01 freigegeben (a9ec7ad)
+- [v1.8]: Roadmap 11.11.2026: Phasen 30 (Mess-Spike), 31 (Ordner anlegen, allein releasefähig), 32 (Tasks suchen, lesen, anlegen, ohne Phase 33 releasefähig), 33 (Aufgaben ändern, jeder Teil abtrennbar), 34 (Doku, Store, Release 0.8.0); 34 Requirements in .planning/REQUIREMENTS.md
+- [v1.8]: Owner-Entscheide E1 bis E14 vom 11.11.2026 stehen mit Zitat in PROJECT.md (Key Decisions); E8 wurde am selben Tag zweimal erweitert (Abhaken, dann alles in 0.8.0, kein 0.8.1), E13 Löschen nur bei positivem Spike-Ergebnis, E14 Verschieben fest
+- [v1.8]: Werkzeugschnitt der Planung: `tasks_complete` (Arbeitsname, Abhaken und Wiederöffnen) getrennt von `tasks_update`; Verschieben und Löschen je ein eigenes Werkzeug; Grund ist die Decke von 1400 Bytes je Werkzeug und die Abtrennbarkeit
+- [v1.8]: Die CLAUDE.md des Repos sieht kein eigenes Audit nach jeder Phase vor; es gelten plan_check, code_review und verifier aus .planning/config.json
 
 ### Pending Todos
 
@@ -790,6 +794,13 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
+- v1.8 offene Owner-Entscheidung E15: eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge (Präzedenz NC_MCP_FILES_UPDATE) oder nur die Abschaltung des Bundles `tasks`; dem Owner noch nicht vorgelegt, Checkpoint am Ende von Phase 30
+- v1.8 unbelegt, mit Abbruchkriterium: `MKCOL` auf `files/` unter AppAPI-Impersonation (erster Punkt von Phase 30), `PUT` mit `If-Match` und `MOVE` unter Impersonation, Erhalt fremder Eigenschaften beim `PUT`
+- v1.8 ändernde Zugriffe, Verschieben und Löschen sind von der Recherche vom 11.11.2026 nicht abgedeckt; alles dazu ist Annahme bis zum Messbericht (REQUIREMENTS.md, A12 bis A19, A21)
+- v1.8 Testinstanz weicht vom Produktionsfall ab: `personal` trägt dort VEVENT,VTODO,VJOURNAL, ein frisches echtes Konto hat keine Aufgabenliste; der Fall braucht einen eigenen Test (TASK-03)
+- v1.8 Schreibzusage: mit Phase 33 stimmt "create-only, keine destruktiven Writes" nicht mehr wörtlich; Präzisierung an allen Stellen ist Pflicht vor dem Release (DOC-05), das Destruktiv-Gate bekommt eng benannte Ausnahmen
+- v1.8 Gate-Dateien: die Phasen 31, 32 und 33 ändern dieselben Gate-Dateien, deshalb nacheinander; Contract-Tests und Budget-Skript laufen in jedem Plan mit (häufigster früherer Fehler)
+- v1.8 Budget: erste Anhebung seit der Senkung in v1.2; der Wert folgt der Messung, `tasks_create` liegt mit Tags und Startdatum geschätzt nahe an der Decke von 1400 Bytes je Werkzeug
 - v1.7 offen aus Phase 27: der CI-Schritt 'Findling hits run through sandbox and exclusion (SBX-01)' im Job exapp ist nie gelaufen (main über 170 Commits vor origin/main); beim nächsten Push muss er grün werden, ohne Skip (27-VERIFICATION human_needed)
 - v1.7 Merker für Phase 28: talk_send und notes_create sind im Klassifikations-Freeze betroffen; ChatGPT-search trägt kein degraded-Feld; Provider-cursors-Kanarientest (27-LIVE-BEWEIS.md, Merker für Phase 28)
 - v1.7 Harness nc35: test_ctx_bundle.py braucht neben .env.nc35 die NC_MCP_E2E_*-Exporte aus topology.py und PYTHONUTF8=1, sonst läuft occ im falschen Container (27-LIVE-BEWEIS.md, Neumessung 28.09.)
@@ -832,13 +843,14 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 
 ## Session Continuity
 
-Last session: 2026-10-01T10:23:22.167Z
-Stopped at: Milestone v1.7 abgeschlossen (2026-10-01)
-Nächster Schritt: Release 0.4.0 nach Merge von PR #14 (Owner-Freigabe), danach /gsd:new-milestone
+Last session: 2026-11-11
+Stopped at: Anforderungen und Roadmap für v1.8 (Release 0.8.0) geschrieben, lokal committet auf plan/v1.8-tasks-080, nicht gepusht
+Nächster Schritt: /gsd:plan-phase 30 (Mess-Spike Aufgaben und Ordner)
 Resume file: None
 
 ## Operator Next Steps
 
-- Release 0.4.0 (nur mit ausdrücklicher Owner-Freigabe, Tag `v*` löst release.yml aus): geplant nach dem Merge von PR #14 (andrewyager, files_read_as_markdown); bündelt den kein-ki-Filter aus v1.7 und die Store-Text-Erwähnung des Tags (EXCL-F02)
-- Lokaler Stand: die Abschluss-Commits von v1.7 sind noch nicht gepusht (Push nur nach Owner-Entscheid)
-- Danach den nächsten Milestone mit /gsd:new-milestone starten (Kandidaten in PROJECT.md, Next Milestone Goals)
+- Roadmap und Anforderungen für v1.8 prüfen (.planning/ROADMAP.md, .planning/REQUIREMENTS.md); der Branch plan/v1.8-tasks-080 ist nur lokal, Push oder PR nur nach Owner-Entscheid
+- E15 entscheiden (Admin-Schalter für ändernde Aufgaben-Werkzeuge), spätestens am Checkpoint von Phase 30
+- Danach Phase 30 planen mit /gsd:plan-phase 30
+- Issue-Antworten in #32 und #44 erst nach dem Store-Release von 0.8.0

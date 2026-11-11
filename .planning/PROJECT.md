@@ -8,17 +8,22 @@ Ein schlankes MCP-only-ExApp für Nextcloud: Nutzer installieren es per Klick au
 
 Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer. Seit v1.7 auf Wunsch weniger: was das System-Tag `kein-ki` trägt, sieht er gar nicht.
 
-## Current Milestone: v1.8 Tasks-Bundle und Store-Sichtbarkeit (Release 0.7.0)
+## Current Milestone: v1.8 Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 
-**Goal:** Der Connector kann Nextcloud-Aufgaben lesen, suchen und anlegen, die Store-Auffindbarkeit steigt (mehrsprachige Summary, Forum-Thread, Cross-Promo), und am Ende steht Release 0.7.0 im Store (Submit nur mit Owner-Freigabe).
+**Goal:** Der Connector kann Nextcloud-Aufgaben suchen, lesen, anlegen, abhaken, wieder öffnen, ändern und in eine andere Liste verschieben (Issue #32) und Ordner anlegen, wahlweise mit fehlenden Elternordnern (Issue #44). Am Ende steht EIN Release 0.8.0 im Store (Submit nur mit Owner-Freigabe); ein 0.8.1 ist nicht eingeplant (Owner-Entscheid 11.11.2026).
 
-**Target features:**
-- Tasks-Bundle (Issue #32): `tasks_search`, `tasks_read`, `tasks_create` über CalDAV VTODO, nach dem Muster des Kalender-Bundles (kuratiert, create-only, keine destruktiven Writes)
-- Store-Strategie vom 24.10.: Summaries en/de/fr in info.xml, `<discussion>`-Link auf einen eigenen Forum-Thread (Entwurf hier, Owner postet), Cross-Promo-Satz zu Findling
-- Release 0.7.0 (Owner-Entscheid 28.10.: HEUTE, ohne Tasks): PR #17 (ChatGPT-Attachments, ivankhokhryakov), Dependency-/Security-Bumps und die Store-Texte; Submit nur mit Owner-Freigabe
-- Das Tasks-Bundle reist danach als Release 0.8.0 im selben Milestone
+**Stand 11.11.2026:** Im Milestone-Zeitraum sind drei Releases erschienen: 0.7.0 (28.10., native ChatGPT-Dateianhänge in `files_upload` aus PR #17 von ivankhokhryakov, Dependency-Bumps), 0.7.1 (02.11., Security-Release: pypdf 6.21.4 und weitere Patch-Stände) und 0.7.2 (06.11., die zehn `NC_MCP_EXCHANGE_*`-Variablen in `appinfo/info.xml` deklariert, Issue #42). Das Tasks-Bundle reist als 0.8.0, zusammen mit dem Ordner-Werkzeug aus #44 (Owner-Entscheid 11.11.2026). Recherche: `.planning/research/v1.8-tasks-080-RESEARCH.md` (Commit 5ddaddf); Anforderungen: `.planning/REQUIREMENTS.md` (34 Requirements); Roadmap: Phasen 30 bis 34.
 
-**Key context:** Owner-Ansage 28.10.: Connector-Release vor Findling 1.6 vor Gameworld Phase 6. Die v1.7-Phasenordner 25-29 bleiben in .planning/phases/ liegen (docs/exclusion*.md, Tests und src/ verlinken darauf, Entscheid beim v1.7-Abschluss).
+**Target features (Release 0.8.0):**
+- Ordner anlegen (Issue #44): `files_create_folder`, wahlweise mit fehlenden Elternordnern (höchstens 10 neue Ordner je Aufruf), hinter Ausschluss `kein-ki`, Sandbox, Paartest, Kanarie und Audit; Phase 31, allein releasefähig
+- Tasks-Bundle (Issue #32) als zehnte Familie `tasks`: `tasks_search`, `tasks_read`, `tasks_create` über CalDAV VTODO (Titel, Liste, Beschreibung, Fälligkeit, Startdatum, Priorität, Tags, Zeitzone, Elternaufgabe), dazu die `task:`-Id über `fetch`; Phase 32
+- Aufgaben ändern: eine einzelne Aufgabe abhaken und wieder öffnen (`tasks_complete`, Arbeitsname), in Titel, Beschreibung, Fälligkeit, Startdatum, Priorität, Tags und Elternaufgabe ändern (`tasks_update`) und in eine andere Liste verschieben, jeweils nur mit gelesener ETag; Phase 33. Löschen nur, wenn der Mess-Spike belegt, dass die Aufgabe wiederherstellbar im Papierkorb des Kalenders landet (E13)
+- Vorab ein Mess-Spike (Phase 30) gegen echte Instanzen, weil die Recherche nichts live gemessen hat; zuerst `MKCOL` unter AppAPI-Impersonation, mit Abbruchkriterien
+- Doku, Store-Text (drei Sprachen, Entwurf vorab an den Owner) und Release 0.8.0; Phase 34
+
+**Schreibzusage:** Mit Phase 33 bekommt die Zusage "create-only, keine destruktiven Writes" erstmals eine eng begrenzte Ausnahme für eine einzelne Aufgabe (ändern und verschieben mit ETag-Prüfung, Löschen nur bedingt nach E13). Kalendertermine, Dateien außerhalb von `files_update`, Notizen und alle übrigen Familien bleiben unberührt. Der Wortlaut in Constraints, Out of Scope, READMEs, `docs/threat-model.md` und Store-Text wird in Phase 34 auf das tatsächlich Ausgelieferte nachgezogen (DOC-05); bis dahin gilt für alles Ausgelieferte der alte Wortlaut.
+
+**Key context:** Owner-Ansage 28.10.: Connector-Release vor Findling 1.6 vor Gameworld Phase 6. Öffentliche Zusagen des Owners vom 08.11.2026 in #32 ("They're coming in 0.8.0 (search, read and create)") und #44 (`files_create_folder`, "optionally creating missing parent folders, in the next release"). Der Melder von #44 arbeitet fast nur mit Gruppenordnern und ACL, deshalb wird dieser Fall gemessen (E12). Issue-Antworten erst nach dem Store-Release. Die v1.7-Phasenordner 25-29 bleiben in .planning/phases/ liegen (docs/exclusion*.md, Tests und src/ verlinken darauf, Entscheid beim v1.7-Abschluss).
 
 ## Current State
 
@@ -98,6 +103,11 @@ Kandidaten nach v1.7 (Stand 2026-10-01):
 
 - [ ] Store-Text-Erwähnung des Tags `kein-ki` in drei Sprachen (EXCL-F02, reist mit Release 0.4.0)
 - [ ] Enterprise-Governance auf dem Tag (EXCL-F01, bezahlte Schicht, nach dem Fabrice-Call)
+- [ ] Mess-Spike für Aufgaben und Ordner gegen echte Instanzen, mit Abbruchkriterien (MESS-01 bis MESS-06, v1.8 Phase 30)
+- [ ] Ordner anlegen über `files_create_folder` hinter der v1.7-Kette (FOLD-01 bis FOLD-06, v1.8 Phase 31)
+- [ ] Tasks-Bundle suchen, lesen, anlegen als zehnte Familie (TASK-01 bis TASK-09, v1.8 Phase 32)
+- [ ] Eine einzelne Aufgabe abhaken, wieder öffnen, ändern und verschieben, nur mit gelesener ETag; Löschen bedingt (TMOD-01 bis TMOD-08, v1.8 Phase 33)
+- [ ] Doku, präzisierte Schreibzusage, Store-Text und Release 0.8.0 (DOC-04, DOC-05, EXAPP-13 bis EXAPP-15, v1.8 Phase 34)
 
 (Weiter extern getaktet: MUCGPT/F13/BaerGPT-Verprobungen, files_update via Community-PR nach Design-Issue #9.)
 
@@ -106,6 +116,8 @@ Kandidaten nach v1.7 (Stand 2026-10-01):
 - openDesk-Suite-Breite (OpenProject, XWiki, Matrix, OX) - Phase 3 nach Oktober 2026, eigener Meilenstein
 - Tool-Flut (100+ Tools) - bewusste Gegenposition zum Platzhirsch; Client-Tool-Limits (z.B. Cursor 80) machen Flut zum Nachteil
 - Destruktive Operationen (Löschen, Überschreiben, Teilen/Freigaben ändern) - Sicherheitsversprechen der v1: "kann konstruktionsbedingt nichts zerstören"
+- Aufgabenlisten anlegen, umbenennen oder löschen; wiederkehrende Aufgaben ändern oder abhaken; mehrere Aufgaben je Aufruf; Zwischenzustände, Erinnerungen und `ATTACH`; Deck über CalDAV; Kalendertermine ändern (v1.8, Owner 11.11.2026; die Ausnahme von der Zeile darüber für eine einzelne Aufgabe steht im Milestone-Abschnitt und in den Key Decisions E8, E13, E14)
+- Ordner umbenennen, verschieben oder löschen; ein Schalter `create_parents` an `files_upload` - wäre ein stiller Zweitschreiber (v1.8)
 - Eigener LLM/RAG-Index - der MCP liefert Daten, das Modell sitzt beim Client; semantische Suche hat der Platzhirsch (Qdrant+Ollama), wir differenzieren über Zugänglichkeit und Auth
 - Konfigurierbarer Tag-Name oder Aliase für den Ausschluss - jede Konfigurationsstelle wäre eine Fail-open-Stelle (D-v1.7-01)
 - "n Einträge zurückgehalten"-Zähler in Antworten - Existenz-Orakel (D-v1.7-02); nur der degraded-Eintrag bei gescheiterter Prüfung
@@ -168,6 +180,21 @@ Kandidaten nach v1.7 (Stand 2026-10-01):
 | Wanduhr prepare_context mit Begründung abgenommen statt weiter optimiert (Owner, 28.09.) | Code nach 27-10 gegen die abwechselnde Kontrolle nicht messbar langsamer; Rauschen größer als die Reserve | , Pending (Schwellen unverändert dokumentiert, Request-Seite belegt; nach 0.4.0 erneut messen) |
 | D-28-21: Talk-Datei-Räume im Suchprovider talk-conversations filtern (Owner, nach Kanarie-Fund) | Die Kanarie fand einen echten Abfluss des getaggten Dateinamens | ✓ Good , Kanarie danach in allen vier Modi 22/22 grün |
 | PR #8 nach 4 Tagen Funkstille selbst fertiggestellt und gemergt (25.09.) | Sollte den Beitrag nicht verfallen lassen; verstiess aber gegen die Owner-Ansage "erst handeln, wenn er antwortet" | ⚠ Revisit , Regel seitdem: fremde PRs nie ohne Antwort des Beitragenden oder fallbezogene Owner-Freigabe fertigstellen |
+| E1 (v1.8): Größenbudget der Werkzeugliste nach der Hausregel anheben (Messung plus 15 Prozent, auf 500 gerundet), Decke je Werkzeug bleibt 1400 (Owner, 11.11.2026, "Wie empfohlen") | Die neuen Werkzeuge passen nicht in 2294 freie Bytes (gemessen 15706 von 18000 bei 23 Werkzeugen); schmaler schneiden hieße Beschreibungen ohne Beispiel | , Pending (Wert folgt der Messung in Phase 32 und 33; erste Anhebung seit der Senkung in v1.2) |
+| E2 (v1.8): eigenes Bundle `tasks` als zehnte Familie (Owner, 11.11.2026, "Wie empfohlen") | Getrennt abschaltbar; Bundle-Namen sind eingefrorene öffentliche API, eine spätere Umsortierung wäre ein Bruch | , Pending (Phase 32) |
+| E3 (v1.8): `task:`-Id über `fetch` und Provider `tasks` auflösbar, eigener Plan, verschiebbar (Owner, 11.11.2026, "Wie empfohlen"; am selben Tag bekräftigt: bleibt drin) | Jede andere adressierbare Art ist über `fetch` lesbar | , Pending (Phase 32, TASK-09) |
+| E4 (v1.8): Schreibziel ohne `list` nur bei genau einer eigenen Liste, sonst Fehler mit den Namen; nie still in geteilte Listen (Owner, 11.11.2026, "Wie empfohlen") | Lehre WR-04 aus dem Kalender-Bundle; für Aufgaben gibt es keinen festen Standard-URI | , Pending (Phase 32, TASK-06) |
+| E5 (v1.8): vorhandener Ordner ist Erfolg mit `created: false`, nach Prüfung, dass dort ein Ordner liegt (Owner, 11.11.2026, "Wie empfohlen") | Der Anwendungsfall aus #44 ist "anlegen, falls er fehlt"; 405 unterscheidet nicht zwischen Ordner und Datei | , Pending (Phase 31, FOLD-03) |
+| E6 (v1.8): keine Aufgabenliste: `tasks_create` Fehler mit Ausweg, `tasks_search` leere Antwort mit Hinweis (Owner, 11.11.2026, "Wie empfohlen") | Ein frisches Konto hat keine Aufgabenliste; beim Suchen ist das der Normalzustand, beim Anlegen muss der Nutzer handeln | , Pending (Phase 32, TASK-03) |
+| E7 (v1.8): Umfang `tasks_create`: summary, list, description, due, priority, timezone, parent; tags und DTSTART später (Owner, 11.11.2026, "Wie empfohlen"). Geändert: `tags` und Startdatum kommen in 0.8.0 (Owner, 11.11.2026, "Das hatte ich übersehen am besten alles in 8.0 ziehen so dass kein 8.1 nötig ist") | Kein 0.8.1; jedes Feld kostet Budget und Testmatrix, deshalb bleibt die Decke je Werkzeug das Maß | , Pending (Phase 32, TASK-05) |
+| E8 (v1.8): kein Abhaken, Ändern, Löschen in 0.8.0, im Store-Text sagen; Abhaken als Kandidat für 0.8.1 (Owner, 11.11.2026, "Wie empfohlen"). Geändert: Abhaken kommt in 0.8.0 (Owner, 11.11.2026, "Warte abhacken in 8.0"). Erneut erweitert: Abhaken, Wiederöffnen und Ändern von Titel, Beschreibung, Fälligkeit, Startdatum, Priorität, Tags und Elternaufgabe in 0.8.0, kein 0.8.1 (Owner, 11.11.2026, "Das hatte ich übersehen am besten alles in 8.0 ziehen so dass kein 8.1 nötig ist") | Erster ändernder Schreibzugriff auf ein bestehendes Objekt; von der Recherche nicht abgedeckt, deshalb eigene Phase 33 hinter dem Mess-Spike, nur mit gelesener ETag, jeder Teil abtrennbar | , Pending (Phase 33; Zusage "create-only" wird in Phase 34 präzisiert, DOC-05) |
+| E9 (v1.8): Deck-Kalender (`app-generated--`) ausschließen, lesend und schreibend (Owner, 11.11.2026, "Wie empfohlen") | Doppelung zu den Deck-Werkzeugen und Abfluss der Kartenbeschreibung, die `deck_browse` bewusst zurückhält | , Pending (Phase 32, TASK-01) |
+| E10 (v1.8): Deckel für neu angelegte Ordnersegmente je Aufruf: 10 (Owner, 11.11.2026, "Wie empfohlen") | Schutz vor beliebig tiefen Bäumen; im Fehlerfall bleibt weniger liegen, weil der Connector nicht löschen kann | , Pending (Phase 31, FOLD-02) |
+| E11 (v1.8): Store-Text dreisprachig neu, Entwurf vor dem Release dem Owner zeigen (Owner, 11.11.2026, "Wie empfohlen") | Der SHA-256-Pin der Store-Texte ist nur mit Owner-Entscheid zu erneuern | , Pending (Phase 34, EXAPP-13) |
+| E12 (v1.8): Gruppenordner mit ACL vor dem Release messen statt nur dokumentieren, mit Negativtest (Owner, 11.11.2026, "Wie empfohlen"; Präzisierung des Owners im Auftrag) | Der Melder von #44 arbeitet fast nur mit Gruppenordnern und ACL; im Projekt nie gemessen | , Pending (Phase 30, MESS-02) |
+| E13 (v1.8): Löschen einer Aufgabe bedingt in 0.8.0: nur wenn der Mess-Spike auf Nextcloud 32 bis 35 belegt, dass eine per CalDAV gelöschte Aufgabe im Papierkorb des Kalenders landet und wiederherstellbar bleibt, auch mit abgeschaltetem Papierkorb und für geteilte Listen; sonst kein Löschen, ohne neue Rückfrage, als bewusste Grenze im Store-Text (Owner, 11.11.2026, "Deine Empfehlung für 1 und 2"; Punkt 1 war Löschen) | Wäre der erste destruktive Schreibzugriff; vertretbar nur, wenn nichts endgültig verloren geht. Wenn gebaut: Papierkorb-Prüfung vor dem Löschen, Elternaufgabe mit Unteraufgaben abgelehnt, Annotation destruktiv, eng benannte Ausnahme im Destruktiv-Gate | , Pending (Messung Phase 30, MESS-06; Bau Phase 33, TMOD-07) |
+| E14 (v1.8): Verschieben einer Aufgabe in eine andere Liste fest in 0.8.0 (Owner, 11.11.2026, "Deine Empfehlung für 1 und 2"; Punkt 2 war Verschieben) | Regeln wie bei den anderen ändernden Zugriffen: ETag, Schreibrecht auf Quelle und Ziel, nie in Deck-Kalender, nie still in geteilte Listen, Audit; `MOVE` unter AppAPI-Impersonation und Unteraufgaben werden gemessen, nicht geraten | , Pending (Messung Phase 30, MESS-06; Bau Phase 33, TMOD-08) |
+| Werkzeugschnitt v1.8: Abhaken und Wiederöffnen (`tasks_complete`, Arbeitsname) getrennt von `tasks_update`; Verschieben und Löschen je ein eigenes Werkzeug (Planung 11.11.2026, vom Owner delegiert) | Decke 1400 Bytes je Werkzeug, der häufigste Fall bleibt ohne Feldschema, jeder Teil ist abtrennbar, der Audit-Eintrag nennt die Handlung | , Pending (Namen frieren mit der Registrierung in Phase 33 ein) |
 
 ## Evolution
 
@@ -187,4 +214,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-28 zum Start von Milestone v1.8*
+*Last updated: 2026-11-11, Roadmap für v1.8 (Release 0.8.0) geschrieben, Owner-Entscheide E1 bis E14 festgehalten*
