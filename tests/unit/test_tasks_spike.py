@@ -255,3 +255,263 @@ def test_missing_quotes_names_what_stands_in_no_raw_file() -> None:
     assert spike.missing_quotes(_REPORT, raw) == ["Content-Length: 0"]
     raw["raw/zwei.txt"] = "      Content-Length: 0\n"
     assert spike.missing_quotes(_REPORT, raw) == []
+
+
+# --- plan 30-02: modifying access -----------------------------------------------------------
+
+_LONG = "Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor"
+
+_TODO = (
+    "BEGIN:VCALENDAR\r\n"
+    "VERSION:2.0\r\n"
+    "PRODID:-//test//EN\r\n"
+    "BEGIN:VTODO\r\n"
+    "UID:u1\r\n"
+    "SUMMARY:" + _LONG[:66] + "\r\n " + _LONG[66:] + "\r\n"
+    "X-SPIKE30-FOO:bar\r\n"
+    "BEGIN:VALARM\r\n"
+    "ACTION:DISPLAY\r\n"
+    "TRIGGER:-PT15M\r\n"
+    "END:VALARM\r\n"
+    "\r\n"
+    "END:VTODO\r\n"
+    "END:VCALENDAR\r\n"
+)
+_FOLDED_SUMMARY = "SUMMARY:" + _LONG[:66] + "\r\n " + _LONG[66:]
+
+
+def test_ics_line_set_unfolds_a_folded_summary_into_one_line_per_component() -> None:
+    lines = spike.ics_line_set(_TODO)
+    summaries = [line for path, line in lines if line.startswith("SUMMARY")]
+    assert summaries == [f"SUMMARY:{_LONG}"]
+    assert ("VCALENDAR/VTODO", "X-SPIKE30-FOO:bar") in lines
+    assert ("VCALENDAR/VTODO/VALARM", "TRIGGER:-PT15M") in lines
+    assert ("VCALENDAR", "VERSION:2.0") in lines
+    assert not any(line == "" for _, line in lines)
+
+
+def test_ics_line_set_unfolds_a_tab_continuation_and_bare_line_feeds() -> None:
+    text = "BEGIN:VCALENDAR\nBEGIN:VTODO\nSUMMARY:ab\n\tcd\nEND:VTODO\nEND:VCALENDAR\n"
+    assert ("VCALENDAR/VTODO", "SUMMARY:abcd") in spike.ics_line_set(text)
+
+
+def test_ics_line_set_counts_components_so_a_lost_second_alarm_shows() -> None:
+    twice = _TODO.replace(
+        "END:VTODO", "BEGIN:VALARM\r\nACTION:DISPLAY\r\nTRIGGER:-PT15M\r\nEND:VALARM\r\nEND:VTODO"
+    )
+    added, removed, changed = spike.line_diff(twice, _TODO)
+    assert (added, removed) == ([], [])
+    assert changed == {"VALARM.BEGIN"}
+
+
+def test_line_diff_names_a_changed_summary_and_nothing_else() -> None:
+    after = _TODO.replace(_FOLDED_SUMMARY, "SUMMARY:neu")
+    added, removed, changed = spike.line_diff(_TODO, after)
+    assert changed == {"SUMMARY"}
+    assert added == []
+    assert removed == []
+
+
+def test_line_diff_names_added_and_removed_lines_with_their_component() -> None:
+    after = _TODO.replace("X-SPIKE30-FOO:bar\r\n", "STATUS:COMPLETED\r\n")
+    added, removed, changed = spike.line_diff(_TODO, after)
+    assert added == ["VCALENDAR/VTODO:STATUS:COMPLETED"]
+    assert removed == ["VCALENDAR/VTODO:X-SPIKE30-FOO:bar"]
+    assert changed == set()
+
+
+def test_preserved_is_true_when_only_the_allowed_property_differs() -> None:
+    after = _TODO.replace(_FOLDED_SUMMARY, "SUMMARY:neu")
+    assert spike.preserved(_TODO, after, allowed={"SUMMARY"}) == (True, [])
+    assert spike.preserved(_TODO, _TODO) == (True, [])
+
+
+def test_preserved_names_a_lost_x_line() -> None:
+    after = _TODO.replace("X-SPIKE30-FOO:bar\r\n", "").replace(_LONG[:66], "neu")
+    ok, lost = spike.preserved(_TODO, after, allowed={"SUMMARY"})
+    assert ok is False
+    assert lost == ["entfernt VCALENDAR/VTODO:X-SPIKE30-FOO:bar"]
+
+
+def test_preserved_names_a_changed_and_an_added_line_that_are_not_allowed() -> None:
+    after = _TODO.replace("TRIGGER:-PT15M", "TRIGGER:-PT30M").replace(
+        "UID:u1\r\n", "UID:u1\r\nSEQUENCE:1\r\n"
+    )
+    ok, lost = spike.preserved(_TODO, after, allowed={"SUMMARY"})
+    assert ok is False
+    assert lost == ["hinzu VCALENDAR/VTODO:SEQUENCE:1", "geaendert VALARM.TRIGGER"]
+
+
+def test_abort_if_match_is_not_triggered_only_by_the_expected_four_values() -> None:
+    aborted, reason = spike.abort_if_match(
+        status_current=204, etag_changed=True, status_stale=412, unchanged_after_stale=True
+    )
+    assert aborted is False
+    assert reason == "keiner"
+
+
+@pytest.mark.parametrize(
+    ("values", "word"),
+    [
+        ((403, True, 412, True), "aktuelle"),
+        ((204, False, 412, True), "ETag"),
+        ((204, True, 204, True), "veraltete"),
+        ((204, True, 409, True), "veraltete"),
+        ((204, True, 412, False), "veraendert"),
+    ],
+)
+def test_abort_if_match_is_triggered_by_every_single_deviation(
+    values: tuple[int, bool, int, bool], word: str
+) -> None:
+    aborted, reason = spike.abort_if_match(
+        status_current=values[0],
+        etag_changed=values[1],
+        status_stale=values[2],
+        unchanged_after_stale=values[3],
+    )
+    assert aborted is True
+    assert word in reason
+
+
+def test_value_form_tells_utc_floating_date_and_tzid_apart() -> None:
+    assert spike.value_form("20261120T101500Z") == "utc"
+    assert spike.value_form("20261120T101500") == "floating"
+    assert spike.value_form("20261120") == "date"
+    assert spike.value_form("DUE;TZID=Europe/Berlin:20261120T101500") == "tzid"
+    assert spike.value_form("COMPLETED:20261120T101500Z") == "utc"
+    assert spike.value_form("DUE;VALUE=DATE:20261120") == "date"
+    assert spike.value_form("morgen") == "other"
+
+
+def test_build_probe_todo_carries_everything_a_modifying_put_must_keep() -> None:
+    text = spike.build_probe_todo("uid-1", "s30 eigenschaften")
+    for wanted in (
+        "BEGIN:VTIMEZONE",
+        "BEGIN:VALARM",
+        "X-SPIKE30-FOO",
+        "X-APPLE-SORT-ORDER",
+        "X-OC-HIDESUBTASKS",
+        "CLASS:",
+        "UID:uid-1",
+    ):
+        assert wanted in text
+    assert text.endswith("\r\n")
+    assert text.count("BEGIN:VTODO") == 1
+    assert "\n" not in text.replace("\r\n", "")
+    lines = spike.ics_line_set(text)
+    summary = [line for _, line in lines if line.startswith("SUMMARY")]
+    assert summary == ["SUMMARY;X-SPIKE30-PARAM=abc:s30 eigenschaften"]
+    categories = [line for _, line in lines if line.startswith("CATEGORIES")]
+    assert categories == ["CATEGORIES:spike30,wichtig"]
+    description = [line for _, line in lines if line.startswith("DESCRIPTION") and len(line) > 75]
+    assert len(description) == 1
+    assert all(len(raw.encode()) <= 75 for raw in text.split("\r\n"))
+
+
+def test_set_summary_changes_exactly_the_summary_line_and_keeps_its_parameters() -> None:
+    text = spike.build_probe_todo("uid-1", "alt")
+    changed = spike.set_summary(text, "neu")
+    assert "SUMMARY;X-SPIKE30-PARAM=abc:neu\r\n" in changed
+    assert spike.line_diff(text, changed) == ([], [], {"SUMMARY"})
+
+
+def test_complete_todo_adds_the_three_lines_of_checking_off_before_the_end() -> None:
+    text = spike.simple_todo("uid-2", "s30 x", ["RRULE:FREQ=DAILY"])
+    done = spike.complete_todo(text, "20261111T120000Z")
+    added, removed, changed = spike.line_diff(text, done)
+    assert added == [
+        "VCALENDAR/VTODO:COMPLETED:20261111T120000Z",
+        "VCALENDAR/VTODO:PERCENT-COMPLETE:100",
+        "VCALENDAR/VTODO:STATUS:COMPLETED",
+    ]
+    assert (removed, changed) == ([], set())
+    assert "RRULE:FREQ=DAILY\r\n" in done
+    assert done.endswith("END:VTODO\r\nEND:VCALENDAR\r\n")
+
+
+def test_short_etag_drops_quotes_and_the_weak_marker() -> None:
+    assert spike.short_etag('"0123456789abcdef0123"') == "0123456789ab"
+    assert spike.short_etag('W/"0123456789abcdef0123"') == "0123456789ab"
+    assert spike.short_etag("") == "-"
+    assert spike.etag_kind('W/"x"') == "schwach"
+    assert spike.etag_kind('"x"') == "stark"
+    assert spike.etag_kind("") == "fehlt"
+
+
+_HOME = """<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">
+ <d:response><d:href>/remote.php/dav/calendars/spike30ui/</d:href>
+  <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop>
+  <d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+ <d:response><d:href>/remote.php/dav/calendars/spike30ui/spike30-liste-1/</d:href>
+  <d:propstat><d:prop><d:displayname>spike30-liste-1</d:displayname>
+   <d:resourcetype><d:collection/><cal:calendar/></d:resourcetype>
+   <cal:supported-calendar-component-set><cal:comp name="VTODO"/>
+   </cal:supported-calendar-component-set></d:prop>
+  <d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+ <d:response><d:href>/remote.php/dav/calendars/spike30ui/x_shared_by_spike30b/</d:href>
+  <d:propstat><d:prop><d:displayname>x</d:displayname>
+   <d:resourcetype><d:collection/><cal:calendar/></d:resourcetype>
+   <cal:supported-calendar-component-set><cal:comp name="VEVENT"/><cal:comp name="VTODO"/>
+   </cal:supported-calendar-component-set></d:prop>
+  <d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+ <d:response><d:href>/remote.php/dav/calendars/spike30ui/inbox/</d:href>
+  <d:propstat><d:prop><d:resourcetype><d:collection/><cal:schedule-inbox/></d:resourcetype>
+  </d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+</d:multistatus>"""
+
+
+def test_calendar_collections_keeps_calendars_with_name_and_components_only() -> None:
+    assert spike.calendar_collections(_HOME) == [
+        ("spike30-liste-1", "spike30-liste-1", ("VTODO",)),
+        ("x_shared_by_spike30b", "x", ("VEVENT", "VTODO")),
+    ]
+
+
+def test_property_value_reads_from_the_unfolded_text() -> None:
+    assert spike.property_value(_TODO, "SUMMARY") == _LONG
+    assert spike.property_value(_TODO, "UID") == "u1"
+    assert spike.property_value(_TODO, "DUE") == ""
+
+
+def test_missing_names_reports_every_expected_summary_a_snapshot_lacks() -> None:
+    seen = [name for name in spike.UI_EXPECTED if name != "s30 notiz"]
+    assert spike.missing_names(seen) == ["s30 notiz"]
+    assert spike.missing_names([*spike.UI_EXPECTED, "sonstiges"]) == []
+    assert len(spike.UI_EXPECTED) == 14
+    assert "s30 wiederkehrend" not in spike.UI_EXPECTED
+
+
+def test_write_snapshot_keeps_two_states_apart_and_replaces_an_older_one(tmp_path: Path) -> None:
+    state_a = [
+        spike.SnapshotObject("liste-1", "a.ics", '"e1"', _TODO.encode(), False),
+        spike.SnapshotObject("liste-1", "b.ics", '"e2"', _TODO.replace("u1", "u2").encode(), False),
+    ]
+    state_b = [
+        spike.SnapshotObject("liste-2", "a.ics", '"e3"', _TODO.encode(), False),
+        spike.SnapshotObject("trashbin", "7-deleted.ics", '"e4"', _TODO.encode(), True),
+    ]
+    assert spike.write_snapshot(tmp_path, "a", state_a) == ["a.ics", "b.ics"]
+    assert spike.write_snapshot(tmp_path, "b", state_b) == ["a.ics", "trash-7-deleted.ics"]
+    assert sorted(path.name for path in (tmp_path / "ui-a").iterdir()) == ["a.ics", "b.ics"]
+    assert (tmp_path / "ui-a" / "a.ics").read_bytes() == _TODO.encode()
+    # A second snapshot under the same label replaces the first, so no stale file survives.
+    assert spike.write_snapshot(tmp_path, "a", state_a[:1]) == ["a.ics"]
+    assert sorted(path.name for path in (tmp_path / "ui-a").iterdir()) == ["a.ics"]
+
+
+def test_write_snapshot_tells_two_objects_of_the_same_name_apart(tmp_path: Path) -> None:
+    twins = [
+        spike.SnapshotObject("liste-1", "a.ics", '"e1"', b"x", False),
+        spike.SnapshotObject("liste-2", "a.ics", '"e2"', b"y", False),
+    ]
+    assert spike.write_snapshot(tmp_path, "b", twins) == ["a.ics", "liste-2--a.ics"]
+
+
+def test_read_ui_file_takes_user_password_and_base_url_from_three_lines(tmp_path: Path) -> None:
+    path = tmp_path / "ui.txt"
+    path.write_text("spike30ui\ngeheim\nhttp://127.0.0.1:8082\n", encoding="utf-8")
+    assert spike.read_ui_file(path) == ("spike30ui", "geheim", "http://127.0.0.1:8082")
+    path.write_text("spike30ui\n", encoding="utf-8")
+    with pytest.raises(spike.RunFailed):
+        spike.read_ui_file(path)
