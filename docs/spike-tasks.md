@@ -1,12 +1,12 @@
 # Mess-Spike Aufgaben und Ordner (MESS-01 bis MESS-06)
 
-**Status:** läuft. Die Abschnitte 1 (MESS-01) und 2 (MESS-02) sind gemessen, das Abbruchkriterium zu MESS-01 ist nicht ausgelöst. Von Abschnitt 3 (MESS-05) sind 3.1 bis 3.4 gemessen, beide Abbruchkriterien zu MESS-05 sind nicht ausgelöst; 3.5, 3.6 und die Abschnitte 4 bis 10 sind offen
+**Status:** läuft. Die Abschnitte 1 (MESS-01) und 2 (MESS-02) sind gemessen, das Abbruchkriterium zu MESS-01 ist nicht ausgelöst. Abschnitt 3 (MESS-05) ist gemessen, beide Abbruchkriterien zu MESS-05 sind nicht ausgelöst, und Abschnitt 7 trägt das Inventar der Gates und Zusagen (A17); die Abschnitte 4 bis 6 und 8 bis 10 sind offen
 **Messzeitraum:** ab 2026-11-11 (erster Messlauf 11:55 UTC), Ende offen
 **Nextcloud:** 35.0.0 (Build 35.0.0.10), gelesen mit `occ status` am 2026-11-11 aus dem laufenden Container `nc35-nc`. Das Image heißt `nextcloud:35.0.0-apache-local` und ist lokal aus dem veröffentlichten Quellpaket gebaut (`compose.nc35.yml`, Kopfkommentar)
 **AppAPI:** `app_api` 35.0.0, gelesen mit `occ app:list --output=json` derselben Instanz am 2026-11-11
 **Diese ExApp:** 0.3.2, gelesen mit `occ app_api:app:list` am 2026-11-11. In der Topologie ist also ein älterer Stand registriert als der Arbeitsbaum. Für die Messung zählt das an zwei Stellen: die Impersonation läuft mit dem Secret dieser Registrierung, und der Produktionsweg (Abschnitt 1.2) läuft im Container dieses Images. Kein Werkzeug der App wird gemessen, nur ihr Zugang zu Nextcloud
 **groupfolders:** 23.0.1, gelesen mit `occ app:list --output=json` am 2026-11-11 nach `occ app:install groupfolders` in der laufenden Instanz (Protokollzeile `GRUPPENORDNER version=23.0.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)`). Die App wurde für die Messung aus dem App Store geladen und danach wieder entfernt. `files_external` 2.0.0-dev.0 gehört zum Server und war nur für die Messung eingeschaltet
-**Tasks:** 0.18.1, gelesen mit `occ app:list --output=json` am 2026-11-11 nach `occ app:install tasks` in der laufenden Instanz (Protokollzeile `TASKS-APP version=0.18.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)`). Die App ist für die Messung aus dem App Store geladen und wird im Rückbau wieder entfernt
+**Tasks:** 0.18.1, gelesen mit `occ app:list --output=json` am 2026-11-11 nach `occ app:install tasks` in der laufenden Instanz (Protokollzeile `TASKS-APP version=0.18.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)`). Die App war für die Messung aus dem App Store geladen und ist im Rückbau wieder entfernt worden. Die Browser-Sitzung lief am 2026-11-11 in Chromium (Playwright), Zeitzone des Browsers Europe/Berlin, Sprache des Messkontos Deutsch
 **Deck:** offen, füllt Plan 30-04
 **Datenbank:** `sqlite3`, gelesen mit `occ config:system:get dbtype` am 2026-11-11
 **Topologie:** die vorhandene Strecke `compose.nc35.yml` (Container `nc35-nc`, `nc35-harp`, `nc35-caddy`, ExApp-Container `nc_app_mcp_connector`, Loopback `http://127.0.0.1:8082`). Sie wird nur mit `docker start` und `docker stop` bewegt, nie abgebaut. Weitere Instanzen für die Versionsbreite nennen die Pläne 30-03 und 30-04
@@ -252,11 +252,50 @@ Für A15 heißt das: serverseitig spricht nichts dafür, wiederkehrende Aufgaben
 
 ### 3.5 Was die Tasks-App beim Abhaken und Wiederöffnen schreibt
 
-Offen, füllt Plan 30-02 nach der Browser-Sitzung (Task 3). Vorbereitet ist: Tasks 0.18.1 ist in der Instanz installiert, das Messkonto `spike30ui` existiert, die Schritte der Sitzung stehen in `.planning/phases/30-mess-spike-aufgaben-und-ordner/30-02-BROWSER-SCHRITTE.md`.
+Gemessen am 2026-11-11 mit Tasks 0.18.1 auf nc35 (Nextcloud 35.0.0, SQLite), Konto `spike30ui`. Die Hauptsitzung hat die zwölf Schritte aus `.planning/phases/30-mess-spike-aufgaben-und-ordner/30-02-BROWSER-SCHRITTE.md` in Chromium (Playwright) gefahren, Zeitzone des Browsers Europe/Berlin. Stand a (nach dem Anlegen, vor jeder Änderung) und Stand b (nach Runde B) sind je per DAV gesichert: ein GET je Objekt unter Impersonation, die Dateien liegen unter `raw/ui-a/` und `raw/ui-b/`. Verglichen wird dasselbe Objekt über seine UID. Nichts in diesem Abschnitt stammt aus dem Quelltext der App.
+
+Drei Belege tragen jede Aussage: die Differenz der Rohobjekte, dieselben Listen noch einmal mit App-Passwort und einem REPORT gelesen (`UI-GLEICH appapi_basic=ja abweichend=keine`), und das Zugriffsprotokoll des Webservers, das jeden schreibenden Aufruf des Kontos mit Statuscode nennt (12.4). Was die Oberfläche anzeigte, ist kein Beleg; an einer Stelle widerspricht es dem Server (3.6).
+
+Pflichtzeilen, wörtlich aus `raw/ui-sitzung.txt`:
+
+- `ABHAKEN FELDER hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED zeitform_completed=utc`
+- `WIEDEROEFFNEN FELDER hinzu=STATUS entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED`
+- `KONTROLLE unberuehrt differenz=leer`
+- `UI-STAND a objekte=15`, `UI-STAND b objekte=15`
+
+| Handlung in der App | Was danach im Objekt steht | Rohwert wörtlich |
+|---------------------|----------------------------|------------------|
+| `s30 abhaken` abgehakt | hinzu: `STATUS:COMPLETED`, `PERCENT-COMPLETE:100`, `COMPLETED` als UTC-Zeit mit `Z`; geändert: `LAST-MODIFIED` und `DTSTAMP`, beide auf den Zeitpunkt des Abhakens; nichts entfernt, kein `SEQUENCE` | `ABHAKEN zeilen_hinzu=['COMPLETED:20261111T125947Z', 'PERCENT-COMPLETE:100', 'STATUS:COMPLETED']` |
+| `s30 wieder-oeffnen` abgehakt und wieder geöffnet | Endstand gegen Stand a: hinzu `STATUS:NEEDS-ACTION`; `COMPLETED` und `PERCENT-COMPLETE` stehen nicht mehr im Objekt (entfernt, nicht auf 0 gesetzt); geändert `LAST-MODIFIED` und `DTSTAMP` | `WIEDEROEFFNEN zeilen_hinzu=['STATUS:NEEDS-ACTION'] abhaken_felder_danach_fehlend=COMPLETED,PERCENT-COMPLETE status_danach=NEEDS-ACTION` |
+| `s30 unberuehrt` nicht angefasst | leere Differenz (Positivkontrolle M3.8) | `KONTROLLE unberuehrt differenz=leer` |
+| Vergleichsobjekt, vom Skript per `PUT` mit `If-Match` abgehakt | genau die drei gesendeten Zeilen, sonst nichts: der Server pflegt kein Feld | `VERGLEICH skript_put pflegefelder_server=keine anlegen=201 abhaken=204 etag_vorher=f11673e3ef94 etag_nachher=eeb5d58cd8b1 gesendet_hinzu=['COMPLETED:20261111T130535Z', 'PERCENT-COMPLETE:100', 'STATUS:COMPLETED'] vom_server_entfernt=keine woertlich_gespeichert=ja auth=appapi nutzer=spike30a liste=spike30-a objekt=s30-vergleich-130535.ics` |
+
+Der Satz für TMOD-03: die Tasks-App setzt beim Abhaken `STATUS:COMPLETED`, `PERCENT-COMPLETE:100` und `COMPLETED` in UTC mit `Z` und zieht `LAST-MODIFIED` und `DTSTAMP` auf denselben Zeitpunkt nach. Beim Wiederöffnen setzt sie `STATUS:NEEDS-ACTION`, entfernt `COMPLETED` und `PERCENT-COMPLETE` und zieht `LAST-MODIFIED` und `DTSTAMP` nach. `SEQUENCE` schreibt sie in keinem der beiden Fälle. Weil der Server keines dieser Felder von sich aus pflegt (Vergleichsobjekt, und 3.2), stammen `LAST-MODIFIED` und `DTSTAMP` von der App; ein Werkzeug, das sich wie die App verhalten soll, muss beide selbst setzen.
+
+A12 ist damit belegt, mit zwei Präzisierungen: das "Gegenstück" beim Wiederöffnen ist `STATUS:NEEDS-ACTION` plus das Entfernen von `COMPLETED` und `PERCENT-COMPLETE`, nicht ein Zurücksetzen auf einen Wert; und zu den Feldern des Abhakens gehören bei der App die beiden Pflegefelder `LAST-MODIFIED` und `DTSTAMP`.
+
+Zeitformen, wie die App sie schreibt (Zeilen `ZEITFORM` in der Rohdatei): ein ganztägiges Fälligkeitsdatum als `DUE;VALUE=DATE:20261120`; ein Fälligkeitsdatum mit Uhrzeit als UTC (`DUE:20261120T091500Z` für 10:15 Uhr in Europe/Berlin), ebenso `DTSTART`; `COMPLETED`, `CREATED`, `LAST-MODIFIED` und `DTSTAMP` immer als UTC. Die App schreibt in keinem der fünfzehn Objekte ein `TZID` und kein `VTIMEZONE`.
+
+Einschränkungen: für `s30 wieder-oeffnen` liegt nur der Endstand vor, nicht der Zwischenstand nach dem Abhaken; dass er dem von `s30 abhaken` gleicht, ist nicht gemessen. Gemessen ist eine Fassung der App (0.18.1) auf einer Fassung des Servers.
 
 ### 3.6 Wiederkehrende Aufgaben und Unteraufgaben in der Tasks-App
 
-Offen, füllt Plan 30-02 nach der Browser-Sitzung (Task 3).
+Pflichtzeilen, wörtlich aus `raw/ui-sitzung.txt`:
+
+- `ELTERN ABHAKEN kind_geaendert=ja kind_differenz=hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED | eltern_geaendert=nein eltern_differenz=leer`
+- `WIEDERKEHREND app differenz hinzu=keine entfernt=keine geaendert=DTSTAMP,DUE,LAST-MODIFIED due_vorher=20261120T130000Z due_nachher=20261121T130000Z rrule_nachher=FREQ=DAILY status_nachher=fehlt completed_nachher=fehlt neue_objekte=0`
+
+**Wiederkehrende Aufgabe (A15, App-Seite).** Die App hat `s30 wiederkehrend` selbst angelegt (`RRULE:FREQ=DAILY`, im Dialog "Aufgabe wiederholen" die Auswahl "Tag"). Beim Abhaken erledigt sie die Aufgabe nicht: sie schiebt `DUE` um einen Tag weiter (von `20261120T130000Z` auf `20261121T130000Z`), lässt die `RRULE` stehen, setzt weder `STATUS` noch `COMPLETED` und legt kein zweites Objekt an. Das ist ein einzelner `PUT` mit 204. Die App schreibt die Serie also fort, statt eine Wiederholung als erledigt festzuhalten. Zusammen mit 3.4 (ein `PUT` am Master, der `STATUS:COMPLETED` setzt, erledigt die ganze Serie) heißt das für A15: ein Abhaken, das dem Verhalten der App entspricht, verlangt die Berechnung des nächsten Termins aus der `RRULE`, und die ist als Grenze des Projekts ausgeschlossen. Die Vorgabe "ablehnen" bleibt von der Messung her bestehen; über sie entscheidet der Owner am Checkpoint in Plan 30-05.
+
+**Elternaufgabe mit Unteraufgabe (A16, App-Seite).** Angeklickt wurde nur das Kontrollkästchen der Elternaufgabe `s30 eltern-abhaken`, die App stellte keine Rückfrage. Das Zugriffsprotokoll zeigt, was sie daraufhin tat: zwei `PUT` innerhalb einer Sekunde, einer auf die Unteraufgabe (204) und einer auf die Elternaufgabe (500). Auf dem Server steht danach die Unteraufgabe `s30 kind-abhaken` als erledigt (`ELTERN ABHAKEN kind_zeilen_hinzu=['COMPLETED:20261111T130125Z', 'PERCENT-COMPLETE:100', 'STATUS:COMPLETED'] eltern_status_stand_b=fehlt`), die Elternaufgabe ist unverändert offen: gleiche ETag wie in Stand a, leere Differenz. Die Ursache des 500 nennt das Serverprotokoll: `SQLSTATE[HY000]: General error: 5 database is locked`, also zwei gleichzeitige Schreibzugriffe auf SQLite.
+
+Der Widerspruch zwischen Oberfläche und Server, wie ihn die Hauptsitzung gesehen hat: direkt nach dem Klick zeigte die App beide Aufgaben als erledigt; nach einem späteren Neuladen der Liste stand die Elternaufgabe wieder als offen da. Die Rohobjekte und das Zugriffsprotokoll erklären beides: die App zeigt den gewünschten Zustand sofort an und hat den gescheiterten `PUT` der Elternaufgabe nicht als Fehler gemeldet; nach dem Neuladen zeigt sie, was der Server hat. Belegt ist das durch drei voneinander unabhängige Quellen (Rohobjekt und ETag in Stand b, Statuscode 500 im Zugriffsprotokoll, Ausnahme im Serverprotokoll).
+
+Für A16 heißt das: serverseitig ist die Annahme belegt (3.4, der Server fasst die Unteraufgabe nicht an). Als Aussage über die Tasks-App ist sie widerlegt: die App hakt die Unteraufgabe von sich aus mit ab, mit einem eigenen `PUT`. Die Vorgabe aus TMOD-03, Unteraufgaben nicht mit abzuhaken, bleibt möglich, weicht dann aber bewusst vom Verhalten der App ab; das ist eine Entscheidung für den Owner-Checkpoint in Plan 30-05. Welche Felder die App in die Elternaufgabe geschrieben hätte, ist nicht gemessen, weil dieser `PUT` scheiterte.
+
+Zwei Nebenbefunde für Phase 33: ein 5xx auf einen `PUT` darf nie als Erfolg gemeldet werden, und auf SQLite genügen zwei gleichzeitige Schreibzugriffe desselben Kontos für einen solchen Fehler (in der Sitzung zweimal, auch in Runde A bei `s30 uhrzeit`).
+
+**Rohmaterial für die Pläne 30-03 und 30-04** (hier nur gesichert und gezählt, nicht ausgewertet): Die App verschiebt mit `MOVE`, je Objekt ein Aufruf mit 201; beim Verschieben der Elternaufgabe `s30 eltern-umzug` hat sie die Unteraufgabe `s30 kind-umzug` mit einem eigenen `MOVE` mitgenommen; Objektname und Inhalt sind in der Zielliste unverändert (`UI-UMZUG objekte_in_liste_2=3 verschoben=3`). Beim Löschen der Elternaufgabe `s30 eltern-loeschen` hat sie auch die Unteraufgabe gelöscht, zwei `DELETE` mit 204; beide Objekte liegen mit unverändertem Inhalt im Papierkorb des Kalenders, dort unter einem Namen aus der Datenbank-Kennung (`UI-PAPIERKORB objekte=2`). Die App legt eine Liste mit `MKCOL` an, nicht mit `MKCALENDAR`, mit dem Komponenten-Set `VTODO`; das Konto hatte nach der ersten Anmeldung außerdem einen Kalender `personal` mit `VEVENT`, `VTODO` und `VJOURNAL`. Die rohe Discovery-Antwort des Kontos steht in `raw/ui-sitzung.txt` (Zeile `UI-DISCOVERY-ROH`).
 
 ## 4. Verschieben und Löschen (MESS-06)
 
@@ -272,7 +311,188 @@ Offen, füllt Plan 30-04.
 
 ## 7. Inventar der Gates und Zusagen (A17)
 
-Offen, füllt Plan 30-02.
+Erstellt am 2026-11-11 mit dem Block inventory des Messskripts, ohne Instanz. Die Zeilennummern gelten auf Commit `32b8df0` (voll: `32b8df00964e5f724ae3edc3de1796f3693159ef`); der Arbeitsbaum wich in den durchsuchten Pfaden nicht ab. Rohbeleg ist `raw/inventar.txt` mit jeder Fundstelle, Auszug in 12.5.
+
+Zwei Suchen, die keinen Suchbegriff teilen:
+
+- **Muster 1** sucht den Wortlaut der Zusage in Englisch, Deutsch und Französisch (create-only, never deleted, overwrite, destructive, move, rename, gelöscht, überschreiben, destruktiv, verschieben, jamais, supprimer, écraser, déplacer und ihre Stämme) in den drei READMEs, `docs/`, `appinfo/info.xml`, den Changelogs, `.planning/PROJECT.md`, `src/mcp_connector/server/` und im Destruktiv-Gate `tests/contract/test_no_destructive_calls.py`.
+- **Muster 2** sucht die technische Seite: die Konstanten der Gates (`EXPECTED_PUT_CALLS`, `FORBIDDEN`, `CHUNK_ASSEMBLY_MOVE`, `CREATE_TOOLS`, `destructive_hint`, `idempotent_hint`, `MUST_REFUSE`, `FILE_WRITERS`, `PARAM_ALLOWLIST`) in `tests/` und `src/`, die Methodenliterale in `src/mcp_connector/nextcloud/clients/`, Testnamen mit create, destructive, overwrite oder readonly, und in den öffentlichen Texten aller drei Sprachen die Wörter der HTTP-Ebene (`PUT`, `DELETE`, `MOVE`, `If-Match`, Papierkorb), die von der Sprache nicht abhängen.
+
+Ergebnis: `INVENTAR MUSTER 1 treffer=242 | MUSTER 2 treffer=191`; `INVENTAR SUMME treffer=416 gate=46 annotation=4 audit=10 kanarie=2 zusage-server=2 zusage-store=3 zusage-doku=47 ungeklaert=0 ausgeschlossen=302`. Die Positivkontrolle steht: `INVENTAR POSITIVKONTROLLE gefunden=6/6 stellen=['EXPECTED_PUT_CALLS', 'FORBIDDEN', 'README-Rechtetabelle', 'threat-model', 'Store-Text', 'Server-Instruktion'] fehlend=keine`. Die Gegenprobe hat getragen: `INVENTAR GEGENPROBE nur_muster_2_im_inventar=41 (Stellen, die Muster 1 nicht fand und die trotzdem im Inventar stehen)`.
+
+Wie zugeordnet wurde: jede Fundstelle beider Muster wurde gelesen; die Zuordnung zu Klasse, berührenden Methoden und Phase steht als Regeltabelle im Skript (`INVENTORY_RULES`), die erste passende Regel entscheidet, und eine Fundstelle ohne Regel lässt den Block scheitern. Ein Treffer, der die Zusage nicht betrifft, ist nicht gelöscht, sondern mit Grund als ausgeschlossen geführt. "Berührt von" meint: `PUT` für den überschreibenden `PUT` (abhaken, wieder öffnen, ändern), `MOVE` für das Verschieben in eine andere Liste, `DELETE` für das bedingte Löschen. In der Tabelle ist der Wortlaut auf 160 Zeichen gekürzt, Backticks sind durch Apostrophe ersetzt und senkrechte Striche maskiert; der ungekürzte Wortlaut steht in der Rohdatei.
+
+Zwei Dinge, die bei der Erstellung aufgefallen sind:
+
+- Die Positivkontrolle des Plans verlangt, dass Muster 1 auch `EXPECTED_PUT_CALLS` und `FORBIDDEN` findet. Muster 1 sucht Wortlaut und kann eine Konstante nicht nennen. Als gefunden zählt deshalb ein Treffer von Muster 1 im Gate selbst, höchstens zwölf Zeilen von der Konstante entfernt: der Satz, der sagt, was die Konstante bewacht.
+- Der erste Entwurf von Muster 1 fand die englische Zeile `README.md:42` ("No deleting") und die Zeilen zum Verschieben und Umbenennen nicht; Muster 2 fand die erste über das Wort `DELETE`. Muster 1 wurde daraufhin um die Stämme für löschen, verschieben und umbenennen und um "Read and create" erweitert, bevor ausgewertet wurde. Der zweite Satz der Server-Instruktion ("Read and create content ...") ist erst dadurch im Inventar.
+
+### 7.1 Fundstellen, die ein ändernder Zugriff berührt
+
+| Klasse | Datei:Zeile | Wortlaut | berührt von | abzuarbeiten in | Muster |
+|--------|-------------|----------|-------------|-----------------|--------|
+| gate | `tests/contract/test_no_destructive_calls.py:4` | never delete, overwrite or re-share anything (TOOL-09). Without a gate that sentence is a | PUT,MOVE,DELETE | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:11` | its module docstring that it implements no DELETE, no MOVE, no COPY and no PROPPATCH. | MOVE,DELETE | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:32` | # Destructive HTTP verbs and the one OCS route that changes who may see an object. Upper | MOVE,DELETE | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:86` | FORBIDDEN: dict[str, str] = { | MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_no_destructive_calls.py:88` | "MOVE": "no tool may move or rename anything", | MOVE,DELETE | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:139` | # The only MOVE in production is Nextcloud's internal chunk-assembly step. It carries | MOVE | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:140` | # ''Overwrite: F'' and is therefore still create-only; user-facing move and rename tools | MOVE | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:142` | CHUNK_ASSEMBLY_MOVE = "nextcloud/clients/dav.py" | MOVE | Phase 33 | 2 |
+| gate | `tests/contract/test_no_destructive_calls.py:387` | destructive call is written as a string: ''client.request("DELETE", url)''. | MOVE,DELETE | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:421` | for needle, why in FORBIDDEN.items(): | MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_no_destructive_calls.py:424` | if needle == "MOVE" and relative == CHUNK_ASSEMBLY_MOVE and text.strip() == '"MOVE",': | MOVE | Phase 33 | 1+2 |
+| gate | `tests/contract/test_no_destructive_calls.py:440` | def test_the_production_code_contains_no_destructive_request() -> None: | MOVE,DELETE | Phase 33 | 1+2 |
+| gate | `tests/contract/test_no_destructive_calls.py:447` | assert findings == [], "destructive call found:\n" + "\n".join(findings) | MOVE,DELETE | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:450` | def test_file_updates_keep_create_and_compare_and_swap_puts_distinct() -> None: | PUT | Phase 33 | 2 |
+| gate | `tests/contract/test_no_destructive_calls.py:451` | """A file update must stay compare-and-swap while file creation stays create-only.""" | PUT | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:470` | #: protocol writes into Nextcloud's temporary upload folder and its final MOVE carries | MOVE | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:471` | #: ''Overwrite: F''; the init-progress push is the ExApp talking about itself to the | PUT | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:480` | EXPECTED_PUT_CALLS = 6 | PUT | Phase 33 | 2 |
+| gate | `tests/contract/test_no_destructive_calls.py:506` | """Every PUT in ''tree'' that could overwrite without a precondition, plus the count. | PUT | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:560` | """No PUT anywhere in the production code may overwrite unconditionally.""" | PUT | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:571` | assert total == EXPECTED_PUT_CALLS, ( | PUT | Phase 33 | 2 |
+| gate | `tests/contract/test_no_destructive_calls.py:573` | f"{EXPECTED_PUT_CALLS}; a new PUT is a review event, update the pin deliberately" | PUT | Phase 33 | 2 |
+| gate | `tests/contract/test_no_destructive_calls.py:633` | def test_the_gate_would_notice_a_destructive_call_in_real_code() -> None: | MOVE,DELETE | Phase 33 | 1+2 |
+| gate | `tests/contract/test_no_destructive_calls.py:642` | real module doubles as the counter proof for the MOVE exemption: dav.py carries the one | MOVE | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:643` | exempt chunk-assembly MOVE and must still report nothing. | MOVE | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:648` | assert "no DELETE, no MOVE, no COPY" not in docstring_text, ( | MOVE,DELETE | Phase 33 | 1 |
+| gate | `tests/contract/test_no_destructive_calls.py:653` | "dav.py must be clean before the injected call can prove anything; its one MOVE is " | MOVE | Phase 33 | 1 |
+| gate | `tests/contract/test_tool_classes.py:89` | async def test_readers_are_read_only_and_writers_are_not() -> None: | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_tool_classes.py:95` | for name in tool_classes.FILE_WRITERS: | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_tool_classes.py:105` | + len(tool_classes.FILE_WRITERS) | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_tool_classes.py:111` | len(tool_classes.FILE_WRITERS), | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_tool_surface.py:73` | CREATE_TOOLS = { | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_tool_surface.py:472` | assert not (CREATE_TOOLS & {name for name in tools if name.startswith("mail")}), ( | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_tool_surface.py:749` | says so by comparing against the frozen ''CREATE_TOOLS'' rather than against a literal: | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_tool_surface.py:756` | assert CREATE_TOOLS < EXPECTED_TOOLS, "every write tool must be part of the curated set" | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_tool_surface.py:766` | assert annotations.destructive_hint is True | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_tool_surface.py:767` | assert annotations.idempotent_hint is False | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_tool_surface.py:768` | elif name in CREATE_TOOLS: | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_tool_surface.py:770` | assert annotations.destructive_hint is False, ( | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_tool_surface.py:773` | assert annotations.idempotent_hint is False, ( | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/test_tool_surface.py:842` | if name in CREATE_TOOLS | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/tool_classes.py:69` | FILE_WRITERS: dict[str, str] = { | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/tool_classes.py:152` | known = FILE_READERS.keys() \| FILE_WRITERS.keys() \| UNAFFECTED.keys() | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/tool_classes.py:177` | "FILE_WRITERS": FILE_WRITERS, | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/tool_classes.py:195` | affected = FILE_READERS.keys() \| FILE_WRITERS.keys() | PUT,MOVE,DELETE | Phase 33 | 2 |
+| gate | `tests/contract/tool_classes.py:200` | for name in sorted(FILE_WRITERS.keys() - paired): | PUT,MOVE,DELETE | Phase 33 | 2 |
+| annotation | `src/mcp_connector/server/__init__.py:79` | destructive_hint=False, | PUT,MOVE,DELETE | Phase 33 | 1+2 |
+| annotation | `src/mcp_connector/server/__init__.py:80` | idempotent_hint=False, | PUT,MOVE,DELETE | Phase 33 | 2 |
+| annotation | `src/mcp_connector/server/__init__.py:86` | destructive_hint=True, | PUT,MOVE,DELETE | Phase 33 | 1+2 |
+| annotation | `src/mcp_connector/server/__init__.py:87` | idempotent_hint=False, | PUT,MOVE,DELETE | Phase 33 | 2 |
+| audit | `src/mcp_connector/audit/allowlist.py:45` | PARAM_ALLOWLIST: Mapping[str, frozenset[str]] = { | PUT,MOVE,DELETE | Phase 33 | 2 |
+| audit | `src/mcp_connector/audit/record.py:37` | from .allowlist import PARAM_ALLOWLIST | PUT,MOVE,DELETE | Phase 33 | 2 |
+| audit | `src/mcp_connector/audit/record.py:105` | return sorted(set(arguments.keys()) & PARAM_ALLOWLIST.get(tool, frozenset())) | PUT,MOVE,DELETE | Phase 33 | 2 |
+| audit | `tests/contract/test_audit_surface.py:27` | from mcp_connector.audit.allowlist import FORBIDDEN_PARAMS, PARAM_ALLOWLIST | PUT,MOVE,DELETE | Phase 33 | 2 |
+| audit | `tests/contract/test_audit_surface.py:56` | f"{name} has no allowlist entry" for name in sorted(surface) if name not in PARAM_ALLOWLIST | PUT,MOVE,DELETE | Phase 33 | 2 |
+| audit | `tests/contract/test_audit_surface.py:60` | for name in sorted(PARAM_ALLOWLIST) | PUT,MOVE,DELETE | Phase 33 | 2 |
+| audit | `tests/contract/test_audit_surface.py:76` | for name in sorted(PARAM_ALLOWLIST): | PUT,MOVE,DELETE | Phase 33 | 2 |
+| audit | `tests/contract/test_audit_surface.py:77` | for parameter in sorted(PARAM_ALLOWLIST[name] - surface.get(name, set())): | PUT,MOVE,DELETE | Phase 33 | 2 |
+| audit | `tests/contract/test_audit_surface.py:90` | for name in sorted(PARAM_ALLOWLIST) | PUT,MOVE,DELETE | Phase 33 | 2 |
+| audit | `tests/contract/test_audit_surface.py:91` | for parameter in sorted(PARAM_ALLOWLIST[name] & FORBIDDEN_PARAMS) | PUT,MOVE,DELETE | Phase 33 | 2 |
+| kanarie | `tests/integration/test_canary.py:89` | MUST_REFUSE = ("files_upload", "notes_create", "talk_send") | PUT,MOVE,DELETE | Phase 33 | 2 |
+| kanarie | `tests/integration/test_canary.py:308` | if tool in MUST_REFUSE: | PUT,MOVE,DELETE | Phase 33 | 2 |
+| zusage-server | `src/mcp_connector/server/__init__.py:62` | "Read and create content in the user's own Nextcloud. " | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-server | `src/mcp_connector/server/__init__.py:63` | "Files are never deleted, moved, renamed or unconditionally overwritten." | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-store | `appinfo/info.xml:69` | - Nothing destructive: no delete, no move, no share; nothing in the background, no telemetry | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-store | `appinfo/info.xml:89` | - Nichts Destruktives: kein Löschen, kein Verschieben, kein Teilen; nichts im Hintergrund, keine Telemetrie | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-store | `appinfo/info.xml:109` | - Rien de destructif : pas de suppression, pas de déplacement, pas de partage ; rien en arrière-plan, pas de télémétrie | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `.planning/PROJECT.md:24` | **Schreibzusage:** Mit Phase 33 bekommt die Zusage "create-only, keine destruktiven Writes" erstmals eine eng begrenzte Ausnahme für eine einzelne Aufgabe (ände | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `.planning/PROJECT.md:70` | - ✓ Risikoarme Writes, destruktive Ops konstruktionsbedingt ausgeschlossen , v1.0 (AST-Grep-Gate, Zwei-Konten-Negativbeweis) | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `.planning/PROJECT.md:118` | - Destruktive Operationen (Löschen, Überschreiben, Teilen/Freigaben ändern) - Sicherheitsversprechen der v1: "kann konstruktionsbedingt nichts zerstören" | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `.planning/PROJECT.md:150` | - **Security**: Der MCP darf nie mehr sehen als der angemeldete Nutzer (Berechtigungs-Durchgriff); keine destruktiven Writes in v1 | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `.planning/PROJECT.md:162` | \| Risikoarme Writes, destruktive Ops ausgeschlossen \| "Kann nichts zerstören" ist Verkaufsargument, kein Mangel \| ✓ Good , als Gate implementiert (AST-Grep), | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `README.de.md:48` | - Nichts löschen: kein Tool setzt ein DELETE auf Dateien, Termine, Notizen, Karten oder | DELETE | Phase 34 | 1+2 |
+| zusage-doku | `README.de.md:50` | - Kein bedingungsloses Überschreiben: Schreiben legt nur neu an, und 'files_upload' lehnt einen | PUT | Phase 34 | 1 |
+| zusage-doku | `README.de.md:56` | - Kein Verschieben, kein Umbenennen, keine Änderung von Freigaben oder Berechtigungen | MOVE | Phase 34 | 1 |
+| zusage-doku | `README.de.md:64` | [tests/contract/test_no_destructive_calls.py](tests/contract/test_no_destructive_calls.py). | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `README.de.md:68` | **read** heißt, das Tool liest nur, **create-only** heißt, es kann neue Objekte anlegen, aber | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `README.fr.md:49` | - Rien supprimer : aucun outil n'émet de DELETE sur des fichiers, événements, notes, cartes | DELETE | Phase 34 | 1+2 |
+| zusage-doku | `README.fr.md:51` | - Pas d’écrasement inconditionnel : les écritures sont en création seule, et 'files_upload' | PUT | Phase 34 | 1 |
+| zusage-doku | `README.fr.md:57` | - Aucun déplacement, aucun renommage, aucune modification de partage ni de permission | MOVE | Phase 34 | 1 |
+| zusage-doku | `README.fr.md:67` | [tests/contract/test_no_destructive_calls.py](tests/contract/test_no_destructive_calls.py). | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `README.fr.md:71` | **read** signifie que l'outil ne fait que lire, **create-only** signifie qu'il peut créer de | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `README.fr.md:72` | nouveaux objets mais ne modifie ni ne supprime jamais ceux qui existent. Le tableau n'est pas | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `README.md:42` | - No deleting: no tool issues a DELETE against files, events, notes, cards or contacts | DELETE | Phase 34 | 1+2 |
+| zusage-doku | `README.md:43` | - No unconditional overwriting: 'files_upload' refuses existing paths. If the admin enables | PUT | Phase 34 | 1 |
+| zusage-doku | `README.md:47` | - No user-visible moving or renaming, no share changes and no permission changes; binary | MOVE | Phase 34 | 1 |
+| zusage-doku | `README.md:55` | modules and fails on the first destructive call, | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `README.md:56` | [tests/contract/test_no_destructive_calls.py](tests/contract/test_no_destructive_calls.py). | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `README.md:60` | **read** means the tool only reads, **create-only** means it can create new objects but never | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/client-setup.md:873` | Remember what the tools cannot do. Nothing here deletes, moves or re-shares | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/conference-demo.md:63` | the tool list has no delete and no move, and the upload tool refuses a path that exists. | MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/conference-demo.md:271` | and that run leaves a message behind. Read the names out: there is no delete, no move and no | MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/conference-talk.md:105` | - Sixteen tools in the released 0.1.2, twenty in the development tree. No delete, no move, no | MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/conference-talk.md:112` | whichever version you install. There is no delete, there is no move, and there is no share. | MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/conference-talk.md:174` | \| 6 \| Sixteen tools in 0.1.2 and twenty in the development tree, no delete, no move, no share \| 'scripts/check_tool_budget.py' and the tool table contract te | MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/conference-talk.md:208` | set deliberately cannot do: there is no delete, no move and no share, and the assistant sees | MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/exapp-install.md:240` | data: {"jsonrpc":"2.0","id":1,"result":{"capabilities":{...},"instructions":"Read and create content in the user's own Nextcloud. This server can never delete,  | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/faq.md:151` | One honest remainder stays with the switch off: the create-only writes (a file, a | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/hardening.de.md:72` | - kein Werkzeug löscht, überschreibt, verschiebt, benennt um oder ändert | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/hardening.de.md:73` | Freigaben oder Rechte; Schreiben ist nur Anlegen, und ein Contract-Test | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/hardening.de.md:74` | fällt beim ersten destruktiven Aufruf durch, | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/hardening.fr.md:72` | - aucun outil ne supprime, n'écrase, ne déplace, ne renomme ni ne modifie | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/hardening.fr.md:74` | contrat échoue au premier appel destructif, | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/hardening.md:68` | - no tool deletes, moves, renames or changes shares or | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/hardening.md:69` | permissions; 'files_upload' remains create-only. When | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/hardening.md:72` | require conditional headers on file PUT routes, | PUT,MOVE,DELETE | Phase 34 | 2 |
+| zusage-doku | `docs/n8n-setup.md:40` | \| Deletes \| Node can delete files \| No delete tool exists at all \| | DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/privacy.md:171` | - The create-only writes ('files_upload', 'deck_create_card', 'tables_create_row') | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/privacy.md:187` | - No tool deletes, moves or re-shares files. Uploads remain create-only. | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/privacy.md:208` | 'NC_MCP_FILES_UPDATE' closes the replacement path, but not the create-only path. | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/threat-model.md:148` | - No tool deletes, moves, renames, re-shares or changes permissions. | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/threat-model.md:149` | 'files_upload' remains create-only. When 'NC_MCP_FILES_UPDATE' is | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/threat-model.md:162` | for deleting, moving, renaming or re-sharing files, optional 'files_update' | PUT,MOVE,DELETE | Phase 34 | 1 |
+| zusage-doku | `docs/threat-model.md:173` | can still misuse read tools and create-only writes within the user's | PUT,MOVE,DELETE | Phase 34 | 1 |
+
+Die Server-Instruktion steht unter `src/`, ist hier aber Phase 34 zugeordnet, weil DOC-05 sie zu den Texten der Zusage zählt; ändert Phase 33 den Text mit, ist das genauso richtig. Die Vortragsunterlagen (`docs/conference-*.md`) beschreiben den Stand eines früheren Release; sie stehen im Inventar, weil der Satz "no delete, no move" dort öffentlich steht, und ob sie nachgezogen werden, entscheidet der Owner.
+
+### 7.2 Ausgeschlossene Treffer
+
+Jeder ausgeschlossene Treffer steht mit Datei, Zeile und Wortlaut in `raw/inventar.txt`. Nach Grund:
+
+| Grund | Anzahl |
+|-------|--------|
+| Aussage ueber ein bestehendes Werkzeug, das unveraendert bleibt | 29 |
+| Datei-Upload oder Route der Einstellungsseite, kein Aufgaben-Zugriff | 6 |
+| Historie eines frueheren Release, wird nicht umgeschrieben | 14 |
+| Mail oder Datei-Upload, kein Aufgaben-Zugriff | 4 |
+| Mail, Deinstallation, Audit-Protokoll oder anderes Thema, kein Aufgaben-Zugriff | 22 |
+| Messbericht oder Anleitung zu einem anderen Thema, keine Zusage ueber Werkzeuge | 87 |
+| Nadeln und Ausnahmen fuer Talk, Mail, Tables, Tags oder den Login-Flow, kein Aufgaben-Zugriff | 21 |
+| Tabellenzeile eines bestehenden Werkzeugs; die Tabelle bekommt neue Zeilen, diese bleibt | 18 |
+| Test eines bestehenden Werkzeugs oder eines anderen Themas, vom Aufgaben-Zugriff nicht beruehrt | 71 |
+| anderes Thema, keine Aussage ueber schreibende Werkzeuge | 6 |
+| beschreibt files_update, das unveraendert bleibt | 2 |
+| beschreibt schon den geplanten Stand von v1.8 oder ist Verfahrenstext | 15 |
+| bestehender Aufruf, den EXPECTED_PUT_CALLS zaehlt oder eine eigene Nadel haelt; selbst keine Zusage | 6 |
+| die Ausnahme CHUNK_ASSEMBLY_MOVE des Datei-Uploads, bleibt | 1 |
+
+### 7.3 Präzedenz für E15: die Kette von NC_MCP_FILES_UPDATE
+
+Als Maß für den Aufwand eines eigenen Schalters, ohne Empfehlung (die steht in Plan 30-05). Gesucht wurden `NC_MCP_FILES_UPDATE`, `files_update_enabled` und `ENV_FILES_UPDATE`:
+
+| Datei:Zeile | Wortlaut |
+|-------------|----------|
+| `src/mcp_connector/config.py:51` | ENV_FILES_UPDATE = "NC_MCP_FILES_UPDATE" |
+| `src/mcp_connector/config.py:716` | def files_update_enabled(env: Mapping[str, str] \| None = None) -> bool: |
+| `src/mcp_connector/config.py:723` | value = (source.get(ENV_FILES_UPDATE) or "").strip().lower() |
+| `src/mcp_connector/config.py:732` | ENV_FILES_UPDATE, |
+| `src/mcp_connector/entry_exapp.py:58` | # tool, and ''files_update'' registers only when ''config.files_update_enabled'' answers |
+| `src/mcp_connector/entry_exapp.py:669` | if config.ENV_FILES_UPDATE in resolved: |
+| `src/mcp_connector/entry_exapp.py:670` | os.environ[config.ENV_FILES_UPDATE] = resolved[config.ENV_FILES_UPDATE] |
+| `src/mcp_connector/exapp/config_values.py:139` | "files_update": config.ENV_FILES_UPDATE, |
+| `src/mcp_connector/exapp/ui/strings.py:802` | #: The form half of ''NC_MCP_FILES_UPDATE''. This is an opt-in write capability: an update |
+| `src/mcp_connector/server/__init__.py:67` | if config.files_update_enabled() |
+| `src/mcp_connector/server/reg_files.py:249` | if config.files_update_enabled(): |
+| `appinfo/info.xml:566` | <name>NC_MCP_FILES_UPDATE</name> |
+
+Dazu Tests in sieben Dateien: `tests/contract/test_tool_surface.py` (2), `tests/unit/test_config.py` (13), `tests/unit/test_exapp_config_values.py` (1), `tests/unit/test_exapp_entry.py` (12), `tests/unit/test_exapp_env_setup.py` (1), `tests/unit/test_exapp_files_update_switch.py` (4), `tests/unit/test_exapp_lifecycle.py` (5). `E15-KETTE SUMME quelltext=12 testdateien=7 testtreffer=38 oeffentliche_texte=15 dateien_oeffentlich=['CHANGELOG.md', 'RE`. Nicht erfasst ist, was den Schalter nur über den Schlüssel `files_update` anspricht, etwa das Formular in `src/mcp_connector/exapp/admin_settings.py`; die Suche nach den drei Namen findet es nicht.
+
+### 7.4 Was das Inventar nicht ist
+
+Es nennt die Stellen, an denen die Zusage "create-only, nichts Destruktives" steht oder bewacht wird. Es nennt nicht, was jedes neue Werkzeug ohnehin berührt, ob ändernd oder nicht: die Werkzeugzahl, das Budget (`scripts/check_tool_budget.py`), die Werkzeugtabellen der READMEs und die Changelogs. Vollständig heißt hier: beide Muster liefern auf dem genannten Commit keine Stelle, die nicht im Inventar oder mit Grund unter den Ausgeschlossenen steht. Eine Zusage in einem Wortlaut, den keines der beiden Muster trifft, findet es nicht.
 
 ## 8. Annahmen A1 bis A19 und A21
 
@@ -303,7 +523,7 @@ Jeder Plan trägt hier seine Ungemessen-Zeilen mit Grund ein. Stand nach Plan 30
 | Serverseitige Verschlüsselung, LDAP- und SSO-Konten | ungemessen | in der Testinstanz nicht vorhanden; wie in `docs/spike-dav.md` benannt |
 | Unzulässige Namen über die drei gemessenen hinaus | ungemessen | gemessen sind `.htaccess`, ein Backslash und 300 Zeichen; die übrigen Regeln der Namensprüfung (weitere reservierte Namen, verbotene Zeichen und Endungen) sind gelesen, nicht gemessen |
 
-Ergänzt durch Plan 30-02, Messungen vor der Browser-Sitzung (2026-11-11):
+Ergänzt durch Plan 30-02 (2026-11-11):
 
 | Punkt | Stand | Grund |
 |-------|-------|-------|
@@ -313,7 +533,13 @@ Ergänzt durch Plan 30-02, Messungen vor der Browser-Sitzung (2026-11-11):
 | Erkennen des fehlenden Schreibrechts vor dem PUT | ungemessen in diesem Plan | gemessen ist nur die Antwort auf den PUT (404); die Privilegien der Sammlung in der Discovery gehören zu MESS-03 in Plan 30-04 |
 | Wiederkehrende Aufgabe mit `RECURRENCE-ID`-Ausnahmen, Abhaken einer einzelnen Wiederholung | ungemessen | gemessen ist der PUT am Master einer täglichen Serie ohne Ausnahmen |
 | Unteraufgaben in einer anderen Liste als die Elternaufgabe, mehrstufige Unteraufgaben | ungemessen | gemessen ist eine Unteraufgabe in derselben Liste |
-| Was die Tasks-App schreibt (A12, App-Seite von A15 und A16), Inventar (A17) | offen | folgt nach der Browser-Sitzung in Task 3 dieses Plans |
+| Felder, die die Tasks-App beim Abhaken einer Elternaufgabe in die Elternaufgabe schreibt | ungemessen | der `PUT` der App auf die Elternaufgabe scheiterte am 2026-11-11 mit 500 (`database is locked`, 12.4); gesichert ist nur, dass sie ihn gesendet hat. Nicht wiederholt, weil nichts nachgestellt wird |
+| Zwischenstand von `s30 wieder-oeffnen` nach dem Abhaken | ungemessen | gesichert sind Stand a und Stand b, nicht der Stand dazwischen |
+| Ob die Tasks-App für eine Wiederholung ein Datum verlangt | ungemessen | in der Sitzung wurde das Fälligkeitsdatum gesetzt, bevor die Wiederholung eingestellt wurde |
+| Wiederkehrende Aufgabe mit Enddatum, mit Zähler oder mit anderem Rhythmus in der App | ungemessen | gemessen ist eine tägliche Wiederholung ohne Ende, einmal abgehakt |
+| Tasks-App in anderen Fassungen als 0.18.1, andere Clients (Thunderbird, DAVx5, Apple) | ungemessen | eine Fassung der App in einem Browser |
+| Wortlaut der Fehler in der Konsole des Browsers | ungemessen | die Hauptsitzung hat die Zahl notiert (vier in Runde A, einer in Runde B), nicht den Text; die beiden 500 stehen im Zugriffsprotokoll |
+| Zusagen in einem Wortlaut, den keines der beiden Suchmuster trifft | ungemessen | Grenze des Inventars, siehe 7.4 |
 
 Zum Rückbau gehört eine Grenze, die keine Messlücke ist, aber benannt sein muss: `occ app:remove groupfolders` nimmt den Code der App weg, nicht ihre Tabellen in der Datenbank, und auch `files_external` behält seine Tabellen nach dem Ausschalten. Die Baseline (Apps, Konten, Gruppen, Dateien, Kalender) ist nach dem Lauf in allen zwölf Feldern gleich; die leeren Tabellen beider Apps bleiben in der Instanz nc35 zurück.
 
@@ -907,4 +1133,134 @@ x-request-id: retZJbJbtJoVIeTo2Bt9
 x-robots-tag: noindex, nofollow
 x-user-id: spike30a
 (no body)
+```
+
+### 12.4 raw/ui-sitzung.txt
+
+Die Datei trägt mehrere Läufe vom 2026-11-11 hintereinander. Zuerst acht Versuche, Stand a zu sichern, die am RAM-Tor endeten (freier Host-Speicher 3,87 bis 3,97 GB bei einer Schwelle von 4,0, der Browser lief noch); sie haben nichts gelesen und nichts geschrieben. Dann der Lauf, der Stand a gesichert hat, der Lauf für Stand b mit dem Vergleichsobjekt, ein Lauf mit ui-log und ui-evaluate, und ein zweiter Lauf von ui-log, der zusätzlich die rohe Discovery des Kontos festhält (als Wiederholung benannt, die Zugriffszeilen sind dieselben). Die acht Abbrüche lauten alle so, nur der Wert wechselt:
+
+```
+RUN FAILED | RunFailed: RAM gate shut: 3.87 GB free (needs 4.0), foreign runs: []; nothing was stopped
+RUN FAILED | RunFailed: RAM gate shut: 3.97 GB free (needs 4.0), foreign runs: []; nothing was stopped
+```
+
+Die Messzeilen ab dem gelungenen Stand a. Von den vierzig schreibenden Aufrufen des Kontos stehen hier die aus Runde B und die beiden mit Fehlerstatus; alle vierzig und die Zeilen je Objekt stehen in der Rohdatei:
+
+```
+UI-LISTE stand=a liste=personal name=Persönlich komponenten=VEVENT,VTODO,VJOURNAL
+UI-LISTE stand=a liste=spike30-liste-1 name=spike30-liste-1 komponenten=VTODO
+UI-LISTE stand=a liste=spike30-liste-2 name=spike30-liste-2 komponenten=VTODO
+2026-11-11T12:59:26Z | UI-PAPIERKORB-LESEN stand=a REPORT calendar-query trashbin/objects auth=appapi status=207 objekte=0
+UI-GLEICH appapi_basic=ja abweichend=keine
+UI-STAND a objekte=15
+UI-WIEDERKEHREND vorhanden=ja
+UI-LISTE stand=b liste=personal name=Persönlich komponenten=VEVENT,VTODO,VJOURNAL
+UI-LISTE stand=b liste=spike30-liste-1 name=spike30-liste-1 komponenten=VTODO
+UI-LISTE stand=b liste=spike30-liste-2 name=spike30-liste-2 komponenten=VTODO
+2026-11-11T13:05:35Z | UI-REPORT stand=b liste=personal auth=appapi status=207 objekte=0 | auth=basic status=207 objekte=0
+2026-11-11T13:05:35Z | UI-REPORT stand=b liste=spike30-liste-1 auth=appapi status=207 objekte=10 | auth=basic status=207 objekte=10
+2026-11-11T13:05:35Z | UI-REPORT stand=b liste=spike30-liste-2 auth=appapi status=207 objekte=3 | auth=basic status=207 objekte=3
+2026-11-11T13:05:35Z | UI-PAPIERKORB-LESEN stand=b REPORT calendar-query trashbin/objects auth=appapi status=207 objekte=2
+UI-STAND b objekte=15
+2026-11-11T13:05:35Z | VERGLEICH skript_put pflegefelder_server=keine anlegen=201 abhaken=204 etag_vorher=f11673e3ef94 etag_nachher=eeb5d58cd8b1 gesendet_hinzu=['COMPLETED:20261111T130535Z', 'PERCENT-COMPLETE:100', 'STATUS:COMPLETED'] vom_server_entfernt=keine woertlich_gespeichert=ja auth=appapi nutzer=spike30a liste=spike30-a objekt=s30-vergleich-130535.ics
+UI-ZUGRIFFE nutzer=spike30ui schreibende_anfragen=40 (Zugriffsprotokoll)
+UI-ZUGRIFF 11/Nov/2026:12:53:23 +0000 PUT spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics status=500
+UI-ZUGRIFF 11/Nov/2026:13:00:01 +0000 PUT spike30-liste-1/2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:01:11 +0000 PUT spike30-liste-1/2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:01:26 +0000 PUT spike30-liste-1/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics status=500
+UI-ZUGRIFF 11/Nov/2026:13:01:25 +0000 PUT spike30-liste-1/7CB0DDE8-C2D1-4640-B1D0-808CA11B3E2E.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:01:29 +0000 PUT spike30-liste-1/7B483532-932E-4791-B363-DD0F4E3C8FEF.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:01:47 +0000 MOVE spike30-liste-1/1EA798A8-7873-43DE-B2DC-0926941B62D0.ics status=201
+UI-ZUGRIFF 11/Nov/2026:13:02:43 +0000 MOVE spike30-liste-1/D9556088-A989-49E2-A64A-EB82F07F575E.ics status=201
+UI-ZUGRIFF 11/Nov/2026:13:02:43 +0000 MOVE spike30-liste-1/C4CED131-CD86-49FE-86E7-1EA2956A4AF2.ics status=201
+UI-ZUGRIFF 11/Nov/2026:13:03:41 +0000 DELETE spike30-liste-1/8284CF2E-FED9-40DF-B41A-31475E72DAA4.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:03:41 +0000 DELETE spike30-liste-1/C67CFD08-4F41-4754-9ECF-5D64AC34BAC9.ics status=204
+UI-ZUGRIFFE mit_fehlerstatus=2
+UI-SERVERFEHLER 2026-11-11T12:53:23+00:00 PUT ars/spike30ui/spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics | An exception occurred while executing a query: SQLSTATE[HY000]: General error: 5 database is locked
+UI-SERVERFEHLER 2026-11-11T12:53:23+00:00 PUT ars/spike30ui/spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics | Uncaught exception
+UI-SERVERFEHLER 2026-11-11T13:01:26+00:00 PUT ars/spike30ui/spike30-liste-1/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics | An exception occurred while executing a query: SQLSTATE[HY000]: General error: 5 database is locked
+UI-SERVERFEHLER 2026-11-11T13:01:26+00:00 PUT ars/spike30ui/spike30-liste-1/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics | Uncaught exception
+UI-AUSWERTUNG stand_a_objekte=15 stand_b_objekte=15 (nach UID)
+ABHAKEN FELDER hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED zeitform_completed=utc
+ABHAKEN zeilen_hinzu=['COMPLETED:20261111T125947Z', 'PERCENT-COMPLETE:100', 'STATUS:COMPLETED']
+WIEDEROEFFNEN FELDER hinzu=STATUS entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED
+WIEDEROEFFNEN zeilen_hinzu=['STATUS:NEEDS-ACTION'] abhaken_felder_danach_fehlend=COMPLETED,PERCENT-COMPLETE status_danach=NEEDS-ACTION
+ELTERN ABHAKEN kind_geaendert=ja kind_differenz=hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED | eltern_geaendert=nein eltern_differenz=leer
+ELTERN ABHAKEN kind_zeilen_hinzu=['COMPLETED:20261111T130125Z', 'PERCENT-COMPLETE:100', 'STATUS:COMPLETED'] eltern_status_stand_b=fehlt
+WIEDERKEHREND app differenz hinzu=keine entfernt=keine geaendert=DTSTAMP,DUE,LAST-MODIFIED due_vorher=20261120T130000Z due_nachher=20261121T130000Z rrule_nachher=FREQ=DAILY status_nachher=fehlt completed_nachher=fehlt neue_objekte=0
+KONTROLLE unberuehrt differenz=leer
+UI-UMZUG objekte_in_liste_2=3 verschoben=3
+UI-UMZUG objekt=s30 umzug-einzeln von=spike30-liste-1 nach=spike30-liste-2 dateiname_gleich=ja inhalt_gleich=ja
+UI-UMZUG objekt=s30 eltern-umzug von=spike30-liste-1 nach=spike30-liste-2 dateiname_gleich=ja inhalt_gleich=ja
+UI-UMZUG objekt=s30 kind-umzug von=spike30-liste-1 nach=spike30-liste-2 dateiname_gleich=ja inhalt_gleich=ja
+UI-PAPIERKORB objekte=2
+UI-PAPIERKORB objekt=s30 eltern-loeschen datei=trash-135.ics datei_stand_a=C67CFD08-4F41-4754-9ECF-5D64AC34BAC9.ics inhalt_gleich_stand_a=ja
+UI-PAPIERKORB objekt=s30 kind-loeschen datei=trash-142.ics datei_stand_a=8284CF2E-FED9-40DF-B41A-31475E72DAA4.ics inhalt_gleich_stand_a=ja
+UI-NEU objekte=0 uids=keine
+UI-VERSCHWUNDEN objekte=0 uids=keine
+ZEITFORM stand=b name=s30 abhaken COMPLETED=utc CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 ganztag DUE=date CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 uhrzeit DTSTART=utc DUE=utc CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 wiederkehrend DUE=utc CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+```
+
+Rückbau und Stopp, angehängt an raw/nc35-aendern.txt (Lauf ui-teardown und nc35-stop); die zwölf BASELINE-Zeilen dieses Laufs enden alle auf gleich=ja und stehen in der Rohdatei:
+
+```
+RUECKBAU ausgesetzt: Konten, Listen und die Tasks-App bleiben fuer die Browser-Sitzung stehen; der Block ui-teardown baut zurueck und vergleicht mit den BASELINE-START-Zeilen dieses Laufs
+UI-TEARDOWN baseline aus nc35-aendern.txt gelesen: 12 Felder
+UI-TEARDOWN die Datei mit den Zugangsdaten des Browser-Kontos ist geloescht
+RUECKBAU reste_mit_praefix_spike30=keine
+RUECKBAU occ user:list -> - admin: admin - alice: alice - bob: bob
+RUECKBAU occ app:list groupfolders_vorhanden=nein files_external_an=nein
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
+docker stop nc_app_mcp_connector -> nc_app_mcp_connector | laeuft=false
+```
+
+### 12.5 raw/inventar.txt
+
+Lauf vom 2026-11-11, Block inventory, ohne Instanz. Kopf und Summen, danach die Zeilen der Konstanten und der Zusagen in Server und Store-Text, danach die Kette zu E15. Alle Fundstellen samt den ausgeschlossenen stehen in der Rohdatei:
+
+```
+INVENTAR commit=32b8df00964e5f724ae3edc3de1796f3693159ef (die Zeilennummern gelten auf diesem Commit)
+INVENTAR arbeitsbaum_abweichend=nein ausgelassen=['docs/spike-tasks.md'] (der Bericht dieser Phase zitiert die Zusagen selbst)
+INVENTAR MUSTER 1 treffer=242 | MUSTER 2 treffer=191
+INVENTAR POSITIVKONTROLLE gefunden=6/6 stellen=['EXPECTED_PUT_CALLS', 'FORBIDDEN', 'README-Rechtetabelle', 'threat-model', 'Store-Text', 'Server-Instruktion'] fehlend=keine
+INVENTAR SUMME treffer=416 gate=46 annotation=4 audit=10 kanarie=2 zusage-server=2 zusage-store=3 zusage-doku=47 ungeklaert=0 ausgeschlossen=302
+INVENTAR GEGENPROBE nur_muster_2_im_inventar=41 (Stellen, die Muster 1 nicht fand und die trotzdem im Inventar stehen)
+INVENTAR gate tests/contract/test_no_destructive_calls.py:86 | FORBIDDEN: dict[str, str] = { | beruehrt_von=MOVE,DELETE | abzuarbeiten_in=Phase 33 | muster=2
+INVENTAR gate tests/contract/test_no_destructive_calls.py:142 | CHUNK_ASSEMBLY_MOVE = "nextcloud/clients/dav.py" | beruehrt_von=MOVE | abzuarbeiten_in=Phase 33 | muster=2
+INVENTAR gate tests/contract/test_no_destructive_calls.py:480 | EXPECTED_PUT_CALLS = 6 | beruehrt_von=PUT | abzuarbeiten_in=Phase 33 | muster=2
+INVENTAR gate tests/contract/test_tool_surface.py:73 | CREATE_TOOLS = { | beruehrt_von=PUT,MOVE,DELETE | abzuarbeiten_in=Phase 33 | muster=2
+INVENTAR gate tests/contract/tool_classes.py:69 | FILE_WRITERS: dict[str, str] = { | beruehrt_von=PUT,MOVE,DELETE | abzuarbeiten_in=Phase 33 | muster=2
+INVENTAR annotation src/mcp_connector/server/__init__.py:79 | destructive_hint=False, | beruehrt_von=PUT,MOVE,DELETE | abzuarbeiten_in=Phase 33 | muster=1+2
+INVENTAR annotation src/mcp_connector/server/__init__.py:86 | destructive_hint=True, | beruehrt_von=PUT,MOVE,DELETE | abzuarbeiten_in=Phase 33 | muster=1+2
+INVENTAR kanarie tests/integration/test_canary.py:89 | MUST_REFUSE = ("files_upload", "notes_create", "talk_send") | beruehrt_von=PUT,MOVE,DELETE | abzuarbeiten_in=Phase 33 | muster=2
+INVENTAR zusage-server src/mcp_connector/server/__init__.py:62 | "Read and create content in the user's own Nextcloud. " | beruehrt_von=PUT,MOVE,DELETE | abzuarbeiten_in=Phase 34 | muster=1
+INVENTAR zusage-server src/mcp_connector/server/__init__.py:63 | "Files are never deleted, moved, renamed or unconditionally overwritten." | beruehrt_von=PUT,MOVE,DELETE | abzuarbeiten_in=Phase 34 | muster=1
+INVENTAR zusage-store appinfo/info.xml:69 | - Nothing destructive: no delete, no move, no share; nothing in the background, no telemetry | beruehrt_von=PUT,MOVE,DELETE | abzuarbeiten_in=Phase 34 | muster=1
+INVENTAR zusage-store appinfo/info.xml:89 | - Nichts Destruktives: kein Löschen, kein Verschieben, kein Teilen; nichts im Hintergrund, keine Telemetrie | beruehrt_von=PUT,MOVE,DELETE | abzuarbeiten_in=Phase 34 | muster=1
+INVENTAR zusage-store appinfo/info.xml:109 | - Rien de destructif : pas de suppression, pas de déplacement, pas de partage ; rien en arrière-plan, pas de télémétrie | beruehrt_von=PUT,MOVE,DELETE | abzuarbeiten_in=Phase 34 | muster=1
+E15-KETTE src/mcp_connector/config.py:51 | ENV_FILES_UPDATE = "NC_MCP_FILES_UPDATE"
+E15-KETTE src/mcp_connector/config.py:716 | def files_update_enabled(env: Mapping[str, str] | None = None) -> bool:
+E15-KETTE src/mcp_connector/config.py:723 | value = (source.get(ENV_FILES_UPDATE) or "").strip().lower()
+E15-KETTE src/mcp_connector/config.py:732 | ENV_FILES_UPDATE,
+E15-KETTE src/mcp_connector/entry_exapp.py:58 | # tool, and ``files_update`` registers only when ``config.files_update_enabled`` answers
+E15-KETTE src/mcp_connector/entry_exapp.py:669 | if config.ENV_FILES_UPDATE in resolved:
+E15-KETTE src/mcp_connector/entry_exapp.py:670 | os.environ[config.ENV_FILES_UPDATE] = resolved[config.ENV_FILES_UPDATE]
+E15-KETTE src/mcp_connector/exapp/config_values.py:139 | "files_update": config.ENV_FILES_UPDATE,
+E15-KETTE src/mcp_connector/exapp/ui/strings.py:802 | #: The form half of ``NC_MCP_FILES_UPDATE``. This is an opt-in write capability: an update
+E15-KETTE src/mcp_connector/server/__init__.py:67 | if config.files_update_enabled()
+E15-KETTE src/mcp_connector/server/reg_files.py:249 | if config.files_update_enabled():
+E15-KETTE appinfo/info.xml:566 | <name>NC_MCP_FILES_UPDATE</name>
+E15-KETTE-TEST tests/contract/test_tool_surface.py treffer=2
+E15-KETTE-TEST tests/unit/test_config.py treffer=13
+E15-KETTE-TEST tests/unit/test_exapp_config_values.py treffer=1
+E15-KETTE-TEST tests/unit/test_exapp_entry.py treffer=12
+E15-KETTE-TEST tests/unit/test_exapp_env_setup.py treffer=1
+E15-KETTE-TEST tests/unit/test_exapp_files_update_switch.py treffer=4
+E15-KETTE-TEST tests/unit/test_exapp_lifecycle.py treffer=5
+E15-KETTE SUMME quelltext=12 testdateien=7 testtreffer=38 oeffentliche_texte=15 dateien_oeffentlich=['CHANGELOG.md', 'README.de.md', 'README.fr.md', 'README.md', 'appinfo/info.xml', 'docs/client-setup.md', 'docs/hardening.md', 'docs/privacy.md', 'docs/threat-model.md']
 ```

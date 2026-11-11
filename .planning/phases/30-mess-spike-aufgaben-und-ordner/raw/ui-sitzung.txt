@@ -1,0 +1,353 @@
+
+# Lauf blocks=ui-snapshot start=2026-11-11T12:56:25Z (neue Datei)
+
+== ui-snapshot a ==
+RAM frei_host_gb=3.87 schwelle=4.0 ergebnis=zu wenig
+gameworld-dev-gameworld-docker-proxy-1  mem 20.05MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 64.52MiB / 5.786GiB  cpu 0.13%
+nc35-caddy  mem 20.11MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 61.18MiB / 5.786GiB  cpu 0.61%
+nc35-nc  mem 294MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+RUN FAILED | RunFailed: RAM gate shut: 3.87 GB free (needs 4.0), foreign runs: []; nothing was stopped
+
+# Lauf blocks=ui-snapshot start=2026-11-11T12:56:46Z (angehaengt an bestehende Datei)
+
+== ui-snapshot a ==
+RAM frei_host_gb=3.91 schwelle=4.0 ergebnis=zu wenig
+gameworld-dev-gameworld-docker-proxy-1  mem 20.05MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 64.65MiB / 5.786GiB  cpu 0.12%
+nc35-caddy  mem 20.11MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 61.24MiB / 5.786GiB  cpu 0.08%
+nc35-nc  mem 293MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+RUN FAILED | RunFailed: RAM gate shut: 3.91 GB free (needs 4.0), foreign runs: []; nothing was stopped
+
+# Lauf blocks=ui-snapshot start=2026-11-11T12:57:10Z (angehaengt an bestehende Datei)
+
+== ui-snapshot a ==
+RAM frei_host_gb=3.89 schwelle=4.0 ergebnis=zu wenig
+gameworld-dev-gameworld-docker-proxy-1  mem 20.05MiB / 5.786GiB  cpu 0.01%
+nc_app_mcp_connector  mem 64.83MiB / 5.786GiB  cpu 2.74%
+nc35-caddy  mem 20.11MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 60.73MiB / 5.786GiB  cpu 5.11%
+nc35-nc  mem 292.9MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+RUN FAILED | RunFailed: RAM gate shut: 3.89 GB free (needs 4.0), foreign runs: []; nothing was stopped
+
+# Lauf blocks=ui-snapshot start=2026-11-11T12:57:27Z (angehaengt an bestehende Datei)
+
+== ui-snapshot a ==
+RAM frei_host_gb=3.91 schwelle=4.0 ergebnis=zu wenig
+gameworld-dev-gameworld-docker-proxy-1  mem 20.05MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 64.71MiB / 5.786GiB  cpu 0.12%
+nc35-caddy  mem 20.11MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 60.75MiB / 5.786GiB  cpu 0.02%
+nc35-nc  mem 293.1MiB / 5.786GiB  cpu 0.01%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+RUN FAILED | RunFailed: RAM gate shut: 3.91 GB free (needs 4.0), foreign runs: []; nothing was stopped
+
+# Lauf blocks=ui-snapshot start=2026-11-11T12:57:44Z (angehaengt an bestehende Datei)
+
+== ui-snapshot a ==
+RAM frei_host_gb=3.92 schwelle=4.0 ergebnis=zu wenig
+gameworld-dev-gameworld-docker-proxy-1  mem 19.86MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 59.77MiB / 5.786GiB  cpu 0.11%
+nc35-caddy  mem 19.65MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 56.86MiB / 5.786GiB  cpu 0.09%
+nc35-nc  mem 289.1MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+RUN FAILED | RunFailed: RAM gate shut: 3.92 GB free (needs 4.0), foreign runs: []; nothing was stopped
+
+# Lauf blocks=ui-snapshot start=2026-11-11T12:58:01Z (angehaengt an bestehende Datei)
+
+== ui-snapshot a ==
+RAM frei_host_gb=3.96 schwelle=4.0 ergebnis=zu wenig
+gameworld-dev-gameworld-docker-proxy-1  mem 19.86MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 62.26MiB / 5.786GiB  cpu 0.13%
+nc35-caddy  mem 19.14MiB / 5.786GiB  cpu 0.03%
+nc35-harp  mem 58.52MiB / 5.786GiB  cpu 0.01%
+nc35-nc  mem 290MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+RUN FAILED | RunFailed: RAM gate shut: 3.96 GB free (needs 4.0), foreign runs: []; nothing was stopped
+
+# Lauf blocks=ui-snapshot start=2026-11-11T12:58:18Z (angehaengt an bestehende Datei)
+
+== ui-snapshot a ==
+RAM frei_host_gb=3.96 schwelle=4.0 ergebnis=zu wenig
+gameworld-dev-gameworld-docker-proxy-1  mem 19.86MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 62.41MiB / 5.786GiB  cpu 0.12%
+nc35-caddy  mem 19.13MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 58.75MiB / 5.786GiB  cpu 0.08%
+nc35-nc  mem 290.1MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+RUN FAILED | RunFailed: RAM gate shut: 3.96 GB free (needs 4.0), foreign runs: []; nothing was stopped
+
+# Lauf blocks=ui-snapshot start=2026-11-11T12:58:35Z (angehaengt an bestehende Datei)
+
+== ui-snapshot a ==
+RAM frei_host_gb=3.97 schwelle=4.0 ergebnis=zu wenig
+gameworld-dev-gameworld-docker-proxy-1  mem 19.86MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 62.59MiB / 5.786GiB  cpu 0.12%
+nc35-caddy  mem 19.13MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 59.35MiB / 5.786GiB  cpu 0.54%
+nc35-nc  mem 290.2MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+RUN FAILED | RunFailed: RAM gate shut: 3.97 GB free (needs 4.0), foreign runs: []; nothing was stopped
+
+# Lauf blocks=ui-snapshot start=2026-11-11T12:59:20Z (angehaengt an bestehende Datei)
+
+== ui-snapshot a ==
+RAM frei_host_gb=4.41 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 19.57MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 58.99MiB / 5.786GiB  cpu 2.84%
+nc35-caddy  mem 18.11MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 55.08MiB / 5.786GiB  cpu 0.03%
+nc35-nc  mem 283.3MiB / 5.786GiB  cpu 6.01%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+occ user:auth-tokens:add spike30ui --password-from-env --name spike30 (token kept)
+UI-LISTE stand=a liste=personal name=Persönlich komponenten=VEVENT,VTODO,VJOURNAL
+UI-LISTE stand=a liste=spike30-liste-1 name=spike30-liste-1 komponenten=VTODO
+UI-LISTE stand=a liste=spike30-liste-2 name=spike30-liste-2 komponenten=VTODO
+2026-11-11T12:59:25Z | UI-REPORT stand=a liste=personal auth=appapi status=207 objekte=0 | auth=basic status=207 objekte=0
+2026-11-11T12:59:25Z | UI-REPORT stand=a liste=spike30-liste-1 auth=appapi status=207 objekte=15 | auth=basic status=207 objekte=15
+2026-11-11T12:59:26Z | UI-REPORT stand=a liste=spike30-liste-2 auth=appapi status=207 objekte=0 | auth=basic status=207 objekte=0
+2026-11-11T12:59:26Z | UI-PAPIERKORB-LESEN stand=a REPORT calendar-query trashbin/objects auth=appapi status=207 objekte=0
+UI-OBJEKT stand=a liste=spike30-liste-1 name=1EA798A8-7873-43DE-B2DC-0926941B62D0.ics summary=s30 umzug-einzeln etag=9335f485c5c8
+UI-OBJEKT stand=a liste=spike30-liste-1 name=231A6117-89EA-417C-952A-9BB4A2AE9A60.ics summary=s30 eltern-abhaken etag=ca82f7f84b94
+UI-OBJEKT stand=a liste=spike30-liste-1 name=2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics summary=s30 wieder-oeffnen etag=91eb3d2b0d91
+UI-OBJEKT stand=a liste=spike30-liste-1 name=4BFE626B-9A78-493B-9A99-78CC0FFC7D38.ics summary=s30 abhaken etag=d5c2d502a54d
+UI-OBJEKT stand=a liste=spike30-liste-1 name=4EA29582-E2DB-4C8D-AAB9-7D57EABD83BA.ics summary=s30 ganztag etag=86afd138749c
+UI-OBJEKT stand=a liste=spike30-liste-1 name=7B483532-932E-4791-B363-DD0F4E3C8FEF.ics summary=s30 wiederkehrend etag=0d9bfbb285ee
+UI-OBJEKT stand=a liste=spike30-liste-1 name=7CB0DDE8-C2D1-4640-B1D0-808CA11B3E2E.ics summary=s30 kind-abhaken etag=c234c7b09730
+UI-OBJEKT stand=a liste=spike30-liste-1 name=801AB782-6BB2-45F8-8CFD-CB945E5FACD2.ics summary=s30 notiz etag=675469b981f4
+UI-OBJEKT stand=a liste=spike30-liste-1 name=8284CF2E-FED9-40DF-B41A-31475E72DAA4.ics summary=s30 kind-loeschen etag=ca4111d710e3
+UI-OBJEKT stand=a liste=spike30-liste-1 name=C4CED131-CD86-49FE-86E7-1EA2956A4AF2.ics summary=s30 eltern-umzug etag=bdcd47680476
+UI-OBJEKT stand=a liste=spike30-liste-1 name=C67CFD08-4F41-4754-9ECF-5D64AC34BAC9.ics summary=s30 eltern-loeschen etag=364e6e4349af
+UI-OBJEKT stand=a liste=spike30-liste-1 name=CACF03F5-EC9A-4258-9B47-58A051256186.ics summary=s30 unberuehrt etag=705ada62ea6f
+UI-OBJEKT stand=a liste=spike30-liste-1 name=D9556088-A989-49E2-A64A-EB82F07F575E.ics summary=s30 kind-umzug etag=0d7b832950c8
+UI-OBJEKT stand=a liste=spike30-liste-1 name=F2771C57-9EFA-4F40-9558-DA8132B79147.ics summary=s30 tags etag=6459e1906866
+UI-OBJEKT stand=a liste=spike30-liste-1 name=FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics summary=s30 uhrzeit etag=74107c27bafe
+UI-GLEICH appapi_basic=ja abweichend=keine
+UI-STAND a objekte=15
+UI-WIEDERKEHREND vorhanden=ja
+
+# Lauf blocks=ui-snapshot start=2026-11-11T13:05:30Z (angehaengt an bestehende Datei)
+
+== ui-snapshot b ==
+RAM frei_host_gb=4.48 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 16.12MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 46.81MiB / 5.786GiB  cpu 0.12%
+nc35-caddy  mem 15.9MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 46.35MiB / 5.786GiB  cpu 0.08%
+nc35-nc  mem 259.3MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+occ user:auth-tokens:add spike30ui --password-from-env --name spike30 (token kept)
+UI-LISTE stand=b liste=personal name=Persönlich komponenten=VEVENT,VTODO,VJOURNAL
+UI-LISTE stand=b liste=spike30-liste-1 name=spike30-liste-1 komponenten=VTODO
+UI-LISTE stand=b liste=spike30-liste-2 name=spike30-liste-2 komponenten=VTODO
+2026-11-11T13:05:35Z | UI-REPORT stand=b liste=personal auth=appapi status=207 objekte=0 | auth=basic status=207 objekte=0
+2026-11-11T13:05:35Z | UI-REPORT stand=b liste=spike30-liste-1 auth=appapi status=207 objekte=10 | auth=basic status=207 objekte=10
+2026-11-11T13:05:35Z | UI-REPORT stand=b liste=spike30-liste-2 auth=appapi status=207 objekte=3 | auth=basic status=207 objekte=3
+2026-11-11T13:05:35Z | UI-PAPIERKORB-LESEN stand=b REPORT calendar-query trashbin/objects auth=appapi status=207 objekte=2
+UI-OBJEKT stand=b liste=spike30-liste-1 name=231A6117-89EA-417C-952A-9BB4A2AE9A60.ics summary=s30 eltern-abhaken etag=ca82f7f84b94
+UI-OBJEKT stand=b liste=spike30-liste-1 name=2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics summary=s30 wieder-oeffnen etag=94ef1539ed80
+UI-OBJEKT stand=b liste=spike30-liste-1 name=4BFE626B-9A78-493B-9A99-78CC0FFC7D38.ics summary=s30 abhaken etag=20ebcee7e7a3
+UI-OBJEKT stand=b liste=spike30-liste-1 name=4EA29582-E2DB-4C8D-AAB9-7D57EABD83BA.ics summary=s30 ganztag etag=86afd138749c
+UI-OBJEKT stand=b liste=spike30-liste-1 name=7B483532-932E-4791-B363-DD0F4E3C8FEF.ics summary=s30 wiederkehrend etag=f9bbebf6e015
+UI-OBJEKT stand=b liste=spike30-liste-1 name=7CB0DDE8-C2D1-4640-B1D0-808CA11B3E2E.ics summary=s30 kind-abhaken etag=85c5300611ce
+UI-OBJEKT stand=b liste=spike30-liste-1 name=801AB782-6BB2-45F8-8CFD-CB945E5FACD2.ics summary=s30 notiz etag=675469b981f4
+UI-OBJEKT stand=b liste=spike30-liste-1 name=CACF03F5-EC9A-4258-9B47-58A051256186.ics summary=s30 unberuehrt etag=705ada62ea6f
+UI-OBJEKT stand=b liste=spike30-liste-1 name=F2771C57-9EFA-4F40-9558-DA8132B79147.ics summary=s30 tags etag=6459e1906866
+UI-OBJEKT stand=b liste=spike30-liste-1 name=FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics summary=s30 uhrzeit etag=74107c27bafe
+UI-OBJEKT stand=b liste=spike30-liste-2 name=1EA798A8-7873-43DE-B2DC-0926941B62D0.ics summary=s30 umzug-einzeln etag=9335f485c5c8
+UI-OBJEKT stand=b liste=spike30-liste-2 name=C4CED131-CD86-49FE-86E7-1EA2956A4AF2.ics summary=s30 eltern-umzug etag=bdcd47680476
+UI-OBJEKT stand=b liste=spike30-liste-2 name=D9556088-A989-49E2-A64A-EB82F07F575E.ics summary=s30 kind-umzug etag=0d7b832950c8
+UI-OBJEKT stand=b liste=trashbin name=trash-135.ics summary=s30 eltern-loeschen etag=364e6e4349af
+UI-OBJEKT stand=b liste=trashbin name=trash-142.ics summary=s30 kind-loeschen etag=ca4111d710e3
+UI-GLEICH appapi_basic=ja abweichend=keine
+UI-STAND b objekte=15
+2026-11-11T13:05:35Z | VERGLEICH skript_put pflegefelder_server=keine anlegen=201 abhaken=204 etag_vorher=f11673e3ef94 etag_nachher=eeb5d58cd8b1 gesendet_hinzu=['COMPLETED:20261111T130535Z', 'PERCENT-COMPLETE:100', 'STATUS:COMPLETED'] vom_server_entfernt=keine woertlich_gespeichert=ja auth=appapi nutzer=spike30a liste=spike30-a objekt=s30-vergleich-130535.ics
+
+# Lauf blocks=ui-log,ui-evaluate start=2026-11-11T13:15:53Z (angehaengt an bestehende Datei)
+
+== ui-log ==
+RAM frei_host_gb=4.63 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 13MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 36.74MiB / 5.786GiB  cpu 0.17%
+nc35-caddy  mem 13.9MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 49.2MiB / 5.786GiB  cpu 0.13%
+nc35-nc  mem 214.6MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+UI-ZUGRIFFE nutzer=spike30ui schreibende_anfragen=40 (Zugriffsprotokoll)
+UI-ZUGRIFF 11/Nov/2026:12:50:14 +0000 MKCOL spike30-liste-1 status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:17 +0000 MKCOL spike30-liste-2 status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:33 +0000 PUT spike30-liste-1/4EA29582-E2DB-4C8D-AAB9-7D57EABD83BA.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:34 +0000 PUT spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:36 +0000 PUT spike30-liste-1/F2771C57-9EFA-4F40-9558-DA8132B79147.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:37 +0000 PUT spike30-liste-1/801AB782-6BB2-45F8-8CFD-CB945E5FACD2.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:39 +0000 PUT spike30-liste-1/CACF03F5-EC9A-4258-9B47-58A051256186.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:40 +0000 PUT spike30-liste-1/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:42 +0000 PUT spike30-liste-1/C4CED131-CD86-49FE-86E7-1EA2956A4AF2.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:43 +0000 PUT spike30-liste-1/C67CFD08-4F41-4754-9ECF-5D64AC34BAC9.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:45 +0000 PUT spike30-liste-1/4BFE626B-9A78-493B-9A99-78CC0FFC7D38.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:46 +0000 PUT spike30-liste-1/2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:48 +0000 PUT spike30-liste-1/1EA798A8-7873-43DE-B2DC-0926941B62D0.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:49 +0000 PUT spike30-liste-1/7B483532-932E-4791-B363-DD0F4E3C8FEF.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:51:11 +0000 PUT spike30-liste-1/7CB0DDE8-C2D1-4640-B1D0-808CA11B3E2E.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:51:15 +0000 PUT spike30-liste-1/D9556088-A989-49E2-A64A-EB82F07F575E.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:51:18 +0000 PUT spike30-liste-1/8284CF2E-FED9-40DF-B41A-31475E72DAA4.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:52:15 +0000 PUT spike30-liste-1/4EA29582-E2DB-4C8D-AAB9-7D57EABD83BA.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:52:17 +0000 PUT spike30-liste-1/4EA29582-E2DB-4C8D-AAB9-7D57EABD83BA.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:53:22 +0000 PUT spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:53:23 +0000 PUT spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics status=500
+UI-ZUGRIFF 11/Nov/2026:12:53:41 +0000 PUT spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:53:58 +0000 PUT spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:54:14 +0000 PUT spike30-liste-1/F2771C57-9EFA-4F40-9558-DA8132B79147.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:54:16 +0000 PUT spike30-liste-1/F2771C57-9EFA-4F40-9558-DA8132B79147.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:54:29 +0000 PUT spike30-liste-1/F2771C57-9EFA-4F40-9558-DA8132B79147.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:54:46 +0000 PUT spike30-liste-1/801AB782-6BB2-45F8-8CFD-CB945E5FACD2.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:55:06 +0000 PUT spike30-liste-1/7B483532-932E-4791-B363-DD0F4E3C8FEF.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:56:10 +0000 PUT spike30-liste-1/7B483532-932E-4791-B363-DD0F4E3C8FEF.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:59:47 +0000 PUT spike30-liste-1/4BFE626B-9A78-493B-9A99-78CC0FFC7D38.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:00:01 +0000 PUT spike30-liste-1/2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:01:11 +0000 PUT spike30-liste-1/2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:01:26 +0000 PUT spike30-liste-1/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics status=500
+UI-ZUGRIFF 11/Nov/2026:13:01:25 +0000 PUT spike30-liste-1/7CB0DDE8-C2D1-4640-B1D0-808CA11B3E2E.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:01:29 +0000 PUT spike30-liste-1/7B483532-932E-4791-B363-DD0F4E3C8FEF.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:01:47 +0000 MOVE spike30-liste-1/1EA798A8-7873-43DE-B2DC-0926941B62D0.ics status=201
+UI-ZUGRIFF 11/Nov/2026:13:02:43 +0000 MOVE spike30-liste-1/D9556088-A989-49E2-A64A-EB82F07F575E.ics status=201
+UI-ZUGRIFF 11/Nov/2026:13:02:43 +0000 MOVE spike30-liste-1/C4CED131-CD86-49FE-86E7-1EA2956A4AF2.ics status=201
+UI-ZUGRIFF 11/Nov/2026:13:03:41 +0000 DELETE spike30-liste-1/8284CF2E-FED9-40DF-B41A-31475E72DAA4.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:03:41 +0000 DELETE spike30-liste-1/C67CFD08-4F41-4754-9ECF-5D64AC34BAC9.ics status=204
+UI-ZUGRIFFE mit_fehlerstatus=2
+UI-SERVERFEHLER 2026-11-11T12:53:23+00:00 PUT ars/spike30ui/spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics | An exception occurred while executing a query: SQLSTATE[HY000]: General error: 5 database is locked
+UI-SERVERFEHLER 2026-11-11T12:53:23+00:00 PUT ars/spike30ui/spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics | Uncaught exception
+UI-SERVERFEHLER 2026-11-11T13:01:26+00:00 PUT ars/spike30ui/spike30-liste-1/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics | An exception occurred while executing a query: SQLSTATE[HY000]: General error: 5 database is locked
+UI-SERVERFEHLER 2026-11-11T13:01:26+00:00 PUT ars/spike30ui/spike30-liste-1/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics | Uncaught exception
+
+== ui-evaluate ==
+UI-AUSWERTUNG stand_a_objekte=15 stand_b_objekte=15 (nach UID)
+ABHAKEN FELDER hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED zeitform_completed=utc
+  ABHAKEN zeilen_hinzu=['COMPLETED:20261111T125947Z', 'PERCENT-COMPLETE:100', 'STATUS:COMPLETED']
+WIEDEROEFFNEN FELDER hinzu=STATUS entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED
+  WIEDEROEFFNEN zeilen_hinzu=['STATUS:NEEDS-ACTION'] abhaken_felder_danach_fehlend=COMPLETED,PERCENT-COMPLETE status_danach=NEEDS-ACTION
+ELTERN ABHAKEN kind_geaendert=ja kind_differenz=hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED | eltern_geaendert=nein eltern_differenz=leer
+  ELTERN ABHAKEN kind_zeilen_hinzu=['COMPLETED:20261111T130125Z', 'PERCENT-COMPLETE:100', 'STATUS:COMPLETED'] eltern_status_stand_b=fehlt
+WIEDERKEHREND app differenz hinzu=keine entfernt=keine geaendert=DTSTAMP,DUE,LAST-MODIFIED due_vorher=20261120T130000Z due_nachher=20261121T130000Z rrule_nachher=FREQ=DAILY status_nachher=fehlt completed_nachher=fehlt neue_objekte=0
+KONTROLLE unberuehrt differenz=leer
+UI-UMZUG objekte_in_liste_2=3 verschoben=3
+UI-UMZUG objekt=s30 umzug-einzeln von=spike30-liste-1 nach=spike30-liste-2 dateiname_gleich=ja inhalt_gleich=ja
+UI-UMZUG objekt=s30 eltern-umzug von=spike30-liste-1 nach=spike30-liste-2 dateiname_gleich=ja inhalt_gleich=ja
+UI-UMZUG objekt=s30 kind-umzug von=spike30-liste-1 nach=spike30-liste-2 dateiname_gleich=ja inhalt_gleich=ja
+UI-PAPIERKORB objekte=2
+UI-PAPIERKORB objekt=s30 eltern-loeschen datei=trash-135.ics datei_stand_a=C67CFD08-4F41-4754-9ECF-5D64AC34BAC9.ics inhalt_gleich_stand_a=ja
+UI-PAPIERKORB objekt=s30 kind-loeschen datei=trash-142.ics datei_stand_a=8284CF2E-FED9-40DF-B41A-31475E72DAA4.ics inhalt_gleich_stand_a=ja
+UI-NEU objekte=0 uids=keine
+UI-VERSCHWUNDEN objekte=0 uids=keine
+UI-DIFFERENZ name=s30 abhaken differenz=hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED
+UI-DIFFERENZ name=s30 eltern-abhaken differenz=leer
+UI-DIFFERENZ name=s30 eltern-loeschen differenz=leer
+UI-DIFFERENZ name=s30 eltern-umzug differenz=leer
+UI-DIFFERENZ name=s30 ganztag differenz=leer
+UI-DIFFERENZ name=s30 kind-abhaken differenz=hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED
+UI-DIFFERENZ name=s30 kind-loeschen differenz=leer
+UI-DIFFERENZ name=s30 kind-umzug differenz=leer
+UI-DIFFERENZ name=s30 notiz differenz=leer
+UI-DIFFERENZ name=s30 tags differenz=leer
+UI-DIFFERENZ name=s30 uhrzeit differenz=leer
+UI-DIFFERENZ name=s30 umzug-einzeln differenz=leer
+UI-DIFFERENZ name=s30 unberuehrt differenz=leer
+UI-DIFFERENZ name=s30 wieder-oeffnen differenz=hinzu=STATUS entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED
+UI-DIFFERENZ name=s30 wiederkehrend differenz=hinzu=keine entfernt=keine geaendert=DTSTAMP,DUE,LAST-MODIFIED
+ZEITFORM stand=a name=s30 abhaken CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 eltern-abhaken CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 eltern-loeschen CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 eltern-umzug CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 ganztag DUE=date CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 kind-abhaken CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 kind-loeschen CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 kind-umzug CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 notiz CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 tags CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 uhrzeit DTSTART=utc DUE=utc CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 umzug-einzeln CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 unberuehrt CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 wieder-oeffnen CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=a name=s30 wiederkehrend DUE=utc CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 abhaken COMPLETED=utc CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 eltern-abhaken CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 eltern-loeschen CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 eltern-umzug CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 ganztag DUE=date CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 kind-abhaken COMPLETED=utc CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 kind-loeschen CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 kind-umzug CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 notiz CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 tags CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 uhrzeit DTSTART=utc DUE=utc CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 umzug-einzeln CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 unberuehrt CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 wieder-oeffnen CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+ZEITFORM stand=b name=s30 wiederkehrend DUE=utc CREATED=utc LAST-MODIFIED=utc DTSTAMP=utc
+
+# Lauf blocks=ui-log start=2026-11-11T13:16:32Z (angehaengt an bestehende Datei)
+WIEDERHOLUNG Grund: der Block ui-log liest jetzt zusaetzlich die rohe Discovery des Browser-Kontos, bevor das Konto geloescht wird; die Zugriffszeilen sind dieselben wie im Lauf davor
+
+== ui-log ==
+RAM frei_host_gb=4.64 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 13MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 36.77MiB / 5.786GiB  cpu 0.12%
+nc35-caddy  mem 13.9MiB / 5.786GiB  cpu 0.02%
+nc35-harp  mem 49.3MiB / 5.786GiB  cpu 0.02%
+nc35-nc  mem 218.3MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+2026-11-11T13:16:36Z | UI-DISCOVERY-ROH PROPFIND Depth 1 auth=appapi nutzer=spike30ui status=207 bytes=8742
+    <?xml version="1.0"?>
+    <d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:cal="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"><d:response><d:href>/remote.php/dav/calendars/spike30ui/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype><d:owner><d:href>/remote.php/dav/principals/users/spike30ui/</d:href></d:owner><d:current-user-privilege-set><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-acl/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><d:sync-token/><cal:supported-calendar-component-set/><cs:getctag/><x1:calendar-color xmlns:x1="http://apple.com/ns/ical/"/><x1:calendar-order xmlns:x1="http://apple.com/ns/ical/"/><oc:calendar-enabled/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/spike30ui/personal/</d:href><d:propstat><d:prop><d:displayname>Persönlich</d:displayname><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:owner><d:href>/remote.php/dav/principals/users/spike30ui/</d:href></d:owner><d:current-user-privilege-set><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-acl/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set><d:sync-token>http://sabre.io/ns/sync/1</d:sync-token><cal:supported-calendar-component-set><cal:comp name="VEVENT"/><cal:comp name="VTODO"/><cal:comp name="VJOURNAL"/></cal:supported-calendar-component-set><cs:getctag>http://sabre.io/ns/sync/1</cs:getctag><x1:calendar-order xmlns:x1="http://apple.com/ns/ical/">0</x1:calendar-order></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><x1:calendar-color xmlns:x1="http://apple.com/ns/ical/"/><oc:calendar-enabled/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/spike30ui/spike30-liste-1/</d:href><d:propstat><d:prop><d:displayname>spike30-liste-1</d:displayname><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:owner><d:href>/remote.php/dav/principals/users/spike30ui/</d:href></d:owner><d:current-user-privilege-set><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-acl/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set><d:sync-token>http://sabre.io/ns/sync/37</d:sync-token><cal:supported-calendar-component-set><cal:comp name="VTODO"/></cal:supported-calendar-component-set><cs:getctag>http://sabre.io/ns/sync/37</cs:getctag><x1:calendar-order xmlns:x1="http://apple.com/ns/ical/">0</x1:calendar-order></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><x1:calendar-color xmlns:x1="http://apple.com/ns/ical/"/><oc:calendar-enabled/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/spike30ui/spike30-liste-2/</d:href><d:propstat><d:prop><d:displayname>spike30-liste-2</d:displayname><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:owner><d:href>/remote.php/dav/principals/users/spike30ui/</d:href></d:owner><d:current-user-privilege-set><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-acl/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set><d:sync-token>http://sabre.io/ns/sync/4</d:sync-token><cal:supported-calendar-component-set><cal:comp name="VTODO"/></cal:supported-calendar-component-set><cs:getctag>http://sabre.io/ns/sync/4</cs:getctag><x1:calendar-order xmlns:x1="http://apple.com/ns/ical/">0</x1:calendar-order></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><x1:calendar-color xmlns:x1="http://apple.com/ns/ical/"/><oc:calendar-enabled/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/spike30ui/inbox/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:schedule-inbox/></d:resourcetype><d:owner><d:href>/remote.php/dav/principals/users/spike30ui/</d:href></d:owner><d:current-user-privilege-set><d:privilege><cal:schedule-deliver/></d:privilege><d:privilege><cal:schedule-deliver-invite/></d:privilege><d:privilege><cal:schedule-deliver-reply/></d:privilege><d:privilege><cal:schedule-query-freebusy/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><d:sync-token/><cal:supported-calendar-component-set/><cs:getctag/><x1:calendar-color xmlns:x1="http://apple.com/ns/ical/"/><x1:calendar-order xmlns:x1="http://apple.com/ns/ical/"/><oc:calendar-enabled/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/spike30ui/outbox/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:schedule-outbox/></d:resourcetype><d:owner><d:href>/remote.php/dav/principals/users/spike30ui/</d:href></d:owner><d:current-user-privilege-set><d:privilege><cal:schedule-send/></d:privilege><d:privilege><cal:schedule-send-invite/></d:privilege><d:privilege><cal:schedule-send-reply/></d:privilege><d:privilege><cal:schedule-send-freebusy/></d:privilege><d:privilege><cal:schedule-post-vevent/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><d:sync-token/><cal:supported-calendar-component-set/><cs:getctag/><x1:calendar-color xmlns:x1="http://apple.com/ns/ical/"/><x1:calendar-order xmlns:x1="http://apple.com/ns/ical/"/><oc:calendar-enabled/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/spike30ui/trashbin/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><x2:trash-bin xmlns:x2="http://nextcloud.com/ns"/></d:resourcetype><d:owner><d:href>/remote.php/dav/principals/users/spike30ui/</d:href></d:owner><d:current-user-privilege-set><d:privilege><d:all/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-acl/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><d:sync-token/><cal:supported-calendar-component-set/><cs:getctag/><x1:calendar-color xmlns:x1="http://apple.com/ns/ical/"/><x1:calendar-order xmlns:x1="http://apple.com/ns/ical/"/><oc:calendar-enabled/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response></d:multistatus>
+UI-ZUGRIFFE nutzer=spike30ui schreibende_anfragen=40 (Zugriffsprotokoll)
+UI-ZUGRIFF 11/Nov/2026:12:50:14 +0000 MKCOL spike30-liste-1 status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:17 +0000 MKCOL spike30-liste-2 status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:33 +0000 PUT spike30-liste-1/4EA29582-E2DB-4C8D-AAB9-7D57EABD83BA.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:34 +0000 PUT spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:36 +0000 PUT spike30-liste-1/F2771C57-9EFA-4F40-9558-DA8132B79147.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:37 +0000 PUT spike30-liste-1/801AB782-6BB2-45F8-8CFD-CB945E5FACD2.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:39 +0000 PUT spike30-liste-1/CACF03F5-EC9A-4258-9B47-58A051256186.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:40 +0000 PUT spike30-liste-1/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:42 +0000 PUT spike30-liste-1/C4CED131-CD86-49FE-86E7-1EA2956A4AF2.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:43 +0000 PUT spike30-liste-1/C67CFD08-4F41-4754-9ECF-5D64AC34BAC9.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:45 +0000 PUT spike30-liste-1/4BFE626B-9A78-493B-9A99-78CC0FFC7D38.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:46 +0000 PUT spike30-liste-1/2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:48 +0000 PUT spike30-liste-1/1EA798A8-7873-43DE-B2DC-0926941B62D0.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:50:49 +0000 PUT spike30-liste-1/7B483532-932E-4791-B363-DD0F4E3C8FEF.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:51:11 +0000 PUT spike30-liste-1/7CB0DDE8-C2D1-4640-B1D0-808CA11B3E2E.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:51:15 +0000 PUT spike30-liste-1/D9556088-A989-49E2-A64A-EB82F07F575E.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:51:18 +0000 PUT spike30-liste-1/8284CF2E-FED9-40DF-B41A-31475E72DAA4.ics status=201
+UI-ZUGRIFF 11/Nov/2026:12:52:15 +0000 PUT spike30-liste-1/4EA29582-E2DB-4C8D-AAB9-7D57EABD83BA.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:52:17 +0000 PUT spike30-liste-1/4EA29582-E2DB-4C8D-AAB9-7D57EABD83BA.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:53:22 +0000 PUT spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:53:23 +0000 PUT spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics status=500
+UI-ZUGRIFF 11/Nov/2026:12:53:41 +0000 PUT spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:53:58 +0000 PUT spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:54:14 +0000 PUT spike30-liste-1/F2771C57-9EFA-4F40-9558-DA8132B79147.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:54:16 +0000 PUT spike30-liste-1/F2771C57-9EFA-4F40-9558-DA8132B79147.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:54:29 +0000 PUT spike30-liste-1/F2771C57-9EFA-4F40-9558-DA8132B79147.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:54:46 +0000 PUT spike30-liste-1/801AB782-6BB2-45F8-8CFD-CB945E5FACD2.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:55:06 +0000 PUT spike30-liste-1/7B483532-932E-4791-B363-DD0F4E3C8FEF.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:56:10 +0000 PUT spike30-liste-1/7B483532-932E-4791-B363-DD0F4E3C8FEF.ics status=204
+UI-ZUGRIFF 11/Nov/2026:12:59:47 +0000 PUT spike30-liste-1/4BFE626B-9A78-493B-9A99-78CC0FFC7D38.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:00:01 +0000 PUT spike30-liste-1/2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:01:11 +0000 PUT spike30-liste-1/2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:01:26 +0000 PUT spike30-liste-1/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics status=500
+UI-ZUGRIFF 11/Nov/2026:13:01:25 +0000 PUT spike30-liste-1/7CB0DDE8-C2D1-4640-B1D0-808CA11B3E2E.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:01:29 +0000 PUT spike30-liste-1/7B483532-932E-4791-B363-DD0F4E3C8FEF.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:01:47 +0000 MOVE spike30-liste-1/1EA798A8-7873-43DE-B2DC-0926941B62D0.ics status=201
+UI-ZUGRIFF 11/Nov/2026:13:02:43 +0000 MOVE spike30-liste-1/D9556088-A989-49E2-A64A-EB82F07F575E.ics status=201
+UI-ZUGRIFF 11/Nov/2026:13:02:43 +0000 MOVE spike30-liste-1/C4CED131-CD86-49FE-86E7-1EA2956A4AF2.ics status=201
+UI-ZUGRIFF 11/Nov/2026:13:03:41 +0000 DELETE spike30-liste-1/8284CF2E-FED9-40DF-B41A-31475E72DAA4.ics status=204
+UI-ZUGRIFF 11/Nov/2026:13:03:41 +0000 DELETE spike30-liste-1/C67CFD08-4F41-4754-9ECF-5D64AC34BAC9.ics status=204
+UI-ZUGRIFFE mit_fehlerstatus=2
+UI-SERVERFEHLER 2026-11-11T12:53:23+00:00 PUT ars/spike30ui/spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics | An exception occurred while executing a query: SQLSTATE[HY000]: General error: 5 database is locked
+UI-SERVERFEHLER 2026-11-11T12:53:23+00:00 PUT ars/spike30ui/spike30-liste-1/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics | Uncaught exception
+UI-SERVERFEHLER 2026-11-11T13:01:26+00:00 PUT ars/spike30ui/spike30-liste-1/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics | An exception occurred while executing a query: SQLSTATE[HY000]: General error: 5 database is locked
+UI-SERVERFEHLER 2026-11-11T13:01:26+00:00 PUT ars/spike30ui/spike30-liste-1/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics | Uncaught exception
