@@ -69,6 +69,46 @@ Drei Regeln des Messskripts gehören zu diesen Kriterien:
 - Das Abbruchkriterium zu MESS-05, Teil Eigenschaften, entscheidet `preserved()`: verglichen werden die entfalteten Inhaltszeilen je Komponente vor und nach dem ändernden PUT; erlaubt ist allein die absichtlich geänderte Zeile (`SUMMARY`). Pflegt der Server von sich aus Zeilen (etwa `LAST-MODIFIED`, `DTSTAMP`, `SEQUENCE`), löst das das Kriterium aus und wird in der Zeile `PFLEGEFELDER` benannt; ob das für TMOD-02 hinnehmbar ist, entscheidet dann der Owner und nicht das Skript.
 - "überschrieben" und "unverändert" werden nicht aus dem Statuscode geschlossen, sondern aus dem sha256 der Datenbankspalte `calendardata` vor und nach dem Aufruf.
 
+Kriterien des Plans 30-03 (ergänzt am 2026-11-11, vor dem ersten Messwert dieses Plans; der Commit dieser Tabelle und der Entscheidungsregel liegt vor `raw/nc35-verschieben.txt` und vor jeder Datei `raw/loeschen-*.txt`):
+
+| Messung | Was als Ergebnis zählt | Positivkontrolle (das Verfahren greift) | Gegenprobe (anderes Muster) |
+|---------|------------------------|------------------------------------------|------------------------------|
+| M4.1 MOVE eigene Liste nach eigene Liste unter Impersonation (A19) | Status 201 oder 204, Quelle danach 404, Ziel lesbar, UID gleich, Inhalt gleich; alles andere löst das Abbruchkriterium aus | Logzeile `"method":"MOVE"` mit dem Messnutzer in `exapp_impersonation.log`; Kontrolle a | beide Listen per REPORT mit App-Passwort auflisten (anderer Auth-Weg, andere Methode); derselbe MOVE mit falschem APP_SECRET verschiebt nichts |
+| M4.2 MOVE auf belegtes Ziel (A19) | mit `Overwrite: F`: Status 412 und beide Objekte unverändert; ohne Kopfzeile: Statuscode und die Aussage ueberschrieben=ja oder nein | M4.1 | Datenbank-Hash des Zielobjekts vor und nach dem Versuch |
+| M4.3 gleiche UID schon in der Zielliste | Statuscode; Ziel- und Quellobjekt danach | M4.1 | Auflistung beider Listen mit App-Passwort |
+| M4.4 MOVE in geteilte Liste mit und ohne Schreibrecht, in Deck-Kalender, in Kalender ohne VTODO | je Statuscode; bei Ablehnung Quelle unverändert | M4.1; die Freigabe mit Schreibrecht nimmt an | Lesen als Eigentümer der Zielliste mit App-Passwort |
+| M4.5 MOVE mit If-Match (aktuelle und veraltete ETag) | Statuscodes; bei veralteter ETag nichts verschoben | M4.1 | Auflistung mit App-Passwort |
+| M4.6 Unteraufgabe beim Verschieben und Löschen der Elternaufgabe, Serverseite (A21) | Ort, ETag und Inhalt der Unteraufgabe danach | die Elternaufgabe ist verschoben oder gelöscht | Datenbank-Hash der Unteraufgabe |
+| M4.7 Unteraufgabe beim Verschieben und Löschen in der Tasks-App (A21) | aus raw/ui-a und raw/ui-b: wo liegt die Unteraufgabe nach dem Umzug der Elternaufgabe, und existiert sie nach dem Löschen der Elternaufgabe noch | "s30 umzug-einzeln" liegt in spike30-liste-2, der Umzug hat also stattgefunden; "s30 unberuehrt" unverändert | Objektzahl je Liste aus den Zeilen UI-OBJEKT (anderer Stand, andere Zählung) |
+| M4.8 DELETE unter Impersonation, Papierkorb im Auslieferungszustand | Status 204, Objekt im Papierkorb, Wiederherstellung bringt es zurück | Logzeile DELETE mit dem Messnutzer | Zeile in der Datenbank mit gesetztem deleted_at per PHP-Einmal-Snippet |
+| M4.9 Löschen je Version, Papierkorb an (A18, W1) | DELETE 204; das Objekt steht in der Auflistung des Papierkorbs; nach der Wiederherstellung ist es am alten Ort mit gleicher UID und gleichem sha256 des Inhalts | ein nicht gelöschtes Nachbarobjekt steht nicht im Papierkorb | Datenbankzeile mit deleted_at gesetzt, danach wieder leer (nicht über DAV gelesen) |
+| M4.10 geteilte Liste (W2) | DELETE durch den Empfänger mit Schreibrecht: Statuscode, in wessen Papierkorb das Objekt steht, wer es wiederherstellen kann; Empfänger ohne Schreibrecht: Ablehnung und Objekt unverändert | M4.9 | Datenbankzeile; Lesen als Eigentümer |
+| M4.11 Papierkorb aus (W3) | DELETE 204; steht das Objekt noch irgendwo, und geht die Wiederherstellung | derselbe Ablauf mit Papierkorb an hat in M4.9 wiederhergestellt | Datenbankzeile vorhanden oder nicht; der Schalter ist per `occ config:app:get` belegt und nach einem Neustart des Containers erneut gemessen |
+| M4.12 Vorab-Test (W4) | je Kandidat der Wert bei Papierkorb an und bei Papierkorb aus; ein Kandidat zählt nur, wenn er beide Zustände richtig anzeigt | der Zustand ist per M4.9 und M4.11 am Verhalten belegt, nicht nur am Schalter | zweiter Kandidat anderer Art (Eigenschaft gegen Existenz der Sammlung) |
+| M4.13 Aufbewahrungsfrist | der konfigurierte Wert und seine Einheit; mit auf 1 Sekunde gesetzter Frist entfernt der Aufräumlauf das gelöschte Objekt endgültig | mit der Standardfrist lässt derselbe Aufräumlauf das Objekt stehen | Datenbankzeile vor und nach dem Aufräumlauf |
+
+Drei Regeln des Messskripts gehören zu diesen Kriterien:
+
+- Das Abbruchkriterium zu MESS-06, Teil MOVE, ist eine Funktion (`abort_move()`): es ist nur dann nicht ausgelöst, wenn der MOVE von einer eigenen Liste in eine eigene Liste unter Impersonation mit 201 oder 204 antwortet, die Quelle danach 404 liefert, das Ziel lesbar ist und die UID gleich geblieben ist. Jede Abweichung in einem der vier Werte löst es aus. Dann wird TMOD-08 nicht geplant, und der Befund geht mit Rohantwort an den Owner.
+- Ein Statuscode 5xx zählt in keiner Zeile als Erfolg und in keiner Zeile als Ablehnung im Sinn der Messung; er steht als eigener Befund da. Die Messschritte laufen nacheinander, nie gleichzeitig (Lehre aus Plan 30-02: zwei gleichzeitige Schreibzugriffe auf SQLite ergaben 500 `database is locked`).
+- "überschrieben", "unverändert", "im Papierkorb" und "wiederhergestellt" werden nicht aus dem Statuscode geschlossen, sondern aus dem sha256 der Datenbankspalte `calendardata` und der Spalte `deleted_at` vor und nach dem Aufruf.
+
+### Entscheidungsregel für das Löschen (E13), vorab festgelegt
+
+Wörtlich aus dem Plan 30-03, als Funktion `delete_verdict()` im Messskript abgebildet und unit-getestet, bevor ein Messwert des Löschens existiert:
+
+Lesart: MESS-06 und TMOD-07 verlangen, dass das Löschwerkzeug vor dem Löschen prüft, ob der Papierkorb für das Konto wirkt, und sonst ablehnt. Die Regel folgt dieser Lesart. Die strengere wörtliche Lesart von E13 ("wiederherstellbar bleibt, auch mit abgeschaltetem Papierkorb") ergäbe bei endgültigem Löschen im Aus-Zustand immer "nicht wiederherstellbar"; der Bericht nennt deshalb den Rohbefund des Aus-Zustands eigens, damit der Owner ihn am Checkpoint sieht.
+
+Owner-Entscheid zur Lesart (11.11.2026, Claude Code Terminal, Antwort des Owners auf die vorgelegte Lesart: "Ok"): Es gilt die Fassung nach TMOD-07. Löschen kommt in 0.8.0, wenn ein verlässlicher Vorab-Test zeigt, ob der Papierkorb des Kalenders für dieses Konto wirkt; das Werkzeug lehnt ab, wenn nicht. Bei abgeschaltetem Papierkorb muss also nicht "wiederherstellbar" herauskommen, sondern der Vorab-Test muss den Aus-Zustand sicher erkennen. Die Regel unten bildet das mit "W3 oder W4" ab und bleibt im Wortlaut unverändert; eingetragen am 11.11.2026 vor dem ersten Messwert dieses Plans. Der Rohbefund des Aus-Zustands steht weiter eigens im Bericht (Unterabschnitt 4.4).
+
+Je Version v aus 32, 33, 34, 35 entstehen fünf Werte: W1 (eigene Liste, Papierkorb an: gelöschte Aufgabe steht im Papierkorb, die Wiederherstellung bringt sie mit gleicher UID und gleichem Inhalt zurück), W2 (geteilte Liste mit Schreibrecht, Papierkorb an: dasselbe, wiederherstellbar durch das löschende Konto oder durch den Eigentümer; wer es kann, wird festgehalten), W3 (Papierkorb aus: die Aufgabe ist danach noch wiederherstellbar, ja oder nein), W4 (mindestens ein Vorab-Test, den ein Konto per DAV oder OCS selbst stellen kann, unterscheidet "Papierkorb an" von "Papierkorb aus" in beiden Richtungen richtig), G (jede der vier Messungen ist gemessen und ihre Positivkontrolle hat gegriffen).
+
+- "wiederherstellbar": für alle vier Versionen gilt G und W1 und W2 und (W3 oder W4).
+- "nicht wiederherstellbar": für mindestens eine Version gilt G, und W1 ist nein oder W2 ist nein oder (W3 ist nein und W4 ist nein).
+- "nicht eindeutig": alle übrigen Fälle, also eine fehlende oder ungemessene Messung, eine gescheiterte Positivkontrolle oder ein Widerspruch zwischen zwei Läufen derselben Version.
+
+Konsequenz, fest und ohne Rückfrage: nur "wiederherstellbar" lässt TMOD-07 in Phase 33 planen, mit der Auflage aus den Messwerten (welcher Vorab-Test, wer wiederherstellen kann, Frist). Bei "nicht wiederherstellbar" und bei "nicht eindeutig" gibt es in 0.8.0 kein Löschen; TMOD-07 wandert nach Out of Scope, und der Store-Text nennt die Grenze (EXAPP-13).
+
 ## 1. MKCOL unter AppAPI-Impersonation (MESS-01)
 
 Gemessen am 2026-11-11 auf Nextcloud 35.0.0 mit SQLite, Rohprotokoll `raw/nc35-mkcol.txt` im Phasenordner (wörtliche Zeilen in Abschnitt 12.1). Jeder Aufruf lief als Messkonto `spike30a`, einmal unter AppAPI-Impersonation (`auth=appapi`, das einzige Geheimnis ist das Secret der App) und einmal mit einem App-Passwort desselben Kontos (`auth=basic`). `MKCOL` ging immer ohne Body und ohne `Content-Type` hinaus.
