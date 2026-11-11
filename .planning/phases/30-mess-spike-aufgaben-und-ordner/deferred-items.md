@@ -4,6 +4,7 @@ Funde außerhalb des Auftrags eines Plans. Sie sind hier benannt und nicht behob
 
 ## DI-30-01: Die Umgebung des Worktrees trägt das Extra `documents` nicht
 
+- **Stand: erledigt (2026-11-11, vor Plan 30-02).** Im Worktree ist die Umgebung jetzt wie in der CI installiert (`uv sync --frozen --extra documents`, so im Auftrag zu Plan 30-02 mitgeteilt). In Plan 30-02 lief der volle Lauf ohne Ausnahmen durch: `pytest tests/unit tests/contract` Exit 0, `pyright` über das ganze Repository 0 Fehler, `ruff check .`, `ruff format --check .`, `vulture` und `scripts/check_tool_budget.py` grün. Der folgende Text beschreibt den Stand aus Plan 30-01.
 - **Gefunden in:** Plan 30-01, voller Lauf am Planende (2026-11-11)
 - **Befund:** In `.venv` des Worktrees `tasks-080` fehlen `docx`, `pypdf`, `pptx` und `openpyxl` (Extra `documents` aus `pyproject.toml`). `pytest tests/unit tests/contract` bricht deshalb schon beim Einsammeln ab (vier Module: `tests/unit/test_documents_docx.py`, `_pdf.py`, `_pptx.py`, `_xlsx.py`), und `pyright` über das ganze Repository meldet 19 Fehler, alle `reportMissingImports` in `src/mcp_connector/documents/`, `scripts/make_document_fixtures.py` und diesen vier Testmodulen.
 - **Nicht verursacht durch Plan 30-01:** der Plan ändert nichts unter `src/`, nichts an `pyproject.toml` und nichts an `uv.lock`; keine der gemeldeten Dateien ist angefasst.

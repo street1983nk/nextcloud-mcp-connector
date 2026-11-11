@@ -1,12 +1,12 @@
 # Mess-Spike Aufgaben und Ordner (MESS-01 bis MESS-06)
 
-**Status:** läuft. Die Abschnitte 1 (MESS-01) und 2 (MESS-02) sind gemessen, das Abbruchkriterium zu MESS-01 ist nicht ausgelöst; die Abschnitte 3 bis 10 sind offen
+**Status:** läuft. Die Abschnitte 1 (MESS-01) und 2 (MESS-02) sind gemessen, das Abbruchkriterium zu MESS-01 ist nicht ausgelöst. Von Abschnitt 3 (MESS-05) sind 3.1 bis 3.4 gemessen, beide Abbruchkriterien zu MESS-05 sind nicht ausgelöst; 3.5, 3.6 und die Abschnitte 4 bis 10 sind offen
 **Messzeitraum:** ab 2026-11-11 (erster Messlauf 11:55 UTC), Ende offen
 **Nextcloud:** 35.0.0 (Build 35.0.0.10), gelesen mit `occ status` am 2026-11-11 aus dem laufenden Container `nc35-nc`. Das Image heißt `nextcloud:35.0.0-apache-local` und ist lokal aus dem veröffentlichten Quellpaket gebaut (`compose.nc35.yml`, Kopfkommentar)
 **AppAPI:** `app_api` 35.0.0, gelesen mit `occ app:list --output=json` derselben Instanz am 2026-11-11
 **Diese ExApp:** 0.3.2, gelesen mit `occ app_api:app:list` am 2026-11-11. In der Topologie ist also ein älterer Stand registriert als der Arbeitsbaum. Für die Messung zählt das an zwei Stellen: die Impersonation läuft mit dem Secret dieser Registrierung, und der Produktionsweg (Abschnitt 1.2) läuft im Container dieses Images. Kein Werkzeug der App wird gemessen, nur ihr Zugang zu Nextcloud
 **groupfolders:** 23.0.1, gelesen mit `occ app:list --output=json` am 2026-11-11 nach `occ app:install groupfolders` in der laufenden Instanz (Protokollzeile `GRUPPENORDNER version=23.0.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)`). Die App wurde für die Messung aus dem App Store geladen und danach wieder entfernt. `files_external` 2.0.0-dev.0 gehört zum Server und war nur für die Messung eingeschaltet
-**Tasks:** offen, füllt Plan 30-02
+**Tasks:** 0.18.1, gelesen mit `occ app:list --output=json` am 2026-11-11 nach `occ app:install tasks` in der laufenden Instanz (Protokollzeile `TASKS-APP version=0.18.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)`). Die App ist für die Messung aus dem App Store geladen und wird im Rückbau wieder entfernt
 **Deck:** offen, füllt Plan 30-04
 **Datenbank:** `sqlite3`, gelesen mit `occ config:system:get dbtype` am 2026-11-11
 **Topologie:** die vorhandene Strecke `compose.nc35.yml` (Container `nc35-nc`, `nc35-harp`, `nc35-caddy`, ExApp-Container `nc_app_mcp_connector`, Loopback `http://127.0.0.1:8082`). Sie wird nur mit `docker start` und `docker stop` bewegt, nie abgebaut. Weitere Instanzen für die Versionsbreite nennen die Pläne 30-03 und 30-04
@@ -189,7 +189,74 @@ Gemessen ist eine Regel gegen ein einzelnes Konto. Regeln gegen Gruppen oder Tea
 
 ## 3. Ändernde Zugriffe (MESS-05)
 
-Offen, füllt Plan 30-02.
+Gemessen am 2026-11-11 auf der Strecke nc35 (Nextcloud 35.0.0, SQLite), Blöcke nc35-up, controls, modify und ui-prepare in einem Aufruf; Rohbeleg `raw/nc35-aendern.txt`, Auszug in 12.3. Die Messkonten sind `spike30a` (schreibt und liest) und `spike30b` (Eigentümer der geteilten Listen). Jede Zeile lief unter AppAPI-Impersonation und, wo es die Kriterien verlangen, zusätzlich mit App-Passwort. Die Listen sind per `MKCALENDAR` mit dem Komponenten-Set genau `VTODO` angelegt; unter Impersonation antwortet `MKCALENDAR` mit 201, der Ersatzweg über PHP wurde nicht gebraucht.
+
+Beide Abbruchkriterien von MESS-05 sind nicht ausgelöst:
+
+- `ABBRUCHKRITERIUM MESS-05 IF-MATCH ausgeloest=nein grund=keiner`
+- `ABBRUCHKRITERIUM MESS-05 EIGENSCHAFTEN ausgeloest=nein verloren=keine put_status=204 aenderung_angekommen=ja kontrolle=ok`
+
+"überschrieben" und "unverändert" stammen in jeder Zeile aus dem sha256 der Datenbankspalte `calendardata` vor und nach dem Aufruf, nicht aus dem Statuscode.
+
+### 3.1 PUT mit If-Match unter Impersonation
+
+| Befund | Aufruf | Nutzer | Rohwert wörtlich | Deutung |
+|--------|--------|--------|------------------|---------|
+| M3.1: PUT mit der gelesenen ETag wird angenommen | `PUT` auf das Objekt in `spike30-a` mit `If-Match` auf die per GET gelesene ETag, nur `SUMMARY` geändert | spike30a, appapi | `IF-MATCH aktuell auth=appapi nutzer=spike30a status=204 etag_vorher=7e104de2233c etag_nachher=2ee40cb76ab8 \| antwort_etag=ja etag_art=stark inhalt_neu=ja db_hash_geaendert=ja db_gleich_gesendet=ja` | 204, neue starke ETag, sie steht auch im Antwortkopf des PUT; GET liefert den gesendeten Text, die Datenbank hält ihn byte-gleich. A13, erster Teil: belegt |
+| Positivkontrolle | `exapp_impersonation.log` | spike30a | `KONTROLLE exapp_impersonation.log, PUT-Zeilen von spike30a: 2` | Nextcloud selbst nennt das Konto und die App `mcp_connector` für den PUT |
+| Gegenprobe, anderer Leseweg | `REPORT calendar-multiget` mit App-Passwort | spike30a, basic | `GEGENPROBE multiget REPORT calendar-multiget auth=basic nutzer=spike30a status=207 objekte=1 inhalt_gleich_gesendet=ja` | derselbe Inhalt über einen anderen Weg und eine andere Anmeldung |
+| Gegenprobe, falsches Secret | derselbe PUT mit `If-Match`, aber falschem APP_SECRET | spike30a | `GEGENPROBE falsches-secret PUT mit If-Match nutzer=spike30a status=401 db_hash_unveraendert=ja` | ohne gültige Anmeldung ändert der Aufruf nichts |
+| M3.2: veraltete ETag wird abgelehnt | derselbe PUT mit der ersten, jetzt veralteten ETag | spike30a, appapi | `IF-MATCH veraltet auth=appapi nutzer=spike30a status=412 etag_vorher=2ee40cb76ab8 etag_nachher=2ee40cb76ab8 \| Sabre\DAV\Exception\PreconditionFailed An If-Match header was specified, but none of the specified ETags matched.` | 412, das Objekt ist danach unverändert (Datenbank-Hash gleich, GET byte-gleich, ETag gleich). A13, zweiter Teil: belegt. Die 412-Antwort trägt die aktuelle ETag im Kopf |
+| Vergleich der Anmeldewege | dieselbe Folge mit App-Passwort | spike30a, basic | `IF-MATCH GLEICH appapi_basic=ja appapi=(204, True, 412, True) basic=(204, True, 412, True) (status aktuell, etag geaendert, status veraltet, danach unveraendert)` | Impersonation und App-Passwort verhalten sich gleich |
+| M3.3: PUT ohne `If-Match` | PUT auf ein vorhandenes Objekt ohne bedingten Kopf | spike30a, appapi | `PUT ohne-if-match auth=appapi nutzer=spike30a status=204 etag_vorher=2ee40cb76ab8 etag_nachher=226402702ad7 \| ueberschrieben=ja` | der Server überschreibt ohne Rückfrage |
+| M3.3: PUT mit `If-Match: *` | PUT mit `If-Match: *` | spike30a, appapi | `PUT if-match-stern auth=appapi nutzer=spike30a status=204 etag_vorher=226402702ad7 etag_nachher=432e3008ca1c \| ueberschrieben=ja` | auch der Stern schützt nicht vor einer zwischenzeitlichen Änderung |
+
+Was Phase 33 daraus übernimmt: die Schreibschiene aus TMOD-01 (lesen, dann `PUT` mit `If-Match` auf die gelesene ETag) trägt unter Impersonation. Die beiden Beobachtungen zu M3.3 begründen das Verbot in TMOD-01: ohne `If-Match` und mit `If-Match: *` überschreibt der Server jeden Stand, ein 412 gibt es nur mit einer konkreten ETag. Die ETag ist stark und steht im Antwortkopf des angenommenen PUT; ob das auch gilt, wenn der Server den Text beim Speichern verändert, ist nicht gemessen (Abschnitt 11).
+
+### 3.2 Erhalt fremder Eigenschaften
+
+Das Probeobjekt trägt ein `VTIMEZONE`, ein `VALARM`, drei `X-`Eigenschaften (`X-SPIKE30-FOO`, `X-APPLE-SORT-ORDER`, `X-OC-HIDESUBTASKS`), einen unbekannten Parameter an `SUMMARY`, `CATEGORIES` mit zwei Werten, `CLASS` und eine gefaltete Beschreibung. Geändert wurde der gelesene Text an genau einer Zeile, textuell und ohne Parser.
+
+| Befund | Aufruf | Nutzer | Rohwert wörtlich | Deutung |
+|--------|--------|--------|------------------|---------|
+| Der Server speichert wörtlich | create-only `PUT`, danach GET und Datenbank-Hash | spike30a, appapi | `SPEICHERUNG woertlich=ja gesendet=633a90c17a2ffd068d3b86762fd9fdf15337f4a1bfc442abcd39e40323730d81:1104 datenbank=1 633a90c17a2ffd068d3b86762fd9fdf15337f4a1bfc442abcd39e40323730d81:1104 get_gleich_gesendet=ja` | sha256 und Länge der Spalte sind die des gesendeten Bodys; die Faltung bleibt, wie gesendet |
+| M3.4: ändernder PUT | `PUT` mit `If-Match`, nur `SUMMARY` geändert | spike30a, appapi | `EIGENSCHAFTEN differenz zeilen_vorher=37 zeilen_nachher=37 hinzu=keine entfernt=keine geaendert=['SUMMARY']` | die Zeilenmenge unterscheidet sich genau um die eine geänderte Zeile. A14: belegt |
+| Gegenprobe | Datenbank-Hash nach dem ändernden PUT | spike30a, appapi | `SPEICHERUNG nach_aendern woertlich=ja gesendet=64989341a79f258ac32e153a1472056663c4f032b159a18c7938a02a8fdf7cdd:1104 datenbank=1 64989341a79f258ac32e153a1472056663c4f032b159a18c7938a02a8fdf7cdd:1104 get_gleich_gesendet=ja` | auch der zweite Stand liegt byte-gleich in der Datenbank |
+| Positivkontrolle | zweites Objekt, dem beim Zurückschreiben eine `X-`Zeile fehlt | spike30a, appapi | `KONTROLLE eigenschaften kontrollobjekt ohne die Zeile X-SPIKE30-FOO:bar zurueckgeschrieben status=204 verloren=['entfernt VCALENDAR/VTODO:X-SPIKE30-FOO:bar'] genau_die_entfernte=ja` | das Verfahren meldet eine fehlende Zeile, und zwar genau diese |
+| Pflegefelder des Servers | Differenz aus M3.4 | spike30a, appapi | `PFLEGEFELDER server=keine` | der Server fasst `LAST-MODIFIED`, `DTSTAMP` und `SEQUENCE` nicht an und fügt nichts hinzu |
+
+Was Phase 33 daraus übernimmt: was der Connector sendet, steht danach so in der Datenbank. Der Erhalt fremder Eigenschaften hängt damit allein daran, wie der Connector den gelesenen Text ändert (TMOD-02), nicht am Server. Und weil der Server keine Pflegefelder setzt, muss der Connector `LAST-MODIFIED` und, soweit nötig, `SEQUENCE` selbst pflegen, wenn sie sich ändern sollen; ob die Tasks-App das tut, zeigt die Browser-Sitzung (3.5).
+
+### 3.3 Nur lesbare geteilte Liste
+
+`spike30b` hat zwei Listen an `spike30a` freigegeben, eine nur lesend und eine mit Schreibrecht (`POST` auf die Kalender-URL mit dem share-Dokument, beide Male 200). In der Discovery von `spike30a` erscheinen sie als `spike30-b-ro_shared_by_spike30b` und `spike30-b-rw_shared_by_spike30b`.
+
+| Befund | Aufruf | Nutzer | Rohwert wörtlich | Deutung |
+|--------|--------|--------|------------------|---------|
+| Lesen geht | GET auf das Objekt in der nur lesbaren Liste | spike30a, appapi | `LESEN geteilt spike30-b-ro_shared_by_spike30b/s30-geteilt-ro-123635.ics auth=appapi nutzer=spike30a status=200` | das Objekt ist sichtbar und lesbar |
+| M3.5: PUT wird abgelehnt, mit 404 | `PUT` mit `If-Match` auf die gelesene ETag | spike30a, appapi | `NUR-LESEN put auth=appapi nutzer=spike30a status=404 etag_vorher=180d92b53430 etag_nachher=180d92b53430 \| beim_eigentuemer_unveraendert=ja \| Sabre\DAV\Exception\NotFound Node with name 's30-geteilt-ro-123635.ics' could not be found` | abgelehnt und beim Eigentümer unverändert. Der Status ist 404 und nicht 403, obwohl dasselbe Objekt eben noch lesbar war |
+| Anlegen wird abgelehnt, mit 404 | create-only `PUT` in die nur lesbare Liste | spike30a, appapi | `NUR-LESEN anlegen auth=appapi nutzer=spike30a status=404 etag_vorher=- etag_nachher=- \| angelegt=nein \| Sabre\DAV\Exception\NotFound Calendar with name 'spike30-b-ro_shared_by_spike30b' could not be found` | nichts angelegt; die Meldung nennt die Liste als nicht gefunden |
+| Positivkontrolle | derselbe PUT in die Freigabe mit Schreibrecht | spike30a, appapi | `SCHREIBRECHT put auth=appapi nutzer=spike30a status=204 etag_vorher=9d8d701ca8d1 etag_nachher=f93acd4b84b2 \| beim_eigentuemer_unveraendert=nein` | mit Schreibrecht wird derselbe Aufruf angenommen und ändert das Objekt des Eigentümers |
+| Gegenprobe | Lesen als Eigentümer mit App-Passwort, Datenbank-Hash | spike30b, basic | `NUR-LESEN ERGEBNIS abgelehnt=ja status=404 anlegen=404 positivkontrolle_schreibrecht=204 (auth=appapi); auth=basic: 404, 404, 204` | mit App-Passwort dieselben drei Statuscodes |
+
+Was Phase 33 daraus übernimmt: die Ablehnung einer nur lesbaren geteilten Liste kommt als 404 mit der Meldung "could not be found", nicht als 403. Ein Werkzeug, das nach einem erfolgreichen Lesen ein 404 auf den PUT bekommt, darf daraus nicht "Aufgabe gelöscht" machen; TMOD-01 verlangt hier die klare Meldung "kein Schreibrecht". Gelesen, nicht gemessen: die Umsetzung von 403 nach 404 steht in `apps/dav/lib/Connector/Sabre/DavAclPlugin.php` (für fremde Knoten `NotFound`, für eigene `Forbidden`). Ob sich das Schreibrecht schon vor dem PUT erkennen lässt (Privilegien der Sammlung in der Discovery), gehört zu MESS-03 in Plan 30-04.
+
+### 3.4 Wiederkehrende Aufgaben und Unteraufgaben, Serverseite
+
+| Befund | Aufruf | Nutzer | Rohwert wörtlich | Deutung |
+|--------|--------|--------|------------------|---------|
+| M3.6: Master mit `RRULE` per PUT abgehakt | `PUT` mit `If-Match`, der `STATUS:COMPLETED`, `PERCENT-COMPLETE:100` und `COMPLETED` am Master setzt | spike30a, appapi | `WIEDERKEHREND server status=204 rrule_erhalten=ja status_completed_gespeichert=ja woertlich_gespeichert=ja objekte_vorher=5 objekte_nachher=5 neue_objekte=keine auth=appapi nutzer=spike30a etag_vorher=67728bfc20f9 etag_nachher=c6bc3d2796d3` | der Server nimmt den PUT an und speichert ihn wörtlich: die ganze Serie steht danach als erledigt da, die `RRULE` bleibt, es entsteht kein Folgeobjekt. Der Server kennt kein "diese eine Wiederholung abhaken" |
+| M3.7: Elternaufgabe per PUT abgehakt | `PUT` mit `If-Match` auf die Elternaufgabe; Unteraufgabe mit `RELATED-TO` davor und danach gelesen | spike30a, appapi | `UNTERAUFGABE server unveraendert=ja eltern_status=204 eltern_etag_geaendert=ja kind_etag_vorher=db690a34e9bf kind_etag_nachher=db690a34e9bf kind_hash_gleich=ja auth=appapi nutzer=spike30a` | die Elternaufgabe hat eine neue ETag (Positivkontrolle), die Unteraufgabe ist in ETag, Inhalt und Datenbank-Hash unverändert. A16, Serverseite: belegt |
+
+Für A15 heißt das: serverseitig spricht nichts dafür, wiederkehrende Aufgaben in einem Objekt abzuhaken. Ein PUT am Master beendet die Serie, statt eine Wiederholung zu erledigen. Die Vorgabe "ablehnen" bleibt von der Serverseite her bestehen; was die Tasks-App an dieser Stelle schreibt, zeigt die Browser-Sitzung (3.6).
+
+### 3.5 Was die Tasks-App beim Abhaken und Wiederöffnen schreibt
+
+Offen, füllt Plan 30-02 nach der Browser-Sitzung (Task 3). Vorbereitet ist: Tasks 0.18.1 ist in der Instanz installiert, das Messkonto `spike30ui` existiert, die Schritte der Sitzung stehen in `.planning/phases/30-mess-spike-aufgaben-und-ordner/30-02-BROWSER-SCHRITTE.md`.
+
+### 3.6 Wiederkehrende Aufgaben und Unteraufgaben in der Tasks-App
+
+Offen, füllt Plan 30-02 nach der Browser-Sitzung (Task 3).
 
 ## 4. Verschieben und Löschen (MESS-06)
 
@@ -235,6 +302,18 @@ Jeder Plan trägt hier seine Ungemessen-Zeilen mit Grund ein. Stand nach Plan 30
 | Externe Speicher anderer Art (SMB, S3, SFTP, WebDAV) | ungemessen | hergestellt wurde nur ein lokaler Speicher; ob ein entfernter nur lesbarer Speicher ebenfalls 403 antwortet, ist Annahme |
 | Serverseitige Verschlüsselung, LDAP- und SSO-Konten | ungemessen | in der Testinstanz nicht vorhanden; wie in `docs/spike-dav.md` benannt |
 | Unzulässige Namen über die drei gemessenen hinaus | ungemessen | gemessen sind `.htaccess`, ein Backslash und 300 Zeichen; die übrigen Regeln der Namensprüfung (weitere reservierte Namen, verbotene Zeichen und Endungen) sind gelesen, nicht gemessen |
+
+Ergänzt durch Plan 30-02, Messungen vor der Browser-Sitzung (2026-11-11):
+
+| Punkt | Stand | Grund |
+|-------|-------|-------|
+| `PUT` mit `If-Match` und Erhalt fremder Eigenschaften auf Nextcloud 32, 33 und 34, auf PostgreSQL oder MySQL | ungemessen | gemessen ist eine Instanz, 35.0.0 mit SQLite; Impersonation gibt es nur auf dieser Strecke |
+| ETag im Antwortkopf, wenn der Server den Text beim Speichern verändert | ungemessen | in jeder gemessenen Zeile speicherte der Server wörtlich, der Fall trat nicht ein; ein absichtlich fehlerhaftes Objekt, das der Server repariert, war nicht Teil des Plans |
+| Nur lesbare Liste aus einer Freigabe an eine Gruppe oder ein Team, öffentlicher Link, Delegation | ungemessen | hergestellt wurde eine Freigabe an ein einzelnes Konto über den DAV-Weg der Kalender-App |
+| Erkennen des fehlenden Schreibrechts vor dem PUT | ungemessen in diesem Plan | gemessen ist nur die Antwort auf den PUT (404); die Privilegien der Sammlung in der Discovery gehören zu MESS-03 in Plan 30-04 |
+| Wiederkehrende Aufgabe mit `RECURRENCE-ID`-Ausnahmen, Abhaken einer einzelnen Wiederholung | ungemessen | gemessen ist der PUT am Master einer täglichen Serie ohne Ausnahmen |
+| Unteraufgaben in einer anderen Liste als die Elternaufgabe, mehrstufige Unteraufgaben | ungemessen | gemessen ist eine Unteraufgabe in derselben Liste |
+| Was die Tasks-App schreibt (A12, App-Seite von A15 und A16), Inventar (A17) | offen | folgt nach der Browser-Sitzung in Task 3 dieses Plans |
 
 Zum Rückbau gehört eine Grenze, die keine Messlücke ist, aber benannt sein muss: `occ app:remove groupfolders` nimmt den Code der App weg, nicht ihre Tabellen in der Datenbank, und auch `files_external` behält seine Tabellen nach dem Ausschalten. Die Baseline (Apps, Konten, Gruppen, Dateien, Kalender) ist nach dem Lauf in allen zwölf Feldern gleich; die leeren Tabellen beider Apps bleiben in der Instanz nc35 zurück.
 
@@ -640,4 +719,192 @@ Rohantwort der Zeile EXTERN ro unter Impersonation:
       <s:exception>Sabre\DAV\Exception\Forbidden</s:exception>
       <s:message/>
     </d:error>
+```
+
+### 12.3 raw/nc35-aendern.txt
+
+Lauf vom 2026-11-11, Blöcke nc35-up, controls, modify und ui-prepare in einem Aufruf. Der Lauf endet ohne Rückbau, weil die Browser-Sitzung die Konten und Listen braucht; den Rückbau fährt der Block ui-teardown nach der Auswertung. Die Messzeilen in der Reihenfolge des Protokolls; die entfalteten Zeilenmengen des Probeobjekts vor und nach dem ändernden PUT stehen nur in der Rohdatei:
+
+```
+2026-11-11T12:36:37Z | MKCALENDAR auth=appapi status=201 liste=spike30-a nutzer=spike30a komponenten=VTODO |
+2026-11-11T12:36:37Z | MKCALENDAR auth=appapi status=201 liste=spike30-b nutzer=spike30a komponenten=VTODO |
+KONTROLLE exapp_impersonation.log, MKCALENDAR-Zeilen von spike30a: 2
+2026-11-11T12:36:37Z | FREIGABE liste=spike30-b-ro an=spike30a schreibrecht=nein nutzer=spike30b auth=basic status=200 (POST mit dem share-Dokument, Namensraum http://owncloud.org/ns)
+2026-11-11T12:36:37Z | FREIGABE liste=spike30-b-rw an=spike30a schreibrecht=ja nutzer=spike30b auth=basic status=200 (POST mit dem share-Dokument, Namensraum http://owncloud.org/ns)
+2026-11-11T12:36:37Z | DISCOVERY PROPFIND Depth 1 auth=appapi nutzer=spike30a 207
+DISCOVERY liste=spike30-a name=spike30-a komponenten=VTODO
+DISCOVERY liste=spike30-b name=spike30-b komponenten=VTODO
+DISCOVERY liste=spike30-b-ro_shared_by_spike30b name=spike30-b-ro (spike30b) komponenten=VTODO
+DISCOVERY liste=spike30-b-rw_shared_by_spike30b name=spike30-b-rw (spike30b) komponenten=VTODO
+2026-11-11T12:36:37Z | SETUP PUT create-only spike30-a/s30-ifmatch-appapi-123635.ics nutzer=spike30a auth=appapi status=201 antwort_etag=7e104de2233c |
+2026-11-11T12:36:39Z | IF-MATCH aktuell auth=appapi nutzer=spike30a status=204 etag_vorher=7e104de2233c etag_nachher=2ee40cb76ab8 | antwort_etag=ja etag_art=stark inhalt_neu=ja db_hash_geaendert=ja db_gleich_gesendet=ja
+KONTROLLE exapp_impersonation.log, PUT-Zeilen von spike30a: 2
+2026-11-11T12:36:39Z | GEGENPROBE multiget REPORT calendar-multiget auth=basic nutzer=spike30a status=207 objekte=1 inhalt_gleich_gesendet=ja
+2026-11-11T12:36:39Z | GEGENPROBE falsches-secret PUT mit If-Match nutzer=spike30a status=401 db_hash_unveraendert=ja | Sabre\DAV\Exception\NotAuthenticated No public access to this resource., AppAPIAuth has not passed, This request is not for a federated calendar, No 'Authorization: Basic' header found. Either the client didn't send one, or the server is misconfigured, No 'Authorization: Bearer' header found. Either
+2026-11-11T12:36:40Z | IF-MATCH veraltet auth=appapi nutzer=spike30a status=412 etag_vorher=2ee40cb76ab8 etag_nachher=2ee40cb76ab8 | Sabre\DAV\Exception\PreconditionFailed An If-Match header was specified, but none of the specified ETags matched.
+HASH calendardata vorher=1 e5384bf2c56eb3fb82cf36e9e0a11977f228d1217c94b7184ec029a9bb745865:245 nachher=1 e5384bf2c56eb3fb82cf36e9e0a11977f228d1217c94b7184ec029a9bb745865:245 gleich=ja get_byte_gleich=ja
+ABBRUCHKRITERIUM MESS-05 IF-MATCH ausgeloest=nein grund=keiner
+2026-11-11T12:36:40Z | SETUP PUT create-only spike30-a/s30-ifmatch-basic-123635.ics nutzer=spike30a auth=basic status=201 antwort_etag=d4d82855683e |
+2026-11-11T12:36:41Z | IF-MATCH aktuell auth=basic nutzer=spike30a status=204 etag_vorher=d4d82855683e etag_nachher=6e9e2a67bdc2 | antwort_etag=ja etag_art=stark inhalt_neu=ja db_hash_geaendert=ja db_gleich_gesendet=ja
+2026-11-11T12:36:42Z | IF-MATCH veraltet auth=basic nutzer=spike30a status=412 etag_vorher=6e9e2a67bdc2 etag_nachher=6e9e2a67bdc2 | Sabre\DAV\Exception\PreconditionFailed An If-Match header was specified, but none of the specified ETags matched.
+HASH calendardata vorher=1 884ec15e15eb36ff483f9149eea2d6369c6d068ade57f22c362bd0cbfa903bb9:244 nachher=1 884ec15e15eb36ff483f9149eea2d6369c6d068ade57f22c362bd0cbfa903bb9:244 gleich=ja get_byte_gleich=ja
+IF-MATCH GLEICH appapi_basic=ja appapi=(204, True, 412, True) basic=(204, True, 412, True) (status aktuell, etag geaendert, status veraltet, danach unveraendert)
+2026-11-11T12:36:42Z | PUT ohne-if-match auth=appapi nutzer=spike30a status=204 etag_vorher=2ee40cb76ab8 etag_nachher=226402702ad7 | ueberschrieben=ja |
+HASH calendardata vorher=1 e5384bf2c56eb3fb82cf36e9e0a11977f228d1217c94b7184ec029a9bb745865:245 nachher=1 31b2447eac07fb1abd802416cdcee6e8411d7de698044a2847b92f84b13d0956:251
+2026-11-11T12:36:43Z | PUT if-match-stern auth=appapi nutzer=spike30a status=204 etag_vorher=226402702ad7 etag_nachher=432e3008ca1c | ueberschrieben=ja |
+HASH calendardata vorher=1 31b2447eac07fb1abd802416cdcee6e8411d7de698044a2847b92f84b13d0956:251 nachher=1 b47a01d476d237d657ede209607749f28c4b7d0d97697d0b7a0b00bb82dab8db:252
+2026-11-11T12:36:43Z | EIGENSCHAFTEN anlegen auth=appapi nutzer=spike30a status=201 etag_vorher=- etag_nachher=0d890eb85e85 |
+SPEICHERUNG woertlich=ja gesendet=633a90c17a2ffd068d3b86762fd9fdf15337f4a1bfc442abcd39e40323730d81:1104 datenbank=1 633a90c17a2ffd068d3b86762fd9fdf15337f4a1bfc442abcd39e40323730d81:1104 get_gleich_gesendet=ja
+2026-11-11T12:36:43Z | EIGENSCHAFTEN aendern auth=appapi nutzer=spike30a status=204 etag_vorher=0d890eb85e85 etag_nachher=8013d80a8066 |
+SPEICHERUNG nach_aendern woertlich=ja gesendet=64989341a79f258ac32e153a1472056663c4f032b159a18c7938a02a8fdf7cdd:1104 datenbank=1 64989341a79f258ac32e153a1472056663c4f032b159a18c7938a02a8fdf7cdd:1104 get_gleich_gesendet=ja
+EIGENSCHAFTEN differenz zeilen_vorher=37 zeilen_nachher=37 hinzu=keine entfernt=keine geaendert=['SUMMARY']
+2026-11-11T12:36:43Z | SETUP PUT create-only spike30-a/s30-eigenschaften-kontrolle-123635.ics nutzer=spike30a auth=appapi status=201 antwort_etag=eb53a0b26d09 |
+2026-11-11T12:36:43Z | KONTROLLE eigenschaften kontrollobjekt ohne die Zeile X-SPIKE30-FOO:bar zurueckgeschrieben status=204 verloren=['entfernt VCALENDAR/VTODO:X-SPIKE30-FOO:bar'] genau_die_entfernte=ja
+PFLEGEFELDER server=keine
+ABBRUCHKRITERIUM MESS-05 EIGENSCHAFTEN ausgeloest=nein verloren=keine put_status=204 aenderung_angekommen=ja kontrolle=ok
+2026-11-11T12:36:44Z | SETUP PUT create-only spike30-b-ro/s30-geteilt-ro-123635.ics nutzer=spike30b auth=basic status=201 antwort_etag=180d92b53430 |
+2026-11-11T12:36:44Z | SETUP PUT create-only spike30-b-rw/s30-geteilt-rw-123635.ics nutzer=spike30b auth=basic status=201 antwort_etag=9d8d701ca8d1 |
+2026-11-11T12:36:44Z | LESEN geteilt spike30-b-ro_shared_by_spike30b/s30-geteilt-ro-123635.ics auth=appapi nutzer=spike30a status=200
+2026-11-11T12:36:44Z | NUR-LESEN put auth=appapi nutzer=spike30a status=404 etag_vorher=180d92b53430 etag_nachher=180d92b53430 | beim_eigentuemer_unveraendert=ja | Sabre\DAV\Exception\NotFound Node with name 's30-geteilt-ro-123635.ics' could not be found
+HASH calendardata vorher=1 1b5e67485bb48966b62b105976b7ffd3fff2dbb8c9b1b14fe965654ad9e59600:243 nachher=1 1b5e67485bb48966b62b105976b7ffd3fff2dbb8c9b1b14fe965654ad9e59600:243; etag_nachher ist als spike30b mit App-Passwort gelesen
+2026-11-11T12:36:44Z | LESEN geteilt spike30-b-rw_shared_by_spike30b/s30-geteilt-rw-123635.ics auth=appapi nutzer=spike30a status=200
+2026-11-11T12:36:45Z | SCHREIBRECHT put auth=appapi nutzer=spike30a status=204 etag_vorher=9d8d701ca8d1 etag_nachher=f93acd4b84b2 | beim_eigentuemer_unveraendert=nein |
+HASH calendardata vorher=1 76fc316791af2682732dc0ec16384fd22dfb2bf31ff8a384deb8e2b60f84202d:243 nachher=1 fb6d58e5c3e73382298c951519c4463a8d963a576d20be855b9300c0bfe7e56a:247; etag_nachher ist als spike30b mit App-Passwort gelesen
+2026-11-11T12:36:45Z | NUR-LESEN anlegen auth=appapi nutzer=spike30a status=404 etag_vorher=- etag_nachher=- | angelegt=nein | Sabre\DAV\Exception\NotFound Calendar with name 'spike30-b-ro_shared_by_spike30b' could not be found
+2026-11-11T12:36:45Z | LESEN geteilt spike30-b-ro_shared_by_spike30b/s30-geteilt-ro-123635.ics auth=basic nutzer=spike30a status=200
+2026-11-11T12:36:45Z | NUR-LESEN put auth=basic nutzer=spike30a status=404 etag_vorher=180d92b53430 etag_nachher=180d92b53430 | beim_eigentuemer_unveraendert=ja | Sabre\DAV\Exception\NotFound Node with name 's30-geteilt-ro-123635.ics' could not be found
+HASH calendardata vorher=1 1b5e67485bb48966b62b105976b7ffd3fff2dbb8c9b1b14fe965654ad9e59600:243 nachher=1 1b5e67485bb48966b62b105976b7ffd3fff2dbb8c9b1b14fe965654ad9e59600:243; etag_nachher ist als spike30b mit App-Passwort gelesen
+2026-11-11T12:36:45Z | LESEN geteilt spike30-b-rw_shared_by_spike30b/s30-geteilt-rw-123635.ics auth=basic nutzer=spike30a status=200
+2026-11-11T12:36:46Z | SCHREIBRECHT put auth=basic nutzer=spike30a status=204 etag_vorher=f93acd4b84b2 etag_nachher=b118b7ab412a | beim_eigentuemer_unveraendert=nein |
+HASH calendardata vorher=1 fb6d58e5c3e73382298c951519c4463a8d963a576d20be855b9300c0bfe7e56a:247 nachher=1 d383c08a0f6a76342dadef8e272ff3c4d46137da1c457cb162b959c898cadabf:246; etag_nachher ist als spike30b mit App-Passwort gelesen
+2026-11-11T12:36:46Z | NUR-LESEN anlegen auth=basic nutzer=spike30a status=404 etag_vorher=- etag_nachher=- | angelegt=nein | Sabre\DAV\Exception\NotFound Calendar with name 'spike30-b-ro_shared_by_spike30b' could not be found
+NUR-LESEN ERGEBNIS abgelehnt=ja status=404 anlegen=404 positivkontrolle_schreibrecht=204 (auth=appapi); auth=basic: 404, 404, 204
+2026-11-11T12:36:46Z | SETUP PUT create-only spike30-a/s30-wiederkehrend-123635.ics nutzer=spike30a auth=appapi status=201 antwort_etag=67728bfc20f9 |
+2026-11-11T12:36:47Z | WIEDERKEHREND server status=204 rrule_erhalten=ja status_completed_gespeichert=ja woertlich_gespeichert=ja objekte_vorher=5 objekte_nachher=5 neue_objekte=keine auth=appapi nutzer=spike30a etag_vorher=67728bfc20f9 etag_nachher=c6bc3d2796d3
+WIEDERKEHREND differenz hinzu=['VCALENDAR/VTODO:COMPLETED:20261111T123646Z', 'VCALENDAR/VTODO:PERCENT-COMPLETE:100', 'VCALENDAR/VTODO:STATUS:COMPLETED'] entfernt=keine geaendert=keine; datenbank=1 4e223650e00b251e23a6dde6eda8fccd79cdeab9ccd40d6a7613595789581ffe:387
+2026-11-11T12:36:47Z | SETUP PUT create-only spike30-a/s30-eltern-123635.ics nutzer=spike30a auth=appapi status=201 antwort_etag=b345eb6f049b |
+2026-11-11T12:36:47Z | SETUP PUT create-only spike30-a/s30-kind-123635.ics nutzer=spike30a auth=appapi status=201 antwort_etag=db690a34e9bf |
+2026-11-11T12:36:47Z | UNTERAUFGABE server unveraendert=ja eltern_status=204 eltern_etag_geaendert=ja kind_etag_vorher=db690a34e9bf kind_etag_nachher=db690a34e9bf kind_hash_gleich=ja auth=appapi nutzer=spike30a
+HASH calendardata der Unteraufgabe vorher=1 908c30d699f984198d59c2ae03541cd807d749356f22ec3e09010aed88fa4f17:265 nachher=1 908c30d699f984198d59c2ae03541cd807d749356f22ec3e09010aed88fa4f17:265
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+TASKS-APP version=0.18.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)
+2026-11-11T12:36:56Z | UI-KONTO DISCOVERY auth=basic nutzer=spike30ui status=207 listen=keine
+2026-11-11T12:36:56Z | UI-KONTO DISCOVERY auth=appapi nutzer=spike30ui status=207 listen=keine
+2026-11-11T12:36:56Z | UI-KONTO GET /apps/tasks/ auth=basic nutzer=spike30ui status=200 html=ja
+UI-KONTO nutzer=spike30ui adresse=http://127.0.0.1:8082/apps/tasks/ zugangsdaten=in einer Datei ausserhalb des Repositorys (drei Zeilen: Nutzer, Passwort, Basis-URL)
+RUECKBAU ausgesetzt: Konten, Listen und die Tasks-App bleiben fuer die Browser-Sitzung stehen; der Block ui-teardown baut zurueck und vergleicht mit den BASELINE-START-Zeilen dieses Laufs
+```
+
+Rohantwort zu M3.1 (PUT mit der gelesenen ETag unter Impersonation):
+
+```
+HTTP 204 No Content
+content-security-policy: default-src 'none';
+date: Wed, 11 Nov 2026 12:36:39 GMT
+etag: "2ee40cb76ab8f266dfa846561bb6a513"
+oc-etag: "2ee40cb76ab8f266dfa846561bb6a513"
+referrer-policy: no-referrer
+server: Apache/2.4.68 (Debian)
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-powered-by: PHP/8.5.9
+x-request-id: b0GrTtuKbb69VATgQHi1
+x-robots-tag: noindex, nofollow
+x-user-id: spike30a
+(no body)
+```
+
+Rohantwort zu M3.2 (PUT mit der veralteten ETag unter Impersonation):
+
+```
+HTTP 412 Precondition Failed
+content-length: 308
+content-security-policy: default-src 'none';
+content-type: application/xml; charset=utf-8
+date: Wed, 11 Nov 2026 12:36:39 GMT
+etag: "2ee40cb76ab8f266dfa846561bb6a513"
+referrer-policy: no-referrer
+server: Apache/2.4.68 (Debian)
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-powered-by: PHP/8.5.9
+x-robots-tag: noindex, nofollow
+x-user-id: spike30a
+(body)
+<?xml version="1.0" encoding="utf-8"?>
+<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+<s:exception>Sabre\DAV\Exception\PreconditionFailed</s:exception>
+<s:message>An If-Match header was specified, but none of the specified ETags matched.</s:message>
+<s:header>If-Match</s:header>
+</d:error>
+```
+
+Rohantworten zu M3.5 (nur lesbare Liste: PUT und Anlegen; danach die Freigabe mit Schreibrecht), alle unter Impersonation:
+
+```
+HTTP 404 Not Found
+content-length: 253
+content-security-policy: default-src 'none';
+content-type: application/xml; charset=utf-8
+date: Wed, 11 Nov 2026 12:36:44 GMT
+referrer-policy: no-referrer
+server: Apache/2.4.68 (Debian)
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-powered-by: PHP/8.5.9
+x-robots-tag: noindex, nofollow
+(body)
+<?xml version="1.0" encoding="utf-8"?>
+<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+<s:exception>Sabre\DAV\Exception\NotFound</s:exception>
+<s:message>Node with name 's30-geteilt-ro-123635.ics' could not be found</s:message>
+</d:error>
+```
+
+```
+HTTP 404 Not Found
+content-length: 263
+content-security-policy: default-src 'none';
+content-type: application/xml; charset=utf-8
+date: Wed, 11 Nov 2026 12:36:45 GMT
+referrer-policy: no-referrer
+server: Apache/2.4.68 (Debian)
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-powered-by: PHP/8.5.9
+x-robots-tag: noindex, nofollow
+x-user-id: spike30a
+(body)
+<?xml version="1.0" encoding="utf-8"?>
+<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+<s:exception>Sabre\DAV\Exception\NotFound</s:exception>
+<s:message>Calendar with name 'spike30-b-ro_shared_by_spike30b' could not be found</s:message>
+</d:error>
+```
+
+```
+HTTP 204 No Content
+content-security-policy: default-src 'none';
+date: Wed, 11 Nov 2026 12:36:44 GMT
+etag: "f93acd4b84b2471100d34b4926741fc8"
+oc-etag: "f93acd4b84b2471100d34b4926741fc8"
+referrer-policy: no-referrer
+server: Apache/2.4.68 (Debian)
+via: 1.1 Caddy
+x-content-type-options: nosniff
+x-frame-options: SAMEORIGIN
+x-permitted-cross-domain-policies: none
+x-powered-by: PHP/8.5.9
+x-request-id: retZJbJbtJoVIeTo2Bt9
+x-robots-tag: noindex, nofollow
+x-user-id: spike30a
+(no body)
 ```
