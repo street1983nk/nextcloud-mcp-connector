@@ -540,3 +540,202 @@ def test_baseline_from_protocol_takes_the_lines_of_the_last_controls_block() -> 
         "nutzer": "- admin: admin - alice: alice",
     }
     assert spike.baseline_from_protocol("nichts") == {}
+
+
+# --- plan 30-02 task 3: evaluation of the browser session and the inventory ------------------
+
+
+def _todo(uid: str, summary: str, *extra: str, stamp: str = "20261111T125045Z") -> str:
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Nextcloud Tasks v0.18.1",
+        "BEGIN:VTODO",
+        f"UID:{uid}",
+        "CREATED:20261111T125045Z",
+        f"LAST-MODIFIED:{stamp}",
+        f"DTSTAMP:{stamp}",
+        f"SUMMARY:{summary}",
+        *extra,
+        "END:VTODO",
+        "END:VCALENDAR",
+        "",
+    ]
+    return "\r\n".join(lines)
+
+
+def _states(tmp_path: Path) -> tuple[dict, dict]:
+    done = ("PERCENT-COMPLETE:100", "COMPLETED:20261111T125947Z", "STATUS:COMPLETED")
+    state_a = [
+        spike.SnapshotObject("l1", "AAA.ics", '"1"', _todo("u-ab", "s30 abhaken").encode(), False),
+        spike.SnapshotObject(
+            "l1", "BBB.ics", '"2"', _todo("u-un", "s30 unberuehrt").encode(), False
+        ),
+        spike.SnapshotObject(
+            "l1", "CCC.ics", '"3"', _todo("u-lo", "s30 eltern-loeschen").encode(), False
+        ),
+    ]
+    state_b = [
+        spike.SnapshotObject(
+            "l1",
+            "AAA.ics",
+            '"4"',
+            _todo("u-ab", "s30 abhaken", *done, stamp="20261111T125947Z").encode(),
+            False,
+        ),
+        spike.SnapshotObject(
+            "l2", "BBB.ics", '"2"', _todo("u-un", "s30 unberuehrt").encode(), False
+        ),
+        spike.SnapshotObject(
+            "trashbin", "135.ics", '"5"', _todo("u-lo", "s30 eltern-loeschen").encode(), True
+        ),
+    ]
+    spike.write_snapshot(tmp_path, "a", state_a)
+    spike.write_snapshot(tmp_path, "b", state_b)
+    return spike.load_snapshot(tmp_path / "ui-a"), spike.load_snapshot(tmp_path / "ui-b")
+
+
+def test_load_snapshot_keys_the_objects_by_uid_and_marks_the_trash(tmp_path: Path) -> None:
+    before, after = _states(tmp_path)
+    assert sorted(before) == ["u-ab", "u-lo", "u-un"]
+    assert before["u-ab"].file == "AAA.ics"
+    assert after["u-lo"].file == "trash-135.ics"
+    assert after["u-lo"].trashed is True
+    assert after["u-ab"].trashed is False
+
+
+def test_snapshot_lists_reads_the_list_of_every_file_from_the_last_run_of_a_label() -> None:
+    protocol = "\n".join(
+        [
+            "UI-OBJEKT stand=a liste=alt name=AAA.ics summary=s30 abhaken etag=1",
+            "UI-OBJEKT stand=a liste=l1 name=AAA.ics summary=s30 abhaken etag=1",
+            "UI-OBJEKT stand=b liste=l2 name=AAA.ics summary=s30 abhaken etag=4",
+            "UI-OBJEKT stand=b liste=trashbin name=trash-135.ics summary=s30 x etag=5",
+        ]
+    )
+    assert spike.snapshot_lists(protocol, "a") == {"AAA.ics": "l1"}
+    assert spike.snapshot_lists(protocol, "b") == {"AAA.ics": "l2", "trash-135.ics": "trashbin"}
+
+
+def test_evaluate_snapshots_writes_the_mandatory_lines_from_two_small_states(
+    tmp_path: Path,
+) -> None:
+    before, after = _states(tmp_path)
+    lists_a = {"AAA.ics": "l1", "BBB.ics": "l1", "CCC.ics": "l1"}
+    lists_b = {"AAA.ics": "l1", "BBB.ics": "l2", "trash-135.ics": "trashbin"}
+    lines = spike.evaluate_snapshots(before, after, lists_a, lists_b)
+    assert (
+        "ABHAKEN FELDER hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=keine "
+        "geaendert=DTSTAMP,LAST-MODIFIED zeitform_completed=utc"
+    ) in lines
+    assert "KONTROLLE unberuehrt differenz=leer" in lines
+    assert any(line.startswith("WIEDEROEFFNEN FELDER ungemessen grund=") for line in lines)
+    assert any(line.startswith("ELTERN ABHAKEN ungemessen grund=") for line in lines)
+    assert any(line.startswith("WIEDERKEHREND app ungemessen grund=") for line in lines)
+    assert "UI-PAPIERKORB objekte=1" in " ".join(lines)
+    assert any(
+        line.startswith("UI-UMZUG objekt=s30 unberuehrt von=l1 nach=l2 dateiname_gleich=ja")
+        for line in lines
+    )
+    assert any(
+        line.startswith("UI-PAPIERKORB objekt=s30 eltern-loeschen")
+        and "inhalt_gleich_stand_a=ja" in line
+        for line in lines
+    )
+
+
+def test_evaluate_snapshots_names_a_touched_control_object(tmp_path: Path) -> None:
+    before, after = _states(tmp_path)
+    touched = dict(after)
+    touched["u-un"] = spike.SnapshotEntry(
+        "BBB.ics", _todo("u-un", "s30 unberuehrt", "PRIORITY:1"), False
+    )
+    lines = spike.evaluate_snapshots(before, touched, {}, {})
+    assert "KONTROLLE unberuehrt differenz=hinzu=PRIORITY entfernt=keine geaendert=keine" in lines
+
+
+def _access(time: str, method: str, user: str, name: str, status: int) -> str:
+    request = f"{method} /remote.php/dav/calendars/{user}/l1/{name} HTTP/1.1"
+    return f'172.1.0.2 - - [11/Nov/2026:{time} +0000] "{request}" {status} 478 "-" "Mozilla"'
+
+
+_ACCESS_LOG = "\n".join(
+    [
+        _access("13:01:25", "PUT", "spike30ui", "AAA.ics", 204),
+        _access("13:01:26", "PUT", "spike30ui", "BBB.ics", 500),
+        _access("13:01:27", "GET", "spike30ui", "BBB.ics", 200),
+        _access("13:01:28", "PUT", "spike30a", "CCC.ics", 204),
+        _access("13:03:41", "DELETE", "spike30ui", "CCC.ics", 204),
+    ]
+)
+
+
+def test_access_writes_keeps_the_writing_requests_of_one_account_with_their_status() -> None:
+    assert spike.access_writes(_ACCESS_LOG, "spike30ui") == [
+        ("11/Nov/2026:13:01:25 +0000", "PUT", "l1/AAA.ics", 204),
+        ("11/Nov/2026:13:01:26 +0000", "PUT", "l1/BBB.ics", 500),
+        ("11/Nov/2026:13:03:41 +0000", "DELETE", "l1/CCC.ics", 204),
+    ]
+
+
+def test_merge_hits_joins_the_two_patterns_on_one_line() -> None:
+    first = [("README.md", 42, "No deleting"), ("README.md", 60, "create-only")]
+    second = [("README.md", 42, "No deleting"), ("tests/x.py", 7, "EXPECTED_PUT_CALLS = 6")]
+    assert spike.merge_hits(first, second) == [
+        spike.Hit("README.md", 42, "No deleting", "1+2"),
+        spike.Hit("README.md", 60, "create-only", "1"),
+        spike.Hit("tests/x.py", 7, "EXPECTED_PUT_CALLS = 6", "2"),
+    ]
+
+
+def test_classify_takes_the_first_matching_rule_and_names_an_unruled_hit() -> None:
+    rules = (
+        spike.Rule(r"^tests/x\.py$", "EXPECTED_PUT_CALLS", "gate", "PUT", "Phase 33"),
+        spike.Rule(r"^tests/", "", "ausgeschlossen", "", "anderes Thema"),
+    )
+    assert spike.classify(spike.Hit("tests/x.py", 7, "EXPECTED_PUT_CALLS = 6", "2"), rules) == (
+        "gate",
+        "PUT",
+        "Phase 33",
+    )
+    assert spike.classify(spike.Hit("tests/x.py", 9, "other", "2"), rules) == (
+        "ausgeschlossen",
+        "",
+        "anderes Thema",
+    )
+    assert spike.classify(spike.Hit("README.md", 1, "x", "1"), rules) == ("ungeklaert", "", "")
+
+
+def test_inventory_line_has_the_agreed_form_for_a_kept_and_an_excluded_hit() -> None:
+    hit = spike.Hit("tests/x.py", 7, "EXPECTED_PUT_CALLS = 6", "1+2")
+    assert spike.inventory_line(hit, ("gate", "PUT", "Phase 33")) == (
+        "INVENTAR gate tests/x.py:7 | EXPECTED_PUT_CALLS = 6 | beruehrt_von=PUT | "
+        "abzuarbeiten_in=Phase 33 | muster=1+2"
+    )
+    assert spike.inventory_line(hit, ("ausgeschlossen", "", "anderes Thema")) == (
+        "INVENTAR ausgeschlossen tests/x.py:7 | EXPECTED_PUT_CALLS = 6 | "
+        "grund=anderes Thema | muster=1+2"
+    )
+    long = spike.Hit("a.md", 1, "x" * 300, "1")
+    assert (
+        len(spike.inventory_line(long, ("zusage-doku", "PUT", "Phase 34")).split(" | ")[1]) == 200
+    )
+
+
+def test_positive_control_names_each_of_the_six_places_a_hit_stands_in() -> None:
+    hits = [
+        ("tests/contract/test_no_destructive_calls.py", 86, "FORBIDDEN: dict[str, str] = {"),
+        ("tests/contract/test_no_destructive_calls.py", 480, "EXPECTED_PUT_CALLS = 6"),
+        ("README.md", 60, "**create-only** means it can create new objects"),
+        ("docs/threat-model.md", 149, "`files_upload` remains create-only."),
+        ("appinfo/info.xml", 69, "- Nothing destructive: no delete, no move, no share"),
+    ]
+    assert spike.positive_control(hits) == [
+        "EXPECTED_PUT_CALLS",
+        "FORBIDDEN",
+        "README-Rechtetabelle",
+        "threat-model",
+        "Store-Text",
+    ]
+    hits.append(("src/mcp_connector/server/__init__.py", 63, "Files are never deleted"))
+    assert spike.positive_control(hits) == list(spike.CONTROL_PLACES)
