@@ -9,3 +9,7 @@
 Dockerfile text eol=lf
 deploy/Caddyfile text eol=lf
 deploy/Caddyfile.staging text eol=lf
+
+# The calendar objects of the measuring spike (phase 30) are raw evidence and later
+# fixtures: they keep the bytes the server sent, CRLF line ends included.
+.planning/phases/30-mess-spike-aufgaben-und-ordner/raw/**/*.ics -text
