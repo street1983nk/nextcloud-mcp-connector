@@ -1,16 +1,16 @@
 # Mess-Spike Aufgaben und Ordner (MESS-01 bis MESS-06)
 
-**Status:** läuft. Abschnitt 1 (MESS-01) ist gemessen, das Abbruchkriterium zu MESS-01 ist nicht ausgelöst; die übrigen Abschnitte sind offen
+**Status:** läuft. Die Abschnitte 1 (MESS-01) und 2 (MESS-02) sind gemessen, das Abbruchkriterium zu MESS-01 ist nicht ausgelöst; die Abschnitte 3 bis 10 sind offen
 **Messzeitraum:** ab 2026-11-11 (erster Messlauf 11:55 UTC), Ende offen
 **Nextcloud:** 35.0.0 (Build 35.0.0.10), gelesen mit `occ status` am 2026-11-11 aus dem laufenden Container `nc35-nc`. Das Image heißt `nextcloud:35.0.0-apache-local` und ist lokal aus dem veröffentlichten Quellpaket gebaut (`compose.nc35.yml`, Kopfkommentar)
 **AppAPI:** `app_api` 35.0.0, gelesen mit `occ app:list --output=json` derselben Instanz am 2026-11-11
 **Diese ExApp:** 0.3.2, gelesen mit `occ app_api:app:list` am 2026-11-11. In der Topologie ist also ein älterer Stand registriert als der Arbeitsbaum. Für die Messung zählt das an zwei Stellen: die Impersonation läuft mit dem Secret dieser Registrierung, und der Produktionsweg (Abschnitt 1.2) läuft im Container dieses Images. Kein Werkzeug der App wird gemessen, nur ihr Zugang zu Nextcloud
-**groupfolders:** offen, füllt Plan 30-01 (gelesen mit `occ app:list` nach der Installation in der Instanz)
+**groupfolders:** 23.0.1, gelesen mit `occ app:list --output=json` am 2026-11-11 nach `occ app:install groupfolders` in der laufenden Instanz (Protokollzeile `GRUPPENORDNER version=23.0.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)`). Die App wurde für die Messung aus dem App Store geladen und danach wieder entfernt. `files_external` 2.0.0-dev.0 gehört zum Server und war nur für die Messung eingeschaltet
 **Tasks:** offen, füllt Plan 30-02
 **Deck:** offen, füllt Plan 30-04
 **Datenbank:** `sqlite3`, gelesen mit `occ config:system:get dbtype` am 2026-11-11
 **Topologie:** die vorhandene Strecke `compose.nc35.yml` (Container `nc35-nc`, `nc35-harp`, `nc35-caddy`, ExApp-Container `nc_app_mcp_connector`, Loopback `http://127.0.0.1:8082`). Sie wird nur mit `docker start` und `docker stop` bewegt, nie abgebaut. Weitere Instanzen für die Versionsbreite nennen die Pläne 30-03 und 30-04
-**Messskript:** `scripts/tasks_spike.py`; der Commit, der das Skript zusammen mit diesen Kriterien festschreibt, liegt vor jeder Rohdatei unter `.planning/phases/30-mess-spike-aufgaben-und-ordner/raw/`. Das ist Commit `63ad052`; die Blöcke `mkcol` und `groupfolder` kamen danach dazu, ohne dass sich Kriterien oder Erwartungen geändert haben
+**Messskript:** `scripts/tasks_spike.py`; der Commit, der das Skript zusammen mit diesen Kriterien festschreibt, liegt vor jeder Rohdatei unter `.planning/phases/30-mess-spike-aufgaben-und-ordner/raw/`. Das ist Commit `63ad052`; die Blöcke `mkcol`, `groupfolder` und `nachlauf` kamen danach dazu, ohne dass sich Kriterien oder Erwartungen geändert haben
 **Scope:** gemessen wird gegen laufende Nextcloud-Instanzen in lokalem Docker, was die Phasen 31 bis 33 bisher nur annehmen: Ordner anlegen mit `MKCOL`, auch unter AppAPI-Impersonation und in einem Gruppenordner mit ACL, danach die Aufgaben-Zugriffe über CalDAV. Es entsteht kein Produktcode: unter `src/` ändert diese Phase nichts, und jeder schreibende Aufruf läuft aus dem Messskript.
 
 Jede Fassungszeile im Kopfblock trägt entweder einen Wert, der aus der laufenden Instanz gelesen wurde, samt Lesebefehl und Datum, oder den Vermerk "offen" mit dem Plan, der sie füllt. Ein Wert aus der Recherche steht dort an keiner Stelle.
@@ -114,7 +114,57 @@ Positivkontrolle zum Kontingent (M1.5): `KONTROLLE kontingent PUT 2048 Bytes /sp
 
 ## 2. Gruppenordner mit ACL und externer Speicher (MESS-02)
 
-Offen, füllt Plan 30-01.
+Gemessen am 2026-11-11 auf derselben Instanz (Nextcloud 35.0.0, SQLite) mit `groupfolders` 23.0.1, Rohprotokoll `raw/nc35-gruppenordner.txt` im Phasenordner (wörtliche Zeilen in Abschnitt 12.2). Jede Zeile lief unter AppAPI-Impersonation und mit App-Passwort.
+
+### 2.1 Aufbau
+
+Die Kommandoformen stammen aus den Hilfetexten der laufenden Instanz (`occ groupfolders:create --help` und die übrigen, roh im Protokoll), nicht aus der Planung.
+
+- Gruppe `spike30grp` mit `spike30a` und `spike30b`, Gruppe `spike30lesen` mit `spike30a`.
+- Gruppenordner `spike30gf` (Id 1) für `spike30grp` mit den Rechten read, write, share, delete, erweiterte Rechte (ACL) eingeschaltet. Gruppenordner `spike30gf-lesen` (Id 2) für `spike30lesen` ohne Angabe von Rechten, also nur lesbar.
+- Positivkontrolle, dass beide Ordner im Home des Messkontos erscheinen: `KONTROLLE PROPFIND Depth 1 home auth=appapi nutzer=spike30a status=207 spike30gf_sichtbar=ja spike30gf-lesen_sichtbar=ja`.
+- Die Unterordner `acl-rw` und `acl-ro` hat `spike30a` selbst unter Impersonation mit `MKCOL` angelegt (beide 201, Zeilen GF-AUFBAU in 12.2). Wo sie im Datenverzeichnis liegen, ist danach von der Platte gelesen: `DATEISYSTEM gruppenordner spike30gf id=1 pfad=/var/www/html/data/__groupfolders/1/files`.
+- ACL-Regel auf `acl-ro` für das Konto `spike30a`: `occ groupfolders:permissions 1 --user spike30a acl-ro -- +read -write -create -delete`. Die Instanz bestätigt die wirksamen Rechte mit `occ groupfolders:permissions 1 --user spike30a --test acl-ro -> +read, -write, -create, -delete, +share`.
+
+### 2.2 Messung
+
+| Befund | Aufruf | Nutzer | Rohwert | Erwartung | Deutung |
+|--------|--------|--------|---------|-----------|---------|
+| M2.1 Gruppenordner mit Schreibrecht | MKCOL `/spike30gf/acl-rw/neu-<auth>` | spike30a | `GF acl-rw auth=appapi nutzer=spike30a status=201 angelegt=ja`<br>`GF acl-rw auth=basic nutzer=spike30a status=201 angelegt=ja` | 201 | angelegt, im Dateisystem unter `__groupfolders/1/files/` gefunden |
+| M2.2 Negativtest: ACL-Regel entzieht Schreiben, Anlegen und Löschen | MKCOL `/spike30gf/acl-ro/neu-<auth>` | spike30a | `GF acl-ro auth=appapi nutzer=spike30a status=403 angelegt=nein`<br>`GF acl-ro auth=basic nutzer=spike30a status=403 angelegt=nein` | Ablehnung, A8 erwartet 403 | abgelehnt mit 403, nichts angelegt; `s:message` ist leer |
+| Positivkontrolle: Konto ohne Regel im selben Ordner | MKCOL `/spike30gf/acl-ro/neu-b-<auth>` | spike30b | `GF acl-ro-kontrolle-b auth=appapi nutzer=spike30b status=201 angelegt=ja`<br>`GF acl-ro-kontrolle-b auth=basic nutzer=spike30b status=201 angelegt=ja` | 201 | angelegt: der Ordner selbst ist beschreibbar, die Ablehnung trifft nur das Konto mit der Regel |
+| Positivkontrolle: Regel entfernt, dasselbe Konto | MKCOL `/spike30gf/acl-ro/nach-<auth>` | spike30a | `GF acl-ro-nach-regelentzug auth=appapi nutzer=spike30a status=201 angelegt=ja`<br>`GF acl-ro-nach-regelentzug auth=basic nutzer=spike30a status=201 angelegt=ja` | 201 | angelegt: ohne die Regel legt auch das Messkonto an |
+| M2.3 Gruppe mit reinem Leserecht | MKCOL `/spike30gf-lesen/neu-<auth>` | spike30a | `GF gruppe-nur-lesen auth=appapi nutzer=spike30a status=403 angelegt=nein`<br>`GF gruppe-nur-lesen auth=basic nutzer=spike30a status=403 angelegt=nein` | Ablehnung | abgelehnt mit 403, nichts angelegt |
+| M2.4 externer Speicher, nur lesbar | MKCOL `/spike30ext/neu-ro-<auth>` | spike30a | `EXTERN ro auth=appapi nutzer=spike30a status=403 angelegt=nein`<br>`EXTERN ro auth=basic nutzer=spike30a status=403 angelegt=nein` | Ablehnung, A8 erwartet 403 | abgelehnt mit 403, im Zielverzeichnis liegt nichts |
+| Positivkontrolle: derselbe Speicher ohne `readonly` | MKCOL `/spike30ext/neu-rw-<auth>` | spike30a | `EXTERN rw auth=appapi nutzer=spike30a status=201 angelegt=ja`<br>`EXTERN rw auth=basic nutzer=spike30a status=201 angelegt=ja` | 201 | angelegt, im Zielverzeichnis des lokalen Speichers gefunden |
+
+**Negativtest E12:** `E12 NEGATIVTEST abgelehnt=ja status=403 a8_403=belegt (auth=appapi nutzer=spike30a; auth=basic status=403)`. **Positivfall E12:** `E12 POSITIV angelegt=ja status=201 (auth=appapi nutzer=spike30a)`. **Kontrollen:** `E12 KONTROLLEN kontrolle_b=201 nach_regelentzug=201 (auth=appapi)`.
+
+Dass die Ablehnung an der ACL-Regel hängt und nicht am Ordner oder am Verfahren, zeigen die zwei Kontrollen: ein Konto ohne Regel legt im selben Ordner an, und nach `occ groupfolders:permissions 1 --user spike30a acl-ro clear` legt auch das Messkonto dort an. Die Ablehnung zählt nach der vorab festgelegten Regel (`refused()`): Status außerhalb von 2xx und im Dateisystem nichts angelegt.
+
+Gegenproben über DAV, aus Sicht von `spike30a`: `KONTROLLE oc:permissions /spike30gf/acl-rw aus Sicht von spike30a auth=appapi status=207 permissions=RMGDNVCK` gegen `KONTROLLE oc:permissions /spike30gf/acl-ro aus Sicht von spike30a auth=appapi status=207 permissions=RMG`. Dem Ordner mit der Regel fehlen `D`, `N`, `V`, `C` und `K`; die Antwort trägt außerdem `nc:acl-enabled` mit 1 und in `nc:acl-list` genau die eine Regel (Rohantwort im Protokoll). Ein `PROPFIND` vor dem Anlegen zeigt das fehlende Recht also schon.
+
+### 2.3 Externer Speicher
+
+Hergestellt als lokaler Speicher: `occ files_external:create spike30ext local null::null -c datadir=/var/www/html/data/spike30ext -> Storage created with id 1`, zugewiesen nur an `spike30a`, Option `readonly` erst `true`, dann `false`. Mit `readonly`: `KONTROLLE oc:permissions /spike30ext (readonly=true) aus Sicht von spike30a auth=appapi status=207 permissions=MG`. Ergebnis: `EXTERN A8 abgelehnt=ja status=403 a8_403=belegt positivkontrolle_rw=201 (auth=appapi nutzer=spike30a)`.
+
+### 2.4 A8 je Speicherart und was Phase 31 übernimmt
+
+| Speicherart | A8 (Ablehnung mit 403) | Beleg |
+|-------------|------------------------|-------|
+| Gruppenordner, ACL-Regel gegen das Konto | belegt | Zeile E12 NEGATIVTEST |
+| Gruppenordner, Gruppe mit reinem Leserecht | belegt | Zeile GF gruppe-nur-lesen, 403 |
+| Externer Speicher (lokal), `readonly` | belegt | Zeile EXTERN A8 |
+| Freigabe ohne Anlegerecht (Abschnitt 1) | belegt | Zeile MKCOL share-ro, 403 |
+
+Für die Meldung "keine Rechte" übernimmt Phase 31:
+
+- In allen vier Fällen kommt derselbe Status 403 mit derselben Ausnahme `Sabre\DAV\Exception\Forbidden` und leerem `s:message`. Der Server sagt nicht, warum abgelehnt wurde; das Werkzeug kann Freigabe, ACL-Regel, Lesegruppe und nur lesbaren Speicher an der Antwort nicht unterscheiden und braucht eine eigene, allgemeine Meldung.
+- Nach einem 403 ist nichts angelegt: in jeder Zeile im Dateisystem geprüft.
+- Unter Impersonation und mit App-Passwort sind alle Zeilen statusgleich.
+- Die Rohantwort für den Gruppenordner mit ACL, auf die sich das Erfolgskriterium 3 der Phase 31 stützt, steht in 12.2.
+
+Gemessen ist eine Regel gegen ein einzelnes Konto. Regeln gegen Gruppen oder Teams, geerbte Regeln in tieferen Ebenen und der Schalter für die Vorgabe ohne Rechte (`--acl-no-default-permission`) sind nicht gemessen.
 
 ## 3. Ändernde Zugriffe (MESS-05)
 
@@ -150,7 +200,28 @@ Offen, füllt Plan 30-05.
 
 ## 11. Was ungemessen blieb
 
-Offen. Jeder Plan trägt hier seine Ungemessen-Zeilen mit Grund ein.
+Jeder Plan trägt hier seine Ungemessen-Zeilen mit Grund ein. Stand nach Plan 30-01 (2026-11-11):
+
+| Punkt | Stand | Grund |
+|-------|-------|-------|
+| `MKCOL` unter Impersonation auf Nextcloud 32, 33 und 34 | ungemessen | Auf den Wegwerf-Instanzen dieser Versionen gibt es keine ExApp-Registrierung; Impersonation ist nur auf der vorhandenen Strecke mit 35.0.0 messbar. Gemessen ist damit eine Version von vier des Store-Fensters |
+| Statusmatrix auf Nextcloud 32, 33 und 34 mit App-Passwort | ungemessen | Plan 30-01 misst nur die Strecke nc35; die Versionsbreite gehört zu den Plänen 30-03 und 30-04, die andere Fragen stellen |
+| Gruppenordner und externer Speicher auf anderen Versionen, auf PostgreSQL oder MySQL | ungemessen | eine Instanz, 35.0.0 mit SQLite, `groupfolders` 23.0.1 |
+| Produktionsweg über ein Werkzeug der App | ungemessen | Das registrierte ExApp-Image ist 0.3.2 und kennt kein Werkzeug zum Ordner-Anlegen; gemessen ist nur ein `MKCOL` aus dem Container mit dessen Secret (Abschnitt 1.2). Den Weg über das Werkzeug belegt Phase 31 |
+| Kontingent knapp, aber nicht erschöpft | ungemessen | gemessen ist nur der Zustand, in dem das Konto mehr belegt als das Kontingent erlaubt (507); ob ein leerer Ordner bei knappem Rest angelegt wird, ist offen |
+| Kontingent eines Gruppenordners | ungemessen | nicht Teil des Plans; die beiden Messordner hatten kein Kontingent |
+| ACL-Regeln gegen Gruppen oder Teams, geerbte Regeln, Vorgabe ohne Rechte | ungemessen | gemessen ist eine Regel gegen ein einzelnes Konto auf einem Unterordner |
+| Externe Speicher anderer Art (SMB, S3, SFTP, WebDAV) | ungemessen | hergestellt wurde nur ein lokaler Speicher; ob ein entfernter nur lesbarer Speicher ebenfalls 403 antwortet, ist Annahme |
+| Serverseitige Verschlüsselung, LDAP- und SSO-Konten | ungemessen | in der Testinstanz nicht vorhanden; wie in `docs/spike-dav.md` benannt |
+| Unzulässige Namen über die drei gemessenen hinaus | ungemessen | gemessen sind `.htaccess`, ein Backslash und 300 Zeichen; die übrigen Regeln der Namensprüfung (weitere reservierte Namen, verbotene Zeichen und Endungen) sind gelesen, nicht gemessen |
+
+Zum Rückbau gehört eine Grenze, die keine Messlücke ist, aber benannt sein muss: `occ app:remove groupfolders` nimmt den Code der App weg, nicht ihre Tabellen in der Datenbank, und auch `files_external` behält seine Tabellen nach dem Ausschalten. Die Baseline (Apps, Konten, Gruppen, Dateien, Kalender) ist nach dem Lauf in allen zwölf Feldern gleich; die leeren Tabellen beider Apps bleiben in der Instanz nc35 zurück.
+
+Drei Vorgänge am Rand der Messung, damit der Rückbau nachvollziehbar bleibt:
+
+- Der Rückbau des Gruppenordner-Laufs hat die beiden Gruppenordner zunächst nicht gelöscht (Werkzeugfehler: das Feld heißt in der JSON-Ausgabe `mountPoint`, das Skript suchte `mount_point`). Die App war danach entfernt, die Ordner standen noch in der Datenbank. Der Block `nachlauf` hat die App erneut installiert, beide Ordner mit `occ groupfolders:delete` gelöscht und die App wieder entfernt; das steht als zweiter Lauf in `raw/nc35-gruppenordner.txt`.
+- Gemessen und im Rückbau berücksichtigt: eine einmal eingeschaltete App behält nach `occ app:disable` und sogar nach `occ app:remove` drei Konfigurationswerte (`installed_version`, `enabled`, `types`), und `occ app:list` zeigt sie dann mit dem Zusatz "installed". Der Rückbau löscht diese drei Werte für die Apps, die vor dem Lauf nie eingeschaltet waren.
+- Vor dem Gruppenordner-Lauf wurden `groupfolders` und `files_external` einmal von Hand eingeschaltet, um die Hilfetexte der Kommandos zu lesen, nach denen der Block gebaut ist, und wieder zurückgenommen (App entfernt, die drei Konfigurationswerte gelöscht). Dabei ist kein Messwert entstanden; der gemessene Lauf begann mit `installiert_vorher=nein`.
 
 ## 12. Rohausgaben
 
@@ -352,5 +423,200 @@ Rohantwort der Zeile quota unter Impersonation (die Abweichung von der Erwartung
     <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
       <s:exception>Sabre\DAV\Exception\InsufficientStorage</s:exception>
       <s:message>Insufficient space in /spike30. Cannot create directory</s:message>
+    </d:error>
+```
+
+### 12.2 raw/nc35-gruppenordner.txt
+
+Zwei Läufe vom 2026-11-11 in einer Datei: erst controls, groupfolder und nc35-stop, danach der Nachlauf (nc35-up, nachlauf, nc35-stop), der zwei in der Datenbank verbliebene Gruppenordner entfernt hat. Die Messzeilen und die Zeilen des Rückbaus in der Reihenfolge des Protokolls; sehr lange Zeilen (Tabellenausgaben) stehen nur in der Rohdatei:
+
+```
+occ app:install groupfolders -> groupfolders 23.0.1 installed groupfolders enabled
+GRUPPENORDNER version=23.0.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)
+occ group:add spike30grp -> Created group "spike30grp"
+occ group:adduser spike30grp spike30a -> user spike30a added
+occ group:adduser spike30grp spike30b -> user spike30b added
+occ group:add spike30lesen -> Created group "spike30lesen"
+occ group:adduser spike30lesen spike30a -> user spike30a added
+occ groupfolders:create spike30gf -> 1
+occ groupfolders:create spike30gf-lesen -> 2
+occ groupfolders:group 1 spike30grp read write share delete -> (keine Ausgabe)
+occ groupfolders:permissions 1 --enable -> (keine Ausgabe)
+occ groupfolders:group 2 spike30lesen -> (keine Ausgabe)
+2026-11-11T12:03:10Z | KONTROLLE PROPFIND Depth 1 home auth=appapi nutzer=spike30a status=207 spike30gf_sichtbar=ja spike30gf-lesen_sichtbar=ja
+2026-11-11T12:03:10Z | GF-AUFBAU MKCOL /spike30gf/acl-rw auth=appapi nutzer=spike30a status=201 |
+2026-11-11T12:03:11Z | GF-AUFBAU MKCOL /spike30gf/acl-ro auth=appapi nutzer=spike30a status=201 |
+DATEISYSTEM gruppenordner spike30gf id=1 pfad=/var/www/html/data/__groupfolders/1/files
+occ groupfolders:permissions 1 --user spike30a acl-ro -- +read -write -create -delete -> (keine Ausgabe)
+occ groupfolders:permissions 1 --user spike30a --test acl-ro -> +read, -write, -create, -delete, +share
+occ groupfolders:permissions 1 -> +--------+---------------------------+---------------------------------+ | Path | User/Group | Permissions | +--------+---------------------------+---------------------------------+ | acl-ro | user: spike30a (spike30a) | +read, -write, -create, -delete | +--------+---------------------------+-------
+2026-11-11T12:03:12Z | KONTROLLE oc:permissions /spike30gf/acl-rw aus Sicht von spike30a auth=appapi status=207 permissions=RMGDNVCK
+2026-11-11T12:03:12Z | KONTROLLE oc:permissions /spike30gf/acl-ro aus Sicht von spike30a auth=appapi status=207 permissions=RMG
+2026-11-11T12:03:12Z | GF acl-rw auth=appapi nutzer=spike30a status=201 angelegt=ja |
+2026-11-11T12:03:12Z | GF acl-ro auth=appapi nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+2026-11-11T12:03:13Z | GF acl-ro-kontrolle-b auth=appapi nutzer=spike30b status=201 angelegt=ja |
+2026-11-11T12:03:13Z | GF acl-rw auth=basic nutzer=spike30a status=201 angelegt=ja |
+2026-11-11T12:03:13Z | GF acl-ro auth=basic nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+2026-11-11T12:03:13Z | GF acl-ro-kontrolle-b auth=basic nutzer=spike30b status=201 angelegt=ja |
+occ groupfolders:permissions 1 --user spike30a acl-ro clear -> (keine Ausgabe)
+occ groupfolders:permissions 1 -> +------+------------+-------------+ | Path | User/Group | Permissions | +------+------------+-------------+
+2026-11-11T12:03:16Z | GF acl-ro-nach-regelentzug auth=appapi nutzer=spike30a status=201 angelegt=ja |
+2026-11-11T12:03:17Z | GF acl-ro-nach-regelentzug auth=basic nutzer=spike30a status=201 angelegt=ja |
+2026-11-11T12:03:17Z | GF gruppe-nur-lesen auth=appapi nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+2026-11-11T12:03:17Z | GF gruppe-nur-lesen auth=basic nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+GF ZEILE acl-rw appapi=201 basic=201
+GF ZEILE acl-ro appapi=403 basic=403
+GF ZEILE acl-ro-kontrolle-b appapi=201 basic=201
+GF ZEILE acl-ro-nach-regelentzug appapi=201 basic=201
+GF ZEILE gruppe-nur-lesen appapi=403 basic=403
+E12 NEGATIVTEST abgelehnt=ja status=403 a8_403=belegt (auth=appapi nutzer=spike30a; auth=basic status=403)
+E12 POSITIV angelegt=ja status=201 (auth=appapi nutzer=spike30a)
+E12 KONTROLLEN kontrolle_b=201 nach_regelentzug=201 (auth=appapi)
+EXTERN files_external an_vorher=nein
+occ app:enable files_external -> files_external 2.0.0-dev.0 enabled
+mkdir -p /var/www/html/data/spike30ext (als www-data) -> angelegt
+occ files_external:create spike30ext local null::null -c datadir=/var/www/html/data/spike30ext -> Storage created with id 1
+occ files_external:applicable 1 --add-user spike30a -> - users: - spike30a - groups:
+occ files_external:option 1 readonly true -> (keine Ausgabe)
+2026-11-11T12:03:21Z | EXTERN ro auth=appapi nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+2026-11-11T12:03:21Z | EXTERN ro auth=basic nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+2026-11-11T12:03:21Z | KONTROLLE oc:permissions /spike30ext (readonly=true) aus Sicht von spike30a auth=appapi status=207 permissions=MG
+occ files_external:option 1 readonly false -> (keine Ausgabe)
+2026-11-11T12:03:22Z | EXTERN rw auth=appapi nutzer=spike30a status=201 angelegt=ja |
+2026-11-11T12:03:22Z | EXTERN rw auth=basic nutzer=spike30a status=201 angelegt=ja |
+EXTERN A8 abgelehnt=ja status=403 a8_403=belegt positivkontrolle_rw=201 (auth=appapi nutzer=spike30a)
+occ files_external:delete --yes 1 ->
+rm -rf /var/www/html/data/spike30ext -> entfernt
+rm -rf /var/www/html/data/__groupfolders (Dateien darin vorher: 0) -> entfernt
+occ group:delete spike30grp -> Group "spike30grp" was removed
+occ group:delete spike30lesen -> Group "spike30lesen" was removed
+occ user:delete spike30a -> The specified user was deleted
+occ user:delete spike30b -> The specified user was deleted
+occ app:disable files_external -> files_external 2.0.0-dev.0 disabled
+occ config:app:delete files_external installed_version enabled types -> config:list: { "apps": { "files_external": [] } }
+occ app:disable groupfolders -> groupfolders 23.0.1 disabled
+occ app:remove groupfolders -> Disabled app 'groupfolders' (uninstall steps executed).
+occ config:app:delete groupfolders installed_version enabled types -> config:list: { "apps": { "groupfolders": [] } }
+RUECKBAU reste_mit_praefix_spike30=keine
+RUECKBAU occ user:list -> - admin: admin - alice: alice - bob: bob
+RUECKBAU occ app:list groupfolders_vorhanden=nein files_external_an=nein
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
+docker stop nc_app_mcp_connector -> nc_app_mcp_connector | laeuft=false
+NACHLAUF grund=der Rueckbau des Laufs davor fand die Gruppenordner nicht (das Feld heisst mountPoint, nicht mount_point); sie blieben in der Datenbank, die App war weg
+occ app:install groupfolders -> groupfolders 23.0.1 installed groupfolders enabled
+GRUPPENORDNER version=23.0.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)
+rm -rf /var/www/html/data/spike30ext -> entfernt
+occ groupfolders:delete --force 1 ->
+occ groupfolders:delete --force 2 ->
+occ groupfolders:list --output=json (nach dem Loeschen) -> []
+rm -rf /var/www/html/data/__groupfolders (Dateien darin vorher: fehlt) -> entfernt
+occ app:disable groupfolders -> groupfolders 23.0.1 disabled
+occ app:remove groupfolders -> Disabled app 'groupfolders' (uninstall steps executed).
+occ config:app:delete groupfolders installed_version enabled types -> config:list: { "apps": { "groupfolders": [] } }
+RUECKBAU reste_mit_praefix_spike30=keine
+RUECKBAU occ user:list -> - admin: admin - alice: alice - bob: bob
+RUECKBAU occ app:list groupfolders_vorhanden=nein files_external_an=nein
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
+docker stop nc_app_mcp_connector -> nc_app_mcp_connector | laeuft=false
+```
+
+Baseline nach dem Nachlauf, alle zwölf Felder gleich; die kurzen Zeilen wörtlich:
+
+```
+BASELINE nutzer vorher={"admin":"admin","alice":"alice","bob":"bob"} nachher={"admin":"admin","alice":"alice","bob":"bob"} gleich=ja
+BASELINE gruppen vorher={"admin":["admin"]} nachher={"admin":["admin"]} gleich=ja
+BASELINE dateien_alice vorher=275 nachher=275 gleich=ja
+BASELINE papierkorb_alice vorher=0 nachher=0 gleich=ja
+BASELINE geloeschte_kalenderobjekte vorher=0 nachher=0 gleich=ja
+BASELINE geloeschte_kalender vorher=0 nachher=0 gleich=ja
+BASELINE calendar_retention vorher= nachher= gleich=ja
+BASELINE quota_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
+```
+
+Rohantwort der Zeile acl-ro unter Impersonation (Negativtest E12):
+
+```
+2026-11-11T12:03:12Z | GF acl-ro auth=appapi nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30gf/acl-ro/neu-appapi ohne Body, Dateisystem: /var/www/html/data/__groupfolders/1/files/acl-ro/neu-appapi
+    HTTP 403 Forbidden
+    content-length: 182
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 12:03:12 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Forbidden</s:exception>
+      <s:message/>
+    </d:error>
+```
+
+Rohantwort der Zeile acl-rw unter Impersonation (Positivfall E12):
+
+```
+2026-11-11T12:03:12Z | GF acl-rw auth=appapi nutzer=spike30a status=201 angelegt=ja | 
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30gf/acl-rw/neu-appapi ohne Body, Dateisystem: /var/www/html/data/__groupfolders/1/files/acl-rw/neu-appapi
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 12:03:12 GMT
+    oc-fileid: 00023311oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: 3KtYmAb9gQPg72qCJID4
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+```
+
+Antwort auf den PROPFIND des Ordners mit der Regel, mit der ACL-Liste:
+
+```
+<d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"><d:response><d:href>/remote.php/dav/files/spike30a/spike30gf/acl-ro/</d:href><d:propstat><d:prop><oc:permissions>RMG</oc:permissions><nc:acl-enabled>1</nc:acl-enabled><nc:acl-list><nc:acl><nc:acl-mapping-type>user</nc:acl-mapping-type><nc:acl-mapping-id>spike30a</nc:acl-mapping-id><nc:acl-mapping-display-name>spike30a</nc:acl-mapping-display-name><nc:acl-mask>15</nc:acl-mask><nc:acl-permissions>1</nc:acl-permissions></nc:acl></nc:acl-list></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>
+```
+
+Rohantwort der Zeile EXTERN ro unter Impersonation:
+
+```
+2026-11-11T12:03:21Z | EXTERN ro auth=appapi nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30ext/neu-ro-appapi ohne Body
+    HTTP 403 Forbidden
+    content-length: 182
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 12:03:21 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Forbidden</s:exception>
+      <s:message/>
     </d:error>
 ```

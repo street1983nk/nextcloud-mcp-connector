@@ -1,0 +1,692 @@
+
+# Lauf blocks=controls,groupfolder,nc35-stop start=2026-11-11T12:02:45Z (neue Datei)
+
+== controls ==
+RAM frei_host_gb=4.60 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 26.34MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 112.3MiB / 5.786GiB  cpu 0.11%
+nc35-caddy  mem 19.08MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 83.46MiB / 5.786GiB  cpu 0.10%
+nc35-nc  mem 249.1MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+BASELINE-START apps_an={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"}
+BASELINE-START apps_aus={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"}
+BASELINE-START nutzer={"admin":"admin","alice":"alice","bob":"bob"}
+BASELINE-START gruppen={"admin":["admin"]}
+BASELINE-START dateien_alice=275
+BASELINE-START papierkorb_alice=0
+BASELINE-START kalender_alice=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+
+BASELINE-START kalender_bob=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+
+BASELINE-START geloeschte_kalenderobjekte=0
+BASELINE-START geloeschte_kalender=0
+BASELINE-START calendar_retention=
+BASELINE-START quota_alice=The setting does not exist for user "alice".
+occ user:add --password-from-env spike30a (password via stdin) -> The account "spike30a" was created successfully
+occ user:auth-tokens:add spike30a --password-from-env --name spike30 (token kept)
+2026-11-11T12:02:55Z | controls | PROPFIND Depth 0 home of spike30a (app password) | HTTP 207 | home
+occ user:add --password-from-env spike30b (password via stdin) -> The account "spike30b" was created successfully
+occ user:auth-tokens:add spike30b --password-from-env --name spike30 (token kept)
+2026-11-11T12:02:57Z | controls | PROPFIND Depth 0 home of spike30b (app password) | HTTP 207 | home
+2026-11-11T12:02:58Z | controls | a: GET /ocs/v2.php/cloud/user (AppAPI as spike30a) | HTTP 200 | id=spike30a erwartet=spike30a gleich=ja
+2026-11-11T12:02:58Z | controls | b: GET /ocs/v2.php/cloud/user (AppAPI as spike30a, wrong APP_SECRET) | HTTP 401 | abgelehnt=ja
+KONTROLLE c: exapp_impersonation.log, GET-Zeilen von spike30a seit 2026-11-11T12:02:57Z: 1
+  {"reqId":"Sz5WNCdNWiuSAdF7x2Ui","level":2,"time":"2026-11-11T12:02:58+00:00","remoteAddr":"172.30.42.128","user":"spike30a","app":"mcp_connector","method":"GET","url":"/ocs/v2.php/cloud/user","scriptName":"/ocs/v2.php","message":"impersonation request","userAgent":"python-httpx/0.28.1","version":"35
+
+== groupfolder ==
+RAM frei_host_gb=4.56 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 26.34MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 112.6MiB / 5.786GiB  cpu 2.89%
+nc35-caddy  mem 19.11MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 82.71MiB / 5.786GiB  cpu 0.01%
+nc35-nc  mem 251.3MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+occ app:install groupfolders -> groupfolders 23.0.1 installed groupfolders enabled
+GRUPPENORDNER version=23.0.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)
+HILFE occ groupfolders:create --help:
+    Description:
+      Create a new Team folder
+    Usage:
+      groupfolders:create [options] [--] <name>
+    Arguments:
+      name                             Name or mount point of the new folder
+    Options:
+          --bucket=BUCKET              Overwrite the bucket used for the new folder
+          --acl-no-default-permission  Do not grant any advanced permission by default
+          --output[=OUTPUT]            Output format (plain, json or json_pretty, default is plain) [default: "plain"]
+      -h, --help                       Display help for the given command. When no command is given display help for the list command
+          --silent                     Do not output any message
+      -q, --quiet                      Only errors are displayed. All other output is suppressed
+      -V, --version                    Display this application version
+          --ansi|--no-ansi             Force (or disable --no-ansi) ANSI output
+      -n, --no-interaction             Do not ask any interactive question
+          --no-warnings                Skip global warnings, show command output only
+      -v|vv|vvv, --verbose             Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
+    Help:
+      More extensive and thorough documentation may be found at https://docs.nextcloud.com
+HILFE occ groupfolders:group --help:
+    Description:
+      Edit the groups that have access to a Team folder
+    Usage:
+      groupfolders:group [options] [--] <folder_id> <group> [<permissions>...]
+    Arguments:
+      folder_id              Id of the folder to configure
+      group                  The group to configure
+      permissions            The permissions to set for the group as a white space separated list (ex: read write). Leave empty for read only
+    Options:
+      -d, --delete           Remove access for the group
+          --output[=OUTPUT]  Output format (plain, json or json_pretty, default is plain) [default: "plain"]
+      -h, --help             Display help for the given command. When no command is given display help for the list command
+          --silent           Do not output any message
+      -q, --quiet            Only errors are displayed. All other output is suppressed
+      -V, --version          Display this application version
+          --ansi|--no-ansi   Force (or disable --no-ansi) ANSI output
+      -n, --no-interaction   Do not ask any interactive question
+          --no-warnings      Skip global warnings, show command output only
+      -v|vv|vvv, --verbose   Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
+    Help:
+      More extensive and thorough documentation may be found at https://docs.nextcloud.com
+HILFE occ groupfolders:permissions --help:
+    Description:
+      Configure advanced permissions for a configured Team folder
+    Usage:
+      groupfolders:permissions [options] [--] <folder_id> [<path> [<permissions>...]]
+    Arguments:
+      folder_id              Id of the folder to configure
+      path                   The path within the folder to set permissions for
+      permissions            The permissions to set for the user or group as a white space separated list (ex: +read "-write"). Use "clear" to remove all permissions. Prepend the permission list with -- to allow parsing the - character.
+    Options:
+      -e, --enable           Enable advanced permissions for the folder
+      -d, --disable          Disable advanced permissions for the folder
+      -m, --manage-add       Add manage permission for user or group
+      -r, --manage-remove    Remove manage permission for user or group
+      -u, --user=USER        The user to configure the permissions for
+      -g, --group=GROUP      The group to configure the permissions for
+      -c, --team=TEAM        The circle/team to configure the permissions for
+      -t, --test             Test the permissions for the set path
+          --output[=OUTPUT]  Output format (plain, json or json_pretty, default is plain) [default: "plain"]
+      -h, --help             Display help for the given command. When no command is given display help for the list command
+          --silent           Do not output any message
+      -q, --quiet            Only errors are displayed. All other output is suppressed
+      -V, --version          Display this application version
+          --ansi|--no-ansi   Force (or disable --no-ansi) ANSI output
+      -n, --no-interaction   Do not ask any interactive question
+          --no-warnings      Skip global warnings, show command output only
+      -v|vv|vvv, --verbose   Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
+    Help:
+      More extensive and thorough documentation may be found at https://docs.nextcloud.com
+HILFE occ groupfolders:delete --help:
+    Description:
+      Delete Team folder
+    Usage:
+      groupfolders:delete [options] [--] <folder_id>
+    Arguments:
+      folder_id              Id of the folder to rename
+    Options:
+      -f, --force            Skip confirmation
+          --output[=OUTPUT]  Output format (plain, json or json_pretty, default is plain) [default: "plain"]
+      -h, --help             Display help for the given command. When no command is given display help for the list command
+          --silent           Do not output any message
+      -q, --quiet            Only errors are displayed. All other output is suppressed
+      -V, --version          Display this application version
+          --ansi|--no-ansi   Force (or disable --no-ansi) ANSI output
+      -n, --no-interaction   Do not ask any interactive question
+          --no-warnings      Skip global warnings, show command output only
+      -v|vv|vvv, --verbose   Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
+    Help:
+      More extensive and thorough documentation may be found at https://docs.nextcloud.com
+occ group:add spike30grp -> Created group "spike30grp"
+occ group:adduser spike30grp spike30a -> user spike30a added
+occ group:adduser spike30grp spike30b -> user spike30b added
+occ group:add spike30lesen -> Created group "spike30lesen"
+occ group:adduser spike30lesen spike30a -> user spike30a added
+occ groupfolders:create spike30gf -> 1
+occ groupfolders:create spike30gf-lesen -> 2
+occ groupfolders:group 1 spike30grp read write share delete -> (keine Ausgabe)
+occ groupfolders:permissions 1 --enable -> (keine Ausgabe)
+occ groupfolders:group 2 spike30lesen -> (keine Ausgabe)
+occ groupfolders:list -> +-----------+-----------------+--------------------+-----------+------+----------------------+-----------------------------+ | Folder Id | Name | Groups | Quota | Size | Advanced Permissions | Manage advanced permissions | +-----------+-----------------+--------------------+-----------+------+----------------------+-----------------------------+ | 1 | spike30gf | spike30grp: | Unlimited | 0 | Enabled | | | 2 | spike30gf-lesen | spike30lesen: read | Unlimited | 0 | Disabled | | +-----------+-----------------+--------------------+-----------+------+----------------------+-----------------------------+
+2026-11-11T12:03:10Z | KONTROLLE PROPFIND Depth 1 home auth=appapi nutzer=spike30a status=207 spike30gf_sichtbar=ja spike30gf-lesen_sichtbar=ja
+2026-11-11T12:03:10Z | GF-AUFBAU MKCOL /spike30gf/acl-rw auth=appapi nutzer=spike30a status=201 | 
+2026-11-11T12:03:11Z | GF-AUFBAU MKCOL /spike30gf/acl-ro auth=appapi nutzer=spike30a status=201 | 
+DATEISYSTEM ls /var/www/html/data/__groupfolders (find -maxdepth 4 -type d):
+    /var/www/html/data/__groupfolders
+    /var/www/html/data/__groupfolders/1
+    /var/www/html/data/__groupfolders/1/files
+    /var/www/html/data/__groupfolders/1/files/acl-ro
+    /var/www/html/data/__groupfolders/1/files/acl-rw
+    /var/www/html/data/__groupfolders/1/trash
+    /var/www/html/data/__groupfolders/1/versions
+    /var/www/html/data/__groupfolders/2
+    /var/www/html/data/__groupfolders/2/files
+    /var/www/html/data/__groupfolders/2/trash
+    /var/www/html/data/__groupfolders/2/versions
+DATEISYSTEM gruppenordner spike30gf id=1 pfad=/var/www/html/data/__groupfolders/1/files
+occ groupfolders:permissions 1 --user spike30a acl-ro -- +read -write -create -delete -> (keine Ausgabe)
+occ groupfolders:permissions 1 --user spike30a --test acl-ro -> +read, -write, -create, -delete, +share
+occ groupfolders:permissions 1 -> +--------+---------------------------+---------------------------------+ | Path | User/Group | Permissions | +--------+---------------------------+---------------------------------+ | acl-ro | user: spike30a (spike30a) | +read, -write, -create, -delete | +--------+---------------------------+-------
+2026-11-11T12:03:12Z | KONTROLLE oc:permissions /spike30gf/acl-rw aus Sicht von spike30a auth=appapi status=207 permissions=RMGDNVCK
+  PROPFIND-Antwort (oc:permissions, nc:acl-enabled, nc:acl-list) fuer acl-rw:
+    <?xml version="1.0"?>
+    <d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"><d:response><d:href>/remote.php/dav/files/spike30a/spike30gf/acl-rw/</d:href><d:propstat><d:prop><oc:permissions>RMGDNVCK</oc:permissions><nc:acl-enabled>1</nc:acl-enabled><nc:acl-list/></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>
+2026-11-11T12:03:12Z | KONTROLLE oc:permissions /spike30gf/acl-ro aus Sicht von spike30a auth=appapi status=207 permissions=RMG
+  PROPFIND-Antwort (oc:permissions, nc:acl-enabled, nc:acl-list) fuer acl-ro:
+    <?xml version="1.0"?>
+    <d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"><d:response><d:href>/remote.php/dav/files/spike30a/spike30gf/acl-ro/</d:href><d:propstat><d:prop><oc:permissions>RMG</oc:permissions><nc:acl-enabled>1</nc:acl-enabled><nc:acl-list><nc:acl><nc:acl-mapping-type>user</nc:acl-mapping-type><nc:acl-mapping-id>spike30a</nc:acl-mapping-id><nc:acl-mapping-display-name>spike30a</nc:acl-mapping-display-name><nc:acl-mask>15</nc:acl-mask><nc:acl-permissions>1</nc:acl-permissions></nc:acl></nc:acl-list></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>
+2026-11-11T12:03:12Z | GF acl-rw auth=appapi nutzer=spike30a status=201 angelegt=ja | 
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30gf/acl-rw/neu-appapi ohne Body, Dateisystem: /var/www/html/data/__groupfolders/1/files/acl-rw/neu-appapi
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 12:03:12 GMT
+    oc-fileid: 00023311oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: 3KtYmAb9gQPg72qCJID4
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T12:03:12Z | GF acl-ro auth=appapi nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30gf/acl-ro/neu-appapi ohne Body, Dateisystem: /var/www/html/data/__groupfolders/1/files/acl-ro/neu-appapi
+    HTTP 403 Forbidden
+    content-length: 182
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 12:03:12 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Forbidden</s:exception>
+      <s:message/>
+    </d:error>
+2026-11-11T12:03:13Z | GF acl-ro-kontrolle-b auth=appapi nutzer=spike30b status=201 angelegt=ja | 
+  Aufruf: MKCOL /remote.php/dav/files/spike30b/spike30gf/acl-ro/neu-b-appapi ohne Body, Dateisystem: /var/www/html/data/__groupfolders/1/files/acl-ro/neu-b-appapi
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 12:03:12 GMT
+    oc-fileid: 00023312oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: 3v5iPLz1lybT5wHDNVKK
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30b
+    (no body)
+2026-11-11T12:03:13Z | GF acl-rw auth=basic nutzer=spike30a status=201 angelegt=ja | 
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30gf/acl-rw/neu-basic ohne Body, Dateisystem: /var/www/html/data/__groupfolders/1/files/acl-rw/neu-basic
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 12:03:13 GMT
+    oc-fileid: 00023313oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: NMBReMeMjEZUMSMB766I
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T12:03:13Z | GF acl-ro auth=basic nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30gf/acl-ro/neu-basic ohne Body, Dateisystem: /var/www/html/data/__groupfolders/1/files/acl-ro/neu-basic
+    HTTP 403 Forbidden
+    content-length: 182
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 12:03:13 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Forbidden</s:exception>
+      <s:message/>
+    </d:error>
+2026-11-11T12:03:13Z | GF acl-ro-kontrolle-b auth=basic nutzer=spike30b status=201 angelegt=ja | 
+  Aufruf: MKCOL /remote.php/dav/files/spike30b/spike30gf/acl-ro/neu-b-basic ohne Body, Dateisystem: /var/www/html/data/__groupfolders/1/files/acl-ro/neu-b-basic
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 12:03:13 GMT
+    oc-fileid: 00023314oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: q3y0Hqn9KjwYuG670ut3
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30b
+    (no body)
+occ groupfolders:permissions 1 --user spike30a acl-ro clear -> (keine Ausgabe)
+occ groupfolders:permissions 1 -> +------+------------+-------------+ | Path | User/Group | Permissions | +------+------------+-------------+
+2026-11-11T12:03:16Z | GF acl-ro-nach-regelentzug auth=appapi nutzer=spike30a status=201 angelegt=ja | 
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30gf/acl-ro/nach-appapi ohne Body, Dateisystem: /var/www/html/data/__groupfolders/1/files/acl-ro/nach-appapi
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 12:03:16 GMT
+    oc-fileid: 00023315oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: VR1WGEQ7JWONb6Xwzw7m
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T12:03:17Z | GF acl-ro-nach-regelentzug auth=basic nutzer=spike30a status=201 angelegt=ja | 
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30gf/acl-ro/nach-basic ohne Body, Dateisystem: /var/www/html/data/__groupfolders/1/files/acl-ro/nach-basic
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 12:03:16 GMT
+    oc-fileid: 00023316oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: 26QvIinmwNLeeZO7H1ot
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+DATEISYSTEM spike30gf-lesen id=2: /var/www/html/data/__groupfolders/2 /var/www/html/data/__groupfolders/2/files /var/www/html/data/__groupfolders/2/trash /var/www/html/data/__groupfolders/2/versions
+2026-11-11T12:03:17Z | GF gruppe-nur-lesen auth=appapi nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30gf-lesen/neu-appapi ohne Body, Dateisystem: /var/www/html/data/__groupfolders/2/files/neu-appapi
+    HTTP 403 Forbidden
+    content-length: 182
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 12:03:17 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Forbidden</s:exception>
+      <s:message/>
+    </d:error>
+2026-11-11T12:03:17Z | GF gruppe-nur-lesen auth=basic nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30gf-lesen/neu-basic ohne Body, Dateisystem: /var/www/html/data/__groupfolders/2/files/neu-basic
+    HTTP 403 Forbidden
+    content-length: 182
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 12:03:17 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Forbidden</s:exception>
+      <s:message/>
+    </d:error>
+
+== groupfolder summary ==
+GF ZEILE acl-rw appapi=201 basic=201
+GF ZEILE acl-ro appapi=403 basic=403
+GF ZEILE acl-ro-kontrolle-b appapi=201 basic=201
+GF ZEILE acl-ro-nach-regelentzug appapi=201 basic=201
+GF ZEILE gruppe-nur-lesen appapi=403 basic=403
+E12 NEGATIVTEST abgelehnt=ja status=403 a8_403=belegt (auth=appapi nutzer=spike30a; auth=basic status=403)
+E12 POSITIV angelegt=ja status=201 (auth=appapi nutzer=spike30a)
+E12 KONTROLLEN kontrolle_b=201 nach_regelentzug=201 (auth=appapi)
+
+== externer-speicher ==
+EXTERN files_external an_vorher=nein
+occ app:enable files_external -> files_external 2.0.0-dev.0 enabled
+HILFE occ files_external:create --help:
+    Description:
+      Create a new mount configuration
+    Usage:
+      files_external:create [options] [--] <mount_point> <storage_backend> <authentication_backend>
+    Arguments:
+      mount_point                              mount point for the new mount
+      storage_backend                          storage backend identifier for the new mount, see `occ files_external:backends` for possible values
+      authentication_backend                   authentication backend identifier for the new mount, see `occ files_external:backends` for possible values
+    Options:
+          --user[=USER]                        user to add the mount configuration for, if not set the mount will be added as system mount
+      -c, --config=CONFIG                      Mount configuration option in key=value format (multiple values allowed)
+          --dry                                Don't save the created mount, only list the new mount
+          --applicable-user=APPLICABLE-USER    Add a user as applicable to the newly created mount (multiple values allowed)
+          --applicable-group=APPLICABLE-GROUP  Add a group as applicable to the newly created mount (multiple values allowed)
+          --output[=OUTPUT]                    Output format (plain, json or json_pretty, default is plain) [default: "plain"]
+      -h, --help                               Display help for the given command. When no command is given display help for the list command
+          --silent                             Do not output any message
+      -q, --quiet                              Only errors are displayed. All other output is suppressed
+      -V, --version                            Display this application version
+          --ansi|--no-ansi                     Force (or disable --no-ansi) ANSI output
+      -n, --no-interaction                     Do not ask any interactive question
+          --no-warnings                        Skip global warnings, show command output only
+      -v|vv|vvv, --verbose                     Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
+    Help:
+      More extensive and thorough documentation may be found at https://docs.nextcloud.com
+HILFE occ files_external:option --help:
+    Description:
+      Manage mount options for a mount
+    Usage:
+      files_external:option [options] [--] <mount_id> <key> [<value>]
+    Arguments:
+      mount_id               The id of the mount to edit
+      key                    key of the mount option to set/get
+      value                  value to set the config option to; when omitted, the existing value is printed; with --value-from-file, this is treated as a file pat
+    Options:
+          --value-from-file  treat the value argument as a file path and read the config value from that file
+      -h, --help             Display help for the given command. When no command is given display help for the list command
+          --silent           Do not output any message
+      -q, --quiet            Only errors are displayed. All other output is suppressed
+      -V, --version          Display this application version
+          --ansi|--no-ansi   Force (or disable --no-ansi) ANSI output
+      -n, --no-interaction   Do not ask any interactive question
+          --no-warnings      Skip global warnings, show command output only
+      -v|vv|vvv, --verbose   Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
+HILFE occ files_external:applicable --help:
+    Description:
+      Manage applicable users and groups for a mount
+    Usage:
+      files_external:applicable [options] [--] <mount_id>
+    Arguments:
+      mount_id                         The id of the mount to edit
+    Options:
+          --add-user=ADD-USER          user to add as applicable (multiple values allowed)
+          --remove-user=REMOVE-USER    user to remove as applicable (multiple values allowed)
+          --add-group=ADD-GROUP        group to add as applicable (multiple values allowed)
+          --remove-group=REMOVE-GROUP  group to remove as applicable (multiple values allowed)
+          --remove-all                 Set the mount to be globally applicable
+          --output[=OUTPUT]            Output format (plain, json or json_pretty, default is plain) [default: "plain"]
+      -h, --help                       Display help for the given command. When no command is given display help for the list command
+          --silent                     Do not output any message
+      -q, --quiet                      Only errors are displayed. All other output is suppressed
+      -V, --version                    Display this application version
+          --ansi|--no-ansi             Force (or disable --no-ansi) ANSI output
+      -n, --no-interaction             Do not ask any interactive question
+          --no-warnings                Skip global warnings, show command output only
+      -v|vv|vvv, --verbose             Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
+    Help:
+      More extensive and thorough documentation may be found at https://docs.nextcloud.com
+mkdir -p /var/www/html/data/spike30ext (als www-data) -> angelegt
+occ files_external:create spike30ext local null::null -c datadir=/var/www/html/data/spike30ext -> Storage created with id 1
+occ files_external:applicable 1 --add-user spike30a -> - users: - spike30a - groups:
+occ files_external:option 1 readonly true -> (keine Ausgabe)
+occ files_external:list -> +----------+-------------+------------------------+---------------------+-----------------------------------------------+-----------------------------------+------------------+-------------------+ | Mount ID | Mount Point | Storage | Authentication Type | Configuration | Options | Applicable Users |
+2026-11-11T12:03:21Z | EXTERN ro auth=appapi nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30ext/neu-ro-appapi ohne Body
+    HTTP 403 Forbidden
+    content-length: 182
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 12:03:21 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Forbidden</s:exception>
+      <s:message/>
+    </d:error>
+2026-11-11T12:03:21Z | EXTERN ro auth=basic nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30ext/neu-ro-basic ohne Body
+    HTTP 403 Forbidden
+    content-length: 182
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 12:03:21 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Forbidden</s:exception>
+      <s:message/>
+    </d:error>
+2026-11-11T12:03:21Z | KONTROLLE oc:permissions /spike30ext (readonly=true) aus Sicht von spike30a auth=appapi status=207 permissions=MG
+occ files_external:option 1 readonly false -> (keine Ausgabe)
+2026-11-11T12:03:22Z | EXTERN rw auth=appapi nutzer=spike30a status=201 angelegt=ja | 
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30ext/neu-rw-appapi ohne Body
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 12:03:22 GMT
+    oc-fileid: 00023318oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: Lm9TIAYzcXBeAV7muhHl
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T12:03:22Z | EXTERN rw auth=basic nutzer=spike30a status=201 angelegt=ja | 
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30ext/neu-rw-basic ohne Body
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 12:03:22 GMT
+    oc-fileid: 00023319oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: xRmy6taOjrTAie3pcdar
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+EXTERN A8 abgelehnt=ja status=403 a8_403=belegt positivkontrolle_rw=201 (auth=appapi nutzer=spike30a)
+
+== rueckbau ==
+occ files_external:delete --yes 1 -> 
+rm -rf /var/www/html/data/spike30ext -> entfernt
+rm -rf /var/www/html/data/__groupfolders (Dateien darin vorher: 0) -> entfernt
+occ group:delete spike30grp -> Group "spike30grp" was removed
+occ group:delete spike30lesen -> Group "spike30lesen" was removed
+occ user:delete spike30a -> The specified user was deleted
+occ user:delete spike30b -> The specified user was deleted
+occ app:disable files_external -> files_external 2.0.0-dev.0 disabled
+occ config:app:delete files_external installed_version enabled types -> config:list: { "apps": { "files_external": [] } }
+occ app:disable groupfolders -> groupfolders 23.0.1 disabled
+occ app:remove groupfolders -> Disabled app 'groupfolders' (uninstall steps executed).
+Removed app 'groupfolders' (version 23.0.1).
+occ config:app:delete groupfolders installed_version enabled types -> config:list: { "apps": { "groupfolders": [] } }
+RUECKBAU reste_mit_praefix_spike30=keine
+RUECKBAU occ user:list -> - admin: admin - alice: alice - bob: bob
+RUECKBAU occ app:list groupfolders_vorhanden=nein files_external_an=nein
+BASELINE apps_an vorher={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"} nachher={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"} gleich=ja
+BASELINE apps_aus vorher={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"} nachher={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"} gleich=ja
+BASELINE nutzer vorher={"admin":"admin","alice":"alice","bob":"bob"} nachher={"admin":"admin","alice":"alice","bob":"bob"} gleich=ja
+BASELINE gruppen vorher={"admin":["admin"]} nachher={"admin":["admin"]} gleich=ja
+BASELINE dateien_alice vorher=275 nachher=275 gleich=ja
+BASELINE papierkorb_alice vorher=0 nachher=0 gleich=ja
+BASELINE kalender_alice vorher=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+ nachher=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+ gleich=ja
+BASELINE kalender_bob vorher=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+ nachher=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+ gleich=ja
+BASELINE geloeschte_kalenderobjekte vorher=0 nachher=0 gleich=ja
+BASELINE geloeschte_kalender vorher=0 nachher=0 gleich=ja
+BASELINE calendar_retention vorher= nachher= gleich=ja
+BASELINE quota_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
+
+== nc35-stop ==
+RAM frei_host_gb=4.53 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 26.34MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 112.3MiB / 5.786GiB  cpu 0.15%
+nc35-caddy  mem 19.24MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 82.75MiB / 5.786GiB  cpu 4.96%
+nc35-nc  mem 261.9MiB / 5.786GiB  cpu 5.34%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
+docker stop nc_app_mcp_connector -> nc_app_mcp_connector | laeuft=false
+
+# Lauf blocks=nc35-up,nachlauf,nc35-stop start=2026-11-11T12:05:04Z (angehaengt an bestehende Datei)
+
+== nc35-up ==
+RAM frei_host_gb=4.63 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 26.34MiB / 5.786GiB  cpu 0.00%
+nc35-nc  mem 78.29MiB / 5.786GiB  cpu 5.05%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+docker start nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+docker start nc35-harp -> nc35-harp
+docker start nc35-caddy -> nc35-caddy
+docker start nc_app_mcp_connector -> nc_app_mcp_connector
+GET http://127.0.0.1:8082/status.php -> HTTP 200
+- installed: true
+  - version: 35.0.0.10
+  - versionstring: 35.0.0
+  - edition: 
+  - maintenance: false
+  - needsDbUpgrade: false
+  - productname: Nextcloud
+  - extendedSupport: false
+VERSION OF RECORD 35.0.0
+dbtype: sqlite3
+APP app_api version=35.0.0 (occ app:list)
+occ app_api:app:list:
+  ExApps:
+  mcp_connector (MCP Connector): 0.3.2 [enabled]
+CONTAINER nc35-nc laeuft=true StartedAt=2026-11-11T12:04:03.372233529Z image=nextcloud:35.0.0-apache-local
+CONTAINER nc35-harp laeuft=true StartedAt=2026-11-11T12:05:09.259934995Z image=ghcr.io/nextcloud/nextcloud-appapi-harp:release
+CONTAINER nc35-caddy laeuft=true StartedAt=2026-11-11T12:05:09.509169721Z image=caddy:2
+CONTAINER nc_app_mcp_connector laeuft=true StartedAt=2026-11-11T12:05:09.790308199Z image=127.0.0.1:5000/mcp_connector:0.3.2
+EXAPP-CONTAINER laeuft=ja
+
+== nachlauf ==
+RAM frei_host_gb=4.54 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 26.34MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 75.26MiB / 5.786GiB  cpu 0.14%
+nc35-caddy  mem 11.09MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 73.35MiB / 5.786GiB  cpu 0.08%
+nc35-nc  mem 93.29MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+BASELINE-START apps_an={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"}
+BASELINE-START apps_aus={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"}
+BASELINE-START nutzer={"admin":"admin","alice":"alice","bob":"bob"}
+BASELINE-START gruppen={"admin":["admin"]}
+BASELINE-START dateien_alice=275
+BASELINE-START papierkorb_alice=0
+BASELINE-START kalender_alice=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+
+BASELINE-START kalender_bob=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+
+BASELINE-START geloeschte_kalenderobjekte=0
+BASELINE-START geloeschte_kalender=0
+BASELINE-START calendar_retention=
+BASELINE-START quota_alice=The setting does not exist for user "alice".
+NACHLAUF grund=der Rueckbau des Laufs davor fand die Gruppenordner nicht (das Feld heisst mountPoint, nicht mount_point); sie blieben in der Datenbank, die App war weg
+occ app:install groupfolders -> groupfolders 23.0.1 installed groupfolders enabled
+GRUPPENORDNER version=23.0.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)
+occ groupfolders:list --output=json (vor dem Loeschen) -> [{"id":1,"quota":-3,"acl":true,"acl_default_no_permission":false,"groups":[],"manage":[],"options":{"separate-storage":true},"team_circle_id":null,"size":0,"groups_list":[],"mountPoint":"spike30gf","rootId":23304,"storageId":26},{"id":2,"quota":-3,"acl":false,"acl_default_no_permission":false,"groups":[],"manage":[],"options":{"separate-storage":true},"team_circle_id":null,"size":0,"groups_list":[],"mountPoint":"spike30gf-lesen","rootId":23308,"storageId":27}]
+
+== rueckbau ==
+rm -rf /var/www/html/data/spike30ext -> entfernt
+occ groupfolders:delete --force 1 -> 
+occ groupfolders:delete --force 2 -> 
+occ groupfolders:list --output=json (nach dem Loeschen) -> []
+rm -rf /var/www/html/data/__groupfolders (Dateien darin vorher: fehlt) -> entfernt
+occ app:disable groupfolders -> groupfolders 23.0.1 disabled
+occ app:remove groupfolders -> Disabled app 'groupfolders' (uninstall steps executed).
+Removed app 'groupfolders' (version 23.0.1).
+occ config:app:delete groupfolders installed_version enabled types -> config:list: { "apps": { "groupfolders": [] } }
+RUECKBAU reste_mit_praefix_spike30=keine
+RUECKBAU occ user:list -> - admin: admin - alice: alice - bob: bob
+RUECKBAU occ app:list groupfolders_vorhanden=nein files_external_an=nein
+BASELINE apps_an vorher={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"} nachher={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"} gleich=ja
+BASELINE apps_aus vorher={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"} nachher={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"} gleich=ja
+BASELINE nutzer vorher={"admin":"admin","alice":"alice","bob":"bob"} nachher={"admin":"admin","alice":"alice","bob":"bob"} gleich=ja
+BASELINE gruppen vorher={"admin":["admin"]} nachher={"admin":["admin"]} gleich=ja
+BASELINE dateien_alice vorher=275 nachher=275 gleich=ja
+BASELINE papierkorb_alice vorher=0 nachher=0 gleich=ja
+BASELINE kalender_alice vorher=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+ nachher=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+ gleich=ja
+BASELINE kalender_bob vorher=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+ nachher=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+ gleich=ja
+BASELINE geloeschte_kalenderobjekte vorher=0 nachher=0 gleich=ja
+BASELINE geloeschte_kalender vorher=0 nachher=0 gleich=ja
+BASELINE calendar_retention vorher= nachher= gleich=ja
+BASELINE quota_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
+
+== nc35-stop ==
+RAM frei_host_gb=4.51 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 26.34MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 75.28MiB / 5.786GiB  cpu 0.13%
+nc35-caddy  mem 11.08MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 73.43MiB / 5.786GiB  cpu 0.01%
+nc35-nc  mem 93.75MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
+docker stop nc_app_mcp_connector -> nc_app_mcp_connector | laeuft=false
