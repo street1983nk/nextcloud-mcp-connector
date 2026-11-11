@@ -1,0 +1,733 @@
+
+# Lauf blocks=nc35-up,controls,mkcol start=2026-11-11T11:55:18Z (neue Datei)
+
+== nc35-up ==
+RAM frei_host_gb=4.67 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 26.48MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 100.9MiB / 5.786GiB  cpu 0.12%
+nc35-caddy  mem 18.86MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 82.23MiB / 5.786GiB  cpu 0.14%
+nc35-nc  mem 166.7MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+docker start nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+docker start nc35-harp -> nc35-harp
+docker start nc35-caddy -> nc35-caddy
+docker start nc_app_mcp_connector -> nc_app_mcp_connector
+GET http://127.0.0.1:8082/status.php -> HTTP 200
+- installed: true
+  - version: 35.0.0.10
+  - versionstring: 35.0.0
+  - edition: 
+  - maintenance: false
+  - needsDbUpgrade: false
+  - productname: Nextcloud
+  - extendedSupport: false
+VERSION OF RECORD 35.0.0
+dbtype: sqlite3
+APP app_api version=35.0.0 (occ app:list)
+occ app_api:app:list:
+  ExApps:
+  mcp_connector (MCP Connector): 0.3.2 [enabled]
+CONTAINER nc35-nc laeuft=true StartedAt=2026-11-11T11:51:29.081193306Z image=nextcloud:35.0.0-apache-local
+CONTAINER nc35-harp laeuft=true StartedAt=2026-11-11T11:51:30.477639218Z image=ghcr.io/nextcloud/nextcloud-appapi-harp:release
+CONTAINER nc35-caddy laeuft=true StartedAt=2026-11-11T11:51:30.781090932Z image=caddy:2
+CONTAINER nc_app_mcp_connector laeuft=true StartedAt=2026-11-11T11:51:31.10149931Z image=127.0.0.1:5000/mcp_connector:0.3.2
+EXAPP-CONTAINER laeuft=ja
+
+== controls ==
+RAM frei_host_gb=4.59 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 26.33MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 100.9MiB / 5.786GiB  cpu 0.12%
+nc35-caddy  mem 18.9MiB / 5.786GiB  cpu 0.30%
+nc35-harp  mem 82.75MiB / 5.786GiB  cpu 0.10%
+nc35-nc  mem 173.6MiB / 5.786GiB  cpu 0.01%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+BASELINE-START apps_an={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"}
+BASELINE-START apps_aus={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"}
+BASELINE-START nutzer={"admin":"admin","alice":"alice","bob":"bob"}
+BASELINE-START gruppen={"admin":["admin"]}
+BASELINE-START dateien_alice=275
+BASELINE-START papierkorb_alice=0
+BASELINE-START kalender_alice=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+
+BASELINE-START kalender_bob=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+
+BASELINE-START geloeschte_kalenderobjekte=0
+BASELINE-START geloeschte_kalender=0
+BASELINE-START calendar_retention=
+BASELINE-START quota_alice=The setting does not exist for user "alice".
+occ user:add --password-from-env spike30a (password via stdin) -> The account "spike30a" was created successfully
+occ user:auth-tokens:add spike30a --password-from-env --name spike30 (token kept)
+2026-11-11T11:55:35Z | controls | PROPFIND Depth 0 home of spike30a (app password) | HTTP 207 | home
+occ user:add --password-from-env spike30b (password via stdin) -> The account "spike30b" was created successfully
+occ user:auth-tokens:add spike30b --password-from-env --name spike30 (token kept)
+2026-11-11T11:55:37Z | controls | PROPFIND Depth 0 home of spike30b (app password) | HTTP 207 | home
+2026-11-11T11:55:39Z | controls | a: GET /ocs/v2.php/cloud/user (AppAPI as spike30a) | HTTP 200 | id=spike30a erwartet=spike30a gleich=ja
+2026-11-11T11:55:39Z | controls | b: GET /ocs/v2.php/cloud/user (AppAPI as spike30a, wrong APP_SECRET) | HTTP 401 | abgelehnt=ja
+KONTROLLE c: exapp_impersonation.log, GET-Zeilen von spike30a seit 2026-11-11T11:55:37Z: 1
+  {"reqId":"fuN9N6SWzobpy0eyIzxI","level":2,"time":"2026-11-11T11:55:38+00:00","remoteAddr":"172.30.42.128","user":"spike30a","app":"mcp_connector","method":"GET","url":"/ocs/v2.php/cloud/user","scriptName":"/ocs/v2.php","message":"impersonation request","userAgent":"python-httpx/0.28.1","version":"35
+
+== mkcol ==
+RAM frei_host_gb=4.64 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 26.33MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 102MiB / 5.786GiB  cpu 0.10%
+nc35-caddy  mem 19.07MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 82.54MiB / 5.786GiB  cpu 0.09%
+nc35-nc  mem 232.7MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+2026-11-11T11:55:43Z | SETUP PUT /spike30/setup.txt mit X-NC-WebDAV-Auto-Mkcol nutzer=spike30a auth=basic status=201 basisordner_vorhanden=ja
+2026-11-11T11:55:43Z | KONTROLLE vorher PROPFIND Depth 0 /spike30/frei-115543 auth=appapi nutzer=spike30a status=404 erwartet=404
+2026-11-11T11:55:45Z | MKCOL frei auth=appapi status=201 angelegt=ja erwartet=201 | 
+ABBRUCHKRITERIUM MESS-01 ausgeloest=nein status=201
+  Aufruf: MKCOL /remote.php/dav/files/spike30a/spike30/frei-115543 ohne Body, nutzer=spike30a, auth=appapi
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 11:55:45 GMT
+    oc-fileid: 00023274oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: pgrDEsSFpyKVk5r8XyzE
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+DATEISYSTEM frei vorhanden=ja pfad=/var/www/html/data/spike30a/files/spike30/frei-115543
+2026-11-11T11:55:45Z | KONTROLLE nachher PROPFIND Depth 0 /spike30/frei-115543 auth=appapi nutzer=spike30a status=207
+KONTROLLE exapp_impersonation.log, MKCOL-Zeilen von spike30a seit 2026-11-11T11:55:43Z: 1
+  {"reqId":"pgrDEsSFpyKVk5r8XyzE","level":2,"time":"2026-11-11T11:55:45+00:00","remoteAddr":"172.30.42.128","user":"spike30a","app":"mcp_connector","method":"MKCOL","url":"/remote.php/dav/files/spike30a/spike30/frei-115543","scriptName":"/remote.php","message":"impersonation request","userAgent":"python-httpx/0.28.1","version":"35.0.0.10","data":{"app":"mcp_connector"}}
+2026-11-11T11:55:45Z | GEGENPROBE falsches-secret MKCOL /spike30/frei-115543-falsches-secret nutzer=spike30a status=401 angelegt=nein | Sabre\DAV\Exception\NotAuthenticated No public access to this resource., AppAPIAuth has not passed, This request is not for a federated calendar, No 'Authorization: Basic' header found. Either the client didn't send one, or the server is misconfigured, No 'Authorization: Bearer' header found. Either
+2026-11-11T11:55:46Z | GEGENPROBE fremdes-home MKCOL /remote.php/dav/files/spike30b/spike30-fremd nutzer=spike30a status=403 angelegt=nein | Sabre\DAV\Exception\Forbidden Permission denied to create directory
+2026-11-11T11:55:46Z | PRODUKTIONSWEG MKCOL status=201 angelegt=ja nutzer=spike30a pfad=/spike30/frei-115543-produktionsweg (aus nc_app_mcp_connector gegen http://caddy)
+2026-11-11T11:55:47Z | MKCOL ordner-vorhanden auth=appapi status=405 angelegt=nein erwartet=405 | Sabre\DAV\Exception\MethodNotAllowed The resource you tried to create already exists
+    HTTP 405 Method Not Allowed
+    allow: OPTIONS, GET, HEAD, DELETE, PROPFIND, PUT, PROPPATCH, COPY, MOVE, REPORT, LOCK, UNLOCK
+    content-length: 247
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:46 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\MethodNotAllowed</s:exception>
+      <s:message>The resource you tried to create already exists</s:message>
+    </d:error>
+2026-11-11T11:55:47Z | SETUP PUT /spike30/datei-appapi.txt nutzer=spike30a auth=appapi status=201
+2026-11-11T11:55:47Z | MKCOL datei-vorhanden auth=appapi status=405 angelegt=nein erwartet=405 | Sabre\DAV\Exception\MethodNotAllowed The resource you tried to create already exists
+    HTTP 405 Method Not Allowed
+    allow: OPTIONS, GET, HEAD, DELETE, PROPFIND, PUT, PROPPATCH, COPY, MOVE, REPORT, LOCK, UNLOCK
+    content-length: 247
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:47 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\MethodNotAllowed</s:exception>
+      <s:message>The resource you tried to create already exists</s:message>
+    </d:error>
+2026-11-11T11:55:47Z | MKCOL eltern-fehlt auth=appapi status=409 angelegt=nein erwartet=409 | Sabre\DAV\Exception\Conflict Parent node does not exist
+    HTTP 409 Conflict
+    content-length: 218
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:47 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Conflict</s:exception>
+      <s:message>Parent node does not exist</s:message>
+    </d:error>
+2026-11-11T11:55:47Z | MKCOL eltern-ist-datei auth=appapi status=409 angelegt=nein erwartet=409 | Sabre\DAV\Exception\Conflict Parent node is not a collection
+    HTTP 409 Conflict
+    content-length: 223
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:47 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Conflict</s:exception>
+      <s:message>Parent node is not a collection</s:message>
+    </d:error>
+2026-11-11T11:55:48Z | MKCOL name-htaccess auth=appapi status=400 angelegt=nein erwartet=400 | OCA\DAV\Connector\Sabre\Exception\InvalidPath Filename is a reserved word
+    HTTP 400 Bad Request
+    content-length: 373
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:48 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:o="http://owncloud.org/ns">
+      <s:exception>OCA\DAV\Connector\Sabre\Exception\InvalidPath</s:exception>
+      <s:message>Filename is a reserved word</s:message>
+      <o:retry xmlns:o="o:">false</o:retry>
+      <o:reason xmlns:o="o:">Filename is a reserved word</o:reason>
+    </d:error>
+  name-backslash: das Segment ist bs%5Cx und wird roh an die URL gehaengt, weil dav.safe_path einen Backslash vor jeder Anfrage ablehnt
+2026-11-11T11:55:48Z | MKCOL name-backslash auth=appapi status=400 angelegt=nein erwartet=400 | OCA\DAV\Connector\Sabre\Exception\InvalidPath "\" is not allowed inside a file or folder name.
+    HTTP 400 Bad Request
+    content-length: 415
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:48 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:o="http://owncloud.org/ns">
+      <s:exception>OCA\DAV\Connector\Sabre\Exception\InvalidPath</s:exception>
+      <s:message>"\" is not allowed inside a file or folder name.</s:message>
+      <o:retry xmlns:o="o:">false</o:retry>
+      <o:reason xmlns:o="o:">"\" is not allowed inside a file or folder name.</o:reason>
+    </d:error>
+  name-ueberlang: das Segment besteht aus 300 mal x
+2026-11-11T11:55:48Z | MKCOL name-ueberlang auth=appapi status=400 angelegt=nein erwartet=400 | OCA\DAV\Connector\Sabre\Exception\InvalidPath Filename is too long
+    HTTP 400 Bad Request
+    content-length: 359
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:48 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:o="http://owncloud.org/ns">
+      <s:exception>OCA\DAV\Connector\Sabre\Exception\InvalidPath</s:exception>
+      <s:message>Filename is too long</s:message>
+      <o:retry xmlns:o="o:">false</o:retry>
+      <o:reason xmlns:o="o:">Filename is too long</o:reason>
+    </d:error>
+2026-11-11T11:55:48Z | MKCOL frei auth=basic status=201 angelegt=ja erwartet=201 | 
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 11:55:48 GMT
+    oc-fileid: 00023277oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: CTdnNWUEeQOCq5gTLile
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T11:55:49Z | MKCOL ordner-vorhanden auth=basic status=405 angelegt=nein erwartet=405 | Sabre\DAV\Exception\MethodNotAllowed The resource you tried to create already exists
+    HTTP 405 Method Not Allowed
+    allow: OPTIONS, GET, HEAD, DELETE, PROPFIND, PUT, PROPPATCH, COPY, MOVE, REPORT, LOCK, UNLOCK
+    content-length: 247
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:49 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\MethodNotAllowed</s:exception>
+      <s:message>The resource you tried to create already exists</s:message>
+    </d:error>
+2026-11-11T11:55:49Z | SETUP PUT /spike30/datei-basic.txt nutzer=spike30a auth=basic status=201
+2026-11-11T11:55:49Z | MKCOL datei-vorhanden auth=basic status=405 angelegt=nein erwartet=405 | Sabre\DAV\Exception\MethodNotAllowed The resource you tried to create already exists
+    HTTP 405 Method Not Allowed
+    allow: OPTIONS, GET, HEAD, DELETE, PROPFIND, PUT, PROPPATCH, COPY, MOVE, REPORT, LOCK, UNLOCK
+    content-length: 247
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:49 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\MethodNotAllowed</s:exception>
+      <s:message>The resource you tried to create already exists</s:message>
+    </d:error>
+2026-11-11T11:55:49Z | MKCOL eltern-fehlt auth=basic status=409 angelegt=nein erwartet=409 | Sabre\DAV\Exception\Conflict Parent node does not exist
+    HTTP 409 Conflict
+    content-length: 218
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:49 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Conflict</s:exception>
+      <s:message>Parent node does not exist</s:message>
+    </d:error>
+2026-11-11T11:55:50Z | MKCOL eltern-ist-datei auth=basic status=409 angelegt=nein erwartet=409 | Sabre\DAV\Exception\Conflict Parent node is not a collection
+    HTTP 409 Conflict
+    content-length: 223
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:49 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Conflict</s:exception>
+      <s:message>Parent node is not a collection</s:message>
+    </d:error>
+2026-11-11T11:55:50Z | MKCOL name-htaccess auth=basic status=400 angelegt=nein erwartet=400 | OCA\DAV\Connector\Sabre\Exception\InvalidPath Filename is a reserved word
+    HTTP 400 Bad Request
+    content-length: 373
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:50 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:o="http://owncloud.org/ns">
+      <s:exception>OCA\DAV\Connector\Sabre\Exception\InvalidPath</s:exception>
+      <s:message>Filename is a reserved word</s:message>
+      <o:retry xmlns:o="o:">false</o:retry>
+      <o:reason xmlns:o="o:">Filename is a reserved word</o:reason>
+    </d:error>
+  name-backslash: das Segment ist bs%5Cx und wird roh an die URL gehaengt, weil dav.safe_path einen Backslash vor jeder Anfrage ablehnt
+2026-11-11T11:55:50Z | MKCOL name-backslash auth=basic status=400 angelegt=nein erwartet=400 | OCA\DAV\Connector\Sabre\Exception\InvalidPath "\" is not allowed inside a file or folder name.
+    HTTP 400 Bad Request
+    content-length: 415
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:50 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:o="http://owncloud.org/ns">
+      <s:exception>OCA\DAV\Connector\Sabre\Exception\InvalidPath</s:exception>
+      <s:message>"\" is not allowed inside a file or folder name.</s:message>
+      <o:retry xmlns:o="o:">false</o:retry>
+      <o:reason xmlns:o="o:">"\" is not allowed inside a file or folder name.</o:reason>
+    </d:error>
+  name-ueberlang: das Segment besteht aus 300 mal x
+2026-11-11T11:55:50Z | MKCOL name-ueberlang auth=basic status=400 angelegt=nein erwartet=400 | OCA\DAV\Connector\Sabre\Exception\InvalidPath Filename is too long
+    HTTP 400 Bad Request
+    content-length: 359
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:50 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:o="http://owncloud.org/ns">
+      <s:exception>OCA\DAV\Connector\Sabre\Exception\InvalidPath</s:exception>
+      <s:message>Filename is too long</s:message>
+      <o:retry xmlns:o="o:">false</o:retry>
+      <o:reason xmlns:o="o:">Filename is too long</o:reason>
+    </d:error>
+2026-11-11T11:55:50Z | SETUP MKCOL /spike30-share-ro nutzer=spike30b auth=basic status=201
+2026-11-11T11:55:51Z | SETUP POST shares path=/spike30-share-ro shareWith=spike30a permissions=1 nutzer=spike30b status=200 id=188 file_target=/spike30-share-ro
+2026-11-11T11:55:51Z | SETUP MKCOL /spike30-share-rw nutzer=spike30b auth=basic status=201
+2026-11-11T11:55:51Z | SETUP POST shares path=/spike30-share-rw shareWith=spike30a permissions=15 nutzer=spike30b status=200 id=189 file_target=/spike30-share-rw
+2026-11-11T11:55:51Z | MKCOL share-ro auth=appapi status=403 angelegt=nein erwartet=403 | Sabre\DAV\Exception\Forbidden
+    HTTP 403 Forbidden
+    content-length: 182
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:51 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Forbidden</s:exception>
+      <s:message/>
+    </d:error>
+2026-11-11T11:55:51Z | MKCOL share-rw auth=appapi status=201 angelegt=ja erwartet=201 | 
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 11:55:51 GMT
+    oc-fileid: 00023282oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: NYceb8NpkEEq3uyhQH5s
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T11:55:52Z | MKCOL share-ro auth=basic status=403 angelegt=nein erwartet=403 | Sabre\DAV\Exception\Forbidden
+    HTTP 403 Forbidden
+    content-length: 182
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:51 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Forbidden</s:exception>
+      <s:message/>
+    </d:error>
+2026-11-11T11:55:52Z | MKCOL share-rw auth=basic status=201 angelegt=ja erwartet=201 | 
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 11:55:52 GMT
+    oc-fileid: 00023283oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: 2dsl7vsH0jnB6XHPwQTK
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+2026-11-11T11:55:52Z | KONTROLLE oc:permissions /spike30-share-ro (Ordner /spike30-share-ro von spike30b) aus Sicht von spike30a auth=appapi status=207 permissions=SGDN
+2026-11-11T11:55:52Z | KONTROLLE oc:permissions /spike30-share-rw (Ordner /spike30-share-rw von spike30b) aus Sicht von spike30a auth=appapi status=207 permissions=SGDNVCK
+2026-11-11T11:55:52Z | SETUP MKCOL /spike30/root nutzer=spike30a auth=basic status=201
+FILES_ROOT root-vorhanden auth=appapi NC_MCP_FILES_ROOT=/spike30/root pfad=/unter-appapi url=/remote.php/dav/files/spike30a/spike30/root/unter-appapi
+2026-11-11T11:55:52Z | MKCOL root-vorhanden auth=appapi status=201 angelegt=ja erwartet=201 | 
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 11:55:52 GMT
+    oc-fileid: 00023285oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: Ce4hXVBUIIvYCulEzZLa
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+FILES_ROOT root-fehlt auth=appapi NC_MCP_FILES_ROOT=/spike30/root-fehlt pfad=/unter-appapi url=/remote.php/dav/files/spike30a/spike30/root-fehlt/unter-appapi
+2026-11-11T11:55:53Z | MKCOL root-fehlt auth=appapi status=409 angelegt=nein erwartet=409 | Sabre\DAV\Exception\Conflict Parent node does not exist
+    HTTP 409 Conflict
+    content-length: 218
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:52 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Conflict</s:exception>
+      <s:message>Parent node does not exist</s:message>
+    </d:error>
+FILES_ROOT root-selbst auth=appapi NC_MCP_FILES_ROOT=/spike30/root pfad=/ url=/remote.php/dav/files/spike30a/spike30/root
+2026-11-11T11:55:53Z | MKCOL root-selbst auth=appapi status=405 angelegt=nein erwartet=405 | Sabre\DAV\Exception\MethodNotAllowed The resource you tried to create already exists
+    HTTP 405 Method Not Allowed
+    allow: OPTIONS, GET, HEAD, DELETE, PROPFIND, PUT, PROPPATCH, COPY, MOVE, REPORT, LOCK, UNLOCK
+    content-length: 247
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:53 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\MethodNotAllowed</s:exception>
+      <s:message>The resource you tried to create already exists</s:message>
+    </d:error>
+FILES_ROOT root-vorhanden auth=basic NC_MCP_FILES_ROOT=/spike30/root pfad=/unter-basic url=/remote.php/dav/files/spike30a/spike30/root/unter-basic
+2026-11-11T11:55:53Z | MKCOL root-vorhanden auth=basic status=201 angelegt=ja erwartet=201 | 
+    HTTP 201 Created
+    content-length: 0
+    content-security-policy: default-src 'none';
+    content-type: text/html; charset=UTF-8
+    date: Wed, 11 Nov 2026 11:55:53 GMT
+    oc-fileid: 00023286oclxpo7v8s2m
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-request-id: qzZ71S1U40Ct421tfXDl
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (no body)
+FILES_ROOT root-fehlt auth=basic NC_MCP_FILES_ROOT=/spike30/root-fehlt pfad=/unter-basic url=/remote.php/dav/files/spike30a/spike30/root-fehlt/unter-basic
+2026-11-11T11:55:53Z | MKCOL root-fehlt auth=basic status=409 angelegt=nein erwartet=409 | Sabre\DAV\Exception\Conflict Parent node does not exist
+    HTTP 409 Conflict
+    content-length: 218
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:53 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\Conflict</s:exception>
+      <s:message>Parent node does not exist</s:message>
+    </d:error>
+FILES_ROOT root-selbst auth=basic NC_MCP_FILES_ROOT=/spike30/root pfad=/ url=/remote.php/dav/files/spike30a/spike30/root
+2026-11-11T11:55:54Z | MKCOL root-selbst auth=basic status=405 angelegt=nein erwartet=405 | Sabre\DAV\Exception\MethodNotAllowed The resource you tried to create already exists
+    HTTP 405 Method Not Allowed
+    allow: OPTIONS, GET, HEAD, DELETE, PROPFIND, PUT, PROPPATCH, COPY, MOVE, REPORT, LOCK, UNLOCK
+    content-length: 247
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:53 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\MethodNotAllowed</s:exception>
+      <s:message>The resource you tried to create already exists</s:message>
+    </d:error>
+occ user:setting spike30a files quota (vorher) -> The setting does not exist for user "spike30a".
+occ user:setting spike30a files quota '1 KB' -> 
+2026-11-11T11:55:54Z | KONTROLLE kontingent PUT 2048 Bytes /spike30/quota-probe-appapi.bin auth=appapi nutzer=spike30a status=507 wirkt=ja | Sabre\DAV\Exception\InsufficientStorage Insufficient space in /spike30/quota-probe-appapi.bin
+2026-11-11T11:55:55Z | MKCOL quota auth=appapi status=507 angelegt=nein erwartet=201 | Sabre\DAV\Exception\InsufficientStorage Insufficient space in /spike30. Cannot create directory
+    HTTP 507 Insufficient Storage
+    content-length: 258
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:54 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\InsufficientStorage</s:exception>
+      <s:message>Insufficient space in /spike30. Cannot create directory</s:message>
+    </d:error>
+2026-11-11T11:55:55Z | KONTROLLE kontingent PUT 2048 Bytes /spike30/quota-probe-basic.bin auth=basic nutzer=spike30a status=507 wirkt=ja | Sabre\DAV\Exception\InsufficientStorage Insufficient space in /spike30/quota-probe-basic.bin
+2026-11-11T11:55:55Z | MKCOL quota auth=basic status=507 angelegt=nein erwartet=201 | Sabre\DAV\Exception\InsufficientStorage Insufficient space in /spike30. Cannot create directory
+    HTTP 507 Insufficient Storage
+    content-length: 258
+    content-security-policy: default-src 'none';
+    content-type: application/xml; charset=utf-8
+    date: Wed, 11 Nov 2026 11:55:55 GMT
+    referrer-policy: no-referrer
+    server: Apache/2.4.68 (Debian)
+    via: 1.1 Caddy
+    x-content-type-options: nosniff
+    x-frame-options: SAMEORIGIN
+    x-permitted-cross-domain-policies: none
+    x-powered-by: PHP/8.5.9
+    x-robots-tag: noindex, nofollow
+    x-user-id: spike30a
+    (body)
+    <?xml version="1.0" encoding="utf-8"?>
+    <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">
+      <s:exception>Sabre\DAV\Exception\InsufficientStorage</s:exception>
+      <s:message>Insufficient space in /spike30. Cannot create directory</s:message>
+    </d:error>
+occ user:setting spike30a files quota zurueckgesetzt -> ok
+
+== mkcol summary ==
+MKCOL ZEILE frei appapi=201 basic=201 erwartet=201 abweichung_von_erwartung=keine
+MKCOL ZEILE ordner-vorhanden appapi=405 basic=405 erwartet=405 abweichung_von_erwartung=keine
+MKCOL ZEILE datei-vorhanden appapi=405 basic=405 erwartet=405 abweichung_von_erwartung=keine
+MKCOL ZEILE eltern-fehlt appapi=409 basic=409 erwartet=409 abweichung_von_erwartung=keine
+MKCOL ZEILE eltern-ist-datei appapi=409 basic=409 erwartet=409 abweichung_von_erwartung=keine
+MKCOL ZEILE name-htaccess appapi=400 basic=400 erwartet=400 abweichung_von_erwartung=keine
+MKCOL ZEILE name-backslash appapi=400 basic=400 erwartet=400 abweichung_von_erwartung=keine
+MKCOL ZEILE name-ueberlang appapi=400 basic=400 erwartet=400 abweichung_von_erwartung=keine
+MKCOL ZEILE share-ro appapi=403 basic=403 erwartet=403 abweichung_von_erwartung=keine
+MKCOL ZEILE share-rw appapi=201 basic=201 erwartet=201 abweichung_von_erwartung=keine
+MKCOL ZEILE root-vorhanden appapi=201 basic=201 erwartet=201 abweichung_von_erwartung=keine
+MKCOL ZEILE root-fehlt appapi=409 basic=409 erwartet=409 abweichung_von_erwartung=keine
+MKCOL ZEILE root-selbst appapi=405 basic=405 erwartet=405 abweichung_von_erwartung=keine
+MKCOL ZEILE quota appapi=507 basic=507 erwartet=201 abweichung_von_erwartung=appapi,basic
+MKCOL GLEICH appapi_basic=ja abweichend=keine
+
+== rueckbau ==
+occ user:delete spike30a -> The specified user was deleted
+occ user:delete spike30b -> The specified user was deleted
+RUECKBAU reste_mit_praefix_spike30=keine
+BASELINE apps_an vorher={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"} nachher={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"} gleich=ja
+BASELINE apps_aus vorher={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"} nachher={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"} gleich=ja
+BASELINE nutzer vorher={"admin":"admin","alice":"alice","bob":"bob"} nachher={"admin":"admin","alice":"alice","bob":"bob"} gleich=ja
+BASELINE gruppen vorher={"admin":["admin"]} nachher={"admin":["admin"]} gleich=ja
+BASELINE dateien_alice vorher=275 nachher=275 gleich=ja
+BASELINE papierkorb_alice vorher=0 nachher=0 gleich=ja
+BASELINE kalender_alice vorher=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+ nachher=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+ gleich=ja
+BASELINE kalender_bob vorher=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+ nachher=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+ gleich=ja
+BASELINE geloeschte_kalenderobjekte vorher=0 nachher=0 gleich=ja
+BASELINE geloeschte_kalender vorher=0 nachher=0 gleich=ja
+BASELINE calendar_retention vorher= nachher= gleich=ja
+BASELINE quota_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
