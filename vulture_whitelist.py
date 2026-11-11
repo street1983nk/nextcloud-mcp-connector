@@ -345,7 +345,6 @@ background
 # --- The measuring script of phase 30 (scripts/tasks_spike.py) ---------------------------
 # Plan 30-01 task 1 commits the pure helpers together with the criteria of the report,
 # before the first measurement exists; that order is the proof that the criteria were not
-# fitted to the numbers. The blocks that call them follow in the same plan. The five names of
-# the mkcol block (MKCOL_KEYS, abort_mess01, same_status, raw_answer, dir_exists) left this
-# list with task 2, as announced; GF_KEYS waits for the groupfolder block of task 3.
-GF_KEYS
+# fitted to the numbers. Empty again, as announced: the five names of the mkcol block
+# (MKCOL_KEYS, abort_mess01, same_status, raw_answer, dir_exists) left this list with task 2,
+# and GF_KEYS left it with the groupfolder block of task 3.

@@ -101,7 +101,15 @@ DAV_FILES = "/remote.php/dav/files/"
 TIMEOUT = httpx.Timeout(60.0)
 
 #: Further blocks follow in plans 30-02 to 30-05.
-BLOCKS = ("nc35-up", "controls", "mkcol", "groupfolder", "nc35-stop", "secret-scan")
+BLOCKS = (
+    "nc35-up",
+    "controls",
+    "mkcol",
+    "groupfolder",
+    "nachlauf",
+    "nc35-stop",
+    "secret-scan",
+)
 
 #: The rows of the group folder measurement (plan 30-01 task 3), in the order they run.
 GF_KEYS = (
@@ -113,6 +121,17 @@ GF_KEYS = (
 )
 
 SHARES_PATH = "/apps/files_sharing/api/v1/shares"
+
+GF_GROUP = f"{PREFIX}grp"
+GF_READ_GROUP = f"{PREFIX}lesen"
+GF_FOLDER = f"{PREFIX}gf"
+GF_READ_FOLDER = f"{PREFIX}gf-lesen"
+GF_DATA = f"{DATA_DIR}/__groupfolders"
+EXT_MOUNT = f"{PREFIX}ext"
+EXT_DIR = f"{DATA_DIR}/{EXT_MOUNT}"
+#: The app config keys Nextcloud writes when an app is enabled for the first time. An app
+#: that was never enabled before a run carries none of them, and gets none back.
+APP_STATE_KEYS = ("installed_version", "enabled", "types")
 
 #: One MKCOL from inside the ExApp container, the exact production way (http://caddy).
 #: Fed to ``/app/.venv/bin/python -`` through stdin with the user and the path as arguments.
@@ -673,6 +692,10 @@ def _one_line(text: str) -> str:
     return " ".join(text.split())
 
 
+def yes_no(value: bool) -> str:
+    return "ja" if value else "nein"
+
+
 def _json_or_text(raw: str) -> Any:
     try:
         return json.loads(raw)
@@ -766,6 +789,14 @@ def restore_apps(before: Mapping[str, str]) -> None:
         note(f"occ app:disable {app} -> {occ(NC_CONTAINER, 'app:disable', app, check=False)}")
         if app not in was_disabled:
             note(f"occ app:remove {app} -> {occ(NC_CONTAINER, 'app:remove', app, check=False)}")
+        if "(installed" not in was_disabled.get(app, ""):
+            # Measured on 35.0.0: an app that was enabled once keeps three config values
+            # after app:disable and even after app:remove, and occ app:list then shows it
+            # as "(installed ...)". They did not exist before this run, so they go again.
+            for key in APP_STATE_KEYS:
+                occ(NC_CONTAINER, "config:app:delete", app, key, check=False)
+            left = _one_line(occ(NC_CONTAINER, "config:list", app, check=False))
+            note(f"occ config:app:delete {app} {' '.join(APP_STATE_KEYS)} -> config:list: {left}")
     for app in sorted(disabled):
         if app in was_enabled:
             note(f"occ app:enable {app} -> {occ(NC_CONTAINER, 'app:enable', app, check=False)}")
@@ -773,13 +804,68 @@ def restore_apps(before: Mapping[str, str]) -> None:
             note(f"occ app:remove {app} -> {occ(NC_CONTAINER, 'app:remove', app, check=False)}")
 
 
+def _mounts_with_prefix(command: str) -> list[str]:
+    """The ids of the mounts ``occ <command> --output=json`` lists with the spike prefix."""
+    data = _json_or_text(occ(NC_CONTAINER, command, "--output=json", check=False))
+    entries = list(data.values()) if isinstance(data, dict) else data
+    if not isinstance(entries, list):
+        return []
+    ids = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        # files_external writes mount_point, groupfolders 23 writes mountPoint (read from
+        # the running instance; the first rollback of this plan missed the second spelling).
+        raw_point = entry.get("mount_point", entry.get("mountPoint", ""))
+        mount_point = str(raw_point).lstrip("/")
+        mount_id = entry.get("mount_id", entry.get("id"))
+        if mount_point.startswith(PREFIX) and mount_id is not None:
+            ids.append(str(mount_id))
+    return ids
+
+
+def remove_spike_mounts(before: Mapping[str, str]) -> None:
+    """Delete the external storages and group folders of this phase, and their directories."""
+    enabled, _ = app_list()
+    if "files_external" in enabled:
+        for mount_id in _mounts_with_prefix("files_external:list"):
+            gone = occ(NC_CONTAINER, "files_external:delete", "--yes", mount_id, check=False)
+            note(f"occ files_external:delete --yes {mount_id} -> {_one_line(gone)[:160]}")
+    removed = shell_in(NC_CONTAINER, 'rm -rf "$1" && echo entfernt', EXT_DIR)
+    note(f"rm -rf {EXT_DIR} -> {removed}")
+    if "groupfolders" in enabled:
+        for folder_id in _mounts_with_prefix("groupfolders:list"):
+            gone = occ(NC_CONTAINER, "groupfolders:delete", "--force", folder_id, check=False)
+            note(f"occ groupfolders:delete --force {folder_id} -> {_one_line(gone)[:160]}")
+        listed = occ(NC_CONTAINER, "groupfolders:list", "--output=json", check=False)
+        note(f"occ groupfolders:list --output=json (nach dem Loeschen) -> {_one_line(listed)}")
+    known = {**json.loads(before["apps_an"]), **json.loads(before["apps_aus"])}
+    if "groupfolders" not in known:
+        # The app did not exist before this run, so nothing else can own this directory.
+        files = shell_in(
+            NC_CONTAINER,
+            'if [ -d "$1" ]; then find "$1" -type f | wc -l; else echo fehlt; fi',
+            GF_DATA,
+        )
+        removed = shell_in(NC_CONTAINER, 'rm -rf "$1" && echo entfernt', GF_DATA)
+        note(f"rm -rf {GF_DATA} (Dateien darin vorher: {files}) -> {removed}")
+
+
 def rollback_nc35(before: Mapping[str, str], env: Mapping[str, str]) -> None:
     """Take everything back and compare against the baseline, as the last protocol lines."""
     section("rueckbau")
+    remove_spike_mounts(before)
     remove_spike_objects()
     restore_apps(before)
     left = _names_with_prefix("user:list") + _names_with_prefix("group:list")
     note(f"RUECKBAU reste_mit_praefix_{PREFIX}={left or 'keine'}")
+    enabled, disabled = app_list()
+    note(f"RUECKBAU occ user:list -> {_one_line(occ(NC_CONTAINER, 'user:list', check=False))}")
+    note(
+        f"RUECKBAU occ app:list groupfolders_vorhanden="
+        f"{yes_no('groupfolders' in enabled or 'groupfolders' in disabled)} "
+        f"files_external_an={yes_no('files_external' in enabled)}"
+    )
     for line in compare_baseline(before, baseline_nc35(env)):
         note(line)
 
@@ -1074,10 +1160,6 @@ def auth_label(creds: Credentials) -> str:
 def fs_home(user: str, sub: str) -> str:
     """The path of ``sub`` below the home of ``user`` in the data directory."""
     return f"{DATA_DIR}/{user}/files{sub}"
-
-
-def yes_no(value: bool) -> str:
-    return "ja" if value else "nein"
 
 
 async def measure_mkcol(session: Session, creds: Credentials, url: str, fs_path: str) -> Measured:
@@ -1457,6 +1539,366 @@ async def block_mkcol(session: Session) -> None:
     note(f"MKCOL GLEICH appapi_basic={yes_no(same)} abweichend={differing or 'keine'}")
 
 
+def note_help(*commands: str) -> None:
+    """The help text of ``occ`` commands, raw: the commands below are built after it."""
+    for command in commands:
+        note(f"HILFE occ {command} --help:")
+        for line in occ(NC_CONTAINER, command, "--help", check=False).splitlines():
+            if line.strip():
+                note(f"    {line.rstrip()}")
+
+
+def occ_noted(*argv: str) -> str:
+    """One ``occ`` call written into the protocol with its answer."""
+    answer = occ(NC_CONTAINER, *argv, check=False)
+    note(f"occ {' '.join(argv)} -> {_one_line(answer)[:300] or '(keine Ausgabe)'}")
+    return answer
+
+
+@dataclass
+class GroupFolders:
+    """The state of one groupfolder block: ids, the data path and the measured rows."""
+
+    session: Session
+    folder_id: str = ""
+    read_folder_id: str = ""
+    data_path: str = ""
+    rows: dict[tuple[str, str], Measured] = field(default_factory=dict)
+
+    async def row(self, key: str, creds: Credentials, sub: str, fs_path: str) -> Measured:
+        """Measure one row and write ``GF <key> auth=.. nutzer=.. status=.. angelegt=..``."""
+        measured = await measure_mkcol(self.session, creds, home_url(creds, sub), fs_path)
+        self.rows[(key, auth_label(creds))] = measured
+        note(
+            f"{now_stamp()} | GF {key} auth={auth_label(creds)} nutzer={creds.user} "
+            f"status={measured.status} angelegt={yes_no(measured.created)} "
+            f"| {describe_error(measured.result.body)[:300]}"
+        )
+        note(f"  Aufruf: MKCOL {DAV_FILES}{creds.user}{sub} ohne Body, Dateisystem: {fs_path}")
+        note_raw(measured.result)
+        return measured
+
+
+def install_groupfolders() -> None:
+    """Install or enable the app and name its version from the running instance."""
+    enabled, disabled = app_list()
+    installed_before = "groupfolders" in enabled or "groupfolders" in disabled
+    if "groupfolders" not in enabled:
+        command = "app:enable" if "groupfolders" in disabled else "app:install"
+        occ_noted(command, "groupfolders")
+    enabled, _ = app_list()
+    version = enabled.get("groupfolders", "")
+    if not version:
+        note(
+            "GRUPPENORDNER ungemessen grund=die App groupfolders liess sich in dieser Instanz "
+            "nicht einschalten, Rohausgabe in der Zeile darueber"
+        )
+        raise RunFailed(
+            "groupfolders could not be installed; E12 demands the measurement, so the "
+            "finding goes to the owner instead of guessing another instance"
+        )
+    note(
+        f"GRUPPENORDNER version={version} installiert_vorher={yes_no(installed_before)} "
+        "(gelesen mit occ app:list --output=json)"
+    )
+
+
+async def groupfolder_setup(state: GroupFolders) -> None:
+    """Groups, two group folders, ACL switched on; the command forms follow the help texts."""
+    note_help(
+        "groupfolders:create",
+        "groupfolders:group",
+        "groupfolders:permissions",
+        "groupfolders:delete",
+    )
+    occ_noted("group:add", GF_GROUP)
+    occ_noted("group:adduser", GF_GROUP, USER_A)
+    occ_noted("group:adduser", GF_GROUP, USER_B)
+    occ_noted("group:add", GF_READ_GROUP)
+    occ_noted("group:adduser", GF_READ_GROUP, USER_A)
+    for name, attribute in ((GF_FOLDER, "folder_id"), (GF_READ_FOLDER, "read_folder_id")):
+        created = occ_noted("groupfolders:create", name)
+        digits = re.findall(r"\d+", created)
+        if not digits:
+            raise RunFailed(f"groupfolders:create {name} returned no id")
+        setattr(state, attribute, digits[-1])
+    occ_noted("groupfolders:group", state.folder_id, GF_GROUP, "read", "write", "share", "delete")
+    occ_noted("groupfolders:permissions", state.folder_id, "--enable")
+    occ_noted("groupfolders:group", state.read_folder_id, GF_READ_GROUP)
+    note(f"occ groupfolders:list -> {_one_line(occ(NC_CONTAINER, 'groupfolders:list'))[:900]}")
+
+    creds = state.session.appapi(USER_A)
+    listing = await dav_request(
+        state.session.client,
+        creds,
+        "PROPFIND",
+        home_url(creds, "/"),
+        depth="1",
+        body=propfind_body([f"{{{xml.OC}}}permissions"]),
+    )
+    hrefs = [href for href, _ in xml.parse_multistatus(listing.body)] if listing.body else []
+    seen = {
+        name: any(href.rstrip("/").endswith(f"/{name}") for href in hrefs)
+        for name in (GF_FOLDER, GF_READ_FOLDER)
+    }
+    note(
+        f"{now_stamp()} | KONTROLLE PROPFIND Depth 1 home auth=appapi nutzer={USER_A} "
+        f"status={listing.status} {GF_FOLDER}_sichtbar={yes_no(seen[GF_FOLDER])} "
+        f"{GF_READ_FOLDER}_sichtbar={yes_no(seen[GF_READ_FOLDER])}"
+    )
+
+    # The two sub folders are created by the impersonated account itself. Where they land
+    # in the data directory is read from the disk afterwards, not assumed.
+    for name in ("acl-rw", "acl-ro"):
+        made = await dav_request(
+            state.session.client, creds, "MKCOL", home_url(creds, f"/{GF_FOLDER}/{name}")
+        )
+        note(
+            f"{now_stamp()} | GF-AUFBAU MKCOL /{GF_FOLDER}/{name} auth=appapi nutzer={USER_A} "
+            f"status={made.status} | {describe_error(made.body)[:300]}"
+        )
+    found = shell_in(NC_CONTAINER, 'find "$1" -maxdepth 4 -type d | sort', GF_DATA)
+    note(f"DATEISYSTEM ls {GF_DATA} (find -maxdepth 4 -type d):")
+    for line in found.splitlines():
+        note(f"    {line}")
+    hits = [line for line in found.splitlines() if line.endswith("/acl-rw")]
+    if len(hits) != 1:
+        raise RunFailed(f"acl-rw was found {len(hits)} times below {GF_DATA}, expected once")
+    state.data_path = hits[0][: -len("/acl-rw")]
+    note(f"DATEISYSTEM gruppenordner {GF_FOLDER} id={state.folder_id} pfad={state.data_path}")
+
+
+async def groupfolder_acl_probe(state: GroupFolders) -> None:
+    """Counter probe: what DAV itself says about the two sub folders, as USER_A."""
+    creds = state.session.appapi(USER_A)
+    props = [f"{{{xml.OC}}}permissions", f"{{{xml.NC}}}acl-enabled", f"{{{xml.NC}}}acl-list"]
+    for name in ("acl-rw", "acl-ro"):
+        answer = await dav_request(
+            state.session.client,
+            creds,
+            "PROPFIND",
+            home_url(creds, f"/{GF_FOLDER}/{name}"),
+            depth="0",
+            body=propfind_body(props),
+        )
+        permissions = ""
+        if answer.status == 207:
+            entries = xml.parse_multistatus(answer.body)
+            permissions = entries[0][1].get(f"{{{xml.OC}}}permissions", "") if entries else ""
+        note(
+            f"{now_stamp()} | KONTROLLE oc:permissions /{GF_FOLDER}/{name} aus Sicht von "
+            f"{USER_A} auth=appapi status={answer.status} permissions={permissions or '(leer)'}"
+        )
+        note(f"  PROPFIND-Antwort (oc:permissions, nc:acl-enabled, nc:acl-list) fuer {name}:")
+        for line in answer.body.decode("utf-8", errors="replace")[:2500].splitlines():
+            if line.strip():
+                note(f"    {line.rstrip()}")
+
+
+async def groupfolder_rows(state: GroupFolders) -> None:
+    """M2.1 to M2.3: with write permission, with the ACL rule, two controls, read-only group."""
+    session = state.session
+    rule = ("groupfolders:permissions", state.folder_id, "--user", USER_A, "acl-ro")
+    occ_noted(*rule, "--", "+read", "-write", "-create", "-delete")
+    occ_noted("groupfolders:permissions", state.folder_id, "--user", USER_A, "--test", "acl-ro")
+    occ_noted("groupfolders:permissions", state.folder_id)
+    await groupfolder_acl_probe(state)
+
+    base = f"/{GF_FOLDER}"
+    for user_a, user_b in (
+        (session.appapi(USER_A), session.appapi(USER_B)),
+        (session.basic(USER_A), session.basic(USER_B)),
+    ):
+        auth = auth_label(user_a)
+        await state.row(
+            "acl-rw", user_a, f"{base}/acl-rw/neu-{auth}", f"{state.data_path}/acl-rw/neu-{auth}"
+        )
+        await state.row(
+            "acl-ro", user_a, f"{base}/acl-ro/neu-{auth}", f"{state.data_path}/acl-ro/neu-{auth}"
+        )
+        await state.row(
+            "acl-ro-kontrolle-b",
+            user_b,
+            f"{base}/acl-ro/neu-b-{auth}",
+            f"{state.data_path}/acl-ro/neu-b-{auth}",
+        )
+
+    occ_noted(*rule, "clear")
+    occ_noted("groupfolders:permissions", state.folder_id)
+    for creds in (session.appapi(USER_A), session.basic(USER_A)):
+        auth = auth_label(creds)
+        await state.row(
+            "acl-ro-nach-regelentzug",
+            creds,
+            f"{base}/acl-ro/nach-{auth}",
+            f"{state.data_path}/acl-ro/nach-{auth}",
+        )
+
+    read_path = shell_in(
+        NC_CONTAINER, 'find "$1" -maxdepth 2 -type d | sort', f"{GF_DATA}/{state.read_folder_id}"
+    )
+    note(f"DATEISYSTEM {GF_READ_FOLDER} id={state.read_folder_id}: {_one_line(read_path)}")
+    read_base = state.data_path.replace(f"/{state.folder_id}", f"/{state.read_folder_id}", 1)
+    for creds in (session.appapi(USER_A), session.basic(USER_A)):
+        auth = auth_label(creds)
+        await state.row(
+            "gruppe-nur-lesen", creds, f"/{GF_READ_FOLDER}/neu-{auth}", f"{read_base}/neu-{auth}"
+        )
+
+
+def groupfolder_verdict(state: GroupFolders) -> None:
+    """The closing lines of E12, decided by ``refused`` and never by the status alone."""
+    for key in GF_KEYS:
+        seen = {
+            auth: state.rows[(key, auth)].status if (key, auth) in state.rows else "fehlt"
+            for auth in ("appapi", "basic")
+        }
+        note(f"GF ZEILE {key} appapi={seen['appapi']} basic={seen['basic']}")
+    positive = state.rows.get(("acl-rw", "appapi"))
+    negative = state.rows.get(("acl-ro", "appapi"))
+    if positive is None or negative is None:
+        note("E12 ungemessen grund=die Zeilen acl-rw oder acl-ro fehlen, siehe BLOCK FAILED")
+        return
+    try:
+        was_refused = refused(negative.status, created=negative.created)
+    except ValueError as contradiction:
+        note(f"E12 NEGATIVTEST widerspruch: {contradiction}")
+        return
+    other = state.rows.get(("acl-ro", "basic"))
+    a8 = "belegt" if was_refused and negative.status == 403 else "widerlegt"
+    note(
+        f"E12 NEGATIVTEST abgelehnt={yes_no(was_refused)} status={negative.status} a8_403={a8} "
+        f"(auth=appapi nutzer={USER_A}; auth=basic status={other.status if other else 'fehlt'})"
+    )
+    note(
+        f"E12 POSITIV angelegt={yes_no(positive.created)} status={positive.status} "
+        f"(auth=appapi nutzer={USER_A})"
+    )
+    controls = {
+        key: state.rows[(key, "appapi")].status if (key, "appapi") in state.rows else "fehlt"
+        for key in ("acl-ro-kontrolle-b", "acl-ro-nach-regelentzug")
+    }
+    note(
+        f"E12 KONTROLLEN kontrolle_b={controls['acl-ro-kontrolle-b']} "
+        f"nach_regelentzug={controls['acl-ro-nach-regelentzug']} (auth=appapi)"
+    )
+
+
+async def external_storage(session: Session) -> None:
+    """M2.4: a local external storage for USER_A, first read-only, then writable."""
+    section("externer-speicher")
+    enabled, _ = app_list()
+    note(f"EXTERN files_external an_vorher={yes_no('files_external' in enabled)}")
+    if "files_external" not in enabled:
+        occ_noted("app:enable", "files_external")
+    note_help("files_external:create", "files_external:option", "files_external:applicable")
+    made = shell_in(NC_CONTAINER, 'mkdir -p "$1" && echo angelegt', EXT_DIR)
+    note(f"mkdir -p {EXT_DIR} (als www-data) -> {made}")
+    created = occ_noted(
+        "files_external:create", EXT_MOUNT, "local", "null::null", "-c", f"datadir={EXT_DIR}"
+    )
+    match = re.search(r"id (\d+)", created)
+    if not match:
+        note(
+            "EXTERN ungemessen grund=files_external:create lieferte keine Mount-Id, "
+            "Rohausgabe in der Zeile darueber"
+        )
+        return
+    mount_id = match[1]
+    occ_noted("files_external:applicable", mount_id, "--add-user", USER_A)
+    occ_noted("files_external:option", mount_id, "readonly", "true")
+    occ_noted("files_external:list")
+
+    measured: dict[tuple[str, str], Measured] = {}
+    for mode in ("ro", "rw"):
+        if mode == "rw":
+            occ_noted("files_external:option", mount_id, "readonly", "false")
+        for creds in (session.appapi(USER_A), session.basic(USER_A)):
+            auth = auth_label(creds)
+            sub = f"/{EXT_MOUNT}/neu-{mode}-{auth}"
+            result = await measure_mkcol(
+                session, creds, home_url(creds, sub), f"{EXT_DIR}/neu-{mode}-{auth}"
+            )
+            measured[(mode, auth)] = result
+            note(
+                f"{now_stamp()} | EXTERN {mode} auth={auth} nutzer={USER_A} "
+                f"status={result.status} angelegt={yes_no(result.created)} "
+                f"| {describe_error(result.result.body)[:300]}"
+            )
+            note(f"  Aufruf: MKCOL {DAV_FILES}{USER_A}{sub} ohne Body")
+            note_raw(result.result)
+        if mode == "ro":
+            creds = session.appapi(USER_A)
+            answer = await dav_request(
+                session.client,
+                creds,
+                "PROPFIND",
+                home_url(creds, f"/{EXT_MOUNT}"),
+                depth="0",
+                body=propfind_body([f"{{{xml.OC}}}permissions"]),
+            )
+            entries = xml.parse_multistatus(answer.body) if answer.status == 207 else []
+            permissions = entries[0][1].get(f"{{{xml.OC}}}permissions", "") if entries else ""
+            note(
+                f"{now_stamp()} | KONTROLLE oc:permissions /{EXT_MOUNT} (readonly=true) aus "
+                f"Sicht von {USER_A} auth=appapi status={answer.status} "
+                f"permissions={permissions or '(leer)'}"
+            )
+
+    read_only, writable = measured[("ro", "appapi")], measured[("rw", "appapi")]
+    if writable.status != 201:
+        note(
+            f"EXTERN ungemessen grund=die Positivkontrolle ohne readonly lieferte "
+            f"{writable.status} statt 201, der Speicher traegt also gar nicht"
+        )
+        return
+    try:
+        was_refused = refused(read_only.status, created=read_only.created)
+    except ValueError as contradiction:
+        note(f"EXTERN widerspruch: {contradiction}")
+        return
+    a8 = "belegt" if was_refused and read_only.status == 403 else "widerlegt"
+    note(
+        f"EXTERN A8 abgelehnt={yes_no(was_refused)} status={read_only.status} a8_403={a8} "
+        f"positivkontrolle_rw={writable.status} (auth=appapi nutzer={USER_A})"
+    )
+
+
+async def block_groupfolder(session: Session) -> None:
+    """MESS-02: group folder with ACL and negative test, then read-only external storage."""
+    section("groupfolder")
+    ram_gate(NC35_CONTAINERS)
+    install_groupfolders()
+    state = GroupFolders(session=session)
+    await groupfolder_setup(state)
+    await guarded("groupfolder rows", groupfolder_rows(state))
+    section("groupfolder summary")
+    groupfolder_verdict(state)
+    await guarded("externer-speicher", external_storage(session))
+
+
+async def block_nachlauf(session: Session) -> None:
+    """A follow-up rollback: group folders an earlier run left behind in the database.
+
+    Removing the app does not remove its folders: their rows survive and come back with the
+    next installation. This block takes a baseline, installs the app again and shows what is
+    left; the rollback in the ``finally`` then deletes the folders, removes the app and
+    compares against the baseline.
+    """
+    section("nachlauf")
+    ram_gate(NC35_CONTAINERS)
+    session.before = baseline_nc35(session.env)
+    for name, value in session.before.items():
+        note(f"BASELINE-START {name}={value}")
+    note(
+        "NACHLAUF grund=der Rueckbau des Laufs davor fand die Gruppenordner nicht (das Feld "
+        "heisst mountPoint, nicht mount_point); sie blieben in der Datenbank, die App war weg"
+    )
+    install_groupfolders()
+    listed = occ(NC_CONTAINER, "groupfolders:list", "--output=json", check=False)
+    note(f"occ groupfolders:list --output=json (vor dem Loeschen) -> {_one_line(listed)}")
+
+
 async def run_blocks(env: Mapping[str, str], blocks: Sequence[str]) -> None:
     """The named blocks in order; the rollback and the stop run whatever happened before."""
     async with new_client() as client:
@@ -1470,7 +1912,9 @@ async def run_blocks(env: Mapping[str, str], blocks: Sequence[str]) -> None:
                 elif name == "mkcol":
                     await block_mkcol(session)
                 elif name == "groupfolder":
-                    raise RunFailed("block groupfolder is not built yet (plan 30-01, task 3)")
+                    await block_groupfolder(session)
+                elif name == "nachlauf":
+                    await block_nachlauf(session)
         finally:
             try:
                 if session.before is not None:
