@@ -743,3 +743,97 @@ def test_positive_control_names_each_of_the_six_places_a_hit_stands_in() -> None
     assert spike.positive_control(hits, anchors) == list(spike.CONTROL_PLACES)
     far = [(gate, 300, "a destructive call far from both constants")]
     assert spike.positive_control(far, anchors) == []
+
+
+# --- plan 30-03 task 1: MOVE under impersonation, sub tasks -----------------------------------
+
+
+def test_abort_move_is_not_triggered_only_by_a_complete_move() -> None:
+    assert spike.abort_move(status=201, source_gone=True, target_readable=True, uid_same=True) == (
+        False,
+        "keiner",
+    )
+    assert spike.abort_move(status=204, source_gone=True, target_readable=True, uid_same=True) == (
+        False,
+        "keiner",
+    )
+
+
+@pytest.mark.parametrize(
+    ("values", "word"),
+    [
+        ({"status": 403}, "403"),
+        ({"status": 500}, "500"),
+        ({"status": 207}, "207"),
+        ({"source_gone": False}, "Quelle"),
+        ({"target_readable": False}, "Ziel"),
+        ({"uid_same": False}, "UID"),
+    ],
+)
+def test_abort_move_is_triggered_by_every_single_deviation_with_a_reason(
+    values: dict[str, int | bool], word: str
+) -> None:
+    good: dict[str, int | bool] = {
+        "status": 201,
+        "source_gone": True,
+        "target_readable": True,
+        "uid_same": True,
+    }
+    aborted, reason = spike.abort_move(**{**good, **values})
+    assert aborted is True
+    assert word in reason
+
+
+def test_destination_header_builds_the_url_of_the_target_object_and_quotes_the_name() -> None:
+    assert (
+        spike.destination_header("http://127.0.0.1:8082", "spike30a", "spike30-b", "x.ics")
+        == "http://127.0.0.1:8082/remote.php/dav/calendars/spike30a/spike30-b/x.ics"
+    )
+    assert spike.destination_header(
+        "http://127.0.0.1:8082/", "spike30a", "spike30-b", "a b.ics"
+    ).endswith("/calendars/spike30a/spike30-b/a%20b.ics")
+
+
+def test_uid_of_reads_the_uid_of_the_vtodo_and_refuses_a_text_without_one() -> None:
+    text = spike.build_probe_todo("uid-in-the-todo", "s30 uid")
+    assert spike.uid_of(text) == "uid-in-the-todo"
+    with pytest.raises(ValueError, match="VTODO"):
+        spike.uid_of("BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n")
+
+
+def _state(*placed: tuple[str, str, str, str]) -> dict[str, object]:
+    """``(uid, summary, collection, extra line)`` per object, as a state of ``child_fate``."""
+    return {
+        uid: spike.Placed(collection, spike.simple_todo(uid, summary, [extra] if extra else []))
+        for uid, summary, collection, extra in placed
+    }
+
+
+def test_child_fate_names_the_four_outcomes_for_the_sub_task() -> None:
+    before = _state(("p", "eltern", "liste-1", ""), ("c", "kind", "liste-1", "RELATED-TO:p"))
+    stays = _state(("p", "eltern", "liste-2", ""), ("c", "kind", "liste-1", "RELATED-TO:p"))
+    follows = _state(("p", "eltern", "liste-2", ""), ("c", "kind", "liste-2", "RELATED-TO:p"))
+    gone = _state(("p", "eltern", "trashbin", ""))
+    trashed = _state(("p", "eltern", "trashbin", ""), ("c", "kind", "trashbin", "RELATED-TO:p"))
+    assert spike.child_fate(before, stays, "eltern", "kind") == "kind bleibt in quelle"
+    assert spike.child_fate(before, follows, "eltern", "kind") == "kind zieht mit"
+    assert spike.child_fate(before, gone, "eltern", "kind") == "kind geloescht"
+    assert spike.child_fate(before, trashed, "eltern", "kind") == "kind im papierkorb"
+
+
+def test_child_fate_refuses_a_state_a_without_the_parent() -> None:
+    before = _state(("c", "kind", "liste-1", "RELATED-TO:p"))
+    with pytest.raises(ValueError, match="eltern"):
+        spike.child_fate(before, before, "eltern", "kind")
+
+
+def test_parse_db_rows_reads_place_trash_mark_and_hash_of_every_row() -> None:
+    rows = spike.parse_db_rows(
+        "2 spike30a/spike30-a/x.ics|leer|ab:12 bob/l/x-deleted.ics|gesetzt|cd:9"
+    )
+    assert rows == [
+        spike.DbRow("spike30a", "spike30-a", "x.ics", False, "ab:12"),
+        spike.DbRow("bob", "l", "x-deleted.ics", True, "cd:9"),
+    ]
+    assert spike.parse_db_rows("0 ") == []
+    assert spike.parse_db_rows("") == []
