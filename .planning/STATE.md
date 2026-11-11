@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: executing
-last_updated: "2026-11-11T12:15:00.000Z"
+last_updated: "2026-11-11T13:45:00.000Z"
 last_activity: 2026-11-11
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 5
-  completed_plans: 1
-  percent: 20
+  completed_plans: 2
+  percent: 40
 ---
 
 # Project State
@@ -20,20 +20,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-11)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) läuft: 30-01 ist ausgeführt, als Nächstes folgt 30-02.
+**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) läuft: 30-01 und 30-02 sind ausgeführt, als Nächstes folgt 30-03.
 
 ## Current Position
 
 Phase: 30 von 30 bis 34 (Mess-Spike Aufgaben und Ordner), in Ausführung
-Plan: 30-02 von 30-01 bis 30-05 ist der nächste; 30-01 ist abgeschlossen
-Status: 30-01 ausgeführt (MESS-01 und MESS-02 gemessen, Abbruchkriterium MESS-01 nicht ausgelöst), nächster Schritt Ausführung 30-02
-Last activity: 2026-11-11, Plan 30-01 ausgeführt (Messskript, MKCOL unter Impersonation, Gruppenordner mit ACL), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
+Plan: 30-03 von 30-01 bis 30-05 ist der nächste; 30-01 und 30-02 sind abgeschlossen
+Status: 30-02 ausgeführt (MESS-05 gemessen, beide Abbruchkriterien zu MESS-05 nicht ausgelöst, Inventar A17 liegt vor), nächster Schritt Ausführung 30-03
+Last activity: 2026-11-11, Plan 30-02 ausgeführt (PUT mit If-Match unter Impersonation, Browser-Sitzung in der Tasks-App 0.18.1, Inventar der Gates und Zusagen), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 173
+- Total plans completed: 174
 - Average duration: 35 min
 - Total execution time: 15.2 hours
 
@@ -64,7 +64,7 @@ Last activity: 2026-11-11, Plan 30-01 ausgeführt (Messskript, MKCOL unter Imper
 | 27 | 10 | - | - |
 | 28 | 12 | - | - |
 | 29 | 9 | - | - |
-| 30 | 1 | 30 min | 30 min |
+| 30 | 2 | 130 min | 65 min |
 
 **Recent Trend:**
 
@@ -217,6 +217,7 @@ Last activity: 2026-11-11, Plan 30-01 ausgeführt (Messskript, MKCOL unter Imper
 | Phase 29 P04 | 35min | 2 tasks | 3 files |
 | Phase 29 P09 | 60min | 3 tasks | 5 files |
 | Phase 30 P01 | 30 min | 3 tasks | 7 files |
+| Phase 30 P02 | 100 min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -789,6 +790,14 @@ Recent decisions affecting current work:
 - [Phase 30]: 30-01: E12 gemessen mit groupfolders 23.0.1: Gruppenordner mit Schreibrecht 201, ACL-Regel gegen das Konto 403 ohne angelegten Ordner, zwei Kontrollen (Konto ohne Regel 201, nach Entfernen der Regel 201); Gruppe mit reinem Leserecht 403; nur lesbarer lokaler externer Speicher 403, ohne `readonly` 201. A8 für alle vier Fälle belegt, immer `Sabre\DAV\Exception\Forbidden` mit leerem `s:message`
 - [Phase 30]: 30-01: Rückbau-Lehren für nc35: `occ groupfolders:list --output=json` nennt `mountPoint` (nicht `mount_point`); `occ app:remove groupfolders` lässt Gruppenordner in der Datenbank stehen; eine einmal eingeschaltete App behält `installed_version`, `enabled`, `types` und erscheint in `occ app:list` als "(installed ...)". Der Rückbau des Messskripts deckt alle drei ab
 - [Phase 30]: 30-01: In nc35 ist die ExApp in Fassung 0.3.2 registriert (gelesen mit `occ app_api:app:list`), nicht der Arbeitsbaum; Impersonation und roher Produktionsweg sind damit messbar, ein Werkzeug der aktuellen App nicht
+- [Phase 30]: 30-02: A13 belegt, `PUT` mit `If-Match` auf die gelesene ETag antwortet unter AppAPI-Impersonation mit 204 (neue starke ETag, auch im Antwortkopf), eine veraltete ETag mit 412 bei unverändertem Objekt; mit App-Passwort dieselben Werte (nc35, Nextcloud 35.0.0, SQLite, als spike30a). Ohne `If-Match` und mit `If-Match: *` überschreibt der Server (204). Abbruchkriterium MESS-05 If-Match nicht ausgelöst
+- [Phase 30]: 30-02: A14 belegt, der Server speichert ein Kalenderobjekt wörtlich (sha256 der Spalte calendardata gleich dem gesendeten Body) und pflegt kein Feld von sich aus, weder `LAST-MODIFIED` noch `DTSTAMP` noch `SEQUENCE`; VTIMEZONE, VALARM, X-Eigenschaften, unbekannte Parameter und die Faltung bleiben. Abbruchkriterium MESS-05 Eigenschaften nicht ausgelöst. Der Erhalt fremder Eigenschaften hängt damit allein am Connector
+- [Phase 30]: 30-02: Eine nur lesbare geteilte Liste lehnt `PUT` und Anlegen mit 404 ab ("could not be found"), nicht mit 403, obwohl GET auf dasselbe Objekt 200 liefert; mit Schreibrecht 204. Phase 33 darf aus diesem 404 nicht "Aufgabe gelöscht" machen
+- [Phase 30]: 30-02: A12 belegt mit Präzisierung (Tasks 0.18.1, Rohobjekte vor und nach der Browser-Sitzung): Abhaken setzt `STATUS:COMPLETED`, `PERCENT-COMPLETE:100`, `COMPLETED` in UTC mit Z und zieht `LAST-MODIFIED` und `DTSTAMP` nach; Wiederöffnen setzt `STATUS:NEEDS-ACTION` und entfernt `COMPLETED` und `PERCENT-COMPLETE`; kein `SEQUENCE`. Die App schreibt Zeiten als UTC oder als `VALUE=DATE`, nie mit `TZID`
+- [Phase 30]: 30-02: A15, die Tasks-App erledigt eine wiederkehrende Aufgabe beim Abhaken nicht, sie schiebt `DUE` auf den nächsten Termin (ein `PUT`, `RRULE` bleibt, kein `COMPLETED`); ein `PUT` am Master mit `STATUS:COMPLETED` erledigt serverseitig die ganze Serie. Die Vorgabe "ablehnen" bleibt von der Messung her bestehen, Entscheid in 30-05
+- [Phase 30]: 30-02: A16 serverseitig belegt, als Aussage über die Tasks-App widerlegt: die App hakt die Unteraufgabe mit einem eigenen `PUT` mit ab, nimmt sie beim Verschieben mit einem eigenen `MOVE` mit und löscht sie mit der Elternaufgabe. In der Sitzung scheiterte der `PUT` der Elternaufgabe mit 500 (SQLite `database is locked`), die Oberfläche zeigte trotzdem beide als erledigt; auf dem Server ist nur die Unteraufgabe erledigt. Ob der Connector vom Verhalten der App abweicht, entscheidet der Owner in 30-05
+- [Phase 30]: 30-02: Inventar A17 auf Commit 32b8df0 (`raw/inventar.txt`, Bericht Abschnitt 7): 114 berührte Fundstellen (gate 46, annotation 4, audit 10, kanarie 2, zusage-server 2, zusage-store 3, zusage-doku 47), 302 mit Grund ausgeschlossen, Positivkontrolle 6/6; zwei Suchmuster ohne gemeinsamen Suchbegriff, die Zuordnung steht als Regeltabelle im Messskript
+- [Phase 30]: 30-02: Lehren für die Messstrecke: der Papierkorb des Kalenders antwortet auf PROPFIND mit 501 und nur auf den REPORT calendar-query, Objekte heißen dort `<id>.ics`; die Tasks-App legt Listen mit `MKCOL` an; ein frisches Konto hat nach der ersten Anmeldung einen Kalender `personal` mit VEVENT, VTODO und VJOURNAL; rohe `.ics`-Belege brauchen `-text` in `.gitattributes`, sonst speichert git sie mit LF
 
 ### Pending Todos
 
@@ -810,8 +819,9 @@ Recent decisions affecting current work:
 - Phase 30 braucht in 30-02 eine Browser-Sitzung in der Tasks-App (Owner oder Hauptsitzung mit Playwright); im Repo ist kein Browser-Treiber installiert und es wird keiner installiert
 - Phase 30 RAM: schwere Läufe nur bei mindestens 4 GB freiem Host-RAM, nie parallel zu einem anderen Docker-Lauf, immer nur eine Nextcloud-Instanz (Gate im Messskript)
 - v1.8 offene Owner-Entscheidung E15: eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge (Präzedenz NC_MCP_FILES_UPDATE) oder nur die Abschaltung des Bundles `tasks`; dem Owner noch nicht vorgelegt, Checkpoint am Ende von Phase 30
-- v1.8 unbelegt, mit Abbruchkriterium: `PUT` mit `If-Match` und `MOVE` unter Impersonation, Erhalt fremder Eigenschaften beim `PUT` (`MKCOL` auf `files/` unter Impersonation ist seit 30-01 belegt, 201 auf Nextcloud 35.0.0; 32 bis 34 unter Impersonation ungemessen, dort gibt es keine ExApp-Registrierung)
-- Phase 30, DI-30-01: der Umgebung des Worktrees tasks-080 fehlt das Extra `documents`; der volle Lauf (pytest tests/unit tests/contract, pyright über alles) ist dort nicht grün (vier Module nicht einsammelbar, sieben Tests rot, 19 Importfehler), unabhängig von Phase 30. Vor 30-02 `uv sync` mit den Extras entscheiden (deferred-items.md im Phasenordner)
+- v1.8 unbelegt, mit Abbruchkriterium: `MOVE` unter Impersonation (30-03). Belegt sind seit 30-01 `MKCOL` auf `files/` (201) und seit 30-02 `PUT` mit `If-Match` (204, veraltet 412) und der Erhalt fremder Eigenschaften, jeweils auf Nextcloud 35.0.0 mit SQLite; 32 bis 34 unter Impersonation ungemessen, dort gibt es keine ExApp-Registrierung
+- Phase 30, DI-30-01 ist erledigt: die Umgebung des Worktrees tasks-080 trägt das Extra `documents`, der volle Lauf war in 30-02 ohne Ausnahmen grün
+- Phase 30, für den Owner-Checkpoint in 30-05: die Tasks-App hakt Unteraufgaben mit ab und schreibt wiederkehrende Aufgaben fort; die Vorgaben aus TMOD-03 (nicht mit abhaken) und TMOD-01 (wiederkehrende ablehnen) weichen davon ab und brauchen einen ausdrücklichen Entscheid
 - v1.8 ändernde Zugriffe, Verschieben und Löschen sind von der Recherche vom 11.11.2026 nicht abgedeckt; alles dazu ist Annahme bis zum Messbericht (REQUIREMENTS.md, A12 bis A19, A21)
 - v1.8 Testinstanz weicht vom Produktionsfall ab: `personal` trägt dort VEVENT,VTODO,VJOURNAL, ein frisches echtes Konto hat keine Aufgabenliste; der Fall braucht einen eigenen Test (TASK-03)
 - v1.8 Schreibzusage: mit Phase 33 stimmt "create-only, keine destruktiven Writes" nicht mehr wörtlich; Präzisierung an allen Stellen ist Pflicht vor dem Release (DOC-05), das Destruktiv-Gate bekommt eng benannte Ausnahmen
@@ -860,15 +870,14 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 ## Session Continuity
 
 Last session: 2026-11-11
-Stopped at: Completed 30-01-PLAN.md (Messwerkzeug, MKCOL unter Impersonation, Gruppenordner mit ACL), lokal committet auf plan/v1.8-tasks-080, nicht gepusht; nc35 zurückgebaut und gestoppt
-Nächster Schritt: Ausführung 30-02 (braucht die Browser-Sitzung in der Tasks-App)
+Stopped at: Completed 30-02-PLAN.md (ändernde Zugriffe unter Impersonation, Browser-Sitzung in der Tasks-App, Inventar A17), lokal committet auf plan/v1.8-tasks-080, nicht gepusht; nc35 zurückgebaut und gestoppt
+Nächster Schritt: Ausführung 30-03 (MOVE unter Impersonation, Löschen mit Papierkorb; vorher die Lesart der Löschregel in 30-03-PLAN.md bestätigen)
 Resume file: None
 
 ## Operator Next Steps
 
 - Roadmap und Anforderungen für v1.8 prüfen (.planning/ROADMAP.md, .planning/REQUIREMENTS.md); der Branch plan/v1.8-tasks-080 ist nur lokal, Push oder PR nur nach Owner-Entscheid
 - E15 entscheiden (Admin-Schalter für ändernde Aufgaben-Werkzeuge), spätestens am Checkpoint von Phase 30
-- Phase 30: 30-01 ist ausgeführt, Befunde in docs/spike-tasks.md (Abschnitte 1 und 2) und 30-01-SUMMARY.md; vor 30-03 die Lesart der Löschregel in 30-03-PLAN.md bestätigen oder ändern; weiter mit 30-02
-- Vor 30-02 entscheiden, ob im Worktree tasks-080 `uv sync` mit dem Extra `documents` laufen soll (DI-30-01), damit der volle Lauf wieder grün werden kann
+- Phase 30: 30-01 und 30-02 sind ausgeführt, Befunde in docs/spike-tasks.md (Abschnitte 1, 2, 3 und 7) und in den beiden SUMMARY-Dateien; vor 30-03 die Lesart der Löschregel in 30-03-PLAN.md bestätigen oder ändern; weiter mit 30-03. Die Rohobjekte der Tasks-App für 30-03 und 30-04 liegen unter raw/ui-a und raw/ui-b
 - Für 30-02 die Browser-Sitzung in der Tasks-App einplanen (zwölf nummerierte Schritte in zwei Runden, nc35 läuft dabei)
 - Issue-Antworten in #32 und #44 erst nach dem Store-Release von 0.8.0
