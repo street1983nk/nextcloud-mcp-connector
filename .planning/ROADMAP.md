@@ -141,7 +141,16 @@ Grundlage: [research/v1.8-tasks-080-RESEARCH.md](research/v1.8-tasks-080-RESEARC
   4. Für die ändernden Zugriffe ist gemessen, welche Felder die Tasks-App beim Abhaken und Wiederöffnen setzt, dass `PUT` mit `If-Match` unter AppAPI-Impersonation funktioniert und eine veraltete ETag abgelehnt wird, dass fremde Eigenschaften den `PUT` überstehen, und wie sich wiederkehrende Aufgaben und Unteraufgaben verhalten; ein Inventar nennt mit Datei und Zeile jedes Gate und jede Zusage, die ein überschreibender `PUT` berührt
   5. Der Messbericht nennt für das Löschen auf Nextcloud 32 bis 35 genau eines der Ergebnisse "wiederherstellbar", "nicht wiederherstellbar" oder "nicht eindeutig" (auch mit abgeschaltetem Papierkorb und für geteilte Listen, mit Aufbewahrungsfrist), für `MOVE` unter Impersonation Statuscodes und das Verhalten der Unteraufgaben, und führt jede Annahme A1 bis A19 und A21 als belegt, widerlegt oder ungemessen; ein Owner-Checkpoint entscheidet E15 und jedes ausgelöste Abbruchkriterium
 
-**Plans**: TBD
+**Plans**: 5 plans (fünf Wellen, streng nacheinander: ein Docker-Host, immer nur eine Instanz)
+
+Plans:
+- [ ] 30-01-PLAN.md: Messwerkzeug, `MKCOL` unter AppAPI-Impersonation als erster Messpunkt samt Statusmatrix, Gruppenordner mit ACL und Negativtest (MESS-01, MESS-02; A7, A8, A9)
+- [ ] 30-02-PLAN.md: Ändernde Zugriffe: `PUT` mit `If-Match` und Erhalt fremder Eigenschaften unter Impersonation, Browser-Sitzung in der Tasks-App, Inventar der Gates und Zusagen (MESS-05; A12 bis A17)
+- [ ] 30-03-PLAN.md: `MOVE` unter Impersonation, Unteraufgaben, Löschen mit Papierkorb an und aus auf 32 bis 35, Ergebniswort nach E13 (MESS-06; A18, A19, A21)
+- [ ] 30-04-PLAN.md: Aufgaben-Discovery, Abfrageverhalten auf 32 bis 35, Kosten bei 2000 Aufgaben auf SQLite und PostgreSQL, Fixtures der Tasks-App (MESS-03, MESS-04; A1 bis A6, A11)
+- [ ] 30-05-PLAN.md: Messbericht abschließen, Übergabe der Abbruchkriterien an die Phasen 31 bis 33, Owner-Checkpoint E15 (Schlusssatz von MESS-06)
+
+Messbericht: `docs/spike-tasks.md`; Rohprotokolle unter `.planning/phases/30-mess-spike-aufgaben-und-ordner/raw/`
 **Abbruchkriterien**: MESS-01 (kein 201 für `MKCOL` unter Impersonation: Phase 31 wird nicht geplant), MESS-05 (`If-Match` geht nicht oder fremde Eigenschaften gehen verloren: Owner entscheidet über Phase 33), MESS-06 (`MOVE` geht nicht: TMOD-08 wird nicht geplant; Löschen nicht eindeutig wiederherstellbar: TMOD-07 entfällt ohne Rückfrage)
 **Research flag**: ja (Live-Zugriff auf Nextcloud 32 bis 35, Tasks-App und Gruppenordner in der Testinstanz, PostgreSQL-Gegenmessung; schwere Läufe seriell, RAM vor Docker-Messungen prüfen). Ändernde Zugriffe, Verschieben und Löschen sind von der Recherche nicht abgedeckt
 **Hinweis**: Messskripte und Gegenproben liegen nie unter `src/`; ein messendes `DELETE` oder `MOVE` läuft nur aus dem Spike-Skript gegen die Wegwerf-Instanz
@@ -248,7 +257,7 @@ Grundlage: [research/v1.8-tasks-080-RESEARCH.md](research/v1.8-tasks-080-RESEARC
 | 27. Familien-Anschluss und Sandbox-Parität | v1.7 | 10/10 | Complete    | 2026-09-28 |
 | 28. Gates und Beweise | v1.7 | 12/12 | Complete    | 2026-10-01 |
 | 29. Prüfkommando und Doku | v1.7 | 9/9 | Complete    | 2026-10-01 |
-| 30. Mess-Spike Aufgaben und Ordner | v1.8 | 0/TBD | Not started | - |
+| 30. Mess-Spike Aufgaben und Ordner | v1.8 | 0/5 | Planned | - |
 | 31. Ordner anlegen | v1.8 | 0/TBD | Not started | - |
 | 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 0/TBD | Not started | - |
 | 33. Aufgaben ändern | v1.8 | 0/TBD | Not started | - |
@@ -297,7 +306,7 @@ Zugeordnet: 34/34 (Phase 30: 6, Phase 31: 6, Phase 32: 9, Phase 33: 8, Phase 34:
 
 ## Next
 
-Aktiver Milestone: v1.8. Nächster Schritt ist die Planung von Phase 30 mit `/gsd:plan-phase 30`. Reihenfolge: 30, 31, 32, 33, 34; Phase 31 ist allein releasefähig, Phase 32 ohne Phase 33. Unverändert außerhalb dieses Milestones: files_update-Weiterentwicklung und die F13-Spur (milestones/v1.6-REQUIREMENTS.md).
+Aktiver Milestone: v1.8. Phase 30 ist geplant (fünf Pläne); nächster Schritt ist die Ausführung von 30-01 mit `/gsd:execute-phase 30`. Reihenfolge: 30, 31, 32, 33, 34; Phase 31 ist allein releasefähig, Phase 32 ohne Phase 33. Unverändert außerhalb dieses Milestones: files_update-Weiterentwicklung und die F13-Spur (milestones/v1.6-REQUIREMENTS.md).
 
 ---
 *Roadmap created: 2026-08-14 (granularity: coarse, mode: mvp); v1.0 abgeschlossen: 2026-08-20; v1.1 abgeschlossen: 2026-08-20 (Phase 7 deferred); v1.2 abgeschlossen: 2026-08-25 (Release 0.1.8 live); v1.3 abgeschlossen: 2026-08-26 (Release 0.1.9 live); v1.4 abgeschlossen: 2026-08-28 (Release 0.1.10 live); v1.5 abgeschlossen: 2026-08-31 (Release 0.1.11, openDesk-Spike, Audit-Log; Abschluss nachgetragen 2026-09-18); v1.6 aufgesetzt: 2026-09-18 (Phasen 20-24, 15 Requirements, granularity coarse); v1.6 abgeschlossen: 2026-09-26 (Token-Exchange-Pfad komplett, 15/15 Requirements, kein Release); v1.7 aufgesetzt: 2026-09-26 (Phasen 25-29, 14 Requirements, granularity coarse); v1.7 abgeschlossen: 2026-10-01 (kein-ki-Filter komplett, 14/14 Requirements, kein Release; Release 0.4.0 nach PR #14); v1.8 Roadmap geschrieben: 2026-11-11 (Phasen 30-34, 34 Requirements, granularity coarse; Owner-Entscheide E1 bis E14)*

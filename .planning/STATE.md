@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: planning
-last_updated: "2026-11-11T11:12:36.000Z"
+last_updated: "2026-11-11T11:40:21.000Z"
 last_activity: 2026-11-11
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 5
   completed_plans: 0
   percent: 0
 ---
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-11)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, als Nächstes wird Phase 30 (Mess-Spike) geplant.
+**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) ist geplant, als Nächstes wird 30-01 ausgeführt.
 
 ## Current Position
 
-Phase: 30 von 30 bis 34 (Mess-Spike Aufgaben und Ordner), noch nicht geplant
-Plan: keiner
-Status: Roadmap für v1.8 geschrieben, nächster Schritt Planung Phase 30
-Last activity: 2026-11-11, Anforderungen (34) und Roadmap (Phasen 30 bis 34) für Release 0.8.0 geschrieben, Owner-Entscheide E1 bis E14 in PROJECT.md festgehalten
+Phase: 30 von 30 bis 34 (Mess-Spike Aufgaben und Ordner), geplant
+Plan: 30-01 von 30-01 bis 30-05, noch nicht begonnen
+Status: Phase 30 geplant, nächster Schritt Ausführung 30-01
+Last activity: 2026-11-11, fünf Pläne für Phase 30 geschrieben (30-01 bis 30-05, fünf Wellen nacheinander), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
 
 ## Performance Metrics
 
@@ -777,6 +777,10 @@ Recent decisions affecting current work:
 - [v1.8]: Owner-Entscheide E1 bis E14 vom 11.11.2026 stehen mit Zitat in PROJECT.md (Key Decisions); E8 wurde am selben Tag zweimal erweitert (Abhaken, dann alles in 0.8.0, kein 0.8.1), E13 Löschen nur bei positivem Spike-Ergebnis, E14 Verschieben fest
 - [v1.8]: Werkzeugschnitt der Planung: `tasks_complete` (Arbeitsname, Abhaken und Wiederöffnen) getrennt von `tasks_update`; Verschieben und Löschen je ein eigenes Werkzeug; Grund ist die Decke von 1400 Bytes je Werkzeug und die Abtrennbarkeit
 - [v1.8]: Die CLAUDE.md des Repos sieht kein eigenes Audit nach jeder Phase vor; es gelten plan_check, code_review und verifier aus .planning/config.json
+- [Phase 30]: Zuschnitt der Planung: 30-01 MKCOL und Gruppenordner (MESS-01, MESS-02), 30-02 ändernde Zugriffe samt Browser-Sitzung und Inventar (MESS-05), 30-03 Verschieben und Löschen mit Ergebniswort (MESS-06), 30-04 Discovery und Kosten (MESS-03, MESS-04), 30-05 Bericht und Owner-Checkpoint E15; jede Annahme A1 bis A19 und A21 liegt in genau einem Plan
+- [Phase 30]: Impersonation wird auf der vorhandenen nc35-Topologie gemessen (eigene Messkonten spike30a, spike30b, spike30ui, Baseline und Rückbau, nie down); Versionsbreite 32 bis 35 über Wegwerf-Instanzen aus compose.spike-tags.yml und compose.spike-tags-pg.yml; Impersonation auf 32 bis 34 bleibt ungemessen mit Grund
+- [Phase 30]: Messbericht ist docs/spike-tasks.md (stabiler Ort für Befundlinks, FOLD-06), Rohprotokolle im Phasenordner unter raw/; Messskript scripts/tasks_spike.py, scripts/tag_spike.py bleibt unverändert
+- [Phase 30]: Die Entscheidungsregel für das Löschen (E13) folgt der Lesart von TMOD-07 (Vorab-Test, ob der Papierkorb wirkt) und steht als getestete Funktion vor der Messung fest; die strengere wörtliche Lesart von E13 ist im Plan 30-03 benannt und vom Owner noch nicht bestätigt
 
 ### Pending Todos
 
@@ -794,6 +798,9 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
+- Phase 30 offen vor der Ausführung von 30-03: Lesart der Löschregel (E13 wörtlich gegen TMOD-07 mit Vorab-Test), siehe 30-03-PLAN.md, Abschnitt Entscheidungsregel
+- Phase 30 braucht in 30-02 eine Browser-Sitzung in der Tasks-App (Owner oder Hauptsitzung mit Playwright); im Repo ist kein Browser-Treiber installiert und es wird keiner installiert
+- Phase 30 RAM: schwere Läufe nur bei mindestens 4 GB freiem Host-RAM, nie parallel zu einem anderen Docker-Lauf, immer nur eine Nextcloud-Instanz (Gate im Messskript)
 - v1.8 offene Owner-Entscheidung E15: eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge (Präzedenz NC_MCP_FILES_UPDATE) oder nur die Abschaltung des Bundles `tasks`; dem Owner noch nicht vorgelegt, Checkpoint am Ende von Phase 30
 - v1.8 unbelegt, mit Abbruchkriterium: `MKCOL` auf `files/` unter AppAPI-Impersonation (erster Punkt von Phase 30), `PUT` mit `If-Match` und `MOVE` unter Impersonation, Erhalt fremder Eigenschaften beim `PUT`
 - v1.8 ändernde Zugriffe, Verschieben und Löschen sind von der Recherche vom 11.11.2026 nicht abgedeckt; alles dazu ist Annahme bis zum Messbericht (REQUIREMENTS.md, A12 bis A19, A21)
@@ -844,13 +851,14 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 ## Session Continuity
 
 Last session: 2026-11-11
-Stopped at: Anforderungen und Roadmap für v1.8 (Release 0.8.0) geschrieben, lokal committet auf plan/v1.8-tasks-080, nicht gepusht
-Nächster Schritt: /gsd:plan-phase 30 (Mess-Spike Aufgaben und Ordner)
+Stopped at: Phase 30 geplant (30-01 bis 30-05), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
+Nächster Schritt: Ausführung 30-01 mit /gsd:execute-phase 30
 Resume file: None
 
 ## Operator Next Steps
 
 - Roadmap und Anforderungen für v1.8 prüfen (.planning/ROADMAP.md, .planning/REQUIREMENTS.md); der Branch plan/v1.8-tasks-080 ist nur lokal, Push oder PR nur nach Owner-Entscheid
 - E15 entscheiden (Admin-Schalter für ändernde Aufgaben-Werkzeuge), spätestens am Checkpoint von Phase 30
-- Danach Phase 30 planen mit /gsd:plan-phase 30
+- Phase 30 ist geplant; vor der Ausführung die Lesart der Löschregel in 30-03-PLAN.md bestätigen oder ändern, dann /gsd:execute-phase 30 (Start mit 30-01)
+- Für 30-02 die Browser-Sitzung in der Tasks-App einplanen (zwölf nummerierte Schritte in zwei Runden, nc35 läuft dabei)
 - Issue-Antworten in #32 und #44 erst nach dem Store-Release von 0.8.0
