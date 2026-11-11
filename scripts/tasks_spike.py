@@ -3392,12 +3392,49 @@ def access_writes(log: str, user: str) -> list[tuple[str, str, str, int]]:
     return rows
 
 
-def block_ui_log(session: Session, ui: "UiOptions") -> None:
+#: What a client sees of a list: asked for once more before the browser account is deleted,
+#: because plan 30-04 evaluates how a list the Tasks app created looks in the discovery.
+UI_DISCOVERY_PROPS = (
+    f"{{{xml.DAV}}}displayname",
+    f"{{{xml.DAV}}}resourcetype",
+    f"{{{xml.DAV}}}owner",
+    f"{{{xml.DAV}}}current-user-privilege-set",
+    f"{{{xml.DAV}}}sync-token",
+    f"{{{xml.CAL}}}supported-calendar-component-set",
+    f"{{{xml.CS}}}getctag",
+    "{http://apple.com/ns/ical/}calendar-color",
+    "{http://apple.com/ns/ical/}calendar-order",
+    f"{{{xml.OC}}}calendar-enabled",
+)
+
+
+async def ui_discovery_raw(session: Session, user: str) -> None:
+    """The raw discovery answer of the browser account under impersonation, line by line."""
+    creds = session.appapi(user)
+    result = await dav_request(
+        session.client,
+        creds,
+        "PROPFIND",
+        caldav.calendars_home_url(creds),
+        depth="1",
+        body=propfind_body(UI_DISCOVERY_PROPS),
+    )
+    note(
+        f"{now_stamp()} | UI-DISCOVERY-ROH PROPFIND Depth 1 auth=appapi nutzer={user} "
+        f"status={result.status} bytes={len(result.body)}"
+    )
+    for line in result.body.decode("utf-8", errors="replace").splitlines():
+        if line.strip():
+            note(f"    {line.rstrip()}")
+
+
+async def block_ui_log(session: Session, ui: "UiOptions") -> None:
     """The writing requests of the browser account and the server errors behind a 5xx."""
     section("ui-log")
     ram_gate(NC35_CONTAINERS)
     user, password, _ = read_ui_file(ui.file())
     remember_secret(f"PASSWORD_{user}", password)
+    await ui_discovery_raw(session, user)
     log = docker("logs", "--tail", "60000", NC_CONTAINER, check=False)
     rows = access_writes(log, user)
     note(f"UI-ZUGRIFFE nutzer={user} schreibende_anfragen={len(rows)} (Zugriffsprotokoll)")
@@ -3957,7 +3994,7 @@ async def run_blocks(env: Mapping[str, str], blocks: Sequence[str], ui: UiOption
                 elif name == "ui-teardown":
                     block_ui_teardown(session, ui)
                 elif name == "ui-log":
-                    block_ui_log(session, ui)
+                    await block_ui_log(session, ui)
                 elif name == "ui-evaluate":
                     block_ui_evaluate(ui)
                 elif name == "inventory" and block_inventory():
