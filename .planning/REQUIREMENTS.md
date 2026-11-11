@@ -57,8 +57,8 @@ Geprüft und bewusst nicht übernommen: Die `CLAUDE.md` des Repos sieht kein eig
 
 ### Mess-Spike (MESS)
 
-- [ ] **MESS-01**: `MKCOL` auf `files/` unter AppAPI-Impersonation ist in der ExApp-Topologie gemessen und mit Statuscode und Rohantwort protokolliert, als ERSTER Punkt des Spikes. Dazu die Statusmatrix für freien Namen, vorhandenen Ordner, vorhandene Datei am Pfad, fehlenden Elternordner, unzulässigen Namen, geteilten Ordner ohne Schreibrecht und gesetzte `NC_MCP_FILES_ROOT`. Abbruchkriterium: liefert `MKCOL` unter Impersonation für einen freien Namen kein 201, wird Phase 31 nicht geplant; der Befund geht mit Rohantwort an den Owner, bevor eine Zeile Produktcode entsteht.
-- [ ] **MESS-02**: Ordner anlegen in einem Gruppenordner mit ACL ist gemessen (E12): mit Schreibrecht entsteht der Ordner, ohne Schreibrecht wird abgelehnt (Negativtest), jeweils mit Statuscode und Rohantwort im Protokoll. Ein nur lesbarer externer Speicher wird mitgemessen, soweit er in der Testinstanz herstellbar ist; andernfalls bleibt er im Protokoll ausdrücklich als ungemessene Annahme stehen.
+- [x] **MESS-01**: `MKCOL` auf `files/` unter AppAPI-Impersonation ist in der ExApp-Topologie gemessen und mit Statuscode und Rohantwort protokolliert, als ERSTER Punkt des Spikes. Dazu die Statusmatrix für freien Namen, vorhandenen Ordner, vorhandene Datei am Pfad, fehlenden Elternordner, unzulässigen Namen, geteilten Ordner ohne Schreibrecht und gesetzte `NC_MCP_FILES_ROOT`. Abbruchkriterium: liefert `MKCOL` unter Impersonation für einen freien Namen kein 201, wird Phase 31 nicht geplant; der Befund geht mit Rohantwort an den Owner, bevor eine Zeile Produktcode entsteht.
+- [x] **MESS-02**: Ordner anlegen in einem Gruppenordner mit ACL ist gemessen (E12): mit Schreibrecht entsteht der Ordner, ohne Schreibrecht wird abgelehnt (Negativtest), jeweils mit Statuscode und Rohantwort im Protokoll. Ein nur lesbarer externer Speicher wird mitgemessen, soweit er in der Testinstanz herstellbar ist; andernfalls bleibt er im Protokoll ausdrücklich als ungemessene Annahme stehen.
 - [ ] **MESS-03**: Die Aufgaben-Discovery und echte Objekte sind auf mindestens Nextcloud 32 und 35 gemessen: ein frisches Konto (Standardkalender nur `VEVENT`) hat keine Aufgabenliste; Deck-Kalender, Papierkorb, Abonnements, geteilte und nur lesbare Listen sind in der Discovery-Antwort identifiziert; von der Tasks-App geschriebene Objekte (ganztägig, mit Uhrzeit, Unteraufgabe, wiederkehrend, mit Tags) liegen als Fixtures vor; der Link des Suchproviders `tasks` und ein create-only `PUT` eines `VTODO` unter AppAPI-Impersonation sind belegt.
 - [ ] **MESS-04**: Die Kosten der Aufgabensuche stehen als Zahlen im Protokoll: eine Liste mit 2000 Aufgaben (davon 1900 erledigt), Modus "offen" und Modus "alle", auf SQLite und PostgreSQL, mit Wanduhr und Antwortgröße; `calendar-search` ist einmal mitgemessen. Deckel und Zeitbudget von `tasks_search` werden aus diesen Zahlen festgelegt, nicht aus der Schätzung.
 - [ ] **MESS-05**: Die ändernden Zugriffe sind gemessen, bevor Phase 33 geplant wird: welche Eigenschaften die Tasks-App beim Abhaken und Wiederöffnen setzt und in welchem Zeitformat; ob `PUT` mit `If-Match` unter AppAPI-Impersonation funktioniert und eine veraltete ETag mit 412 abgelehnt wird; ob der Server beim `PUT` unbekannte `X-`Eigenschaften, `VALARM` und übrige Eigenschaften unverändert speichert; Verhalten bei wiederkehrenden Aufgaben und bei Unteraufgaben; Antwort einer nur lesbaren geteilten Liste auf `PUT`. Dazu ein Inventar mit Datei und Zeile aller Gates und Zusagen, die ein überschreibender `PUT` berührt (`EXPECTED_PUT_CALLS`, Destruktiv-Gate, create-only-Aussagen in README, `docs/threat-model.md`, Store-Text, Server-Instruktion). Abbruchkriterium: geht `If-Match` unter Impersonation nicht oder verliert der Server fremde Eigenschaften, entscheidet der Owner über Phase 33, und 0.8.0 bleibt mit den Phasen 31 und 32 releasefähig.
@@ -167,8 +167,8 @@ A1 bis A11 stammen aus der Annahmenliste der Recherche, A12 bis A21 aus den Owne
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MESS-01 | Phase 30 | Pending |
-| MESS-02 | Phase 30 | Pending |
+| MESS-01 | Phase 30 | Complete |
+| MESS-02 | Phase 30 | Complete |
 | MESS-03 | Phase 30 | Pending |
 | MESS-04 | Phase 30 | Pending |
 | MESS-05 | Phase 30 | Pending |

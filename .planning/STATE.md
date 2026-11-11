@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
-status: planning
-last_updated: "2026-11-11T11:40:21.000Z"
+status: executing
+last_updated: "2026-11-11T12:15:00.000Z"
 last_activity: 2026-11-11
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 5
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 20
 ---
 
 # Project State
@@ -20,20 +20,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-11)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) ist geplant, als Nächstes wird 30-01 ausgeführt.
+**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) läuft: 30-01 ist ausgeführt, als Nächstes folgt 30-02.
 
 ## Current Position
 
-Phase: 30 von 30 bis 34 (Mess-Spike Aufgaben und Ordner), geplant
-Plan: 30-01 von 30-01 bis 30-05, noch nicht begonnen
-Status: Phase 30 geplant, nächster Schritt Ausführung 30-01
-Last activity: 2026-11-11, fünf Pläne für Phase 30 geschrieben (30-01 bis 30-05, fünf Wellen nacheinander), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
+Phase: 30 von 30 bis 34 (Mess-Spike Aufgaben und Ordner), in Ausführung
+Plan: 30-02 von 30-01 bis 30-05 ist der nächste; 30-01 ist abgeschlossen
+Status: 30-01 ausgeführt (MESS-01 und MESS-02 gemessen, Abbruchkriterium MESS-01 nicht ausgelöst), nächster Schritt Ausführung 30-02
+Last activity: 2026-11-11, Plan 30-01 ausgeführt (Messskript, MKCOL unter Impersonation, Gruppenordner mit ACL), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 172
+- Total plans completed: 173
 - Average duration: 35 min
 - Total execution time: 15.2 hours
 
@@ -64,6 +64,7 @@ Last activity: 2026-11-11, fünf Pläne für Phase 30 geschrieben (30-01 bis 30-
 | 27 | 10 | - | - |
 | 28 | 12 | - | - |
 | 29 | 9 | - | - |
+| 30 | 1 | 30 min | 30 min |
 
 **Recent Trend:**
 
@@ -215,6 +216,7 @@ Last activity: 2026-11-11, fünf Pläne für Phase 30 geschrieben (30-01 bis 30-
 | Phase 29 P03 | 25min | 2 tasks | 4 files |
 | Phase 29 P04 | 35min | 2 tasks | 3 files |
 | Phase 29 P09 | 60min | 3 tasks | 5 files |
+| Phase 30 P01 | 30 min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -781,6 +783,12 @@ Recent decisions affecting current work:
 - [Phase 30]: Impersonation wird auf der vorhandenen nc35-Topologie gemessen (eigene Messkonten spike30a, spike30b, spike30ui, Baseline und Rückbau, nie down); Versionsbreite 32 bis 35 über Wegwerf-Instanzen aus compose.spike-tags.yml und compose.spike-tags-pg.yml; Impersonation auf 32 bis 34 bleibt ungemessen mit Grund
 - [Phase 30]: Messbericht ist docs/spike-tasks.md (stabiler Ort für Befundlinks, FOLD-06), Rohprotokolle im Phasenordner unter raw/; Messskript scripts/tasks_spike.py, scripts/tag_spike.py bleibt unverändert
 - [Phase 30]: Die Entscheidungsregel für das Löschen (E13) folgt der Lesart von TMOD-07 (Vorab-Test, ob der Papierkorb wirkt) und steht als getestete Funktion vor der Messung fest; die strengere wörtliche Lesart von E13 ist im Plan 30-03 benannt und vom Owner noch nicht bestätigt
+- [Phase 30]: 30-01: A7 belegt, `MKCOL` auf `files/` liefert unter AppAPI-Impersonation 201 (nc35, Nextcloud 35.0.0, SQLite, als spike30a; Kontrollen a, b, c, Dateisystem, falsches Secret 401, fremdes Home 403, Produktionsweg aus dem ExApp-Container 201); das Abbruchkriterium MESS-01 ist nicht ausgelöst, Phase 31 darf geplant werden
+- [Phase 30]: 30-01: Statusmatrix unter Impersonation und mit App-Passwort in allen vierzehn Zeilen gleich: 201 frei, 405 Ordner oder Datei vorhanden (nicht unterscheidbar), 409 Elternordner fehlt oder ist Datei (nur die Meldung unterscheidet), 400 InvalidPath für `.htaccess`, Backslash und 300 Zeichen, 403 Freigabe ohne Anlegerecht, Sandbox-Wurzel 201, 409, 405
+- [Phase 30]: 30-01: A9 widerlegt, `MKCOL` antwortet bei erschöpftem Kontingent mit 507 ("Insufficient space ... Cannot create directory"); der 507-Zweig in FOLD-01 wird gebraucht. Gemessen nur im erschöpften Zustand
+- [Phase 30]: 30-01: E12 gemessen mit groupfolders 23.0.1: Gruppenordner mit Schreibrecht 201, ACL-Regel gegen das Konto 403 ohne angelegten Ordner, zwei Kontrollen (Konto ohne Regel 201, nach Entfernen der Regel 201); Gruppe mit reinem Leserecht 403; nur lesbarer lokaler externer Speicher 403, ohne `readonly` 201. A8 für alle vier Fälle belegt, immer `Sabre\DAV\Exception\Forbidden` mit leerem `s:message`
+- [Phase 30]: 30-01: Rückbau-Lehren für nc35: `occ groupfolders:list --output=json` nennt `mountPoint` (nicht `mount_point`); `occ app:remove groupfolders` lässt Gruppenordner in der Datenbank stehen; eine einmal eingeschaltete App behält `installed_version`, `enabled`, `types` und erscheint in `occ app:list` als "(installed ...)". Der Rückbau des Messskripts deckt alle drei ab
+- [Phase 30]: 30-01: In nc35 ist die ExApp in Fassung 0.3.2 registriert (gelesen mit `occ app_api:app:list`), nicht der Arbeitsbaum; Impersonation und roher Produktionsweg sind damit messbar, ein Werkzeug der aktuellen App nicht
 
 ### Pending Todos
 
@@ -802,7 +810,8 @@ Recent decisions affecting current work:
 - Phase 30 braucht in 30-02 eine Browser-Sitzung in der Tasks-App (Owner oder Hauptsitzung mit Playwright); im Repo ist kein Browser-Treiber installiert und es wird keiner installiert
 - Phase 30 RAM: schwere Läufe nur bei mindestens 4 GB freiem Host-RAM, nie parallel zu einem anderen Docker-Lauf, immer nur eine Nextcloud-Instanz (Gate im Messskript)
 - v1.8 offene Owner-Entscheidung E15: eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge (Präzedenz NC_MCP_FILES_UPDATE) oder nur die Abschaltung des Bundles `tasks`; dem Owner noch nicht vorgelegt, Checkpoint am Ende von Phase 30
-- v1.8 unbelegt, mit Abbruchkriterium: `MKCOL` auf `files/` unter AppAPI-Impersonation (erster Punkt von Phase 30), `PUT` mit `If-Match` und `MOVE` unter Impersonation, Erhalt fremder Eigenschaften beim `PUT`
+- v1.8 unbelegt, mit Abbruchkriterium: `PUT` mit `If-Match` und `MOVE` unter Impersonation, Erhalt fremder Eigenschaften beim `PUT` (`MKCOL` auf `files/` unter Impersonation ist seit 30-01 belegt, 201 auf Nextcloud 35.0.0; 32 bis 34 unter Impersonation ungemessen, dort gibt es keine ExApp-Registrierung)
+- Phase 30, DI-30-01: der Umgebung des Worktrees tasks-080 fehlt das Extra `documents`; der volle Lauf (pytest tests/unit tests/contract, pyright über alles) ist dort nicht grün (vier Module nicht einsammelbar, sieben Tests rot, 19 Importfehler), unabhängig von Phase 30. Vor 30-02 `uv sync` mit den Extras entscheiden (deferred-items.md im Phasenordner)
 - v1.8 ändernde Zugriffe, Verschieben und Löschen sind von der Recherche vom 11.11.2026 nicht abgedeckt; alles dazu ist Annahme bis zum Messbericht (REQUIREMENTS.md, A12 bis A19, A21)
 - v1.8 Testinstanz weicht vom Produktionsfall ab: `personal` trägt dort VEVENT,VTODO,VJOURNAL, ein frisches echtes Konto hat keine Aufgabenliste; der Fall braucht einen eigenen Test (TASK-03)
 - v1.8 Schreibzusage: mit Phase 33 stimmt "create-only, keine destruktiven Writes" nicht mehr wörtlich; Präzisierung an allen Stellen ist Pflicht vor dem Release (DOC-05), das Destruktiv-Gate bekommt eng benannte Ausnahmen
@@ -851,14 +860,15 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 ## Session Continuity
 
 Last session: 2026-11-11
-Stopped at: Phase 30 geplant (30-01 bis 30-05), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
-Nächster Schritt: Ausführung 30-01 mit /gsd:execute-phase 30
+Stopped at: Completed 30-01-PLAN.md (Messwerkzeug, MKCOL unter Impersonation, Gruppenordner mit ACL), lokal committet auf plan/v1.8-tasks-080, nicht gepusht; nc35 zurückgebaut und gestoppt
+Nächster Schritt: Ausführung 30-02 (braucht die Browser-Sitzung in der Tasks-App)
 Resume file: None
 
 ## Operator Next Steps
 
 - Roadmap und Anforderungen für v1.8 prüfen (.planning/ROADMAP.md, .planning/REQUIREMENTS.md); der Branch plan/v1.8-tasks-080 ist nur lokal, Push oder PR nur nach Owner-Entscheid
 - E15 entscheiden (Admin-Schalter für ändernde Aufgaben-Werkzeuge), spätestens am Checkpoint von Phase 30
-- Phase 30 ist geplant; vor der Ausführung die Lesart der Löschregel in 30-03-PLAN.md bestätigen oder ändern, dann /gsd:execute-phase 30 (Start mit 30-01)
+- Phase 30: 30-01 ist ausgeführt, Befunde in docs/spike-tasks.md (Abschnitte 1 und 2) und 30-01-SUMMARY.md; vor 30-03 die Lesart der Löschregel in 30-03-PLAN.md bestätigen oder ändern; weiter mit 30-02
+- Vor 30-02 entscheiden, ob im Worktree tasks-080 `uv sync` mit dem Extra `documents` laufen soll (DI-30-01), damit der volle Lauf wieder grün werden kann
 - Für 30-02 die Browser-Sitzung in der Tasks-App einplanen (zwölf nummerierte Schritte in zwei Runden, nc35 läuft dabei)
 - Issue-Antworten in #32 und #44 erst nach dem Store-Release von 0.8.0
