@@ -23,7 +23,11 @@ under impersonation, a stale ETag, foreign properties, a list shared read-only, 
 side of recurring tasks and sub tasks), ``ui-prepare`` (the Tasks app and the account of the
 browser session), ``ui-snapshot`` (every object of that account as a file, before and after
 the browser session), ``ui-teardown`` (take all of that back and compare against the
-baseline the kept run wrote), ``nc35-stop`` (``docker stop`` of the
+baseline the kept run wrote), ``move`` (``MOVE`` between two task lists under impersonation,
+the abort measurement of MESS-06 first, then a taken target, shared lists, a Deck calendar,
+sub tasks, and ``DELETE`` with the restore out of the calendar trash bin),
+``ui-evaluate-move`` (what the Tasks app did to sub tasks, read from the snapshots),
+``nc35-stop`` (``docker stop`` of the
 same four containers) and ``secret-scan`` (the gate over every raw protocol of the phase
 folder and the report before a commit). Whatever the measuring blocks created is taken back
 in a ``finally`` and compared against the baseline, before ``nc35-stop`` runs.
@@ -122,6 +126,8 @@ BLOCKS = (
     "ui-evaluate",
     "inventory",
     "ui-teardown",
+    "move",
+    "ui-evaluate-move",
     "nc35-stop",
     "secret-scan",
 )
@@ -1256,6 +1262,8 @@ def rollback_nc35(before: Mapping[str, str], env: Mapping[str, str]) -> None:
         f"{yes_no('groupfolders' in enabled or 'groupfolders' in disabled)} "
         f"files_external_an={yes_no('files_external' in enabled)}"
     )
+    boards = php(NC_CONTAINER, PHP_COUNT_DECK_BOARDS, PREFIX)
+    note(f"RUECKBAU deck_boards_mit_praefix_{PREFIX}={boards} (Tabelle deck_boards, per PHP)")
     for line in compare_baseline(before, baseline_nc35(env)):
         note(line)
 
@@ -2358,13 +2366,14 @@ def header_of(result: DavResult, name: str) -> str:
     return next((value for key, value in result.headers if key.lower() == name.lower()), "")
 
 
-def mkcalendar_body(name: str) -> bytes:
-    """A MKCALENDAR body for a list that takes VTODO only, as the Tasks app creates one."""
+def mkcalendar_body(name: str, components: Sequence[str] = ("VTODO",)) -> bytes:
+    """A MKCALENDAR body; by default a list that takes VTODO only, as the Tasks app has it."""
     root = etree.Element(f"{{{xml.CAL}}}mkcalendar", nsmap={"d": xml.DAV, "c": xml.CAL})
     prop = etree.SubElement(etree.SubElement(root, f"{{{xml.DAV}}}set"), f"{{{xml.DAV}}}prop")
     etree.SubElement(prop, f"{{{xml.DAV}}}displayname").text = name
     comps = etree.SubElement(prop, f"{{{xml.CAL}}}supported-calendar-component-set")
-    etree.SubElement(comps, f"{{{xml.CAL}}}comp", name="VTODO")
+    for component in components:
+        etree.SubElement(comps, f"{{{xml.CAL}}}comp", name=component)
     return etree.tostring(root, xml_declaration=True, encoding="utf-8")
 
 
@@ -3928,6 +3937,1056 @@ def block_inventory() -> int:
     return 1 if counts["ungeklaert"] or len(reached) != len(CONTROL_PLACES) else 0
 
 
+# --- plan 30-03: moving and deleting (MESS-06) -------------------------------------------------
+
+LIST_EVENTS = f"{PREFIX}-nur-termine"
+DECK_BOARD = f"{PREFIX}-board"
+DECK_PREFIX = "app-generated--deck--board-"
+DAV_CALENDARS = "/remote.php/dav/calendars/"
+#: How a state of ``child_fate`` names the trash bin of the calendar.
+TRASH = "trashbin"
+#: The protocol of the browser session of plan 30-02; ui-evaluate-move reads its lines.
+UI_PROTOCOL = "ui-sitzung.txt"
+
+#: Where the dav app lies in a running instance, and what has to be confirmed there before
+#: any path or switch of the calendar trash bin is used: file and the pattern of its lines.
+SOURCE_DIR = "/var/www/html/apps/dav/lib"
+SOURCE_CHECKS: tuple[tuple[str, str], ...] = (
+    ("CalDAV/RetentionService.php", r"RETENTION_CONFIG_KEY =|DEFAULT_RETENTION_SECONDS ="),
+    ("CalDAV/Trashbin/TrashbinHome.php", r"const NAME"),
+    (
+        "CalDAV/Trashbin/DeletedCalendarObjectsCollection.php",
+        r"const NAME|function calendarQuery|new NotImplemented",
+    ),
+    ("CalDAV/Trashbin/RestoreTarget.php", r"const NAME|function moveInto"),
+    ("CalDAV/Trashbin/Plugin.php", r"PROPERTY_RETENTION_DURATION =|X-NC-CalDAV-No-Trashbin"),
+    (
+        "CalDAV/CalDavBackend.php",
+        (
+            r"function deleteCalendarObject|function restoreCalendarObject"
+            r"|function moveCalendarObject|RETENTION_CONFIG_KEY\) === "
+        ),
+    ),
+    ("CalDAV/CalendarHome.php", r"new TrashbinHome"),
+    ("Command/RetentionCleanupCommand.php", r"parent::__construct\("),
+)
+
+#: Every row of the table calendarobjects that carries one UID, with its place, its trash
+#: mark and the hash of its text. The UID is the key because the server renames the object
+#: on its way into the trash bin (``<name>-deleted.ics``) and a MOVE may rename it too.
+PHP_OBJECT_ROWS = (
+    _PHP_BOOT
+    + r"""
+$db = \OCP\Server::get(\OCP\IDBConnection::class);
+$qb = $db->getQueryBuilder();
+$qb->select('o.uri', 'o.deleted_at', 'o.calendardata')
+    ->selectAlias('c.uri', 'calendar')
+    ->selectAlias('c.principaluri', 'principal')
+    ->from('calendarobjects', 'o')
+    ->join('o', 'calendars', 'c', $qb->expr()->eq('o.calendarid', 'c.id'))
+    ->where($qb->expr()->eq('o.uid', $qb->createNamedParameter($argv[1])))
+    ->andWhere($qb->expr()->eq('o.calendartype', $qb->createNamedParameter(0)))
+    ->orderBy('o.id');
+$out = [];
+foreach ($qb->executeQuery()->fetchAll() as $row) {
+    $data = $row['calendardata'];
+    if (is_resource($data)) {
+        $data = stream_get_contents($data);
+    }
+    $out[] = basename($row['principal']) . '/' . $row['calendar'] . '/' . $row['uri']
+        . '|' . ($row['deleted_at'] === null ? 'leer' : 'gesetzt')
+        . '|' . hash('sha256', (string)$data) . ':' . strlen((string)$data);
+}
+echo count($out), ' ', implode(' ', $out), "\n";
+"""
+)
+
+#: Deck boards whose title carries the spike prefix, deleted ones included.
+PHP_COUNT_DECK_BOARDS = (
+    _PHP_BOOT
+    + r"""
+$db = \OCP\Server::get(\OCP\IDBConnection::class);
+try {
+    $qb = $db->getQueryBuilder();
+    $qb->select($qb->func()->count('*', 'n'))->from('deck_boards')
+        ->where($qb->expr()->like('title', $qb->createNamedParameter($argv[1] . '%')));
+    echo $qb->executeQuery()->fetchOne(), "\n";
+} catch (\Throwable $e) {
+    echo 'keine-tabelle', "\n";
+}
+"""
+)
+
+#: One MOVE from inside the ExApp container, the exact production way (http://caddy). The
+#: Destination header is built on the base the container itself talks to. Prints the status.
+EXAPP_MOVE_PROGRAM = r"""
+import base64, os, sys
+import httpx
+
+user, source, target = sys.argv[1], sys.argv[2], sys.argv[3]
+token = base64.b64encode(("%s:%s" % (user, os.environ["APP_SECRET"])).encode()).decode()
+headers = {
+    "AA-VERSION": os.environ.get("AA_VERSION", ""),
+    "EX-APP-ID": os.environ.get("APP_ID", ""),
+    "EX-APP-VERSION": os.environ.get("APP_VERSION", ""),
+    "AUTHORIZATION-APP-API": token,
+    "Overwrite": "F",
+}
+base = os.environ.get("NEXTCLOUD_URL", "http://caddy").rstrip("/")
+headers["Destination"] = base + target
+response = httpx.request("MOVE", base + source, headers=headers, timeout=60.0)
+print(response.status_code)
+"""
+
+
+def abort_move(
+    *,
+    status: int,
+    source_gone: bool,
+    target_readable: bool,
+    uid_same: bool,
+    content_same: bool = True,
+) -> tuple[bool, str]:
+    """The abort criterion of MESS-06 for ``MOVE``: ``(triggered, reason)``.
+
+    Not triggered only if the MOVE from an own list into an own list answered 201 or 204,
+    the source is gone afterwards, the target can be read, and UID and content are the same.
+    """
+    reasons = []
+    if status not in (201, 204):
+        reasons.append(f"MOVE lieferte {status} statt 201 oder 204")
+    if not source_gone:
+        reasons.append("die Quelle ist nach dem MOVE noch da")
+    if not target_readable:
+        reasons.append("das Ziel ist nach dem MOVE nicht lesbar")
+    if not uid_same:
+        reasons.append("die UID am Ziel ist eine andere")
+    if not content_same:
+        reasons.append("der Inhalt am Ziel ist ein anderer")
+    return (bool(reasons), "; ".join(reasons) or "keiner")
+
+
+def destination_header(base_url: str, user: str, calendar: str, name: str) -> str:
+    """The value of the ``Destination`` header for one object of a calendar of ``user``."""
+    return (
+        f"{base_url.rstrip('/')}{DAV_CALENDARS}{quote(user, safe='')}/"
+        f"{quote(calendar, safe='')}/{quote(name, safe='')}"
+    )
+
+
+def uid_of(text: str) -> str:
+    """The UID of the VTODO of a calendar text; a text without a VTODO is refused."""
+    match = re.search(r"(?ms)^BEGIN:VTODO$(.*?)^END:VTODO$", unfold(text))
+    if match is None:
+        raise ValueError("the text carries no VTODO")
+    uid = re.search(r"(?m)^UID(?:;[^:\n]*)?:(.*)$", match[1])
+    if uid is None:
+        raise ValueError("the VTODO carries no UID")
+    return uid[1].strip()
+
+
+@dataclass(frozen=True, slots=True)
+class Placed:
+    """One object of a state: the collection it lies in and its text."""
+
+    collection: str
+    text: str
+
+
+def child_fate(
+    before: Mapping[str, Placed],
+    after: Mapping[str, Placed],
+    parent_summary: str,
+    child_summary: str,
+) -> str:
+    """What became of a sub task between two states, both keyed by UID.
+
+    ``kind bleibt in quelle``, ``kind zieht mit``, ``kind geloescht`` or ``kind im
+    papierkorb``. A state a without the parent or the sub task is refused: the evaluation
+    then has nothing to stand on and writes an ``ungemessen`` line instead.
+    """
+    by_name = {property_value(item.text, "SUMMARY"): uid for uid, item in before.items()}
+    for wanted in (parent_summary, child_summary):
+        if wanted not in by_name:
+            raise ValueError(f"state a carries no object named {wanted}")
+    parent_uid, child_uid = by_name[parent_summary], by_name[child_summary]
+    if child_uid not in after:
+        return "kind geloescht"
+    child = after[child_uid]
+    if child.collection == TRASH:
+        return "kind im papierkorb"
+    if child.collection == before[child_uid].collection:
+        return "kind bleibt in quelle"
+    parent = after.get(parent_uid)
+    if parent is not None and parent.collection == child.collection:
+        return "kind zieht mit"
+    return f"kind in {child.collection}"
+
+
+@dataclass(frozen=True, slots=True)
+class DbRow:
+    """One row of calendarobjects for a UID: owner, calendar, object name, trash mark, hash."""
+
+    owner: str
+    calendar: str
+    uri: str
+    deleted: bool
+    digest: str
+
+
+def parse_db_rows(line: str) -> list[DbRow]:
+    """The rows ``PHP_OBJECT_ROWS`` printed: ``<n> <owner>/<calendar>/<uri>|<mark>|<hash>``."""
+    rows = []
+    for entry in line.split()[1:]:
+        place, mark, digest = entry.split("|")
+        owner, calendar, uri = place.split("/", 2)
+        rows.append(DbRow(owner, calendar, uri, mark == "gesetzt", digest))
+    return rows
+
+
+def db_rows(uid: str, container: str = NC_CONTAINER) -> list[DbRow]:
+    """Where the database holds the object with this UID; the counter probe that asks no DAV."""
+    return parse_db_rows(php(container, PHP_OBJECT_ROWS, uid))
+
+
+def rows_text(rows: Sequence[DbRow]) -> str:
+    """Database rows as one protocol value, ``keine`` for none."""
+    return (
+        ",".join(
+            f"{row.owner}/{row.calendar}/{row.uri}:"
+            f"{'deleted_at_gesetzt' if row.deleted else 'deleted_at_leer'}:{row.digest[:12]}"
+            for row in rows
+        )
+        or "keine"
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class TrashSource:
+    """What the source of the running instance says about the calendar trash bin."""
+
+    key: str
+    default_seconds: int
+    off_value: str
+    home: str
+    objects: str
+    restore: str
+    retention_property: str
+    cleanup: str
+
+
+#: What documentation and research expected; a version that reads differently is a finding.
+EXPECTED_SOURCE = TrashSource(
+    key="calendarRetentionObligation",
+    default_seconds=2592000,
+    off_value="0",
+    home="trashbin",
+    objects="objects",
+    restore="restore",
+    retention_property="{http://nextcloud.com/ns}trash-bin-retention-duration",
+    cleanup="dav:retention:clean-up",
+)
+
+
+def parse_trash_source(found: Mapping[str, Sequence[str]]) -> TrashSource:
+    """Key, default, paths and clean-up command out of the grepped source lines per file.
+
+    Raises ``ValueError`` naming what could not be read: without the confirmation no path
+    and no switch is used.
+    """
+
+    def pick(file: str, pattern: str) -> str:
+        for line in found.get(file, ()):
+            match = re.search(pattern, line)
+            if match:
+                return match[1]
+        raise ValueError(f"{file}: no line matches {pattern}")
+
+    product = pick("CalDAV/RetentionService.php", r"DEFAULT_RETENTION_SECONDS = ([0-9* ]+);")
+    seconds = 1
+    for factor in product.split("*"):
+        seconds *= int(factor)
+    return TrashSource(
+        key=pick("CalDAV/RetentionService.php", r"RETENTION_CONFIG_KEY = '(\w+)'"),
+        default_seconds=seconds,
+        off_value=pick("CalDAV/CalDavBackend.php", r"RETENTION_CONFIG_KEY\) === '([^']*)'"),
+        home=pick("CalDAV/Trashbin/TrashbinHome.php", r"const NAME = '(\w+)'"),
+        objects=pick(
+            "CalDAV/Trashbin/DeletedCalendarObjectsCollection.php", r"const NAME = '(\w+)'"
+        ),
+        restore=pick("CalDAV/Trashbin/RestoreTarget.php", r"const NAME = '(\w+)'"),
+        retention_property=pick(
+            "CalDAV/Trashbin/Plugin.php", r"PROPERTY_RETENTION_DURATION = '([^']+)'"
+        ),
+        cleanup=pick("Command/RetentionCleanupCommand.php", r"parent::__construct\('([^']+)'\)"),
+    )
+
+
+def confirm_sources(container: str) -> TrashSource:
+    """Grep the trash bin sources of the running instance and write them as QUELLE lines."""
+    found: dict[str, list[str]] = {}
+    for file, pattern in SOURCE_CHECKS:
+        output = docker(
+            "exec", container, "grep", "-nE", pattern, f"{SOURCE_DIR}/{file}", check=False
+        )
+        found[file] = [line.strip() for line in output.splitlines() if line.strip()]
+        for line in found[file]:
+            number, _, wording = line.partition(":")
+            note(f"QUELLE apps/dav/lib/{file}:{number} | {_one_line(wording)[:220]}")
+        if not found[file]:
+            note(f"QUELLE apps/dav/lib/{file} | (keine Zeile zum Muster {pattern})")
+    try:
+        source = parse_trash_source(found)
+    except ValueError as failure:
+        raise RunFailed(f"trash bin source not confirmed: {failure}") from failure
+    listed = occ(container, "list", "dav", check=False)
+    commands = [line.split()[0] for line in listed.splitlines() if "retention" in line]
+    note(f"QUELLE occ list dav | {' '.join(commands) or '(kein Kommando mit retention)'}")
+    if source.cleanup not in commands:
+        raise RunFailed(f"occ list dav does not name {source.cleanup}")
+    for name in TrashSource.__slots__:
+        got, expected = getattr(source, name), getattr(EXPECTED_SOURCE, name)
+        if got != expected:
+            note(f"QUELLE ABWEICHUNG {name} gelesen={got} erwartet={expected}")
+    note(
+        f"QUELLE BESTAETIGT schluessel={source.key} standard_sekunden={source.default_seconds} "
+        f"aus_wert={source.off_value} sammlung={source.home}/{source.objects} "
+        f"wiederherstellung=Verschieben nach {source.home}/{source.restore}/<name> "
+        f"eigenschaft={source.retention_property} aufraeumen=occ {source.cleanup}"
+    )
+    return source
+
+
+def trash_url(creds: Credentials, source: TrashSource, tail: str = "") -> str:
+    """The URL of the calendar trash bin of the account of ``creds``, or of ``tail`` in it."""
+    return f"{caldav.calendars_home_url(creds)}{source.home}/{tail}"
+
+
+async def trash_names(session: Session, creds: Credentials, source: TrashSource) -> dict[str, str]:
+    """UID to object name for the trash bin of one account, read with a REPORT.
+
+    The collection answers a PROPFIND with 501 (measured in plan 30-02); it implements the
+    calendar-query REPORT only and names every object ``<id>.ics``.
+    """
+    status, rows = await report(
+        session,
+        creds,
+        "",
+        report_body("calendar-query"),
+        url=trash_url(creds, source, f"{source.objects}/"),
+    )
+    if status != 207:
+        raise RunFailed(f"REPORT on the trash bin of {creds.user} answered {status}")
+    return {property_value(data, "UID"): name for name, _, data in rows}
+
+
+async def restore_object(
+    session: Session, creds: Credentials, source: TrashSource, name: str
+) -> DavResult:
+    """Restore one trash bin entry: a MOVE onto the restore target, as the source reads."""
+    return await dav_request(
+        session.client,
+        creds,
+        "MOVE",
+        trash_url(creds, source, f"{source.objects}/{quote(name, safe='')}"),
+        extra_headers={"Destination": trash_url(creds, source, f"{source.restore}/file")},
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class MoveOutcome:
+    """One measured MOVE: the answer and what source and target say afterwards."""
+
+    result: DavResult
+    source_after: int
+    target_after: int
+    uid_same: str
+    content_same: bool
+    etag_before: str
+    etag_after: str
+
+    def values(self) -> tuple[int, int, int, str, bool]:
+        """What two ways in are compared by."""
+        return (
+            self.result.status,
+            self.source_after,
+            self.target_after,
+            self.uid_same,
+            self.content_same,
+        )
+
+
+async def measure_move(
+    session: Session,
+    creds: Credentials,
+    source_url: str,
+    destination: str,
+    headers: Mapping[str, str] | None = None,
+    *,
+    target_url: str | None = None,
+) -> MoveOutcome:
+    """One MOVE with the given ``Destination``, read back at the source and at the target.
+
+    ``target_url`` is where the target is read afterwards, if the header names it in another
+    form than this client can ask for (a bare path, a foreign host).
+    """
+    _, etag0, text0 = await get_object(session, creds, source_url)
+    result = await dav_request(
+        session.client,
+        creds,
+        "MOVE",
+        source_url,
+        extra_headers={"Destination": destination, **(headers or {})},
+    )
+    source_after, _, _ = await get_object(session, creds, source_url)
+    target_after, etag1, text1 = await get_object(session, creds, target_url or destination)
+    uid_same = "-"
+    if target_after.status == 200:
+        try:
+            uid_same = yes_no(uid_of(text1) == uid_of(text0))
+        except ValueError:
+            uid_same = "nein"
+    return MoveOutcome(
+        result=result,
+        source_after=source_after.status,
+        target_after=target_after.status,
+        uid_same=uid_same,
+        content_same=target_after.status == 200 and text1 == text0,
+        etag_before=etag0,
+        etag_after=etag1,
+    )
+
+
+def move_line(key: str, creds: Credentials, outcome: MoveOutcome, raw: str = "") -> None:
+    """``MOVE <key> auth=.. status=.. quelle_danach=.. ziel_danach=.. uid_gleich=.. | raw``."""
+    excerpt = describe_error(outcome.result.body)[:300]
+    note(
+        f"{now_stamp()} | MOVE {key} auth={auth_label(creds)} status={outcome.result.status} "
+        f"quelle_danach={outcome.source_after} ziel_danach={outcome.target_after} "
+        f"uid_gleich={outcome.uid_same} etag_vorher={short_etag(outcome.etag_before)} "
+        f"etag_nachher={short_etag(outcome.etag_after)} | "
+        f"inhalt_gleich={yes_no(outcome.content_same)} {raw} {excerpt}".rstrip()
+    )
+
+
+@dataclass
+class Move:
+    """The state of one move block: session, names of this run, targets, confirmed source."""
+
+    session: Session
+    stamp: str
+    source: TrashSource
+    shared: dict[str, str] = field(default_factory=dict)
+    deck_uri: str = ""
+    board_id: str = ""
+
+    def name(self, key: str) -> str:
+        """The object name of this run for ``key``; the UID is the name without ``.ics``."""
+        return f"s30-{key}-{self.stamp}.ics"
+
+    async def put(self, creds: Credentials, uri: str, name: str, text: str) -> str:
+        """A create-only PUT under a given name, written as a SETUP line; returns the URL."""
+        url = caldav.object_url(creds, uri, name)
+        made = await put_object(self.session, creds, url, text, if_none_match="*")
+        note(
+            f"{now_stamp()} | SETUP PUT create-only {uri}/{name} nutzer={creds.user} "
+            f"auth={auth_label(creds)} status={made.status} | {describe_error(made.body)[:200]}"
+        )
+        if made.status not in (201, 204):
+            raise RunFailed(f"create-only PUT of {name} answered {made.status}")
+        return url
+
+    async def todo(self, creds: Credentials, uri: str, key: str, extra: Iterable[str] = ()) -> str:
+        """A plain task named after ``key`` in the list ``uri``; returns its URL."""
+        name = self.name(key)
+        text = simple_todo(name.removesuffix(".ics"), f"s30 {key}", extra)
+        return await self.put(creds, uri, name, text)
+
+    def target(self, uri: str, key: str) -> str:
+        """The Destination for the object of ``key`` in a list of USER_A, same object name."""
+        return destination_header(_base_url(self.session.env), USER_A, uri, self.name(key))
+
+
+async def deck_board(state: Move) -> None:
+    """A Deck board of USER_A over the REST interface, and its calendar in the discovery."""
+    session = state.session
+    creds = session.basic(USER_A)
+    response = await session.client.post(
+        f"{creds.base_url}/index.php/apps/deck/api/v1.0/boards",
+        json={"title": DECK_BOARD, "color": "0082c9"},
+        headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+        auth=creds.auth(),
+    )
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    state.board_id = str(data.get("id") or "") if isinstance(data, dict) else ""
+    note(
+        f"{now_stamp()} | SETUP DECK POST /index.php/apps/deck/api/v1.0/boards titel={DECK_BOARD} "
+        f"nutzer={USER_A} auth=basic status={response.status_code} board_id="
+        f"{state.board_id or '-'}"
+    )
+    appapi = session.appapi(USER_A)
+    home = await dav_request(
+        session.client,
+        appapi,
+        "PROPFIND",
+        caldav.calendars_home_url(appapi),
+        depth="1",
+        body=caldav.build_discovery_body(),
+    )
+    found = calendar_collections(home.body) if home.status == 207 else []
+    for uri, name, comps in found:
+        note(f"  DISCOVERY liste={uri} name={name} komponenten={','.join(comps)}")
+    wanted = f"{DECK_PREFIX}{state.board_id}"
+    state.deck_uri = next((uri for uri, _, _ in found if state.board_id and uri == wanted), "")
+    note(
+        f"DECK-KALENDER in_der_discovery={yes_no(bool(state.deck_uri))} uri={state.deck_uri or '-'}"
+    )
+
+
+async def move_setup(state: Move) -> None:
+    """The lists of the modify block, a calendar for events only, and a Deck board."""
+    session = state.session
+    state.shared = await modify_setup(Modify(session=session, stamp=state.stamp))
+    creds = session.appapi(USER_A)
+    made = await dav_request(
+        session.client,
+        creds,
+        "MKCALENDAR",
+        caldav.calendar_url(creds, LIST_EVENTS),
+        body=mkcalendar_body(LIST_EVENTS, ("VEVENT",)),
+    )
+    note(
+        f"{now_stamp()} | SETUP MKCALENDAR liste={LIST_EVENTS} nutzer={USER_A} auth=appapi "
+        f"status={made.status} komponenten=VEVENT"
+    )
+    await guarded("move deck-board", deck_board(state))
+
+
+async def move_own(state: Move) -> None:
+    """M4.1, the abort measurement: MOVE from an own list into an own list."""
+    session = state.session
+    creds = session.appapi(USER_A)
+    name = state.name("eigen")
+    uid = name.removesuffix(".ics")
+    text = build_probe_todo(uid, "s30 eigen")
+    source_url = await state.put(creds, LIST_A, name, text)
+    since = container_now()
+    await asyncio.sleep(1)
+    outcome = await measure_move(session, creds, source_url, state.target(LIST_B, "eigen"))
+    move_line("eigen", creds, outcome)
+    aborted, reason = abort_move(
+        status=outcome.result.status,
+        source_gone=outcome.source_after == 404,
+        target_readable=outcome.target_after == 200,
+        uid_same=outcome.uid_same == "ja",
+        content_same=outcome.content_same,
+    )
+    note(f"ABBRUCHKRITERIUM MESS-06 MOVE ausgeloest={yes_no(aborted)} grund={reason}")
+    note(
+        f"  Aufruf: Methode wie in der Zeile darueber, Quelle {source_url[len(creds.base_url) :]}"
+        f", Destination {state.target(LIST_B, 'eigen')}, keine weitere Kopfzeile"
+    )
+    note_raw(outcome.result)
+    lines = impersonation_lines(since, USER_A, "MOVE")
+    note(f"KONTROLLE exapp_impersonation.log, Zeilen der Methode von {USER_A}: {len(lines)}")
+    for line in lines[-2:]:
+        note(f"  {line[:400]}")
+    basic = session.basic(USER_A)
+    in_source = name in await object_names(session, basic, LIST_A)
+    in_target = name in await object_names(session, basic, LIST_B)
+    rows = db_rows(uid)
+    note(
+        f"{now_stamp()} | GEGENPROBE eigen auflistung REPORT calendar-query auth=basic "
+        f"nutzer={USER_A} in_{LIST_A}={yes_no(in_source)} in_{LIST_B}={yes_no(in_target)} | "
+        f"datenbank={rows_text(rows)} db_gleich_gesendet="
+        f"{yes_no(len(rows) == 1 and rows[0].digest == sha_of(text))}"
+    )
+
+    wrong_url = await state.todo(creds, LIST_A, "eigen-falsches-secret")
+    wrong_uid = state.name("eigen-falsches-secret").removesuffix(".ics")
+    wrong = await dav_request(
+        session.client,
+        session.appapi(USER_A, "0" * 64),
+        "MOVE",
+        wrong_url,
+        extra_headers={"Destination": state.target(LIST_B, "eigen-falsches-secret")},
+    )
+    note(
+        f"{now_stamp()} | GEGENPROBE eigen falsches-secret status={wrong.status} "
+        f"datenbank={rows_text(db_rows(wrong_uid))} | {describe_error(wrong.body)[:200]}"
+    )
+
+    basic_name = state.name("eigen-basic")
+    basic_url = await state.put(
+        basic,
+        LIST_A,
+        basic_name,
+        build_probe_todo(basic_name.removesuffix(".ics"), "s30 eigen basic"),
+    )
+    other = await measure_move(session, basic, basic_url, state.target(LIST_B, "eigen-basic"))
+    move_line("eigen", basic, other)
+    note_raw(other.result)
+    note(
+        f"MOVE GLEICH appapi_basic={yes_no(outcome.values() == other.values())} "
+        f"appapi={outcome.values()} basic={other.values()} (status, quelle danach, ziel danach, "
+        "uid gleich, inhalt gleich)"
+    )
+
+
+def production_move(state: Move, source_path: str, target_path: str, uid: str) -> None:
+    """The same MOVE from inside the ExApp container against ``http://caddy``."""
+    running = docker("inspect", "--format", "{{.State.Running}}", EXAPP_CONTAINER, check=False)
+    if running.strip() != "true":
+        note(f"PRODUKTIONSWEG MOVE ungemessen grund=ExApp-Container {EXAPP_CONTAINER} laeuft nicht")
+        return
+    output = docker(
+        "exec",
+        "-i",
+        EXAPP_CONTAINER,
+        "/app/.venv/bin/python",
+        "-",
+        USER_A,
+        source_path,
+        target_path,
+        stdin=EXAPP_MOVE_PROGRAM,
+        check=False,
+    ).strip()
+    last = output.splitlines()[-1].strip() if output else ""
+    if not last.isdigit():
+        note(f"PRODUKTIONSWEG MOVE ungemessen grund=keine Statuszeile: {last[:200]}")
+        return
+    rows = db_rows(uid)
+    moved = len(rows) == 1 and rows[0].calendar == LIST_B and not rows[0].deleted
+    note(
+        f"{now_stamp()} | PRODUKTIONSWEG MOVE status={last} verschoben={yes_no(moved)} "
+        f"nutzer={USER_A} datenbank={rows_text(rows)} (aus {EXAPP_CONTAINER} gegen "
+        f"http://caddy, Destination auf http://caddy, Overwrite F; lauf={state.stamp})"
+    )
+
+
+async def move_destination_forms(state: Move) -> None:
+    """Which base ``Destination`` may carry: the production base, a bare path, a foreign host."""
+    session = state.session
+    creds = session.appapi(USER_A)
+    base = creds.base_url
+    url = await state.todo(creds, LIST_A, "produktion")
+    production_move(
+        state,
+        url[len(base) :],
+        state.target(LIST_B, "produktion")[len(base) :],
+        state.name("produktion").removesuffix(".ics"),
+    )
+    for key, form in (("ziel-nur-pfad", ""), ("ziel-fremder-host", "http://spike30.invalid")):
+        url = await state.todo(creds, LIST_A, key)
+        real = state.target(LIST_B, key)
+        outcome = await measure_move(
+            session, creds, url, f"{form}{real[len(base) :]}", target_url=real
+        )
+        move_line(key, creds, outcome, f"destination_basis={form or '(keine, nur Pfad)'}")
+        note_raw(outcome.result)
+
+
+async def move_occupied(state: Move) -> None:
+    """M4.2: a MOVE onto a name that is taken, with ``Overwrite: F`` and without the header."""
+    session = state.session
+    creds = session.appapi(USER_A)
+    variants: tuple[tuple[str, dict[str, str]], ...] = (
+        ("belegt-overwrite-f", {"Overwrite": "F"}),
+        ("belegt-ohne-kopf", {}),
+    )
+    for key, headers in variants:
+        name = state.name(key)
+        uid = name.removesuffix(".ics")
+        target_uid = f"{uid}-ziel"
+        source_url = await state.put(creds, LIST_A, name, simple_todo(uid, f"s30 {key} quelle"))
+        await state.put(creds, LIST_B, name, simple_todo(target_uid, f"s30 {key} ziel"))
+        source_before, target_before = db_rows(uid), db_rows(target_uid)
+        outcome = await measure_move(session, creds, source_url, state.target(LIST_B, key), headers)
+        source_now, target_now = db_rows(uid), db_rows(target_uid)
+        live = [row for row in target_now if not row.deleted]
+        if not target_now:
+            old = "endgueltig_weg"
+        elif not live:
+            old = "papierkorb"
+        else:
+            old = "unveraendert" if target_now == target_before else "veraendert"
+        move_line(
+            key,
+            creds,
+            outcome,
+            f"ueberschrieben={yes_no(old != 'unveraendert')} altes_ziel={old} "
+            f"quelle_unveraendert={yes_no(source_now == source_before)}",
+        )
+        note(
+            f"  HASH ziel vorher={rows_text(target_before)} nachher={rows_text(target_now)} | "
+            f"quelle vorher={rows_text(source_before)} nachher={rows_text(source_now)}"
+        )
+        note_raw(outcome.result)
+
+
+async def move_same_uid(state: Move) -> None:
+    """M4.3: the target list already holds an object with the same UID under another name."""
+    session = state.session
+    creds = session.appapi(USER_A)
+    name = state.name("gleiche-uid")
+    uid = name.removesuffix(".ics")
+    source_url = await state.put(creds, LIST_A, name, simple_todo(uid, "s30 gleiche-uid quelle"))
+    await state.put(
+        creds, LIST_B, state.name("gleiche-uid-ziel"), simple_todo(uid, "s30 gleiche-uid ziel")
+    )
+    before = db_rows(uid)
+    outcome = await measure_move(session, creds, source_url, state.target(LIST_B, "gleiche-uid"))
+    after = db_rows(uid)
+    move_line("gleiche-uid", creds, outcome, f"datenbank_unveraendert={yes_no(before == after)}")
+    note(f"  DATENBANK uid={uid} vorher={rows_text(before)} nachher={rows_text(after)}")
+    note_raw(outcome.result)
+    basic = session.basic(USER_A)
+    in_a = [n for n in await object_names(session, basic, LIST_A) if "gleiche-uid" in n]
+    in_b = [n for n in await object_names(session, basic, LIST_B) if "gleiche-uid" in n]
+    note(
+        f"{now_stamp()} | GEGENPROBE gleiche-uid auflistung auth=basic nutzer={USER_A} "
+        f"{LIST_A}={in_a} {LIST_B}={in_b}"
+    )
+
+
+async def move_targets(state: Move) -> None:
+    """M4.4: a shared list with and without write access, a Deck calendar, events only."""
+    session = state.session
+    creds = session.appapi(USER_A)
+    owner = session.basic(USER_B)
+    no_share = "die Freigabe fehlt in der Discovery"
+    targets = (
+        ("geteilt-rw", state.shared.get("rw", ""), LIST_RW, no_share),
+        ("geteilt-ro", state.shared.get("ro", ""), LIST_RO, no_share),
+        ("deck", state.deck_uri, "", "der Deck-Kalender erscheint nicht in der Discovery"),
+        ("nur-termine", LIST_EVENTS, "", ""),
+    )
+    for key, uri, owner_uri, reason in targets:
+        if not uri:
+            note(f"MOVE {key} ungemessen grund={reason} von {USER_A} (Rohzeilen DISCOVERY oben)")
+            continue
+        name = state.name(key)
+        uid = name.removesuffix(".ics")
+        source_url = await state.todo(creds, LIST_A, key)
+        before = db_rows(uid)
+        outcome = await measure_move(session, creds, source_url, state.target(uri, key))
+        after = db_rows(uid)
+        move_line(
+            key,
+            creds,
+            outcome,
+            f"ziel={uri} quelle_unveraendert={yes_no(before == after)} "
+            f"datenbank_nachher={rows_text(after)}",
+        )
+        note_raw(outcome.result)
+        if owner_uri:
+            seen, _, _ = await get_object(session, owner, caldav.object_url(owner, owner_uri, name))
+            note(
+                f"{now_stamp()} | GEGENPROBE {key} lesen als Eigentuemer nutzer={USER_B} "
+                f"auth=basic liste={owner_uri} status={seen.status}"
+            )
+
+
+async def move_if_match(state: Move) -> None:
+    """M4.5: MOVE with ``If-Match`` on the current and on a stale ETag."""
+    session = state.session
+    creds = session.appapi(USER_A)
+    basic = session.basic(USER_A)
+    for key, stale in (("if-match-aktuell", False), ("if-match-veraltet", True)):
+        name = state.name(key)
+        uid = name.removesuffix(".ics")
+        url = await state.todo(creds, LIST_A, key)
+        _, etag, text = await get_object(session, creds, url)
+        if stale:
+            changed = await put_object(
+                session, creds, url, set_summary(text, f"s30 {key} v1"), if_match=etag
+            )
+            note(
+                f"{now_stamp()} | SETUP PUT aendert {name}, die gelesene ETag ist danach "
+                f"veraltet status={changed.status}"
+            )
+        before = db_rows(uid)
+        outcome = await measure_move(
+            session, creds, url, state.target(LIST_B, key), {"If-Match": etag}
+        )
+        after = db_rows(uid)
+        in_target = name in await object_names(session, basic, LIST_B)
+        move_line(
+            key,
+            creds,
+            outcome,
+            f"if_match={short_etag(etag)} datenbank_unveraendert={yes_no(before == after)} "
+            f"auflistung_basic_in_{LIST_B}={yes_no(in_target)}",
+        )
+        note_raw(outcome.result)
+
+
+async def move_subtask(state: Move) -> None:
+    """M4.6: what the server does to a sub task when only its parent moves or is deleted."""
+    session = state.session
+    creds = session.appapi(USER_A)
+    for key in ("verschieben", "loeschen"):
+        parent_key, child_key = f"eltern-{key}", f"kind-{key}"
+        parent_uid = state.name(parent_key).removesuffix(".ics")
+        child_uid = state.name(child_key).removesuffix(".ics")
+        parent_url = await state.todo(creds, LIST_A, parent_key)
+        child_url = await state.todo(creds, LIST_A, child_key, [f"RELATED-TO:{parent_uid}"])
+        _, child_etag0, child0 = await get_object(session, creds, child_url)
+        child_rows0 = db_rows(child_uid)
+        if key == "verschieben":
+            outcome = await measure_move(
+                session, creds, parent_url, state.target(LIST_B, parent_key)
+            )
+            status = outcome.result.status
+            done = status in (201, 204) and outcome.source_after == 404
+        else:
+            _, parent_etag, _ = await get_object(session, creds, parent_url)
+            deleted = await dav_request(
+                session.client, creds, "DELETE", parent_url, extra_headers={"If-Match": parent_etag}
+            )
+            status = deleted.status
+            gone, _, _ = await get_object(session, creds, parent_url)
+            done = status == 204 and gone.status == 404
+        got, child_etag1, child1 = await get_object(session, creds, child_url)
+        child_rows1 = db_rows(child_uid)
+        same = (
+            got.status == 200
+            and child_etag0 == child_etag1
+            and child0 == child1
+            and child_rows0 == child_rows1
+        )
+        place = child_rows1[0].calendar if len(child_rows1) == 1 else rows_text(child_rows1)
+        action = "verschoben" if key == "verschieben" else "geloescht"
+        tail = (
+            f"eltern_status={status} eltern_{action}={yes_no(done)} kind_get={got.status} "
+            f"kind_etag_vorher={short_etag(child_etag0)} "
+            f"kind_etag_nachher={short_etag(child_etag1)} auth=appapi nutzer={USER_A} | "
+            f"datenbank kind vorher={rows_text(child_rows0)} nachher={rows_text(child_rows1)} "
+            f"eltern={rows_text(db_rows(parent_uid))}"
+        )
+        if key == "verschieben":
+            note(
+                f"{now_stamp()} | UNTERAUFGABE server-verschieben ort={place} "
+                f"unveraendert={yes_no(same)} {tail}"
+            )
+        else:
+            note(
+                f"{now_stamp()} | UNTERAUFGABE server-loeschen vorhanden="
+                f"{yes_no(got.status == 200)} unveraendert={yes_no(same)} {tail}"
+            )
+
+
+async def move_delete(state: Move) -> None:
+    """M4.8: DELETE under impersonation with the trash bin as delivered, and the restore."""
+    session = state.session
+    creds = session.appapi(USER_A)
+    source = state.source
+    switch = occ(NC_CONTAINER, "config:app:get", "dav", source.key, check=False)
+    note(
+        f"PAPIERKORB zustand={_one_line(switch) or 'leer'} (occ config:app:get dav {source.key}; "
+        f"leer heisst Standard, laut Quelle {source.default_seconds} Sekunden; auf nc35 wird "
+        "der Schalter nie veraendert)"
+    )
+    name = state.name("loeschen")
+    uid = name.removesuffix(".ics")
+    text = build_probe_todo(uid, "s30 loeschen")
+    url = await state.put(creds, LIST_A, name, text)
+    _, etag, _ = await get_object(session, creds, url)
+    since = container_now()
+    await asyncio.sleep(1)
+    deleted = await dav_request(
+        session.client, creds, "DELETE", url, extra_headers={"If-Match": etag}
+    )
+    gone, _, _ = await get_object(session, creds, url)
+    note(
+        f"{now_stamp()} | DELETE impersonation status={deleted.status} auth=appapi "
+        f"nutzer={USER_A} if_match={short_etag(etag)} get_danach={gone.status} | "
+        f"{describe_error(deleted.body)[:200]}"
+    )
+    note_raw(deleted)
+    lines = impersonation_lines(since, USER_A, "DELETE")
+    note(f"KONTROLLE exapp_impersonation.log, DELETE-Zeilen von {USER_A}: {len(lines)}")
+    for line in lines[-2:]:
+        note(f"  {line[:400]}")
+
+    stale_uid = state.name("loeschen-veraltet").removesuffix(".ics")
+    stale_url = await state.todo(creds, LIST_A, "loeschen-veraltet")
+    _, etag0, text0 = await get_object(session, creds, stale_url)
+    await put_object(
+        session, creds, stale_url, set_summary(text0, "s30 veraltet v1"), if_match=etag0
+    )
+    before = db_rows(stale_uid)
+    refused = await dav_request(
+        session.client, creds, "DELETE", stale_url, extra_headers={"If-Match": etag0}
+    )
+    after = db_rows(stale_uid)
+    note(
+        f"{now_stamp()} | DELETE veraltet status={refused.status} "
+        f"objekt_unveraendert={yes_no(before == after)} auth=appapi nutzer={USER_A} | "
+        f"datenbank vorher={rows_text(before)} nachher={rows_text(after)} | "
+        f"{describe_error(refused.body)[:200]}"
+    )
+    note_raw(refused)
+
+    probe = await dav_request(
+        session.client,
+        creds,
+        "PROPFIND",
+        trash_url(creds, source, f"{source.objects}/"),
+        depth="1",
+        body=propfind_body([f"{{{xml.DAV}}}getetag"]),
+    )
+    note(
+        f"{now_stamp()} | PAPIERKORB PROPFIND Depth 1 {source.home}/{source.objects} "
+        f"status={probe.status} | {describe_error(probe.body)[:120]}"
+    )
+    names = await trash_names(session, creds, source)
+    note(
+        f"{now_stamp()} | PAPIERKORB eintrag={yes_no(uid in names)} name={names.get(uid, '-')} "
+        f"eintraege={len(names)} (REPORT calendar-query, auth=appapi nutzer={USER_A}) | "
+        f"GEGENPROBE datenbank={rows_text(db_rows(uid))}"
+    )
+    if uid not in names:
+        note("WIEDERHERSTELLUNG ungemessen grund=das Objekt steht nicht im Papierkorb")
+        return
+    restored = await restore_object(session, creds, source, names[uid])
+    back, _, text1 = await get_object(session, creds, url)
+    same_uid = back.status == 200 and uid_of(text1) == uid
+    note(
+        f"{now_stamp()} | WIEDERHERSTELLUNG status={restored.status} "
+        f"uid_gleich={yes_no(same_uid)} inhalt_gleich={yes_no(text1 == text)} "
+        f"get_danach={back.status} auth=appapi nutzer={USER_A} | GEGENPROBE datenbank="
+        f"{rows_text(db_rows(uid))} | {describe_error(restored.body)[:200]}"
+    )
+    note(
+        f"  Aufruf: Verschieben von {source.home}/{source.objects}/{names[uid]} mit "
+        f"Destination {source.home}/{source.restore}/file"
+    )
+    note_raw(restored)
+
+
+async def move_teardown(state: Move) -> None:
+    """Delete the Deck board and empty the calendar trash bins of the measuring accounts."""
+    session = state.session
+    if state.board_id:
+        creds = session.basic(USER_A)
+        gone = await session.client.delete(
+            f"{creds.base_url}/index.php/apps/deck/api/v1.0/boards/{state.board_id}",
+            headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+            auth=creds.auth(),
+        )
+        note(f"RUECKBAU DECK DELETE boards/{state.board_id} status={gone.status_code}")
+    for user in (USER_A, USER_B):
+        creds = session.basic(user)
+        names = await trash_names(session, creds, state.source)
+        for name in names.values():
+            url = trash_url(creds, state.source, f"{state.source.objects}/{quote(name, safe='')}")
+            purged = await dav_request(session.client, creds, "DELETE", url)
+            note(f"RUECKBAU PAPIERKORB {user} {name} endgueltig status={purged.status}")
+        note(f"RUECKBAU PAPIERKORB {user} eintraege_vorher={len(names)}")
+
+
+async def block_move(session: Session) -> None:
+    """MESS-06 on nc35: the abort measurement first, then every other target and DELETE."""
+    section("move")
+    ram_gate(NC35_CONTAINERS)
+    source = confirm_sources(NC_CONTAINER)
+    state = Move(session=session, stamp=datetime.now(UTC).strftime("%H%M%S"), source=source)
+    try:
+        await move_setup(state)
+        await move_own(state)
+        await guarded("move destination", move_destination_forms(state))
+        await guarded("move belegt", move_occupied(state))
+        await guarded("move gleiche-uid", move_same_uid(state))
+        await guarded("move ziele", move_targets(state))
+        await guarded("move if-match", move_if_match(state))
+        await guarded("move unteraufgabe", move_subtask(state))
+        await guarded("move delete", move_delete(state))
+    finally:
+        await guarded("move rueckbau", move_teardown(state))
+
+
+def placed_state(directory: Path, lists: Mapping[str, str]) -> dict[str, Placed]:
+    """A written snapshot as a state of ``child_fate``: UID to collection and text."""
+    return {
+        uid: Placed(TRASH if entry.trashed else lists.get(entry.file, "?"), entry.text)
+        for uid, entry in load_snapshot(directory).items()
+    }
+
+
+def block_ui_evaluate_move() -> None:
+    """M4.7: what the Tasks app did to the sub tasks, read from ``raw/ui-a`` and ``raw/ui-b``."""
+    section("ui-evaluate-move")
+    protocol_file = RAW_DIR / UI_PROTOCOL
+    protocol = protocol_file.read_text(encoding="utf-8") if protocol_file.is_file() else ""
+    files_a = {uid: entry.file for uid, entry in load_snapshot(RAW_DIR / "ui-a").items()}
+    files_b = {uid: entry.file for uid, entry in load_snapshot(RAW_DIR / "ui-b").items()}
+    before = placed_state(RAW_DIR / "ui-a", snapshot_lists(protocol, "a"))
+    after = placed_state(RAW_DIR / "ui-b", snapshot_lists(protocol, "b"))
+    note(
+        f"APP AUSWERTUNG quelle=raw/ui-a ({len(before)} Objekte) und raw/ui-b ({len(after)} "
+        f"Objekte), Listen aus den Zeilen UI-OBJEKT in raw/{UI_PROTOCOL}; nur gelesen, kein "
+        "Aufruf gegen eine Instanz"
+    )
+    names = {property_value(item.text, "SUMMARY"): uid for uid, item in before.items()}
+
+    def place(name: str) -> str:
+        item = after.get(names.get(name, ""))
+        return item.collection if item is not None else "fehlt"
+
+    for label, parent, child in (
+        ("APP VERSCHIEBEN", "s30 eltern-umzug", "s30 kind-umzug"),
+        ("APP LOESCHEN", "s30 eltern-loeschen", "s30 kind-loeschen"),
+    ):
+        try:
+            fate = child_fate(before, after, parent, child)
+        except ValueError as failure:
+            note(f"{label} eltern={parent} ungemessen grund={failure}")
+            continue
+        if label == "APP VERSCHIEBEN":
+            note(
+                f"{label} eltern={parent} kind={fate.removeprefix('kind ')} "
+                f"eltern_uid_gleich={yes_no(names[parent] in after)} "
+                f"eltern_ort_danach={place(parent)} kind_ort_danach={place(child)}"
+            )
+        else:
+            note(
+                f"{label} eltern={parent} kind={fate} eltern_ort_danach={place(parent)} "
+                f"kind_ort_danach={place(child)}"
+            )
+
+    single = names.get("s30 umzug-einzeln")
+    if single is None or single not in after:
+        note("APP VERSCHIEBEN einzeln ungemessen grund=s30 umzug-einzeln fehlt in Stand a oder b")
+    else:
+        moved = after[single].collection != before[single].collection
+        note(
+            f"APP VERSCHIEBEN einzeln uid_gleich=ja dateiname_gleich="
+            f"{yes_no(files_a[single] == files_b[single])} "
+            f"inhalt_gleich={yes_no(before[single].text == after[single].text)} "
+            f"von={before[single].collection} nach={after[single].collection} "
+            f"positivkontrolle_umzug_stattgefunden={yes_no(moved)}"
+        )
+    control = names.get("s30 unberuehrt")
+    if control is None or control not in after:
+        note("KONTROLLE unberuehrt ungemessen grund=s30 unberuehrt fehlt in Stand a oder b")
+    else:
+        same_place = before[control].collection == after[control].collection
+        note(
+            f"KONTROLLE unberuehrt differenz="
+            f"{field_diff(before[control].text, after[control].text)} "
+            f"ort_gleich={yes_no(same_place)}"
+        )
+    for label, state in (("a", before), ("b", after)):
+        counts: dict[str, int] = {}
+        for item in state.values():
+            counts[item.collection] = counts.get(item.collection, 0) + 1
+        note(f"GEGENPROBE objektzahl stand={label} {json.dumps(counts, sort_keys=True)}")
+
+
 def block_ui_teardown(session: Session, ui: "UiOptions") -> None:
     """Hand the baseline of the kept run to the rollback and delete the login file.
 
@@ -3997,6 +5056,10 @@ async def run_blocks(env: Mapping[str, str], blocks: Sequence[str], ui: UiOption
                     await block_ui_log(session, ui)
                 elif name == "ui-evaluate":
                     block_ui_evaluate(ui)
+                elif name == "move":
+                    await block_move(session)
+                elif name == "ui-evaluate-move":
+                    block_ui_evaluate_move()
                 elif name == "inventory" and block_inventory():
                     raise RunFailed("inventory incomplete: an unruled hit or a missed place")
             keep = any(name in KEEP_BLOCKS for name in blocks)

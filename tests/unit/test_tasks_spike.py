@@ -837,3 +837,36 @@ def test_parse_db_rows_reads_place_trash_mark_and_hash_of_every_row() -> None:
     ]
     assert spike.parse_db_rows("0 ") == []
     assert spike.parse_db_rows("") == []
+
+
+def test_parse_trash_source_reads_key_default_paths_and_command_from_the_grepped_lines() -> None:
+    found = {
+        "CalDAV/RetentionService.php": [
+            "18:\tpublic const RETENTION_CONFIG_KEY = 'calendarRetentionObligation';",
+            "19:\tprivate const int DEFAULT_RETENTION_SECONDS = 30 * 24 * 60 * 60;",
+        ],
+        "CalDAV/Trashbin/TrashbinHome.php": ["28:\tpublic const NAME = 'trashbin';"],
+        "CalDAV/Trashbin/DeletedCalendarObjectsCollection.php": [
+            "26:\tpublic const NAME = 'objects';"
+        ],
+        "CalDAV/Trashbin/RestoreTarget.php": ["20:\tpublic const NAME = 'restore';"],
+        "CalDAV/Trashbin/Plugin.php": [
+            (
+                "33:\tpublic const PROPERTY_RETENTION_DURATION = "
+                "'{http://nextcloud.com/ns}trash-bin-retention-duration';"
+            )
+        ],
+        "CalDAV/CalDavBackend.php": [
+            (
+                "1778:\t\tif ($forceDeletePermanently || $this->config->getAppValue("
+                "Application::APP_ID, RetentionService::RETENTION_CONFIG_KEY) === '0') {"
+            )
+        ],
+        "Command/RetentionCleanupCommand.php": [
+            "22:\t\tparent::__construct('dav:retention:clean-up');"
+        ],
+    }
+    assert spike.parse_trash_source(found) == spike.EXPECTED_SOURCE
+    del found["CalDAV/Trashbin/RestoreTarget.php"]
+    with pytest.raises(ValueError, match="RestoreTarget"):
+        spike.parse_trash_source(found)
