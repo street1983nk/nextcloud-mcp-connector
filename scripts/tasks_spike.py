@@ -2428,12 +2428,14 @@ async def get_object(session: Session, creds: Credentials, url: str) -> tuple[Da
 
 
 async def report(
-    session: Session, creds: Credentials, uri: str, body: bytes
+    session: Session, creds: Credentials, uri: str, body: bytes, *, url: str | None = None
 ) -> tuple[int, list[tuple[str, str, str]]]:
-    """One REPORT on a list: status and ``(object name, etag, calendar-data)`` per object."""
-    result = await dav_request(
-        session.client, creds, "REPORT", caldav.calendar_url(creds, uri), depth="1", body=body
-    )
+    """One REPORT on a list: status and ``(object name, etag, calendar-data)`` per object.
+
+    ``url`` replaces the URL of the list ``uri``, for a collection that is no calendar.
+    """
+    target = url or caldav.calendar_url(creds, uri)
+    result = await dav_request(session.client, creds, "REPORT", target, depth="1", body=body)
     if result.status != 207:
         return result.status, []
     rows = []
@@ -2969,6 +2971,10 @@ async def block_ui_prepare(session: Session, ui_file: Path) -> None:
     session.app_passwords[UI_USER] = new_app_password(
         NC_CONTAINER, UI_USER, password, f"APP_PASSWORD_{UI_USER}"
     )
+    # A fixed interface language, so the written steps of the browser session name the
+    # labels the app really shows; both values fall with the account.
+    occ_noted("user:setting", UI_USER, "core", "lang", "de")
+    occ_noted("user:setting", UI_USER, "core", "locale", "de_DE")
     basic = session.basic(UI_USER)
     home = await dav_request(
         session.client,
@@ -3080,27 +3086,24 @@ async def block_ui_snapshot(session: Session, label: str, seed: bool, ui_file: P
                 differing.append(f"{uri}/{name}")
         differing.extend(f"{uri}/{name}" for name in other if name not in {r[0] for r in rows})
 
+    # The trash bin answers a PROPFIND with 501 (measured on 35.0.0); its collection only
+    # implements the calendar-query REPORT, which lists every deleted object as <id>.ics.
     trash_url = f"{home_url_}trashbin/objects/"
-    trash = await dav_request(
-        session.client,
-        creds,
-        "PROPFIND",
-        trash_url,
-        depth="1",
-        body=propfind_body([f"{{{xml.DAV}}}getetag"]),
+    trash_status, trash_rows = await report(
+        session, creds, "", report_body("calendar-query"), url=trash_url
     )
-    hrefs = [href for href, _ in xml.parse_multistatus(trash.body)] if trash.status == 207 else []
-    names = [unquote(href.rsplit("/", 1)[-1]) for href in hrefs if not href.endswith("/")]
     note(
-        f"{now_stamp()} | UI-PAPIERKORB-LESEN stand={label} PROPFIND Depth 1 trashbin/objects "
-        f"auth=appapi status={trash.status} objekte={len(names)}"
+        f"{now_stamp()} | UI-PAPIERKORB-LESEN stand={label} REPORT calendar-query "
+        f"trashbin/objects auth=appapi status={trash_status} objekte={len(trash_rows)}"
     )
-    for name in names:
-        got, etag, _ = await get_object(session, creds, f"{trash_url}{quote(name, safe='')}")
+    for name, etag, data in trash_rows:
+        got, got_etag, _ = await get_object(session, creds, f"{trash_url}{quote(name, safe='')}")
         if got.status == 200:
-            objects.append(SnapshotObject("trashbin", name, etag, got.body, True))
+            objects.append(SnapshotObject("trashbin", name, got_etag or etag, got.body, True))
         else:
-            note(f"  UI-PAPIERKORB objekt={name} GET status={got.status}, nicht gesichert")
+            # The REPORT carried the text already; XML parsing left it with LF line ends.
+            note(f"  UI-PAPIERKORB objekt={name} GET status={got.status}, Text aus dem REPORT")
+            objects.append(SnapshotObject("trashbin", name, etag, data.encode(), True))
 
     files = write_snapshot(RAW_DIR, label, objects)
     summaries = []
