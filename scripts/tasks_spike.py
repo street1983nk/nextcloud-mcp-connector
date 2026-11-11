@@ -54,8 +54,9 @@ from urllib.parse import quote
 import httpx
 from lxml import etree
 
+from mcp_connector import config
 from mcp_connector.errors import ToolError
-from mcp_connector.nextcloud.clients import ocs, xml
+from mcp_connector.nextcloud.clients import dav, ocs, xml
 from mcp_connector.nextcloud.credentials import MODE_APPAPI, MODE_BASIC, Credentials
 from mcp_connector.nextcloud.http import NoCookieJar
 
@@ -110,6 +111,30 @@ GF_KEYS = (
     "acl-ro-nach-regelentzug",
     "gruppe-nur-lesen",
 )
+
+SHARES_PATH = "/apps/files_sharing/api/v1/shares"
+
+#: One MKCOL from inside the ExApp container, the exact production way (http://caddy).
+#: Fed to ``/app/.venv/bin/python -`` through stdin with the user and the path as arguments.
+#: It reads APP_SECRET from its own environment and prints nothing but the status.
+EXAPP_MKCOL_PROGRAM = r"""
+import base64, os, sys
+from urllib.parse import quote
+import httpx
+
+user, path = sys.argv[1], sys.argv[2]
+token = base64.b64encode(("%s:%s" % (user, os.environ["APP_SECRET"])).encode()).decode()
+headers = {
+    "AA-VERSION": os.environ.get("AA_VERSION", ""),
+    "EX-APP-ID": os.environ.get("APP_ID", ""),
+    "EX-APP-VERSION": os.environ.get("APP_VERSION", ""),
+    "AUTHORIZATION-APP-API": token,
+}
+base = os.environ.get("NEXTCLOUD_URL", "http://caddy").rstrip("/")
+url = base + "/remote.php/dav/files/" + quote(user, safe="") + quote(path, safe="/")
+response = httpx.request("MKCOL", url, headers=headers, timeout=60.0)
+print(response.status_code)
+"""
 
 # --- PHP one shot snippets ------------------------------------------------------------------
 # Handed to ``php --`` through stdin; nothing of them lands in the repository as a .php file.
@@ -1029,6 +1054,409 @@ async def block_controls(session: Session) -> None:
         note(f"  {line[:300]}")
 
 
+@dataclass(frozen=True, slots=True)
+class Measured:
+    """One MKCOL with its counter probe in the file system."""
+
+    result: DavResult
+    created: bool
+
+    @property
+    def status(self) -> int:
+        return self.result.status
+
+
+def auth_label(creds: Credentials) -> str:
+    """How a row names its authentication: ``appapi`` or ``basic``."""
+    return "appapi" if creds.mode == MODE_APPAPI else "basic"
+
+
+def fs_home(user: str, sub: str) -> str:
+    """The path of ``sub`` below the home of ``user`` in the data directory."""
+    return f"{DATA_DIR}/{user}/files{sub}"
+
+
+def yes_no(value: bool) -> str:
+    return "ja" if value else "nein"
+
+
+async def measure_mkcol(session: Session, creds: Credentials, url: str, fs_path: str) -> Measured:
+    """One ``MKCOL`` without body and without ``Content-Type``, and what the disk says.
+
+    ``created`` means: the folder is in the file system after the call and was not there
+    before it. A folder that already existed is not counted as created.
+    """
+    before = dir_exists(fs_path)
+    result = await dav_request(session.client, creds, "MKCOL", url)
+    return Measured(result, dir_exists(fs_path) and not before)
+
+
+def mkcol_line(key: str, creds: Credentials, measured: Measured) -> str:
+    """``MKCOL <key> auth=.. status=.. angelegt=.. erwartet=.. | exception message``."""
+    return (
+        f"{now_stamp()} | MKCOL {key} auth={auth_label(creds)} status={measured.status} "
+        f"angelegt={yes_no(measured.created)} erwartet={mkcol_expectations()[key]} "
+        f"| {describe_error(measured.result.body)[:300]}"
+    )
+
+
+def note_raw(result: DavResult) -> None:
+    for line in raw_answer(result.status, result.reason, result.headers, result.body):
+        note(line)
+
+
+async def setup_request(
+    session: Session, creds: Credentials, method: str, sub: str, body: bytes | None = None
+) -> int:
+    """A preparing request, written as a ``SETUP`` line so it is never read as a measured row."""
+    result = await dav_request(
+        session.client,
+        creds,
+        method,
+        home_url(creds, sub),
+        body=body,
+        content_type="application/octet-stream",
+    )
+    note(
+        f"{now_stamp()} | SETUP {method} {sub} nutzer={creds.user} "
+        f"auth={auth_label(creds)} status={result.status}"
+    )
+    return result.status
+
+
+@dataclass
+class Matrix:
+    """The state of one mkcol block: the names of this run and the measured statuses."""
+
+    session: Session
+    stamp: str
+    base: str = f"/{PREFIX}"
+    statuses: dict[str, dict[str, int]] = field(default_factory=lambda: {"appapi": {}, "basic": {}})
+
+    async def row(
+        self,
+        key: str,
+        creds: Credentials,
+        sub: str,
+        *,
+        url: str | None = None,
+        fs: str | None = None,
+    ) -> Measured:
+        """Measure one row of the matrix and write its line and its raw answer."""
+        measured = await measure_mkcol(
+            self.session,
+            creds,
+            url or home_url(creds, sub),
+            fs or fs_home(USER_A, sub),
+        )
+        self.statuses[auth_label(creds)][key] = measured.status
+        note(mkcol_line(key, creds, measured))
+        note_raw(measured.result)
+        return measured
+
+
+def production_way(user: str, sub: str) -> None:
+    """The same MKCOL from inside the ExApp container against ``http://caddy``."""
+    running = docker("inspect", "--format", "{{.State.Running}}", EXAPP_CONTAINER, check=False)
+    if running.strip() != "true":
+        note(f"PRODUKTIONSWEG ungemessen grund=ExApp-Container {EXAPP_CONTAINER} laeuft nicht")
+        return
+    output = docker(
+        "exec",
+        "-i",
+        EXAPP_CONTAINER,
+        "/app/.venv/bin/python",
+        "-",
+        user,
+        sub,
+        stdin=EXAPP_MKCOL_PROGRAM,
+        check=False,
+    ).strip()
+    last = output.splitlines()[-1].strip() if output else ""
+    if not last.isdigit():
+        note(f"PRODUKTIONSWEG ungemessen grund=keine Statuszeile aus dem Container: {last[:200]}")
+        return
+    created = dir_exists(fs_home(user, sub))
+    note(
+        f"{now_stamp()} | PRODUKTIONSWEG MKCOL status={last} angelegt={yes_no(created)} "
+        f"nutzer={user} pfad={sub} (aus {EXAPP_CONTAINER} gegen http://caddy)"
+    )
+
+
+async def mkcol_first_point(matrix: Matrix, free: str) -> bool:
+    """M1.1, the first measuring point of the phase; returns whether MESS-01 aborts."""
+    session = matrix.session
+    creds = session.appapi(USER_A)
+    resourcetype = propfind_body([f"{{{xml.DAV}}}resourcetype"])
+    pre = await dav_request(
+        session.client, creds, "PROPFIND", home_url(creds, free), depth="0", body=resourcetype
+    )
+    note(
+        f"{now_stamp()} | KONTROLLE vorher PROPFIND Depth 0 {free} auth=appapi "
+        f"nutzer={USER_A} status={pre.status} erwartet=404"
+    )
+    since = container_now()
+    await asyncio.sleep(1)
+    measured = await measure_mkcol(session, creds, home_url(creds, free), fs_home(USER_A, free))
+    matrix.statuses["appapi"]["frei"] = measured.status
+    note(mkcol_line("frei", creds, measured))
+    aborted = abort_mess01(measured.status)
+    note(f"ABBRUCHKRITERIUM MESS-01 ausgeloest={yes_no(aborted)} status={measured.status}")
+    note(f"  Aufruf: MKCOL {DAV_FILES}{USER_A}{free} ohne Body, nutzer={USER_A}, auth=appapi")
+    note_raw(measured.result)
+    present = dir_exists(fs_home(USER_A, free))
+    note(f"DATEISYSTEM frei vorhanden={yes_no(present)} pfad={fs_home(USER_A, free)}")
+    after = await dav_request(
+        session.client, creds, "PROPFIND", home_url(creds, free), depth="0", body=resourcetype
+    )
+    note(
+        f"{now_stamp()} | KONTROLLE nachher PROPFIND Depth 0 {free} auth=appapi "
+        f"nutzer={USER_A} status={after.status}"
+    )
+    lines = impersonation_lines(since, USER_A, "MKCOL")
+    note(f"KONTROLLE exapp_impersonation.log, MKCOL-Zeilen von {USER_A} seit {since}: {len(lines)}")
+    for line in lines[-3:]:
+        note(f"  {line[:400]}")
+
+    wrong_sub = f"{free}-falsches-secret"
+    wrong = await measure_mkcol(
+        session,
+        session.appapi(USER_A, "0" * 64),
+        home_url(creds, wrong_sub),
+        fs_home(USER_A, wrong_sub),
+    )
+    note(
+        f"{now_stamp()} | GEGENPROBE falsches-secret MKCOL {wrong_sub} nutzer={USER_A} "
+        f"status={wrong.status} angelegt={yes_no(wrong.created)} "
+        f"| {describe_error(wrong.result.body)[:300]}"
+    )
+    foreign_sub = f"/{PREFIX}-fremd"
+    foreign = await measure_mkcol(
+        session,
+        creds,
+        home_url(creds, foreign_sub, owner=USER_B),
+        fs_home(USER_B, foreign_sub),
+    )
+    note(
+        f"{now_stamp()} | GEGENPROBE fremdes-home MKCOL {DAV_FILES}{USER_B}{foreign_sub} "
+        f"nutzer={USER_A} status={foreign.status} angelegt={yes_no(foreign.created)} "
+        f"| {describe_error(foreign.result.body)[:300]}"
+    )
+    production_way(USER_A, f"{free}-produktionsweg")
+    return aborted
+
+
+async def mkcol_matrix(matrix: Matrix, creds: Credentials, free_dir: str) -> None:
+    """M1.2: the rows that need nothing but the own home, for one way of authenticating."""
+    auth = auth_label(creds)
+    base = matrix.base
+    if "frei" not in matrix.statuses[auth]:
+        await matrix.row("frei", creds, free_dir)
+    await matrix.row("ordner-vorhanden", creds, free_dir)
+    file_sub = f"{base}/datei-{auth}.txt"
+    await setup_request(matrix.session, creds, "PUT", file_sub, b"spike30\n")
+    await matrix.row("datei-vorhanden", creds, file_sub)
+    await matrix.row("eltern-fehlt", creds, f"{base}/fehlt-{auth}/kind")
+    await matrix.row("eltern-ist-datei", creds, f"{file_sub}/kind")
+    await matrix.row("name-htaccess", creds, f"{free_dir}/.htaccess")
+    note(
+        "  name-backslash: das Segment ist bs%5Cx und wird roh an die URL gehaengt, weil "
+        "dav.safe_path einen Backslash vor jeder Anfrage ablehnt"
+    )
+    await matrix.row(
+        "name-backslash",
+        creds,
+        f"{free_dir}/bs%5Cx",
+        url=f"{home_url(creds, free_dir)}/bs%5Cx",
+        fs=fs_home(USER_A, f"{free_dir}/bs\\x"),
+    )
+    note("  name-ueberlang: das Segment besteht aus 300 mal x")
+    await matrix.row("name-ueberlang", creds, f"{free_dir}/{'x' * 300}")
+
+
+async def mkcol_shares(matrix: Matrix) -> None:
+    """M1.3: a share without and a share with create permission, from USER_B to USER_A."""
+    session = matrix.session
+    owner = session.basic(USER_B)
+    targets: dict[str, tuple[str, str]] = {}
+    for key, permissions in (("share-ro", 1), ("share-rw", 15)):
+        folder = f"/{PREFIX}-{key}"
+        await setup_request(session, owner, "MKCOL", folder)
+        response = await ocs.ocs_post(
+            session.client,
+            owner,
+            SHARES_PATH,
+            {"path": folder, "shareType": 0, "shareWith": USER_A, "permissions": permissions},
+        )
+        data = ocs.parse_ocs(response, what=f"the share of {folder}")
+        share_id = str(data.get("id", "")) if isinstance(data, dict) else ""
+        target = str(data.get("file_target", "")) if isinstance(data, dict) else ""
+        note(
+            f"{now_stamp()} | SETUP POST shares path={folder} shareWith={USER_A} "
+            f"permissions={permissions} nutzer={USER_B} status={response.status_code} "
+            f"id={share_id} file_target={target}"
+        )
+        if not target:
+            raise RunFailed(f"the share of {folder} returned no file_target")
+        targets[key] = (folder, target)
+    for creds in (session.appapi(USER_A), session.basic(USER_A)):
+        for key, (folder, target) in targets.items():
+            name = f"neu-{auth_label(creds)}"
+            await matrix.row(key, creds, f"{target}/{name}", fs=fs_home(USER_B, f"{folder}/{name}"))
+    creds = session.appapi(USER_A)
+    for folder, target in targets.values():
+        answer = await dav_request(
+            session.client,
+            creds,
+            "PROPFIND",
+            home_url(creds, target),
+            depth="0",
+            body=propfind_body([f"{{{xml.OC}}}permissions"]),
+        )
+        permissions = ""
+        if answer.status == 207:
+            entries = xml.parse_multistatus(answer.body)
+            permissions = entries[0][1].get(f"{{{xml.OC}}}permissions", "") if entries else ""
+        note(
+            f"{now_stamp()} | KONTROLLE oc:permissions {target} (Ordner {folder} von {USER_B}) "
+            f"aus Sicht von {USER_A} auth=appapi status={answer.status} "
+            f"permissions={permissions or '(leer)'}"
+        )
+
+
+def files_url_with_root(creds: Credentials, root: str, virtual: str) -> str:
+    """The URL ``dav.files_url`` builds for ``virtual`` while ``NC_MCP_FILES_ROOT`` is ``root``.
+
+    ``config.files_root`` reads the process environment on every call, so the variable is
+    set for exactly this one call and put back afterwards.
+    """
+    previous = os.environ.get(config.ENV_FILES_ROOT)
+    os.environ[config.ENV_FILES_ROOT] = root
+    try:
+        return dav.files_url(creds, virtual)
+    finally:
+        if previous is None:
+            del os.environ[config.ENV_FILES_ROOT]
+        else:
+            os.environ[config.ENV_FILES_ROOT] = previous
+
+
+async def mkcol_root(matrix: Matrix) -> None:
+    """M1.4: the three sandbox rows, measured at the URL the connector itself would build."""
+    session = matrix.session
+    root = f"{matrix.base}/root"
+    await setup_request(session, session.basic(USER_A), "MKCOL", root)
+    for creds in (session.appapi(USER_A), session.basic(USER_A)):
+        auth = auth_label(creds)
+        cases = (
+            ("root-vorhanden", root, f"/unter-{auth}"),
+            ("root-fehlt", f"{root}-fehlt", f"/unter-{auth}"),
+            ("root-selbst", root, "/"),
+        )
+        for key, env_root, virtual in cases:
+            url = files_url_with_root(creds, env_root, virtual)
+            real = env_root if virtual == "/" else f"{env_root}{virtual}"
+            note(
+                f"FILES_ROOT {key} auth={auth} {config.ENV_FILES_ROOT}={env_root} "
+                f"pfad={virtual} url={url[len(creds.base_url) :]}"
+            )
+            await matrix.row(key, creds, real, url=url)
+
+
+async def mkcol_quota(matrix: Matrix) -> None:
+    """M1.5: MKCOL with an exhausted quota; a PUT shows first that the quota bites."""
+    session = matrix.session
+    setting = ("user:setting", USER_A, "files", "quota")
+    previous = occ(NC_CONTAINER, *setting, check=False)
+    was_set = "does not exist" not in previous
+    note(f"occ user:setting {USER_A} files quota (vorher) -> {previous}")
+    note(f"occ user:setting {USER_A} files quota '1 KB' -> {occ(NC_CONTAINER, *setting, '1 KB')}")
+    try:
+        for creds in (session.appapi(USER_A), session.basic(USER_A)):
+            auth = auth_label(creds)
+            probe = f"{matrix.base}/quota-probe-{auth}.bin"
+            put = await dav_request(
+                session.client,
+                creds,
+                "PUT",
+                home_url(creds, probe),
+                body=b"x" * 2048,
+                content_type="application/octet-stream",
+            )
+            note(
+                f"{now_stamp()} | KONTROLLE kontingent PUT 2048 Bytes {probe} auth={auth} "
+                f"nutzer={USER_A} status={put.status} wirkt={yes_no(put.status == 507)} "
+                f"| {describe_error(put.body)[:300]}"
+            )
+            if put.status != 507:
+                note(
+                    f"M1.5 ungemessen auth={auth} grund=die Positivkontrolle lieferte "
+                    f"{put.status} statt 507, das Kontingent wirkt nicht"
+                )
+            await matrix.row("quota", creds, f"{matrix.base}/quota-{auth}")
+    finally:
+        if was_set:
+            restored = occ(NC_CONTAINER, *setting, previous, check=False)
+        else:
+            restored = occ(NC_CONTAINER, *setting, "--delete", check=False)
+        note(f"occ user:setting {USER_A} files quota zurueckgesetzt -> {restored or 'ok'}")
+
+
+async def block_mkcol(session: Session) -> None:
+    """MESS-01: the first measuring point, then the status matrix under both ways in."""
+    section("mkcol")
+    ram_gate(NC35_CONTAINERS)
+    matrix = Matrix(session=session, stamp=datetime.now(UTC).strftime("%H%M%S"))
+    basic = session.basic(USER_A)
+    appapi = session.appapi(USER_A)
+
+    # The base folder is set up by a PUT that creates its parent, so that the very first
+    # MKCOL of this phase is the measured one and not a preparing one.
+    setup = await session.client.put(
+        home_url(basic, f"{matrix.base}/setup.txt"),
+        content=b"spike30\n",
+        headers={"X-NC-WebDAV-Auto-Mkcol": "1"},
+        auth=basic.auth(),
+    )
+    base_ready = dir_exists(fs_home(USER_A, matrix.base))
+    note(
+        f"{now_stamp()} | SETUP PUT {matrix.base}/setup.txt mit X-NC-WebDAV-Auto-Mkcol "
+        f"nutzer={USER_A} auth=basic status={setup.status_code} "
+        f"basisordner_vorhanden={yes_no(base_ready)}"
+    )
+    free = f"{matrix.base}/frei-{matrix.stamp}" if base_ready else f"/{PREFIX}-frei-{matrix.stamp}"
+    aborted = await mkcol_first_point(matrix, free)
+    if not base_ready:
+        await setup_request(session, basic, "MKCOL", matrix.base)
+    if aborted:
+        note(
+            "ABBRUCHKRITERIUM MESS-01 ist ausgeloest: die Matrix laeuft als Diagnose weiter, "
+            "Phase 31 wird nicht geplant, der Befund geht an den Owner"
+        )
+
+    free_basic = f"{matrix.base}/frei-basic-{matrix.stamp}"
+    await guarded("mkcol matrix appapi", mkcol_matrix(matrix, appapi, free))
+    await guarded("mkcol matrix basic", mkcol_matrix(matrix, basic, free_basic))
+    await guarded("mkcol shares", mkcol_shares(matrix))
+    await guarded("mkcol root", mkcol_root(matrix))
+    await guarded("mkcol quota", mkcol_quota(matrix))
+
+    section("mkcol summary")
+    expected = mkcol_expectations()
+    for key in MKCOL_KEYS:
+        seen_appapi = matrix.statuses["appapi"].get(key, "fehlt")
+        seen_basic = matrix.statuses["basic"].get(key, "fehlt")
+        differs = [
+            auth for auth in ("appapi", "basic") if matrix.statuses[auth].get(key) != expected[key]
+        ]
+        note(
+            f"MKCOL ZEILE {key} appapi={seen_appapi} basic={seen_basic} "
+            f"erwartet={expected[key]} abweichung_von_erwartung={','.join(differs) or 'keine'}"
+        )
+    same, differing = same_status(matrix.statuses["appapi"], matrix.statuses["basic"])
+    note(f"MKCOL GLEICH appapi_basic={yes_no(same)} abweichend={differing or 'keine'}")
+
+
 async def run_blocks(env: Mapping[str, str], blocks: Sequence[str]) -> None:
     """The named blocks in order; the rollback and the stop run whatever happened before."""
     async with new_client() as client:
@@ -1039,8 +1467,10 @@ async def run_blocks(env: Mapping[str, str], blocks: Sequence[str]) -> None:
                     block_nc35_up()
                 elif name == "controls":
                     await block_controls(session)
-                elif name in ("mkcol", "groupfolder"):
-                    raise RunFailed(f"block {name} is not built yet (plan 30-01, tasks 2 and 3)")
+                elif name == "mkcol":
+                    await block_mkcol(session)
+                elif name == "groupfolder":
+                    raise RunFailed("block groupfolder is not built yet (plan 30-01, task 3)")
         finally:
             try:
                 if session.before is not None:
