@@ -870,3 +870,127 @@ def test_parse_trash_source_reads_key_default_paths_and_command_from_the_grepped
     del found["CalDAV/Trashbin/RestoreTarget.php"]
     with pytest.raises(ValueError, match="RestoreTarget"):
         spike.parse_trash_source(found)
+
+
+# --- plan 30-03 task 2: the delete verdict (E13) ----------------------------------------------
+
+
+def _row(major: int, **values: bool) -> object:
+    flags = {"g": True, "w1": True, "w2": True, "w3": False, "w4": True, **values}
+    return spike.VersionRow(major=major, version=f"{major}.0.1", who="eigentuemer", **flags)
+
+
+def _all(**values: bool) -> list[object]:
+    return [_row(major, **values) for major in (32, 33, 34, 35)]
+
+
+def test_delete_verdict_is_restorable_when_the_pretest_tells_the_off_state() -> None:
+    assert spike.delete_verdict(_all(w3=False, w4=True)) == "wiederherstellbar"
+
+
+def test_delete_verdict_is_restorable_when_the_off_state_still_restores() -> None:
+    assert spike.delete_verdict(_all(w3=True, w4=False)) == "wiederherstellbar"
+
+
+def test_delete_verdict_is_lost_when_one_version_has_neither_restore_nor_pretest() -> None:
+    rows = [*_all()[:3], _row(35, w3=False, w4=False)]
+    assert spike.delete_verdict(rows) == "nicht wiederherstellbar"
+
+
+def test_delete_verdict_is_lost_when_one_version_fails_on_a_shared_list() -> None:
+    rows = [_row(32, w2=False), *_all()[1:]]
+    assert spike.delete_verdict(rows) == "nicht wiederherstellbar"
+
+
+def test_delete_verdict_is_lost_when_one_version_fails_on_an_own_list() -> None:
+    rows = [_row(32), _row(33, w1=False), _row(34), _row(35)]
+    assert spike.delete_verdict(rows) == "nicht wiederherstellbar"
+
+
+def test_delete_verdict_is_unclear_when_one_version_is_not_measured() -> None:
+    rows = [*_all()[:2], _row(34, g=False), _row(35)]
+    assert spike.delete_verdict(rows) == "nicht eindeutig"
+
+
+def test_delete_verdict_is_unclear_when_a_version_is_missing_and_refuses_an_unknown_one() -> None:
+    assert spike.delete_verdict(_all()[:3]) == "nicht eindeutig"
+    assert spike.delete_verdict([]) == "nicht eindeutig"
+    with pytest.raises(ValueError, match="36"):
+        spike.delete_verdict([*_all(), _row(36)])
+
+
+def test_delete_verdict_is_unclear_when_two_runs_of_one_version_contradict() -> None:
+    rows = [*_all(), _row(34, w1=False)]
+    assert spike.delete_verdict(rows) == "nicht eindeutig"
+    assert spike.delete_verdict([*_all(), _row(34)]) == "wiederherstellbar"
+
+
+def test_the_three_verdict_words_are_module_constants_with_real_blanks() -> None:
+    assert spike.VERDICT_RESTORABLE == "wiederherstellbar"
+    assert spike.VERDICT_LOST == "nicht wiederherstellbar"
+    assert spike.VERDICT_UNCLEAR == "nicht eindeutig"
+
+
+def test_parse_version_line_reads_the_major_version_and_the_five_values() -> None:
+    row = spike.parse_version_line(
+        "LOESCHEN VERSION 34.0.4 g=ja w1=ja w2=ja w3=nein w4=ja wer=eigentuemer"
+    )
+    assert (row.major, row.version, row.who) == (34, "34.0.4", "eigentuemer")
+    assert (row.g, row.w1, row.w2, row.w3, row.w4) == (True, True, True, False, True)
+    with pytest.raises(ValueError, match="w3"):
+        spike.parse_version_line(
+            "LOESCHEN VERSION 34.0.4 g=ja w1=ja w2=ja w3=vielleicht w4=ja wer=eigentuemer"
+        )
+    with pytest.raises(ValueError, match="LOESCHEN VERSION"):
+        spike.parse_version_line("LOESCHEN an-eigen status=204")
+
+
+def test_version_rows_lets_a_declared_repeat_replace_the_runs_before_it() -> None:
+    first = "# Lauf blocks=delete-matrix start=a\nLOESCHEN VERSION 33.0.9 g=nein w1=ja w2=ja w3=nein w4=ja wer=keiner\n"
+    repeat = (
+        "# Lauf blocks=delete-matrix start=b\nWIEDERHOLUNG Grund: Werkzeugfehler\n"
+        "LOESCHEN VERSION 33.0.9 g=ja w1=ja w2=ja w3=nein w4=ja wer=eigentuemer\n"
+    )
+    plain = "# Lauf blocks=delete-matrix start=c\nLOESCHEN VERSION 33.0.9 g=ja w1=nein w2=ja w3=nein w4=ja wer=keiner\n"
+    assert [row.g for row in spike.version_rows(first + repeat)] == [True]
+    assert [row.g for row in spike.version_rows(first + plain)] == [False, True]
+    assert spike.version_rows("# Lauf blocks=delete-matrix start=a\nRUN FAILED | x\n") == []
+
+
+def test_consequence_names_the_fixed_outcome_of_each_word() -> None:
+    assert "TMOD-07" in spike.consequence("wiederherstellbar")
+    assert "planbar" in spike.consequence("wiederherstellbar")
+    for word in ("nicht wiederherstellbar", "nicht eindeutig"):
+        assert "kein L\u00f6schen in 0.8.0, ohne R\u00fcckfrage" in spike.consequence(word)
+    with pytest.raises(ValueError, match="vielleicht"):
+        spike.consequence("vielleicht")
+
+
+def test_validate_delete_tag_takes_the_four_tags_and_others_only_on_request() -> None:
+    for tag in ("32.0.15-apache", "33.0.9-apache", "34.0.4-apache", "35.0.2-apache"):
+        assert spike.validate_delete_tag(tag) == tag
+    with pytest.raises(ValueError, match="allow-other-tag"):
+        spike.validate_delete_tag("35.0.0-apache")
+    assert spike.validate_delete_tag("35.0.0-apache", allow_other=True) == "35.0.0-apache"
+    with pytest.raises(ValueError, match="allow-other-tag"):
+        spike.validate_delete_tag("latest", allow_other=True)
+
+
+def test_pretest_shows_reads_each_candidate_as_on_off_or_unclear() -> None:
+    assert spike.pretest_shows("frist-eigenschaft", "2592000") == "an"
+    assert spike.pretest_shows("frist-eigenschaft", "0") == "aus"
+    assert spike.pretest_shows("frist-eigenschaft", "fehlt") == "unklar"
+    assert spike.pretest_shows("papierkorb-propfind", "207") == "an"
+    assert spike.pretest_shows("papierkorb-propfind", "404") == "aus"
+    assert spike.pretest_shows("papierkorb-propfind", "500") == "unklar"
+    assert spike.pretest_shows("home-kind-trashbin", "ja") == "an"
+    assert spike.pretest_shows("dav-kopf", "nein") == "aus"
+    assert spike.pretest_shows("capabilities-dav", '{"chunking": "1.0"}') == "unklar"
+
+
+def test_pretest_distinguishing_keeps_only_candidates_right_in_both_states() -> None:
+    on = {"frist-eigenschaft": "2592000", "papierkorb-propfind": "207", "dav-kopf": "ja"}
+    off = {"frist-eigenschaft": "0", "papierkorb-propfind": "207", "dav-kopf": "ja"}
+    assert spike.pretest_distinguishing(on, off) == ["frist-eigenschaft"]
+    assert spike.pretest_distinguishing(on, on) == []
+    assert spike.pretest_distinguishing(off, on) == []
