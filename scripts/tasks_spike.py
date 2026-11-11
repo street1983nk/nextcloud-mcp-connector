@@ -18,7 +18,12 @@ file. The blocks are ``nc35-up`` (start the standing topology with ``docker star
 ``up`` and never ``down``, and read the versions of record from the running instance),
 ``controls`` (baseline inventory, the measuring accounts, the three identity controls),
 ``mkcol`` (the first measuring point and the status matrix), ``groupfolder`` (group folder
-with ACL, negative test, read-only external storage), ``nc35-stop`` (``docker stop`` of the
+with ACL, negative test, read-only external storage), ``modify`` (``PUT`` with ``If-Match``
+under impersonation, a stale ETag, foreign properties, a list shared read-only, the server
+side of recurring tasks and sub tasks), ``ui-prepare`` (the Tasks app and the account of the
+browser session), ``ui-snapshot`` (every object of that account as a file, before and after
+the browser session), ``ui-teardown`` (take all of that back and compare against the
+baseline the kept run wrote), ``nc35-stop`` (``docker stop`` of the
 same four containers) and ``secret-scan`` (the gate over every raw protocol of the phase
 folder and the report before a commit). Whatever the measuring blocks created is taken back
 in a ``finally`` and compared against the baseline, before ``nc35-stop`` runs.
@@ -36,6 +41,7 @@ through stdin only, never as an argument.
 import argparse
 import asyncio
 import base64
+import hashlib
 import io
 import json
 import os
@@ -49,14 +55,14 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 import httpx
 from lxml import etree
 
 from mcp_connector import config
 from mcp_connector.errors import ToolError
-from mcp_connector.nextcloud.clients import dav, ocs, xml
+from mcp_connector.nextcloud.clients import caldav, dav, ocs, xml
 from mcp_connector.nextcloud.credentials import MODE_APPAPI, MODE_BASIC, Credentials
 from mcp_connector.nextcloud.http import NoCookieJar
 
@@ -72,6 +78,8 @@ DATA_DIR = "/var/www/html/data"
 PREFIX = "spike30"
 USER_A = "spike30a"
 USER_B = "spike30b"
+#: The account of the browser session of plan 30-02; it falls with ui-teardown.
+UI_USER = "spike30ui"
 
 #: The RAM rule of the phase: a heavy run needs this much free host memory.
 MIN_FREE_HOST_GB = 4.0
@@ -100,13 +108,18 @@ SABRE = "http://sabredav.org/ns"
 DAV_FILES = "/remote.php/dav/files/"
 TIMEOUT = httpx.Timeout(60.0)
 
-#: Further blocks follow in plans 30-02 to 30-05.
+#: Further blocks follow in plans 30-03 to 30-05; ui-evaluate and inventory
+#: follow in task 3 of plan 30-02.
 BLOCKS = (
     "nc35-up",
     "controls",
     "mkcol",
     "groupfolder",
     "nachlauf",
+    "modify",
+    "ui-prepare",
+    "ui-snapshot",
+    "ui-teardown",
     "nc35-stop",
     "secret-scan",
 )
@@ -376,6 +389,381 @@ def missing_quotes(report_text: str, raw_texts: Mapping[str, str]) -> list[str]:
     ]
 
 
+# --- pure helpers: iCalendar texts (plan 30-02) ----------------------------------------------
+
+
+def unfold(text: str) -> str:
+    """An iCalendar text with LF line ends and every folded line joined again (RFC 5545 3.1)."""
+    plain = text.replace("\r\n", "\n").replace("\r", "\n")
+    return re.sub(r"\n[ \t]", "", plain)
+
+
+def property_name(line: str) -> str:
+    """The name of a content line: everything before the first ``;``, ``:`` or blank."""
+    return re.split(r"[;: ]", line.strip(), maxsplit=1)[0].upper()
+
+
+def ics_line_set(text: str) -> set[tuple[str, str]]:
+    """The content lines of an iCalendar text as ``(component path, unfolded line)``.
+
+    Empty lines are dropped. ``BEGIN`` and ``END`` do not count as content, but every
+    component path gets one line ``BEGIN x<n>`` with the number of components of that path:
+    a set would otherwise hide that the second of two equal alarms went missing.
+    """
+    stack: list[str] = []
+    lines: set[tuple[str, str]] = set()
+    counts: dict[str, int] = {}
+    for line in unfold(text).split("\n"):
+        if not line.strip():
+            continue
+        name = property_name(line)
+        if name == "BEGIN":
+            stack.append(line.split(":", 1)[1].strip().upper())
+            path = "/".join(stack)
+            counts[path] = counts.get(path, 0) + 1
+        elif name == "END":
+            if stack:
+                stack.pop()
+        else:
+            lines.add(("/".join(stack), line))
+    lines.update((path, f"BEGIN x{count}") for path, count in counts.items())
+    return lines
+
+
+def _diff_name(path: str, line: str) -> str:
+    """How a changed property is named: bare inside the VTODO, else with its component."""
+    name = property_name(line)
+    component = path.rsplit("/", 1)[-1]
+    return name if component in ("VTODO", "VEVENT") else f"{component}.{name}"
+
+
+def line_diff(before: str, after: str) -> tuple[list[str], list[str], set[str]]:
+    """``(added, removed, changed names)`` between two iCalendar texts.
+
+    A property that stands on both sides with a different line counts as changed and is
+    named once; it shows up in neither of the two lists. Added and removed lines are
+    written as ``<component path>:<line>``.
+    """
+    old, new = ics_line_set(before), ics_line_set(after)
+    only_old, only_new = old - new, new - old
+    keys_old = {(path, property_name(line)) for path, line in only_old}
+    keys_new = {(path, property_name(line)) for path, line in only_new}
+    both = keys_old & keys_new
+    added = sorted(
+        f"{path}:{line}" for path, line in only_new if (path, property_name(line)) not in both
+    )
+    removed = sorted(
+        f"{path}:{line}" for path, line in only_old if (path, property_name(line)) not in both
+    )
+    changed = {
+        _diff_name(path, line) for path, line in only_new if (path, property_name(line)) in both
+    }
+    return added, removed, changed
+
+
+def preserved(
+    before: str, after: str, allowed: Iterable[str] = ("SUMMARY",)
+) -> tuple[bool, list[str]]:
+    """Whether ``after`` differs from ``before`` in nothing but the ``allowed`` properties.
+
+    The second value names every offence: ``entfernt <line>``, ``hinzu <line>`` and
+    ``geaendert <name>``. This is the abort criterion of MESS-05 for foreign properties.
+    """
+    added, removed, changed = line_diff(before, after)
+    permitted = {name.upper() for name in allowed}
+    offences = [f"entfernt {line}" for line in removed]
+    offences.extend(f"hinzu {line}" for line in added)
+    offences.extend(f"geaendert {name}" for name in sorted(changed - permitted))
+    return (not offences, offences)
+
+
+def abort_if_match(
+    *, status_current: int, etag_changed: bool, status_stale: int, unchanged_after_stale: bool
+) -> tuple[bool, str]:
+    """The abort criterion of MESS-05 for ``If-Match``: ``(triggered, reason)``.
+
+    Not triggered only if the PUT with the current ETag answered 2xx, the ETag is another
+    one afterwards, the PUT with the stale ETag answered exactly 412 and the object is
+    unchanged after it.
+    """
+    reasons = []
+    if not 200 <= status_current < 300:
+        reasons.append(f"PUT mit der aktuellen ETag lieferte {status_current} statt 2xx")
+    if not etag_changed:
+        reasons.append("die ETag ist nach dem PUT dieselbe")
+    if status_stale != 412:
+        reasons.append(f"PUT mit der veralteten ETag lieferte {status_stale} statt 412")
+    if not unchanged_after_stale:
+        reasons.append("das Objekt ist nach dem abgelehnten PUT veraendert")
+    return (bool(reasons), "; ".join(reasons) or "keiner")
+
+
+def value_form(text: str) -> str:
+    """The form of a time value: ``utc``, ``tzid``, ``floating``, ``date`` or ``other``.
+
+    Takes a bare value or a whole content line; a ``TZID`` parameter wins over the value.
+    """
+    head, _, value = text.rpartition(":")
+    if "TZID=" in head.upper():
+        return "tzid"
+    value = value.strip()
+    if re.fullmatch(r"\d{8}T\d{6}Z", value):
+        return "utc"
+    if re.fullmatch(r"\d{8}T\d{6}", value):
+        return "floating"
+    if re.fullmatch(r"\d{8}", value):
+        return "date"
+    return "other"
+
+
+def property_value(text: str, name: str) -> str:
+    """The value of the first ``name`` line of an iCalendar text, unfolded; else empty."""
+    match = re.search(rf"^{re.escape(name)}(?:;[^:\n]*)?:(.*)$", unfold(text), re.MULTILINE)
+    return match[1].strip() if match else ""
+
+
+def fold_line(line: str) -> str:
+    """One content line folded at 75 octets, continuation lines starting with a space."""
+    parts = []
+    rest = line
+    limit = 75
+    while len(rest.encode()) > limit:
+        parts.append(rest[:limit])
+        rest = rest[limit:]
+        limit = 74
+    parts.append(rest)
+    return "\r\n ".join(parts)
+
+
+def _ics(lines: Iterable[str]) -> str:
+    return "".join(f"{fold_line(line)}\r\n" for line in lines)
+
+
+def simple_todo(uid: str, summary: str, extra: Iterable[str] = ()) -> str:
+    """A plain VTODO with CRLF line ends; ``extra`` lines go in before the end of it."""
+    return _ics(
+        [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//spike30//tasks_spike//EN",
+            "BEGIN:VTODO",
+            f"UID:{uid}",
+            "DTSTAMP:20261111T100000Z",
+            "CREATED:20261111T100000Z",
+            "LAST-MODIFIED:20261111T100000Z",
+            f"SUMMARY:{summary}",
+            *extra,
+            "END:VTODO",
+            "END:VCALENDAR",
+        ]
+    )
+
+
+def build_probe_todo(uid: str, summary: str) -> str:
+    """The object of the second abort measurement: everything a modifying PUT has to keep.
+
+    A VTIMEZONE, an alarm, three X- properties, an unknown parameter at SUMMARY, two
+    categories, a class and a description long enough to be folded.
+    """
+    description = (
+        "Eine Beschreibung mit mehr als fuenfundsiebzig Zeichen\\, damit die Zeile gefaltet "
+        "werden muss und der Server sie beim Speichern nicht neu umbrechen darf."
+    )
+    return _ics(
+        [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//spike30//tasks_spike//EN",
+            "CALSCALE:GREGORIAN",
+            "BEGIN:VTIMEZONE",
+            "TZID:Europe/Berlin",
+            "BEGIN:DAYLIGHT",
+            "TZOFFSETFROM:+0100",
+            "TZOFFSETTO:+0200",
+            "TZNAME:CEST",
+            "DTSTART:19700329T020000",
+            "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU",
+            "END:DAYLIGHT",
+            "BEGIN:STANDARD",
+            "TZOFFSETFROM:+0200",
+            "TZOFFSETTO:+0100",
+            "TZNAME:CET",
+            "DTSTART:19701025T030000",
+            "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU",
+            "END:STANDARD",
+            "END:VTIMEZONE",
+            "BEGIN:VTODO",
+            f"UID:{uid}",
+            "DTSTAMP:20261111T100000Z",
+            "CREATED:20261111T100000Z",
+            "LAST-MODIFIED:20261111T100000Z",
+            f"SUMMARY;X-SPIKE30-PARAM=abc:{summary}",
+            f"DESCRIPTION:{description}",
+            "DTSTART;TZID=Europe/Berlin:20261119T090000",
+            "DUE;TZID=Europe/Berlin:20261120T101500",
+            "CATEGORIES:spike30,wichtig",
+            "CLASS:CONFIDENTIAL",
+            "PRIORITY:1",
+            "X-SPIKE30-FOO:bar",
+            "X-APPLE-SORT-ORDER:123",
+            "X-OC-HIDESUBTASKS:1",
+            "BEGIN:VALARM",
+            "ACTION:DISPLAY",
+            "DESCRIPTION:spike30 Erinnerung",
+            "TRIGGER:-PT15M",
+            "END:VALARM",
+            "END:VTODO",
+            "END:VCALENDAR",
+        ]
+    )
+
+
+def set_summary(text: str, summary: str) -> str:
+    """Replace the value of the SUMMARY line, textually; parameters and all else stay.
+
+    On purpose not through icalendar: a parser would rewrite the whole object, and the
+    measurement is about what the server does with a text it is handed.
+    """
+    changed, count = re.subn(
+        r"(?m)^(SUMMARY(?:;[^:\r\n]*)?):[^\r\n]*", lambda match: f"{match[1]}:{summary}", text
+    )
+    if count != 1:
+        raise ValueError(f"expected exactly one SUMMARY line, found {count}")
+    return changed
+
+
+def complete_todo(text: str, stamp: str) -> str:
+    """Add the three lines of checking off right before ``END:VTODO``, textually."""
+    lines = f"STATUS:COMPLETED\r\nPERCENT-COMPLETE:100\r\nCOMPLETED:{stamp}\r\n"
+    if text.count("END:VTODO") != 1:
+        raise ValueError("expected exactly one VTODO")
+    return text.replace("END:VTODO", f"{lines}END:VTODO")
+
+
+def short_etag(etag: str) -> str:
+    """The first twelve characters of an ETag without quotes and weak marker; ``-`` if none."""
+    bare = etag.strip().removeprefix("W/").strip('"')
+    return bare[:12] or "-"
+
+
+def etag_kind(etag: str) -> str:
+    """``stark``, ``schwach`` or ``fehlt``."""
+    if not etag.strip():
+        return "fehlt"
+    return "schwach" if etag.strip().startswith("W/") else "stark"
+
+
+def calendar_collections(body: str | bytes) -> list[tuple[str, str, tuple[str, ...]]]:
+    """Every calendar collection of a discovery answer: ``(uri, display name, components)``.
+
+    Unlike ``caldav.parse_calendar_home`` this keeps task lists and shared collections; the
+    inbox, the outbox, the trash bin and the home itself are no calendars and drop out.
+    """
+    root = xml.parse_root(body)
+    found = []
+    for response in root.findall(f"{{{xml.DAV}}}response"):
+        if response.find(f".//{{{xml.DAV}}}resourcetype/{{{xml.CAL}}}calendar") is None:
+            continue
+        href = response.findtext(f"{{{xml.DAV}}}href") or ""
+        uri = unquote(href.strip().rstrip("/").rsplit("/", 1)[-1])
+        name = (response.findtext(f".//{{{xml.DAV}}}displayname") or "").strip()
+        comps = tuple(
+            str(comp.get("name"))
+            for comp in response.iterfind(
+                f".//{{{xml.CAL}}}supported-calendar-component-set/{{{xml.CAL}}}comp"
+            )
+        )
+        found.append((uri, name or uri, comps))
+    return found
+
+
+#: The tasks the browser session of plan 30-02 creates in round A, by SUMMARY. The
+#: recurring one is not in here: whether the Tasks app can create it is itself a finding.
+UI_EXPECTED = (
+    "s30 ganztag",
+    "s30 uhrzeit",
+    "s30 tags",
+    "s30 notiz",
+    "s30 unberuehrt",
+    "s30 eltern-abhaken",
+    "s30 kind-abhaken",
+    "s30 eltern-umzug",
+    "s30 kind-umzug",
+    "s30 eltern-loeschen",
+    "s30 kind-loeschen",
+    "s30 abhaken",
+    "s30 wieder-oeffnen",
+    "s30 umzug-einzeln",
+)
+UI_RECURRING = "s30 wiederkehrend"
+
+
+def missing_names(summaries: Iterable[str]) -> list[str]:
+    """The expected task names a snapshot does not carry."""
+    seen = set(summaries)
+    return [name for name in UI_EXPECTED if name not in seen]
+
+
+@dataclass(frozen=True, slots=True)
+class SnapshotObject:
+    """One calendar object of a snapshot of the browser session, bytes as the server sent."""
+
+    collection: str
+    name: str
+    etag: str
+    data: bytes
+    trashed: bool
+
+
+def write_snapshot(raw_dir: Path, label: str, objects: Sequence[SnapshotObject]) -> list[str]:
+    """Write one file per object into ``raw_dir/ui-<label>/`` and return the file names.
+
+    The file name is the object name; an object of the trash bin gets the prefix ``trash-``,
+    and a second object of the same name gets its collection in front. Files of an earlier
+    snapshot under the same label are removed first, so no stale object survives.
+    """
+    target = raw_dir / f"ui-{label}"
+    target.mkdir(parents=True, exist_ok=True)
+    for stale in target.glob("*.ics"):
+        stale.unlink()
+    written: list[str] = []
+    for item in objects:
+        name = f"trash-{item.name}" if item.trashed else item.name
+        if name in written:
+            name = f"{item.collection}--{name}"
+        (target / name).write_bytes(item.data)
+        written.append(name)
+    return written
+
+
+def baseline_from_protocol(text: str) -> dict[str, str]:
+    """The baseline of the last ``controls`` block of a raw protocol, from its own lines.
+
+    A run that keeps its accounts for the browser session ends without a rollback. The
+    teardown in a later process compares against the ``BASELINE-START`` lines that run
+    wrote, so the baseline needs no file of its own.
+    """
+    baseline: dict[str, str] = {}
+    for line in text.splitlines():
+        if line.strip() == "== controls ==":
+            baseline = {}
+        elif line.startswith("BASELINE-START "):
+            name, _, value = line.removeprefix("BASELINE-START ").partition("=")
+            baseline[name] = value
+    return baseline
+
+
+def read_ui_file(path: Path) -> tuple[str, str, str]:
+    """User, login password and base URL of the browser account, one per line.
+
+    The file lives outside the repository; its second line is a secret and never printed.
+    """
+    lines = path.read_text(encoding="utf-8").splitlines() if path.is_file() else []
+    if len(lines) < 3 or not all(line.strip() for line in lines[:3]):
+        raise RunFailed(f"{path.name} does not carry user, password and base URL; run ui-prepare")
+    return lines[0].strip(), lines[1].strip(), lines[2].strip()
+
+
 # --- protocol -------------------------------------------------------------------------------
 
 _protocol: list[str] = []
@@ -569,7 +957,7 @@ def remember_env_secrets(env: Mapping[str, str]) -> None:
         if _SECRET_NAME.search(name):
             remember_secret(name, value)
     secret = env.get("APP_SECRET", "")
-    for user in (env.get("NC_MCP_TEST_USER", ""), USER_A, USER_B):
+    for user in (env.get("NC_MCP_TEST_USER", ""), USER_A, USER_B, UI_USER):
         if user and secret:
             token = base64.b64encode(f"{user}:{secret}".encode()).decode()
             remember_secret(f"APPAPI_TOKEN_{user}", token)
@@ -948,6 +1336,7 @@ async def dav_request(
     depth: str | None = None,
     body: bytes | None = None,
     content_type: str | None = "application/xml; charset=utf-8",
+    extra_headers: Mapping[str, str] | None = None,
 ) -> DavResult:
     """One DAV request, timed; a 4xx is returned, never raised.
 
@@ -959,6 +1348,7 @@ async def dav_request(
         headers["Depth"] = depth
     if body is not None and content_type is not None:
         headers["Content-Type"] = content_type
+    headers.update(extra_headers or {})
     started = time.perf_counter()
     response = await client.request(method, url, headers=headers, content=body, auth=creds.auth())
     seconds = time.perf_counter() - started
@@ -1899,10 +2289,882 @@ async def block_nachlauf(session: Session) -> None:
     note(f"occ groupfolders:list --output=json (vor dem Loeschen) -> {_one_line(listed)}")
 
 
-async def run_blocks(env: Mapping[str, str], blocks: Sequence[str]) -> None:
-    """The named blocks in order; the rollback and the stop run whatever happened before."""
+# --- plan 30-02: modifying access (MESS-05) ---------------------------------------------------
+
+LIST_A = f"{PREFIX}-a"
+LIST_B = f"{PREFIX}-b"
+LIST_RO = f"{PREFIX}-b-ro"
+LIST_RW = f"{PREFIX}-b-rw"
+ICS_TYPE = "text/calendar; charset=utf-8"
+OC_SHARE_NS = "http://owncloud.org/ns"
+PROBE_X_LINE = "X-SPIKE30-FOO:bar\r\n"
+#: Blocks whose accounts and lists a later call still needs; ui-teardown takes them back.
+KEEP_BLOCKS = ("modify", "ui-prepare")
+
+#: Row count, sha256 and length of the column calendardata for one object name.
+PHP_OBJECT_HASH = (
+    _PHP_BOOT
+    + r"""
+$db = \OCP\Server::get(\OCP\IDBConnection::class);
+$qb = $db->getQueryBuilder();
+$qb->select('calendardata')->from('calendarobjects')
+    ->where($qb->expr()->eq('uri', $qb->createNamedParameter($argv[1])))
+    ->andWhere($qb->expr()->isNull('deleted_at'));
+$out = [];
+foreach ($qb->executeQuery()->fetchAll() as $row) {
+    $data = $row['calendardata'];
+    if (is_resource($data)) {
+        $data = stream_get_contents($data);
+    }
+    $out[] = hash('sha256', (string)$data) . ':' . strlen((string)$data);
+}
+echo count($out), ' ', implode(',', $out), "\n";
+"""
+)
+
+#: The substitute way if MKCALENDAR is refused under impersonation: the backend itself.
+PHP_CREATE_TASK_LIST = (
+    _PHP_BOOT
+    + r"""
+$backend = \OCP\Server::get(\OCA\DAV\CalDAV\CalDavBackend::class);
+$id = $backend->createCalendar('principals/users/' . $argv[1], $argv[2], [
+    '{DAV:}displayname' => $argv[2],
+    '{urn:ietf:params:xml:ns:caldav}supported-calendar-component-set'
+        => new \Sabre\CalDAV\Xml\Property\SupportedCalendarComponentSet(['VTODO']),
+]);
+echo 'angelegt id=', $id, "\n";
+"""
+)
+
+
+def sha_of(text: str | bytes) -> str:
+    """``<sha256>:<length>`` of a body, the form ``PHP_OBJECT_HASH`` prints per row."""
+    data = text.encode() if isinstance(text, str) else text
+    return f"{hashlib.sha256(data).hexdigest()}:{len(data)}"
+
+
+def db_hash(object_name: str) -> str:
+    """``<rows> <sha256>:<length>`` of the stored object, read from the database.
+
+    The counter probe of every modifying row: it does not ask DAV.
+    """
+    return php(NC_CONTAINER, PHP_OBJECT_HASH, object_name)
+
+
+def header_of(result: DavResult, name: str) -> str:
+    """One response header by name, empty if the answer does not carry it."""
+    return next((value for key, value in result.headers if key.lower() == name.lower()), "")
+
+
+def mkcalendar_body(name: str) -> bytes:
+    """A MKCALENDAR body for a list that takes VTODO only, as the Tasks app creates one."""
+    root = etree.Element(f"{{{xml.CAL}}}mkcalendar", nsmap={"d": xml.DAV, "c": xml.CAL})
+    prop = etree.SubElement(etree.SubElement(root, f"{{{xml.DAV}}}set"), f"{{{xml.DAV}}}prop")
+    etree.SubElement(prop, f"{{{xml.DAV}}}displayname").text = name
+    comps = etree.SubElement(prop, f"{{{xml.CAL}}}supported-calendar-component-set")
+    etree.SubElement(comps, f"{{{xml.CAL}}}comp", name="VTODO")
+    return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+
+def share_body(user: str, *, writable: bool) -> bytes:
+    """The share document of the calendar sharing plugin (namespace owncloud.org/ns)."""
+    root = etree.Element(f"{{{OC_SHARE_NS}}}share", nsmap={"d": xml.DAV, "o": OC_SHARE_NS})
+    entry = etree.SubElement(root, f"{{{OC_SHARE_NS}}}set")
+    etree.SubElement(entry, f"{{{xml.DAV}}}href").text = f"principal:principals/users/{user}"
+    if writable:
+        etree.SubElement(entry, f"{{{OC_SHARE_NS}}}read-write")
+    return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+
+def report_body(kind: str, hrefs: Sequence[str] = ()) -> bytes:
+    """``calendar-multiget`` for ``hrefs`` or ``calendar-query`` without a narrowing filter."""
+    root = etree.Element(f"{{{xml.CAL}}}{kind}", nsmap={"d": xml.DAV, "c": xml.CAL})
+    prop = etree.SubElement(root, f"{{{xml.DAV}}}prop")
+    etree.SubElement(prop, f"{{{xml.DAV}}}getetag")
+    etree.SubElement(prop, f"{{{xml.CAL}}}calendar-data")
+    if kind == "calendar-query":
+        scope = etree.SubElement(root, f"{{{xml.CAL}}}filter")
+        etree.SubElement(scope, f"{{{xml.CAL}}}comp-filter", name="VCALENDAR")
+    for href in hrefs:
+        etree.SubElement(root, f"{{{xml.DAV}}}href").text = href
+    return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+
+def plain(text: str) -> str:
+    """A calendar text with LF line ends and no outer blanks, to compare two ways of reading."""
+    return text.replace("\r\n", "\n").strip()
+
+
+async def put_object(
+    session: Session,
+    creds: Credentials,
+    url: str,
+    text: str,
+    *,
+    if_match: str | None = None,
+    if_none_match: str | None = None,
+) -> DavResult:
+    """One PUT of a calendar object with exactly the conditional headers given."""
+    headers = {}
+    if if_match is not None:
+        headers["If-Match"] = if_match
+    if if_none_match is not None:
+        headers["If-None-Match"] = if_none_match
+    return await dav_request(
+        session.client,
+        creds,
+        "PUT",
+        url,
+        body=text.encode(),
+        content_type=ICS_TYPE,
+        extra_headers=headers,
+    )
+
+
+async def get_object(session: Session, creds: Credentials, url: str) -> tuple[DavResult, str, str]:
+    """One GET of a calendar object: the answer, its ETag header and the body as text."""
+    result = await dav_request(session.client, creds, "GET", url)
+    return result, header_of(result, "etag"), result.body.decode("utf-8", errors="replace")
+
+
+async def report(
+    session: Session, creds: Credentials, uri: str, body: bytes
+) -> tuple[int, list[tuple[str, str, str]]]:
+    """One REPORT on a list: status and ``(object name, etag, calendar-data)`` per object."""
+    result = await dav_request(
+        session.client, creds, "REPORT", caldav.calendar_url(creds, uri), depth="1", body=body
+    )
+    if result.status != 207:
+        return result.status, []
+    rows = []
+    for href, props in xml.parse_multistatus(result.body):
+        name = unquote(href.rstrip("/").rsplit("/", 1)[-1])
+        etag = props.get(f"{{{xml.DAV}}}getetag", "")
+        rows.append((name, etag, props.get(f"{{{xml.CAL}}}calendar-data", "")))
+    return result.status, rows
+
+
+def measure_line(
+    name: str, creds: Credentials, result: DavResult, before: str, after: str, raw: str
+) -> None:
+    """``<MESSUNG> auth=.. nutzer=.. status=.. etag_vorher=.. etag_nachher=.. | raw``."""
+    note(
+        f"{now_stamp()} | {name} auth={auth_label(creds)} nutzer={creds.user} "
+        f"status={result.status} etag_vorher={short_etag(before)} "
+        f"etag_nachher={short_etag(after)} | {raw}"
+    )
+
+
+def note_lines(title: str, text: str) -> None:
+    """The unfolded content lines of an object, so the compared line sets stand in the raw file."""
+    note(f"  {title}:")
+    for line in unfold(text).split("\n"):
+        if line.strip():
+            note(f"      {line}")
+
+
+@dataclass
+class Modify:
+    """The state of one modify block: the session, the stamp of its names, its objects."""
+
+    session: Session
+    stamp: str
+    names: dict[str, str] = field(default_factory=dict)
+
+    def name(self, key: str) -> str:
+        """The object name of this run for ``key``; the UID is the name without ``.ics``."""
+        return self.names.setdefault(key, f"s30-{key}-{self.stamp}.ics")
+
+    async def create(self, creds: Credentials, uri: str, key: str, text: str) -> str:
+        """A create-only PUT (``If-None-Match: *``), written as a SETUP line; returns the URL."""
+        url = caldav.object_url(creds, uri, self.name(key))
+        made = await put_object(self.session, creds, url, text, if_none_match="*")
+        note(
+            f"{now_stamp()} | SETUP PUT create-only {uri}/{self.name(key)} nutzer={creds.user} "
+            f"auth={auth_label(creds)} status={made.status} antwort_etag="
+            f"{short_etag(header_of(made, 'etag'))} | {describe_error(made.body)[:200]}"
+        )
+        if made.status not in (201, 204):
+            raise RunFailed(f"create-only PUT of {self.name(key)} answered {made.status}")
+        return url
+
+
+async def modify_setup(state: Modify) -> dict[str, str]:
+    """The four lists, the two shares and what USER_A sees of them; returns the shared URIs."""
+    session = state.session
+    creds = session.appapi(USER_A)
+    since = container_now()
+    await asyncio.sleep(1)
+    for uri in (LIST_A, LIST_B):
+        made = await dav_request(
+            session.client,
+            creds,
+            "MKCALENDAR",
+            caldav.calendar_url(creds, uri),
+            body=mkcalendar_body(uri),
+        )
+        note(
+            f"{now_stamp()} | MKCALENDAR auth=appapi status={made.status} liste={uri} "
+            f"nutzer={USER_A} komponenten=VTODO | {describe_error(made.body)[:300]}"
+        )
+        note_raw(made)
+        if made.status != 201:
+            answer = php(NC_CONTAINER, PHP_CREATE_TASK_LIST, USER_A, uri)
+            note(f"MKCALENDAR ersatzweg=php liste={uri} nutzer={USER_A} -> {answer}")
+    lines = impersonation_lines(since, USER_A, "MKCALENDAR")
+    note(f"KONTROLLE exapp_impersonation.log, MKCALENDAR-Zeilen von {USER_A}: {len(lines)}")
+    for line in lines[-2:]:
+        note(f"  {line[:400]}")
+
+    owner = session.basic(USER_B)
+    for uri, writable in ((LIST_RO, False), (LIST_RW, True)):
+        url = caldav.calendar_url(owner, uri)
+        made = await dav_request(
+            session.client, owner, "MKCALENDAR", url, body=mkcalendar_body(uri)
+        )
+        note(
+            f"{now_stamp()} | SETUP MKCALENDAR liste={uri} nutzer={USER_B} auth=basic "
+            f"status={made.status}"
+        )
+        shared = await dav_request(
+            session.client, owner, "POST", url, body=share_body(USER_A, writable=writable)
+        )
+        note(
+            f"{now_stamp()} | FREIGABE liste={uri} an={USER_A} schreibrecht={yes_no(writable)} "
+            f"nutzer={USER_B} auth=basic status={shared.status} (POST mit dem share-Dokument, "
+            f"Namensraum {OC_SHARE_NS})"
+        )
+        note_raw(shared)
+
+    home = await dav_request(
+        session.client,
+        creds,
+        "PROPFIND",
+        caldav.calendars_home_url(creds),
+        depth="1",
+        body=caldav.build_discovery_body(),
+    )
+    found = calendar_collections(home.body) if home.status == 207 else []
+    note(f"{now_stamp()} | DISCOVERY PROPFIND Depth 1 auth=appapi nutzer={USER_A} {home.status}")
+    for uri, name, comps in found:
+        note(f"  DISCOVERY liste={uri} name={name} komponenten={','.join(comps)}")
+    shared_uris = {}
+    for key, uri in (("ro", LIST_RO), ("rw", LIST_RW)):
+        wanted = f"{uri}_shared_by_{USER_B}"
+        if any(wanted == seen for seen, _, _ in found):
+            shared_uris[key] = wanted
+    return shared_uris
+
+
+async def if_match_sequence(
+    state: Modify, creds: Credentials, *, controls: bool
+) -> tuple[int, bool, int, bool]:
+    """M3.1 and M3.2 for one way in: PUT with the current ETag, then with the stale one.
+
+    Returns the four values ``abort_if_match`` decides on.
+    """
+    session = state.session
+    auth = auth_label(creds)
+    key = f"ifmatch-{auth}"
+    name = state.name(key)
+    uid = name.removesuffix(".ics")
+    url = await state.create(creds, LIST_A, key, simple_todo(uid, "s30 if-match v0"))
+    path = url[len(creds.base_url) :]
+    _, etag0, text0 = await get_object(session, creds, url)
+    since = container_now()
+    await asyncio.sleep(1)
+    text1 = set_summary(text0, "s30 if-match v1")
+    hash0 = db_hash(name)
+    put1 = await put_object(session, creds, url, text1, if_match=etag0)
+    _, etag1, text_now = await get_object(session, creds, url)
+    hash1 = db_hash(name)
+    measure_line(
+        "IF-MATCH aktuell",
+        creds,
+        put1,
+        etag0,
+        etag1,
+        f"antwort_etag={yes_no(bool(header_of(put1, 'etag')))} etag_art={etag_kind(etag1)} "
+        f"inhalt_neu={yes_no(text_now == text1)} db_hash_geaendert={yes_no(hash0 != hash1)} "
+        f"db_gleich_gesendet={yes_no(hash1 == f'1 {sha_of(text1)}')}",
+    )
+    note(f"  Aufruf: PUT {path} mit If-Match auf die gelesene ETag, nur SUMMARY geaendert")
+    note_raw(put1)
+    if controls:
+        lines = impersonation_lines(since, creds.user, "PUT")
+        note(f"KONTROLLE exapp_impersonation.log, PUT-Zeilen von {creds.user}: {len(lines)}")
+        for line in lines[-2:]:
+            note(f"  {line[:400]}")
+        other = session.basic(creds.user)
+        href = caldav.object_url(other, LIST_A, name)[len(other.base_url) :]
+        status, rows = await report(
+            session, other, LIST_A, report_body("calendar-multiget", [href])
+        )
+        data = rows[0][2] if rows else ""
+        note(
+            f"{now_stamp()} | GEGENPROBE multiget REPORT calendar-multiget auth=basic "
+            f"nutzer={other.user} status={status} objekte={len(rows)} "
+            f"inhalt_gleich_gesendet={yes_no(plain(data) == plain(text1))}"
+        )
+        wrong = await put_object(
+            session,
+            session.appapi(creds.user, "0" * 64),
+            url,
+            set_summary(text1, "s30 if-match falsches secret"),
+            if_match=etag1,
+        )
+        note(
+            f"{now_stamp()} | GEGENPROBE falsches-secret PUT mit If-Match nutzer={creds.user} "
+            f"status={wrong.status} db_hash_unveraendert={yes_no(db_hash(name) == hash1)} "
+            f"| {describe_error(wrong.body)[:300]}"
+        )
+
+    hash_before = db_hash(name)
+    stale = await put_object(
+        session, creds, url, set_summary(text1, "s30 if-match veraltet"), if_match=etag0
+    )
+    _, etag2, text_after = await get_object(session, creds, url)
+    hash_after = db_hash(name)
+    unchanged = hash_before == hash_after and text_after == text_now and etag2 == etag1
+    measure_line("IF-MATCH veraltet", creds, stale, etag1, etag2, describe_error(stale.body)[:300])
+    note(
+        f"  HASH calendardata vorher={hash_before} nachher={hash_after} "
+        f"gleich={yes_no(hash_before == hash_after)} "
+        f"get_byte_gleich={yes_no(text_after == text_now)}"
+    )
+    note(f"  Aufruf: PUT {path} mit If-Match auf die erste, jetzt veraltete ETag")
+    note_raw(stale)
+    return (put1.status, bool(etag1) and etag1 != etag0, stale.status, unchanged)
+
+
+async def modify_if_match(state: Modify) -> None:
+    """The first abort measurement of MESS-05, then the same sequence with the app password."""
+    session = state.session
+    values = await if_match_sequence(state, session.appapi(USER_A), controls=True)
+    aborted, reason = abort_if_match(
+        status_current=values[0],
+        etag_changed=values[1],
+        status_stale=values[2],
+        unchanged_after_stale=values[3],
+    )
+    note(f"ABBRUCHKRITERIUM MESS-05 IF-MATCH ausgeloest={yes_no(aborted)} grund={reason}")
+    other = await if_match_sequence(state, session.basic(USER_A), controls=False)
+    note(
+        f"IF-MATCH GLEICH appapi_basic={yes_no(values == other)} "
+        f"appapi={values} basic={other} (status aktuell, etag geaendert, status veraltet, "
+        "danach unveraendert)"
+    )
+
+
+async def modify_unconditional(state: Modify) -> None:
+    """M3.3: what a PUT without ``If-Match`` and one with ``If-Match: *`` does to an object."""
+    session = state.session
+    creds = session.appapi(USER_A)
+    name = state.name("ifmatch-appapi")
+    url = caldav.object_url(creds, LIST_A, name)
+    for label, condition in (("PUT ohne-if-match", None), ("PUT if-match-stern", "*")):
+        _, etag_before, text = await get_object(session, creds, url)
+        hash_before = db_hash(name)
+        put = await put_object(
+            session, creds, url, set_summary(text, f"s30 {label}"), if_match=condition
+        )
+        _, etag_after, _ = await get_object(session, creds, url)
+        hash_after = db_hash(name)
+        measure_line(
+            label,
+            creds,
+            put,
+            etag_before,
+            etag_after,
+            f"ueberschrieben={yes_no(hash_before != hash_after)} "
+            f"| {describe_error(put.body)[:200]}",
+        )
+        note(f"  HASH calendardata vorher={hash_before} nachher={hash_after}")
+        note_raw(put)
+
+
+async def modify_properties(state: Modify) -> None:
+    """M3.4, the second abort measurement: does a modifying PUT keep foreign properties?"""
+    session = state.session
+    creds = session.appapi(USER_A)
+    name = state.name("eigenschaften")
+    sent = build_probe_todo(name.removesuffix(".ics"), "s30 eigenschaften v0")
+    url = caldav.object_url(creds, LIST_A, name)
+    made = await put_object(session, creds, url, sent, if_none_match="*")
+    _, etag0, text0 = await get_object(session, creds, url)
+    measure_line("EIGENSCHAFTEN anlegen", creds, made, "", etag0, describe_error(made.body)[:200])
+    note_raw(made)
+    stored = db_hash(name)
+    verbatim = stored == f"1 {sha_of(sent)}"
+    note(
+        f"SPEICHERUNG woertlich={yes_no(verbatim)} gesendet={sha_of(sent)} datenbank={stored} "
+        f"get_gleich_gesendet={yes_no(text0 == sent)}"
+    )
+    if not verbatim or text0 != sent:
+        added, removed, changed = line_diff(sent, text0)
+        note(
+            f"  SPEICHERUNG differenz gesendet gegen gelesen: hinzu={added or 'keine'} "
+            f"entfernt={removed or 'keine'} geaendert={sorted(changed) or 'keine'}"
+        )
+
+    text1 = set_summary(text0, "s30 eigenschaften v1")
+    put = await put_object(session, creds, url, text1, if_match=etag0)
+    _, etag1, text2 = await get_object(session, creds, url)
+    measure_line("EIGENSCHAFTEN aendern", creds, put, etag0, etag1, describe_error(put.body)[:200])
+    note("  Aufruf: PUT mit If-Match, der gelesene Text mit genau einer geaenderten Zeile")
+    note_raw(put)
+    stored = db_hash(name)
+    note(
+        f"SPEICHERUNG nach_aendern woertlich={yes_no(stored == f'1 {sha_of(text1)}')} "
+        f"gesendet={sha_of(text1)} datenbank={stored} get_gleich_gesendet={yes_no(text2 == text1)}"
+    )
+    added, removed, changed = line_diff(text0, text2)
+    note(
+        f"EIGENSCHAFTEN differenz zeilen_vorher={len(ics_line_set(text0))} "
+        f"zeilen_nachher={len(ics_line_set(text2))} hinzu={added or 'keine'} "
+        f"entfernt={removed or 'keine'} geaendert={sorted(changed) or 'keine'}"
+    )
+    note_lines("ZEILEN vorher (entfaltet)", text0)
+    note_lines("ZEILEN nachher (entfaltet)", text2)
+    ok, lost = preserved(text0, text2)
+
+    # The control object: the same PUT, but the text sent back lacks one X- line on purpose.
+    control_url = await state.create(
+        creds,
+        LIST_A,
+        "eigenschaften-kontrolle",
+        build_probe_todo(state.name("eigenschaften-kontrolle")[:-4], "s30 kontrolle v0"),
+    )
+    _, control_etag, control0 = await get_object(session, creds, control_url)
+    cut = set_summary(control0, "s30 kontrolle v1").replace(PROBE_X_LINE, "")
+    control_put = await put_object(session, creds, control_url, cut, if_match=control_etag)
+    _, _, control2 = await get_object(session, creds, control_url)
+    _, control_lost = preserved(control0, control2)
+    control_ok = control_lost == [f"entfernt VCALENDAR/VTODO:{PROBE_X_LINE.strip()}"]
+    note(
+        f"{now_stamp()} | KONTROLLE eigenschaften kontrollobjekt ohne die Zeile "
+        f"{PROBE_X_LINE.strip()} zurueckgeschrieben status={control_put.status} "
+        f"verloren={control_lost or 'keine'} genau_die_entfernte={yes_no(control_ok)}"
+    )
+
+    maintained = sorted(
+        (changed - {"SUMMARY"}) | {property_name(line.split(":", 1)[1]) for line in added}
+    )
+    note(f"PFLEGEFELDER server={','.join(maintained) or 'keine'}")
+    written = 200 <= put.status < 300 and "SUMMARY" in changed
+    aborted = not ok or not written
+    note(
+        f"ABBRUCHKRITERIUM MESS-05 EIGENSCHAFTEN ausgeloest={yes_no(aborted)} "
+        f"verloren={lost or 'keine'} put_status={put.status} "
+        f"aenderung_angekommen={yes_no(written)} "
+        f"kontrolle={'ok' if control_ok else 'fehlgeschlagen'}"
+    )
+
+
+async def modify_shared(state: Modify, shared: Mapping[str, str]) -> None:
+    """M3.5: PUT into a list shared read-only, and the same into one shared with write access."""
+    session = state.session
+    if set(shared) != {"ro", "rw"}:
+        note(
+            "NUR-LESEN ungemessen grund=die geteilten Listen erscheinen nicht in der Discovery "
+            f"von {USER_A} (gefunden: {dict(shared) or 'keine'}), Rohantwort der Freigabe oben"
+        )
+        return
+    owner = session.basic(USER_B)
+    owner_urls = {}
+    for key, uri in (("ro", LIST_RO), ("rw", LIST_RW)):
+        name = state.name(f"geteilt-{key}")
+        text = simple_todo(name.removesuffix(".ics"), f"s30 geteilt {key} v0")
+        owner_urls[key] = await state.create(owner, uri, f"geteilt-{key}", text)
+    statuses: dict[tuple[str, str], int] = {}
+    for creds in (session.appapi(USER_A), session.basic(USER_A)):
+        auth = auth_label(creds)
+        for key, label in (("ro", "NUR-LESEN put"), ("rw", "SCHREIBRECHT put")):
+            name = state.name(f"geteilt-{key}")
+            url = caldav.object_url(creds, shared[key], name)
+            got, etag, text = await get_object(session, creds, url)
+            note(
+                f"{now_stamp()} | LESEN geteilt {shared[key]}/{name} auth={auth} "
+                f"nutzer={creds.user} status={got.status}"
+            )
+            if got.status != 200:
+                raise RunFailed(f"the shared object {name} could not be read: {got.status}")
+            hash_before = db_hash(name)
+            put = await put_object(
+                session, creds, url, set_summary(text, f"s30 geteilt {key} {auth}"), if_match=etag
+            )
+            _, owner_etag, _ = await get_object(session, owner, owner_urls[key])
+            hash_after = db_hash(name)
+            statuses[(key, auth)] = put.status
+            measure_line(
+                label,
+                creds,
+                put,
+                etag,
+                owner_etag,
+                f"beim_eigentuemer_unveraendert={yes_no(hash_before == hash_after)} "
+                f"| {describe_error(put.body)[:300]}",
+            )
+            note(
+                f"  HASH calendardata vorher={hash_before} nachher={hash_after}; etag_nachher "
+                f"ist als {USER_B} mit App-Passwort gelesen"
+            )
+            note_raw(put)
+        fresh = state.name(f"geteilt-ro-neu-{auth}")
+        made = await put_object(
+            session,
+            creds,
+            caldav.object_url(creds, shared["ro"], fresh),
+            simple_todo(fresh.removesuffix(".ics"), "s30 geteilt ro neu"),
+            if_none_match="*",
+        )
+        rows = db_hash(fresh).split()[0]
+        statuses[("neu", auth)] = made.status
+        measure_line(
+            "NUR-LESEN anlegen",
+            creds,
+            made,
+            "",
+            "",
+            f"angelegt={yes_no(rows != '0')} | {describe_error(made.body)[:300]}",
+        )
+        note_raw(made)
+    refused_ro = not 200 <= statuses[("ro", "appapi")] < 300
+    note(
+        f"NUR-LESEN ERGEBNIS abgelehnt={yes_no(refused_ro)} "
+        f"status={statuses[('ro', 'appapi')]} anlegen={statuses[('neu', 'appapi')]} "
+        f"positivkontrolle_schreibrecht={statuses[('rw', 'appapi')]} (auth=appapi); "
+        f"auth=basic: {statuses[('ro', 'basic')]}, {statuses[('neu', 'basic')]}, "
+        f"{statuses[('rw', 'basic')]}"
+    )
+
+
+async def object_names(session: Session, creds: Credentials, uri: str) -> list[str]:
+    """The object names of one list, read with a calendar-query REPORT."""
+    _, rows = await report(session, creds, uri, report_body("calendar-query"))
+    return sorted(name for name, _, _ in rows)
+
+
+async def modify_recurring(state: Modify) -> None:
+    """M3.6: the server side of checking off the master of a recurring task with one PUT."""
+    session = state.session
+    creds = session.appapi(USER_A)
+    name = state.name("wiederkehrend")
+    extra = ["DTSTART:20261112T090000Z", "DUE:20261112T100000Z", "RRULE:FREQ=DAILY"]
+    text = simple_todo(name.removesuffix(".ics"), "s30 wiederkehrend server", extra)
+    url = await state.create(creds, LIST_A, "wiederkehrend", text)
+    _, etag0, text0 = await get_object(session, creds, url)
+    before = await object_names(session, creds, LIST_A)
+    done = complete_todo(text0, datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"))
+    put = await put_object(session, creds, url, done, if_match=etag0)
+    _, etag1, text2 = await get_object(session, creds, url)
+    after = await object_names(session, creds, LIST_A)
+    stored = db_hash(name)
+    note(
+        f"{now_stamp()} | WIEDERKEHREND server status={put.status} "
+        f"rrule_erhalten={yes_no('RRULE:FREQ=DAILY' in unfold(text2))} "
+        f"status_completed_gespeichert={yes_no('STATUS:COMPLETED' in unfold(text2))} "
+        f"woertlich_gespeichert={yes_no(stored == f'1 {sha_of(done)}')} "
+        f"objekte_vorher={len(before)} objekte_nachher={len(after)} "
+        f"neue_objekte={sorted(set(after) - set(before)) or 'keine'} auth=appapi nutzer={USER_A} "
+        f"etag_vorher={short_etag(etag0)} etag_nachher={short_etag(etag1)}"
+    )
+    added, removed, changed = line_diff(text0, text2)
+    note(
+        f"  WIEDERKEHREND differenz hinzu={added or 'keine'} entfernt={removed or 'keine'} "
+        f"geaendert={sorted(changed) or 'keine'}; datenbank={stored}"
+    )
+    note_raw(put)
+
+
+async def modify_subtask(state: Modify) -> None:
+    """M3.7: does the server touch a sub task when its parent is checked off with one PUT?"""
+    session = state.session
+    creds = session.appapi(USER_A)
+    parent_name, child_name = state.name("eltern"), state.name("kind")
+    parent_uid = parent_name.removesuffix(".ics")
+    parent_url = await state.create(
+        creds, LIST_A, "eltern", simple_todo(parent_uid, "s30 eltern server")
+    )
+    child_url = await state.create(
+        creds,
+        LIST_A,
+        "kind",
+        simple_todo(
+            child_name.removesuffix(".ics"), "s30 kind server", [f"RELATED-TO:{parent_uid}"]
+        ),
+    )
+    _, child_etag0, child0 = await get_object(session, creds, child_url)
+    child_hash0 = db_hash(child_name)
+    _, parent_etag0, parent0 = await get_object(session, creds, parent_url)
+    done = complete_todo(parent0, datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ"))
+    put = await put_object(session, creds, parent_url, done, if_match=parent_etag0)
+    _, parent_etag1, _ = await get_object(session, creds, parent_url)
+    _, child_etag1, child1 = await get_object(session, creds, child_url)
+    child_hash1 = db_hash(child_name)
+    same = child_etag0 == child_etag1 and child0 == child1 and child_hash0 == child_hash1
+    note(
+        f"{now_stamp()} | UNTERAUFGABE server unveraendert={yes_no(same)} "
+        f"eltern_status={put.status} "
+        f"eltern_etag_geaendert={yes_no(bool(parent_etag1) and parent_etag0 != parent_etag1)} "
+        f"kind_etag_vorher={short_etag(child_etag0)} kind_etag_nachher={short_etag(child_etag1)} "
+        f"kind_hash_gleich={yes_no(child_hash0 == child_hash1)} auth=appapi nutzer={USER_A}"
+    )
+    note(f"  HASH calendardata der Unteraufgabe vorher={child_hash0} nachher={child_hash1}")
+    note_raw(put)
+
+
+async def block_modify(session: Session) -> None:
+    """MESS-05, server side: the two abort measurements first, then the rest.
+
+    The block does not take its lists back: the browser session and the evaluation after it
+    still need the instance, and ui-teardown rolls everything back.
+    """
+    section("modify")
+    ram_gate(NC35_CONTAINERS)
+    state = Modify(session=session, stamp=datetime.now(UTC).strftime("%H%M%S"))
+    shared = await modify_setup(state)
+    await guarded("modify if-match", modify_if_match(state))
+    await guarded("modify ohne if-match", modify_unconditional(state))
+    await guarded("modify eigenschaften", modify_properties(state))
+    await guarded("modify nur-lesen", modify_shared(state, shared))
+    await guarded("modify wiederkehrend", modify_recurring(state))
+    await guarded("modify unteraufgabe", modify_subtask(state))
+
+
+def outside_repository(path: Path) -> Path:
+    """``path`` resolved, refused if it lies inside the repository (threat T-30-08)."""
+    resolved = path.resolve()
+    if resolved == REPO_ROOT or REPO_ROOT in resolved.parents:
+        raise RunFailed("the file with the browser login has to lie outside the repository")
+    return resolved
+
+
+async def block_ui_prepare(session: Session, ui_file: Path) -> None:
+    """The Tasks app and the account of the browser session; the login goes to ``ui_file``."""
+    section("ui-prepare")
+    ram_gate(NC35_CONTAINERS)
+    target = outside_repository(ui_file)
+    enabled, disabled = app_list()
+    installed_before = "tasks" in enabled or "tasks" in disabled
+    if "tasks" not in enabled:
+        occ_noted("app:enable" if "tasks" in disabled else "app:install", "tasks")
+    enabled, _ = app_list()
+    version = enabled.get("tasks", "")
+    if not version:
+        note(
+            "TASKS-APP ungemessen grund=die App tasks liess sich in dieser Instanz nicht "
+            "einschalten, Rohausgabe in der Zeile darueber"
+        )
+        raise RunFailed("the Tasks app could not be installed; a finding for the owner")
+    note(
+        f"TASKS-APP version={version} installiert_vorher={yes_no(installed_before)} "
+        "(gelesen mit occ app:list --output=json)"
+    )
+
+    password = secrets.token_urlsafe(24)
+    remember_secret(f"PASSWORD_{UI_USER}", password)
+    added = occ_pw(NC_CONTAINER, password, "user:add", "--password-from-env", UI_USER)
+    note(f"occ user:add --password-from-env {UI_USER} (password via stdin) -> {added[:120]}")
+    session.app_passwords[UI_USER] = new_app_password(
+        NC_CONTAINER, UI_USER, password, f"APP_PASSWORD_{UI_USER}"
+    )
+    basic = session.basic(UI_USER)
+    home = await dav_request(
+        session.client,
+        basic,
+        "PROPFIND",
+        home_url(basic, "/"),
+        depth="0",
+        body=propfind_body([f"{{{xml.OC}}}fileid"]),
+    )
+    note(f"{now_stamp()} | SETUP PROPFIND Depth 0 home of {UI_USER} auth=basic -> {home.status}")
+    for creds in (basic, session.appapi(UI_USER)):
+        listing = await dav_request(
+            session.client,
+            creds,
+            "PROPFIND",
+            caldav.calendars_home_url(creds),
+            depth="1",
+            body=caldav.build_discovery_body(),
+        )
+        found = calendar_collections(listing.body) if listing.status == 207 else []
+        lists = [f"{uri} ({','.join(comps)})" for uri, _, comps in found]
+        note(
+            f"{now_stamp()} | UI-KONTO DISCOVERY auth={auth_label(creds)} nutzer={UI_USER} "
+            f"status={listing.status} listen={lists or 'keine'}"
+        )
+    page = await session.client.get(f"{basic.base_url}/apps/tasks/", auth=basic.auth())
+    note(
+        f"{now_stamp()} | UI-KONTO GET /apps/tasks/ auth=basic nutzer={UI_USER} "
+        f"status={page.status_code} html={yes_no('<html' in page.text[:2000].lower())}"
+    )
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    handle = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(handle, "w", encoding="utf-8", newline="\n") as stream:
+        stream.write(f"{UI_USER}\n{password}\n{basic.base_url}\n")
+    note(
+        f"UI-KONTO nutzer={UI_USER} adresse={basic.base_url}/apps/tasks/ zugangsdaten=in einer "
+        "Datei ausserhalb des Repositorys (drei Zeilen: Nutzer, Passwort, Basis-URL)"
+    )
+    # Console only, never the protocol: the path names a local account directory.
+    print(f"UI-LOGIN nutzer={UI_USER} zugangsdatei={target}")
+
+
+async def ui_seed_recurring(
+    session: Session, creds: Credentials, lists: Sequence[tuple[str, str, tuple[str, ...]]]
+) -> None:
+    """Create the recurring task by PUT if the Tasks app offers no recurrence."""
+    wanted = "spike30-liste-1"
+    target = next((uri for uri, name, _ in lists if wanted in (name, uri)), "")
+    if not target:
+        raise RunFailed(f"--seed-recurring needs the list {wanted}, which the account lacks")
+    name = "s30-wiederkehrend-skript.ics"
+    extra = ["DTSTART:20261112T090000Z", "DUE:20261112T100000Z", "RRULE:FREQ=DAILY"]
+    put = await put_object(
+        session,
+        creds,
+        caldav.object_url(creds, target, name),
+        simple_todo(name.removesuffix(".ics"), UI_RECURRING, extra),
+        if_none_match="*",
+    )
+    note(
+        f"UI-NACHGELEGT {UI_RECURRING} status={put.status} liste={target} objekt={name} "
+        "(vom Skript per PUT mit RRULE:FREQ=DAILY angelegt, keine von der App geschriebene Fixture)"
+    )
+
+
+async def block_ui_snapshot(session: Session, label: str, seed: bool, ui_file: Path) -> None:
+    """Every object of the browser account as one file below ``raw/ui-<label>/``.
+
+    Read under impersonation with one GET per object, so the files carry the bytes the
+    server sent; the counter probe reads the same lists with an app password and a REPORT.
+    """
+    section(f"ui-snapshot {label}")
+    ram_gate(NC35_CONTAINERS)
+    user, password, _ = read_ui_file(ui_file)
+    remember_secret(f"PASSWORD_{user}", password)
+    session.app_passwords[user] = new_app_password(
+        NC_CONTAINER, user, password, f"APP_PASSWORD_{user}_{label}"
+    )
+    creds, basic = session.appapi(user), session.basic(user)
+    home_url_ = caldav.calendars_home_url(creds)
+    home = await dav_request(
+        session.client, creds, "PROPFIND", home_url_, depth="1", body=caldav.build_discovery_body()
+    )
+    if home.status != 207:
+        raise RunFailed(f"the discovery of {user} answered {home.status}")
+    lists = calendar_collections(home.body)
+    for uri, name, comps in lists:
+        note(f"UI-LISTE stand={label} liste={uri} name={name} komponenten={','.join(comps)}")
+    if seed:
+        await ui_seed_recurring(session, creds, lists)
+
+    objects: list[SnapshotObject] = []
+    differing: list[str] = []
+    for uri, _, _ in lists:
+        status, rows = await report(session, creds, uri, report_body("calendar-query"))
+        other_status, other_rows = await report(session, basic, uri, report_body("calendar-query"))
+        other = {name: plain(data) for name, _, data in other_rows}
+        note(
+            f"{now_stamp()} | UI-REPORT stand={label} liste={uri} auth=appapi status={status} "
+            f"objekte={len(rows)} | auth=basic status={other_status} objekte={len(other_rows)}"
+        )
+        for name, _, _ in rows:
+            got, etag, text = await get_object(session, creds, caldav.object_url(creds, uri, name))
+            if got.status != 200:
+                raise RunFailed(f"GET of {uri}/{name} answered {got.status}")
+            objects.append(SnapshotObject(uri, name, etag, got.body, False))
+            if other.get(name) != plain(text):
+                differing.append(f"{uri}/{name}")
+        differing.extend(f"{uri}/{name}" for name in other if name not in {r[0] for r in rows})
+
+    trash_url = f"{home_url_}trashbin/objects/"
+    trash = await dav_request(
+        session.client,
+        creds,
+        "PROPFIND",
+        trash_url,
+        depth="1",
+        body=propfind_body([f"{{{xml.DAV}}}getetag"]),
+    )
+    hrefs = [href for href, _ in xml.parse_multistatus(trash.body)] if trash.status == 207 else []
+    names = [unquote(href.rsplit("/", 1)[-1]) for href in hrefs if not href.endswith("/")]
+    note(
+        f"{now_stamp()} | UI-PAPIERKORB-LESEN stand={label} PROPFIND Depth 1 trashbin/objects "
+        f"auth=appapi status={trash.status} objekte={len(names)}"
+    )
+    for name in names:
+        got, etag, _ = await get_object(session, creds, f"{trash_url}{quote(name, safe='')}")
+        if got.status == 200:
+            objects.append(SnapshotObject("trashbin", name, etag, got.body, True))
+        else:
+            note(f"  UI-PAPIERKORB objekt={name} GET status={got.status}, nicht gesichert")
+
+    files = write_snapshot(RAW_DIR, label, objects)
+    summaries = []
+    for item, file_name in zip(objects, files, strict=True):
+        summary = property_value(item.data.decode("utf-8", errors="replace"), "SUMMARY")
+        if not item.trashed:
+            summaries.append(summary)
+        note(
+            f"UI-OBJEKT stand={label} liste={item.collection} name={file_name} "
+            f"summary={summary} etag={short_etag(item.etag)}"
+        )
+    note(f"UI-GLEICH appapi_basic={yes_no(not differing)} abweichend={differing or 'keine'}")
+    note(f"UI-STAND {label} objekte={len(objects)}")
+    if label == "a":
+        for name in missing_names(summaries):
+            note(f"UI-FEHLT name={name}")
+        note(f"UI-WIEDERKEHREND vorhanden={yes_no(UI_RECURRING in summaries)}")
+
+
+def block_ui_teardown(session: Session, ui: "UiOptions") -> None:
+    """Hand the baseline of the kept run to the rollback and delete the login file.
+
+    The rollback itself runs in the ``finally`` of ``run_blocks``: it deletes every account
+    with the prefix, removes the Tasks app if it was not there before, and compares.
+    """
+    section("ui-teardown")
+    ram_gate(NC35_CONTAINERS)
+    if ui.out is None or not ui.out.is_file():
+        raise RunFailed("ui-teardown appends to the protocol of the kept run; --out names it")
+    before = baseline_from_protocol(ui.out.read_text(encoding="utf-8"))
+    if not before:
+        raise RunFailed(f"{ui.out.name} carries no BASELINE-START line to compare against")
+    note(f"UI-TEARDOWN baseline aus {ui.out.name} gelesen: {len(before)} Felder")
+    if ui.ui_file is not None and ui.ui_file.is_file():
+        outside_repository(ui.ui_file).unlink()
+        note("UI-TEARDOWN die Datei mit den Zugangsdaten des Browser-Kontos ist geloescht")
+    session.before = before
+
+
+@dataclass(frozen=True, slots=True)
+class UiOptions:
+    """The options of the browser blocks: snapshot label, seed, login file, protocol file."""
+
+    label: str = ""
+    seed_recurring: bool = False
+    ui_file: Path | None = None
+    out: Path | None = None
+
+    def file(self) -> Path:
+        if self.ui_file is None:
+            raise RunFailed("--ui-file is required for the browser blocks")
+        return self.ui_file
+
+
+async def run_blocks(env: Mapping[str, str], blocks: Sequence[str], ui: UiOptions) -> None:
+    """The named blocks in order; the rollback and the stop run whatever happened before.
+
+    The rollback is put off only if a run with one of ``KEEP_BLOCKS`` came to its end: the
+    browser session needs the accounts and lists, and ui-teardown takes them back later. A
+    run that broke off is rolled back as ever, so a repeat starts from the baseline.
+    """
     async with new_client() as client:
         session = Session(env=env, client=client)
+        keep = False
         try:
             for name in blocks:
                 if name == "nc35-up":
@@ -1915,9 +3177,24 @@ async def run_blocks(env: Mapping[str, str], blocks: Sequence[str]) -> None:
                     await block_groupfolder(session)
                 elif name == "nachlauf":
                     await block_nachlauf(session)
+                elif name == "modify":
+                    await block_modify(session)
+                elif name == "ui-prepare":
+                    await block_ui_prepare(session, ui.file())
+                elif name == "ui-snapshot":
+                    await block_ui_snapshot(session, ui.label, ui.seed_recurring, ui.file())
+                elif name == "ui-teardown":
+                    block_ui_teardown(session, ui)
+            keep = any(name in KEEP_BLOCKS for name in blocks)
         finally:
             try:
-                if session.before is not None:
+                if session.before is not None and keep:
+                    note(
+                        "RUECKBAU ausgesetzt: Konten, Listen und die Tasks-App bleiben fuer die "
+                        "Browser-Sitzung stehen; der Block ui-teardown baut zurueck und "
+                        "vergleicht mit den BASELINE-START-Zeilen dieses Laufs"
+                    )
+                elif session.before is not None:
                     rollback_nc35(session.before, env)
             finally:
                 if "nc35-stop" in blocks:
@@ -1971,6 +3248,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--repeat-reason",
         help="why this run repeats an earlier one; written as the line WIEDERHOLUNG Grund",
     )
+    parser.add_argument("--label", choices=("a", "b"), help="the state ui-snapshot writes")
+    parser.add_argument(
+        "--seed-recurring",
+        action="store_true",
+        help="ui-snapshot creates the recurring task by PUT, if the Tasks app could not",
+    )
+    parser.add_argument(
+        "--ui-file",
+        help="the file outside the repository with user, password and base URL of the "
+        "browser account, one per line; written by ui-prepare, read by ui-snapshot",
+    )
     options = parser.parse_args(argv)
     blocks: list[str] = options.block
     if isinstance(sys.stdout, io.TextIOWrapper):
@@ -1985,6 +3273,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--out is required for a measuring block")
     if "nc35-stop" in blocks and blocks[-1] != "nc35-stop":
         parser.error("nc35-stop has to be the last block")
+    if {"ui-prepare", "ui-snapshot"} & set(blocks) and not options.ui_file:
+        parser.error("--ui-file is required for ui-prepare and ui-snapshot")
+    if "ui-snapshot" in blocks and not options.label:
+        parser.error("--label is required for ui-snapshot")
+    ui = UiOptions(
+        label=options.label or "",
+        seed_recurring=options.seed_recurring,
+        ui_file=Path(options.ui_file) if options.ui_file else None,
+        out=Path(options.out),
+    )
 
     out = Path(options.out)
     mode = "angehaengt an bestehende Datei" if out.exists() else "neue Datei"
@@ -1996,7 +3294,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         note(f"WIEDERHOLUNG Grund: {options.repeat_reason}")
     code = 0
     try:
-        asyncio.run(run_blocks(env, blocks))
+        asyncio.run(run_blocks(env, blocks, ui))
     except (RunFailed, ToolError, httpx.HTTPError) as failure:
         note(f"RUN FAILED | {type(failure).__name__}: {str(failure)[:300]}")
         code = 1

@@ -515,3 +515,28 @@ def test_read_ui_file_takes_user_password_and_base_url_from_three_lines(tmp_path
     path.write_text("spike30ui\n", encoding="utf-8")
     with pytest.raises(spike.RunFailed):
         spike.read_ui_file(path)
+
+
+def test_baseline_from_protocol_takes_the_lines_of_the_last_controls_block() -> None:
+    protocol = "\n".join(
+        [
+            "# Lauf blocks=controls",
+            "",
+            "== controls ==",
+            "BASELINE-START nutzer=alt",
+            "BASELINE-START gruppen=alt",
+            "# Lauf blocks=controls,modify",
+            "",
+            "== controls ==",
+            'BASELINE-START apps_an={"dav": "2.0.0"}',
+            "BASELINE-START nutzer=- admin: admin - alice: alice",
+            "BASELINE quota_alice vorher=x nachher=x gleich=ja",
+            "",
+            "== modify ==",
+        ]
+    )
+    assert spike.baseline_from_protocol(protocol) == {
+        "apps_an": '{"dav": "2.0.0"}',
+        "nutzer": "- admin: admin - alice: alice",
+    }
+    assert spike.baseline_from_protocol("nichts") == {}
