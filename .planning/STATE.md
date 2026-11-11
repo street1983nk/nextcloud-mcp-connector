@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: executing
-last_updated: "2026-11-11T13:45:00.000Z"
+last_updated: "2026-11-11T17:35:00.000Z"
 last_activity: 2026-11-11
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 5
-  completed_plans: 2
-  percent: 40
+  completed_plans: 3
+  percent: 60
 ---
 
 # Project State
@@ -20,20 +20,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-11)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) läuft: 30-01 und 30-02 sind ausgeführt, als Nächstes folgt 30-03.
+**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) läuft: 30-01, 30-02 und 30-03 sind ausgeführt, als Nächstes folgt 30-04.
 
 ## Current Position
 
 Phase: 30 von 30 bis 34 (Mess-Spike Aufgaben und Ordner), in Ausführung
-Plan: 30-03 von 30-01 bis 30-05 ist der nächste; 30-01 und 30-02 sind abgeschlossen
-Status: 30-02 ausgeführt (MESS-05 gemessen, beide Abbruchkriterien zu MESS-05 nicht ausgelöst, Inventar A17 liegt vor), nächster Schritt Ausführung 30-03
-Last activity: 2026-11-11, Plan 30-02 ausgeführt (PUT mit If-Match unter Impersonation, Browser-Sitzung in der Tasks-App 0.18.1, Inventar der Gates und Zusagen), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
+Plan: 30-04 von 30-01 bis 30-05 ist der nächste; 30-01, 30-02 und 30-03 sind abgeschlossen
+Status: 30-03 ausgeführt (MESS-06 gemessen bis auf die Vorlage von E15 in 30-05: Abbruchkriterium MOVE nicht ausgelöst, Ergebniswort für das Löschen "wiederherstellbar"), nächster Schritt Ausführung 30-04
+Last activity: 2026-11-11, Plan 30-03 ausgeführt (MOVE und DELETE unter Impersonation auf nc35, Löschmatrix auf Nextcloud 32 bis 35, Ergebniswort nach E13), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 174
+- Total plans completed: 175
 - Average duration: 35 min
 - Total execution time: 15.2 hours
 
@@ -64,7 +64,7 @@ Last activity: 2026-11-11, Plan 30-02 ausgeführt (PUT mit If-Match unter Impers
 | 27 | 10 | - | - |
 | 28 | 12 | - | - |
 | 29 | 9 | - | - |
-| 30 | 2 | 130 min | 65 min |
+| 30 | 3 | 205 min | 68 min |
 
 **Recent Trend:**
 
@@ -218,6 +218,7 @@ Last activity: 2026-11-11, Plan 30-02 ausgeführt (PUT mit If-Match unter Impers
 | Phase 29 P09 | 60min | 3 tasks | 5 files |
 | Phase 30 P01 | 30 min | 3 tasks | 7 files |
 | Phase 30 P02 | 100 min | 3 tasks | 11 files |
+| Phase 30 P03 | 75 min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -798,6 +799,12 @@ Recent decisions affecting current work:
 - [Phase 30]: 30-02: A16 serverseitig belegt, als Aussage über die Tasks-App widerlegt: die App hakt die Unteraufgabe mit einem eigenen `PUT` mit ab, nimmt sie beim Verschieben mit einem eigenen `MOVE` mit und löscht sie mit der Elternaufgabe. In der Sitzung scheiterte der `PUT` der Elternaufgabe mit 500 (SQLite `database is locked`), die Oberfläche zeigte trotzdem beide als erledigt; auf dem Server ist nur die Unteraufgabe erledigt. Ob der Connector vom Verhalten der App abweicht, entscheidet der Owner in 30-05
 - [Phase 30]: 30-02: Inventar A17 auf Commit 32b8df0 (`raw/inventar.txt`, Bericht Abschnitt 7): 114 berührte Fundstellen (gate 46, annotation 4, audit 10, kanarie 2, zusage-server 2, zusage-store 3, zusage-doku 47), 302 mit Grund ausgeschlossen, Positivkontrolle 6/6; zwei Suchmuster ohne gemeinsamen Suchbegriff, die Zuordnung steht als Regeltabelle im Messskript
 - [Phase 30]: 30-02: Lehren für die Messstrecke: der Papierkorb des Kalenders antwortet auf PROPFIND mit 501 und nur auf den REPORT calendar-query, Objekte heißen dort `<id>.ics`; die Tasks-App legt Listen mit `MKCOL` an; ein frisches Konto hat nach der ersten Anmeldung einen Kalender `personal` mit VEVENT, VTODO und VJOURNAL; rohe `.ics`-Belege brauchen `-text` in `.gitattributes`, sonst speichert git sie mit LF
+- [Phase 30]: 30-03: A19 belegt mit Einschränkung: `MOVE` zwischen zwei eigenen Aufgabenlisten antwortet unter AppAPI-Impersonation mit 201 (nc35, Nextcloud 35.0.0, SQLite, als spike30a), UID, Text und ETag bleiben, mit App-Passwort und auf dem Produktionsweg dasselbe; Abbruchkriterium MESS-06 MOVE nicht ausgelöst. Ohne `Overwrite`-Kopf überschreibt der Server ein belegtes Ziel (204, das verdrängte Objekt liegt im Papierkorb), mit `Overwrite: F` 412; `If-Match` wirkt (veraltet 412); gleiche UID im Ziel 409
+- [Phase 30]: 30-03: Der Server prüft beim `MOVE` das Komponenten-Set des Ziels nicht (201 in einen Kalender nur für `VEVENT`); geteilte Liste ohne Schreibrecht 404, Deck-Kalender 403; im Kopf `Destination` zählt nur der Pfad, der Hostname wird nicht ausgewertet. Die Regel "Ziel ist eine beschreibbare Aufgabenliste" muss der Connector aus der Discovery durchsetzen
+- [Phase 30]: 30-03: A21 belegt: der Server nimmt eine Unteraufgabe weder beim Verschieben noch beim Löschen der Elternaufgabe mit; die Tasks-App 0.18.1 nimmt sie mit je einem eigenen `MOVE` oder `DELETE` mit. Nach dem Wortlaut von A21 folgt der Connector dem Gemessenen; Umsetzung und Teilfehler plant Phase 33, Übergabe in 30-05
+- [Phase 30]: 30-03: A18 auf Nextcloud 32.0.15, 33.0.9, 34.0.4 und 35.0.2 (Wegwerf-Instanzen, SQLite, App-Passwort): `DELETE` 204, die Aufgabe steht im Papierkorb des Kalenders und kommt per `MOVE` auf `trashbin/restore/file` mit gleicher UID und gleichem sha256 zurück; in einer geteilten Liste steht sie im Papierkorb beider Konten, löschendes Konto und Eigentümer können wiederherstellen; ohne Schreibrecht 404. Mit `calendarRetentionObligation` gleich 0 löscht `DELETE` endgültig. Standardfrist 2592000 Sekunden (30 Tage)
+- [Phase 30]: 30-03: Vorab-Test für TMOD-07: `PROPFIND` Depth 0 auf `calendars/<konto>/trashbin/` nach `{http://nextcloud.com/ns}trash-bin-retention-duration`; eine Zahl größer 0 heißt "Papierkorb wirkt" und ist die Frist in Sekunden, 0 heißt aus. Die Existenz der Sammlung, der `DAV`-Kopf und die Capabilities unterscheiden die Zustände nicht. Ein Papierkorb mit der Frist 1 erscheint als "an" und ist nach dem nächsten Aufräumlauf leer
+- [Phase 30]: 30-03: ERGEBNIS LOESCHEN (E13): wiederherstellbar, nach der Lesart nach TMOD-07 (Owner, 11.11.2026, "Ok"); TMOD-07 ist für Phase 33 planbar, mit den Auflagen aus Bericht 4.5. Nach der wörtlichen Lesart von E13 wäre es "nicht wiederherstellbar" (Rohbefund in Bericht 4.4)
 
 ### Pending Todos
 
@@ -819,7 +826,7 @@ Recent decisions affecting current work:
 - Phase 30 braucht in 30-02 eine Browser-Sitzung in der Tasks-App (Owner oder Hauptsitzung mit Playwright); im Repo ist kein Browser-Treiber installiert und es wird keiner installiert
 - Phase 30 RAM: schwere Läufe nur bei mindestens 4 GB freiem Host-RAM, nie parallel zu einem anderen Docker-Lauf, immer nur eine Nextcloud-Instanz (Gate im Messskript)
 - v1.8 offene Owner-Entscheidung E15: eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge (Präzedenz NC_MCP_FILES_UPDATE) oder nur die Abschaltung des Bundles `tasks`; dem Owner noch nicht vorgelegt, Checkpoint am Ende von Phase 30
-- v1.8 unbelegt, mit Abbruchkriterium: `MOVE` unter Impersonation (30-03). Belegt sind seit 30-01 `MKCOL` auf `files/` (201) und seit 30-02 `PUT` mit `If-Match` (204, veraltet 412) und der Erhalt fremder Eigenschaften, jeweils auf Nextcloud 35.0.0 mit SQLite; 32 bis 34 unter Impersonation ungemessen, dort gibt es keine ExApp-Registrierung
+- v1.8: kein Abbruchkriterium der Phase 30 ist bisher ausgelöst. Belegt sind seit 30-01 `MKCOL` auf `files/` (201), seit 30-02 `PUT` mit `If-Match` (204, veraltet 412) und der Erhalt fremder Eigenschaften, seit 30-03 `MOVE` zwischen Aufgabenlisten (201), jeweils unter Impersonation auf Nextcloud 35.0.0 mit SQLite; 32 bis 34 unter Impersonation ungemessen, dort gibt es keine ExApp-Registrierung. Das Löschen ist auf 32 bis 35 mit App-Passwort gemessen
 - Phase 30, DI-30-01 ist erledigt: die Umgebung des Worktrees tasks-080 trägt das Extra `documents`, der volle Lauf war in 30-02 ohne Ausnahmen grün
 - Phase 30, für den Owner-Checkpoint in 30-05: die Tasks-App hakt Unteraufgaben mit ab und schreibt wiederkehrende Aufgaben fort; die Vorgaben aus TMOD-03 (nicht mit abhaken) und TMOD-01 (wiederkehrende ablehnen) weichen davon ab und brauchen einen ausdrücklichen Entscheid
 - v1.8 ändernde Zugriffe, Verschieben und Löschen sind von der Recherche vom 11.11.2026 nicht abgedeckt; alles dazu ist Annahme bis zum Messbericht (REQUIREMENTS.md, A12 bis A19, A21)
@@ -870,14 +877,14 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 ## Session Continuity
 
 Last session: 2026-11-11
-Stopped at: Completed 30-02-PLAN.md (ändernde Zugriffe unter Impersonation, Browser-Sitzung in der Tasks-App, Inventar A17), lokal committet auf plan/v1.8-tasks-080, nicht gepusht; nc35 zurückgebaut und gestoppt
-Nächster Schritt: Ausführung 30-03 (MOVE unter Impersonation, Löschen mit Papierkorb; vorher die Lesart der Löschregel in 30-03-PLAN.md bestätigen)
+Stopped at: Completed 30-03-PLAN.md (MOVE unter Impersonation, Unteraufgaben, Löschen mit Papierkorb auf 32 bis 35), lokal committet auf plan/v1.8-tasks-080, nicht gepusht; nc35 zurückgebaut und gestoppt, keine Wegwerf-Instanz und kein Volume übrig
+Nächster Schritt: Ausführung 30-04 (Discovery, echte Objekte, Kosten der Aufgabensuche)
 Resume file: None
 
 ## Operator Next Steps
 
 - Roadmap und Anforderungen für v1.8 prüfen (.planning/ROADMAP.md, .planning/REQUIREMENTS.md); der Branch plan/v1.8-tasks-080 ist nur lokal, Push oder PR nur nach Owner-Entscheid
 - E15 entscheiden (Admin-Schalter für ändernde Aufgaben-Werkzeuge), spätestens am Checkpoint von Phase 30
-- Phase 30: 30-01 und 30-02 sind ausgeführt, Befunde in docs/spike-tasks.md (Abschnitte 1, 2, 3 und 7) und in den beiden SUMMARY-Dateien; vor 30-03 die Lesart der Löschregel in 30-03-PLAN.md bestätigen oder ändern; weiter mit 30-03. Die Rohobjekte der Tasks-App für 30-03 und 30-04 liegen unter raw/ui-a und raw/ui-b
+- Phase 30: 30-01, 30-02 und 30-03 sind ausgeführt, Befunde in docs/spike-tasks.md (Abschnitte 1 bis 4 und 7) und in den drei SUMMARY-Dateien; weiter mit 30-04. Die Rohobjekte der Tasks-App für 30-04 liegen unter raw/ui-a und raw/ui-b. Für den Owner-Checkpoint in 30-05 aus 30-03: Unteraufgaben beim Verschieben und Löschen mitnehmen (A21), Mindestfrist des Papierkorbs für TMOD-07, Übernahme des Ergebnisworts in REQUIREMENTS.md
 - Für 30-02 die Browser-Sitzung in der Tasks-App einplanen (zwölf nummerierte Schritte in zwei Runden, nc35 läuft dabei)
 - Issue-Antworten in #32 und #44 erst nach dem Store-Release von 0.8.0
