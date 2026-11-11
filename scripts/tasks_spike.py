@@ -27,6 +27,10 @@ baseline the kept run wrote), ``move`` (``MOVE`` between two task lists under im
 the abort measurement of MESS-06 first, then a taken target, shared lists, a Deck calendar,
 sub tasks, and ``DELETE`` with the restore out of the calendar trash bin),
 ``ui-evaluate-move`` (what the Tasks app did to sub tasks, read from the snapshots),
+``delete-matrix`` (one throwaway instance per ``--nc-tag`` from ``compose.spike-tags.yml``:
+deleting with the calendar trash bin on and off, for shared lists, the retention and the
+pretest; it needs no environment file and ends with ``down -v``), ``delete-verdict`` (the
+decision rule of E13 over the four raw files of the delete matrix, no Docker),
 ``nc35-stop`` (``docker stop`` of the
 same four containers) and ``secret-scan`` (the gate over every raw protocol of the phase
 folder and the report before a commit). Whatever the measuring blocks created is taken back
@@ -128,6 +132,8 @@ BLOCKS = (
     "ui-teardown",
     "move",
     "ui-evaluate-move",
+    "delete-matrix",
+    "delete-verdict",
     "nc35-stop",
     "secret-scan",
 )
@@ -846,8 +852,19 @@ def write_protocol(out: Path, header: str) -> None:
 # --- processes ------------------------------------------------------------------------------
 
 
-def run(argv: Sequence[str], *, stdin: str | None = None, check: bool = True) -> str:
-    """One external command, no shell, fixed argument list, output as text."""
+def run(
+    argv: Sequence[str],
+    *,
+    stdin: str | None = None,
+    check: bool = True,
+    env: Mapping[str, str] | None = None,
+) -> str:
+    """One external command, no shell, fixed argument list, output as text.
+
+    ``env`` is added to the inherited environment of this one child process only; that is
+    how a secret reaches ``docker compose`` without ever being an argument.
+    """
+    child_env = None if env is None else {**os.environ, **env}
     finished = subprocess.run(  # noqa: S603 - a fixed argument list, never a shell
         list(argv),
         input=stdin,
@@ -856,6 +873,7 @@ def run(argv: Sequence[str], *, stdin: str | None = None, check: bool = True) ->
         encoding="utf-8",
         errors="replace",
         check=False,
+        env=child_env,
     )
     if check and finished.returncode != 0:
         raise RunFailed(
@@ -3959,7 +3977,10 @@ SOURCE_CHECKS: tuple[tuple[str, str], ...] = (
         r"const NAME|function calendarQuery|new NotImplemented",
     ),
     ("CalDAV/Trashbin/RestoreTarget.php", r"const NAME|function moveInto"),
-    ("CalDAV/Trashbin/Plugin.php", r"PROPERTY_RETENTION_DURATION =|X-NC-CalDAV-No-Trashbin"),
+    (
+        "CalDAV/Trashbin/Plugin.php",
+        r"PROPERTY_RETENTION_DURATION =|X-NC-CalDAV-No-Trashbin|nc-calendar-trashbin",
+    ),
     (
         "CalDAV/CalDavBackend.php",
         (
@@ -4369,6 +4390,19 @@ def move_line(key: str, creds: Credentials, outcome: MoveOutcome, raw: str = "")
     )
 
 
+async def put_new(session: Session, creds: Credentials, uri: str, name: str, text: str) -> str:
+    """A create-only PUT under a given name, written as a SETUP line; returns the URL."""
+    url = caldav.object_url(creds, uri, name)
+    made = await put_object(session, creds, url, text, if_none_match="*")
+    note(
+        f"{now_stamp()} | SETUP PUT create-only {uri}/{name} nutzer={creds.user} "
+        f"auth={auth_label(creds)} status={made.status} | {describe_error(made.body)[:200]}"
+    )
+    if made.status not in (201, 204):
+        raise RunFailed(f"create-only PUT of {name} answered {made.status}")
+    return url
+
+
 @dataclass
 class Move:
     """The state of one move block: session, names of this run, targets, confirmed source."""
@@ -4385,16 +4419,8 @@ class Move:
         return f"s30-{key}-{self.stamp}.ics"
 
     async def put(self, creds: Credentials, uri: str, name: str, text: str) -> str:
-        """A create-only PUT under a given name, written as a SETUP line; returns the URL."""
-        url = caldav.object_url(creds, uri, name)
-        made = await put_object(self.session, creds, url, text, if_none_match="*")
-        note(
-            f"{now_stamp()} | SETUP PUT create-only {uri}/{name} nutzer={creds.user} "
-            f"auth={auth_label(creds)} status={made.status} | {describe_error(made.body)[:200]}"
-        )
-        if made.status not in (201, 204):
-            raise RunFailed(f"create-only PUT of {name} answered {made.status}")
-        return url
+        """A create-only PUT under a given name in a list of this run; returns the URL."""
+        return await put_new(self.session, creds, uri, name, text)
 
     async def todo(self, creds: Credentials, uri: str, key: str, extra: Iterable[str] = ()) -> str:
         """A plain task named after ``key`` in the list ``uri``; returns its URL."""
@@ -4987,6 +5013,984 @@ def block_ui_evaluate_move() -> None:
         note(f"GEGENPROBE objektzahl stand={label} {json.dumps(counts, sort_keys=True)}")
 
 
+# --- plan 30-03 task 2: delete matrix on throwaway instances (A18, E13) -----------------------
+
+SPIKE_CONTAINER = "nc-spike-tags"
+SPIKE_BASE_URL = "http://127.0.0.1:8083"
+SPIKE_COMPOSE = "compose.spike-tags.yml"
+#: The full name of its volume; it must be absent before ``up``, or the run would upgrade.
+SPIKE_VOLUME = "nc-mcp-spike-tags_nc-spike-tags-data"
+#: The patch releases of the store window the delete matrix measures; the version of record
+#: is ``occ status`` of the running instance, never this tuple.
+DELETE_TAGS = ("32.0.15-apache", "33.0.9-apache", "34.0.4-apache", "35.0.2-apache")
+DELETE_MAJORS = (32, 33, 34, 35)
+
+#: The three words plan 30-03 may end with (E13). Blanks are real blanks.
+VERDICT_RESTORABLE = "wiederherstellbar"
+VERDICT_LOST = "nicht wiederherstellbar"
+VERDICT_UNCLEAR = "nicht eindeutig"
+
+ALICE = "alice"
+BOB = "bob"
+DEL_OWN = f"{PREFIX}-eigen"
+DEL_RW = f"{PREFIX}-geteilt-rw"
+DEL_RO = f"{PREFIX}-geteilt-ro"
+#: The DAV feature the trash bin plugin announces (read in Trashbin/Plugin.php).
+TRASH_FEATURE = "nc-calendar-trashbin"
+#: The candidates of the pretest (M4.12), in the order they are asked.
+PRETESTS = (
+    "papierkorb-propfind",
+    "frist-eigenschaft",
+    "frist-eigenschaft-home",
+    "home-kind-trashbin",
+    "capabilities-dav",
+    "dav-kopf",
+)
+#: The sections whose positive control has to hold for ``g=ja``.
+CONTROL_SECTIONS = (
+    "an-eigen",
+    "an-geteilt",
+    "unterauftrag",
+    "aus-eigen",
+    "aus-geteilt",
+    "vorabtest",
+    "aufraeumen",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class VersionRow:
+    """The collected line of one delete matrix run: version and the five values of the rule."""
+
+    major: int
+    version: str
+    g: bool
+    w1: bool
+    w2: bool
+    w3: bool
+    w4: bool
+    who: str
+
+
+def parse_version_line(line: str) -> VersionRow:
+    """``LOESCHEN VERSION <version> g=.. w1=.. w2=.. w3=.. w4=.. wer=..`` as a row.
+
+    A value other than ``ja`` or ``nein`` is refused: a line the rule cannot read must not
+    be read as a no.
+    """
+    match = re.match(r"LOESCHEN VERSION ((\d+)\.\S+) (.+)$", line.strip())
+    if match is None:
+        raise ValueError(f"not a LOESCHEN VERSION line: {line[:80]!r}")
+    fields: dict[str, str] = {}
+    for part in match[3].split():
+        key, _, value = part.partition("=")
+        fields[key] = value
+    flags: dict[str, bool] = {}
+    for name in ("g", "w1", "w2", "w3", "w4"):
+        value = fields.get(name)
+        if value not in ("ja", "nein"):
+            raise ValueError(f"{name}={value!r} is neither ja nor nein")
+        flags[name] = value == "ja"
+    return VersionRow(
+        major=int(match[2]),
+        version=match[1],
+        g=flags["g"],
+        w1=flags["w1"],
+        w2=flags["w2"],
+        w3=flags["w3"],
+        w4=flags["w4"],
+        who=fields.get("wer", ""),
+    )
+
+
+def version_rows(protocol: str) -> list[VersionRow]:
+    """Every collected line of one raw file, run by run.
+
+    A run that declares itself a repeat (``WIEDERHOLUNG Grund:``, written for a tool error
+    only) replaces the runs before it; without that line two runs of one version both
+    count, and a contradiction between them is the rule's business.
+    """
+    rows: list[VersionRow] = []
+    for run_text in re.split(r"(?m)^# Lauf ", protocol):
+        if re.search(r"(?m)^WIEDERHOLUNG Grund:", run_text):
+            rows = []
+        rows.extend(
+            parse_version_line(line)
+            for line in run_text.splitlines()
+            if line.startswith("LOESCHEN VERSION ")
+        )
+    return rows
+
+
+def delete_verdict(rows: Iterable[VersionRow]) -> str:
+    """The decision rule of plan 30-03 for deleting (E13), word for word and nothing more.
+
+    ``wiederherstellbar``: for all four versions G and W1 and W2 and (W3 or W4).
+    ``nicht wiederherstellbar``: for at least one version G holds, and W1 is no or W2 is no
+    or (W3 is no and W4 is no). ``nicht eindeutig``: everything else, that is a missing or
+    unmeasured version, a failed positive control, or two runs of one version that differ.
+    A version outside 32 to 35 is refused.
+    """
+    by_major: dict[int, set[tuple[bool, bool, bool, bool, bool]]] = {}
+    for row in rows:
+        if row.major not in DELETE_MAJORS:
+            raise ValueError(f"version {row.major} is not one of {DELETE_MAJORS}")
+        by_major.setdefault(row.major, set()).add((row.g, row.w1, row.w2, row.w3, row.w4))
+    settled = {major: next(iter(runs)) for major, runs in by_major.items() if len(runs) == 1}
+
+    def good(values: tuple[bool, bool, bool, bool, bool]) -> bool:
+        g, w1, w2, w3, w4 = values
+        return g and w1 and w2 and (w3 or w4)
+
+    def bad(values: tuple[bool, bool, bool, bool, bool]) -> bool:
+        g, w1, w2, w3, w4 = values
+        return g and (not w1 or not w2 or (not w3 and not w4))
+
+    if all(major in settled and good(settled[major]) for major in DELETE_MAJORS):
+        return VERDICT_RESTORABLE
+    if any(bad(values) for values in settled.values()):
+        return VERDICT_LOST
+    return VERDICT_UNCLEAR
+
+
+def consequence(word: str) -> str:
+    """The fixed consequence of a verdict word for TMOD-07, without a question to the owner."""
+    if word == VERDICT_RESTORABLE:
+        return (
+            "TMOD-07 ist planbar (Phase 33), mit den Auflagen aus den Messwerten: Vorab-Test "
+            "vor dem L\u00f6schen, wer wiederherstellen kann, Aufbewahrungsfrist."
+        )
+    if word in (VERDICT_LOST, VERDICT_UNCLEAR):
+        return (
+            "kein L\u00f6schen in 0.8.0, ohne R\u00fcckfrage; TMOD-07 wandert nach Out of "
+            "Scope, und der Store-Text nennt die Grenze (EXAPP-13)."
+        )
+    raise ValueError(f"{word!r} is none of the three verdict words")
+
+
+def validate_delete_tag(tag: str, *, allow_other: bool = False) -> str:
+    """The image tag the delete matrix may start: one of ``DELETE_TAGS``, others on request."""
+    if tag in DELETE_TAGS:
+        return tag
+    if allow_other and re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+-apache", tag):
+        return tag
+    raise ValueError(
+        f"--nc-tag {tag!r} is not one of {', '.join(DELETE_TAGS)}; "
+        "another patch release needs --allow-other-tag"
+    )
+
+
+def _trash_keys(data: Any) -> list[Any]:
+    """The values of every key that names the trash bin or a retention, at any depth."""
+    found: list[Any] = []
+    if isinstance(data, dict):
+        for key, value in data.items():
+            if re.search(r"trash|retention", str(key), re.IGNORECASE):
+                found.append(value)
+            found.extend(_trash_keys(value))
+    elif isinstance(data, list):
+        for value in data:
+            found.extend(_trash_keys(value))
+    return found
+
+
+def pretest_shows(name: str, value: str) -> str:
+    """What one pretest candidate says about the trash bin: ``an``, ``aus`` or ``unklar``.
+
+    The reading is fixed before the measurement: a candidate only counts if it says ``an``
+    while the trash bin works and ``aus`` while it is switched off.
+    """
+    if name == "papierkorb-propfind":
+        return {"207": "an", "404": "aus"}.get(value, "unklar")
+    if name in ("frist-eigenschaft", "frist-eigenschaft-home"):
+        if not value.isdigit():
+            return "unklar"
+        return "an" if int(value) > 0 else "aus"
+    if name in ("home-kind-trashbin", "dav-kopf"):
+        return {"ja": "an", "nein": "aus"}.get(value, "unklar")
+    if name == "capabilities-dav":
+        keys = _trash_keys(_json_or_text(value))
+        if not keys:
+            return "unklar"
+        return "an" if all(keys) else "aus"
+    return "unklar"
+
+
+def pretest_distinguishing(on: Mapping[str, str], off: Mapping[str, str]) -> list[str]:
+    """The candidates that are right in both states, in the order of ``PRETESTS``."""
+    return [
+        name
+        for name in PRETESTS
+        if pretest_shows(name, on.get(name, "")) == "an"
+        and pretest_shows(name, off.get(name, "")) == "aus"
+    ]
+
+
+def compose(action: Sequence[str], compose_env: Mapping[str, str], *, check: bool = True) -> str:
+    """One ``docker compose`` call on the throwaway file; secrets only in ``compose_env``."""
+    argv = ["docker", "compose", "-f", str(REPO_ROOT / SPIKE_COMPOSE), *action]
+    return run(argv, env=compose_env, check=check)
+
+
+def spike_leftovers() -> tuple[str, str]:
+    """The ids of a throwaway container and of its volume, empty strings when absent."""
+    container = docker("ps", "-a", "--filter", f"name={SPIKE_CONTAINER}", "-q", check=False)
+    volume = docker("volume", "ls", "-q", "--filter", f"name={SPIKE_VOLUME}", check=False)
+    return container.strip(), volume.strip()
+
+
+def delete_preconditions() -> None:
+    """Never next to nc35, never two throwaway instances, never an old volume, enough RAM."""
+    section("vorbedingungen")
+    running = docker("ps", "--format", "{{.Names}}", check=False).split()
+    standing = [name for name in running if name in NC35_CONTAINERS]
+    if standing:
+        raise RunFailed(f"nc35 erst stoppen: {standing} laufen noch (--block nc35-stop)")
+    ram_gate(())
+    container, volume = spike_leftovers()
+    note(f"VORBEDINGUNG Container {SPIKE_CONTAINER} vorhanden: {yes_no(bool(container))}")
+    note(f"VORBEDINGUNG Volume {SPIKE_VOLUME} vorhanden: {yes_no(bool(volume))}")
+    if container or volume:
+        raise RunFailed(
+            f"a throwaway container or the volume {SPIKE_VOLUME} is still there; "
+            "take it down with down -v first"
+        )
+
+
+def wait_for_http(base_url: str) -> None:
+    """Wait until ``status.php`` answers 200 again after a start or a restart (120 s)."""
+    deadline = time.monotonic() + 120
+    status = 0
+    while time.monotonic() < deadline:
+        try:
+            status = httpx.get(f"{base_url}/status.php", timeout=10.0).status_code
+        except httpx.HTTPError:
+            status = 0
+        if status == 200:
+            return
+        time.sleep(2)
+    raise RunFailed(f"{base_url}/status.php did not answer 200 within 120 s (last {status})")
+
+
+async def spike_app_password(session: Session, user: str, password: str) -> str:
+    """An app password on the throwaway instance; falls back to OCS where occ is broken.
+
+    Measured in phase 25: ``occ user:auth-tokens:add`` has no ``--name`` on 32 and breaks
+    with ``--password-from-env`` on 33.0.9. The fallback sends the login password in the
+    basic auth header of one loopback request, never as an argument.
+    """
+    try:
+        return new_app_password(SPIKE_CONTAINER, user, password, f"SPIKE_APP_{user}")
+    except RunFailed as failure:
+        note(
+            f"BEFUND occ user:auth-tokens:add --name scheitert auf dieser Version "
+            f"({_one_line(str(failure))[-160:]}); Rueckfall GET /ocs/v2.php/core/getapppassword"
+        )
+    response = await session.client.get(
+        f"{SPIKE_BASE_URL}/ocs/v2.php/core/getapppassword",
+        headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+        auth=(user, password),
+    )
+    try:
+        token = str(response.json()["ocs"]["data"]["apppassword"])
+    except (ValueError, KeyError, TypeError):
+        token = ""
+    if len(token) < 20:
+        raise RunFailed(f"getapppassword for {user} answered {response.status_code}, no token")
+    remember_secret(f"SPIKE_APP_{user}", token)
+    note(f"GET /ocs/v2.php/core/getapppassword als {user} -> HTTP {response.status_code} (kept)")
+    return token
+
+
+@dataclass
+class DeleteRun:
+    """The state of one delete matrix run on one throwaway instance."""
+
+    session: Session
+    container: str
+    source: TrashSource
+    stamp: str
+    shared: dict[str, str] = field(default_factory=dict)
+    flags: dict[str, bool] = field(default_factory=dict)
+    controls: dict[str, bool] = field(default_factory=dict)
+    unmeasured: list[str] = field(default_factory=list)
+    pretests: dict[str, dict[str, str]] = field(default_factory=dict)
+    permanent: dict[str, bool] = field(default_factory=dict)
+    who: str = "keiner"
+
+    def name(self, key: str) -> str:
+        """The object name of this run for ``key``; the UID is the name without ``.ics``."""
+        return f"s30-{key}-{self.stamp}.ics"
+
+    def rows(self, uid: str) -> list[DbRow]:
+        """The database rows of one UID on the instance of this run."""
+        return db_rows(uid, self.container)
+
+
+async def measured(run_: DeleteRun, name: str, work: Coroutine[Any, Any, None]) -> None:
+    """One section of the matrix; a failure makes it ``ungemessen`` and costs ``g``."""
+    section(name)
+    try:
+        await work
+    except Exception as failure:
+        reason = f"{type(failure).__name__}: {_one_line(str(failure))[:240]}"
+        note(f"BLOCK FAILED | {name} | {reason}")
+        note(f"ABSCHNITT {name} ungemessen grund={reason}")
+        run_.unmeasured.append(name)
+
+
+def trash_mark(rows: Sequence[DbRow]) -> str:
+    """``gesetzt``, ``leer`` or ``weg``: the column deleted_at of the rows of one UID."""
+    if not rows:
+        return "weg"
+    return "gesetzt" if all(row.deleted for row in rows) else "leer"
+
+
+def has_uid(text: str, uid: str) -> bool:
+    """Whether ``text`` is a calendar text whose VTODO carries ``uid``."""
+    try:
+        return uid_of(text) == uid
+    except ValueError:
+        return False
+
+
+async def delete_with_etag(session: Session, creds: Credentials, url: str) -> DavResult:
+    """Read the ETag and DELETE with ``If-Match`` on it, the way TMOD-07 would."""
+    _, etag, _ = await get_object(session, creds, url)
+    headers = {"If-Match": etag} if etag else {}
+    return await dav_request(session.client, creds, "DELETE", url, extra_headers=headers)
+
+
+async def make_list(run_: DeleteRun, creds: Credentials, uri: str) -> None:
+    """A task list (VTODO only) of the account of ``creds``, written as a SETUP line."""
+    made = await dav_request(
+        run_.session.client,
+        creds,
+        "MKCALENDAR",
+        caldav.calendar_url(creds, uri),
+        body=mkcalendar_body(uri),
+    )
+    note(
+        f"{now_stamp()} | SETUP MKCALENDAR liste={uri} nutzer={creds.user} auth=basic "
+        f"status={made.status} komponenten=VTODO"
+    )
+    if made.status != 201:
+        raise RunFailed(f"MKCALENDAR {uri} answered {made.status}")
+
+
+async def retention_facts(run_: DeleteRun) -> None:
+    """The configured retention and the default the source names."""
+    source = run_.source
+    value = _one_line(occ(run_.container, "config:app:get", "dav", source.key, check=False))
+    note(
+        f"FRIST konfiguriert={value or 'leer'} standard_laut_quelle={source.default_seconds} "
+        f"einheit=Sekunden (occ config:app:get dav {source.key}; leer heisst Standard; Einheit "
+        "gelesen aus der Konstante DEFAULT_RETENTION_SECONDS, gemessen im Abschnitt aufraeumen)"
+    )
+
+
+async def delete_own_on(run_: DeleteRun) -> None:
+    """M4.9, W1: delete an own task with the trash bin on, find it there, restore it."""
+    session, source = run_.session, run_.source
+    alice = session.basic(ALICE)
+    await make_list(run_, alice, DEL_OWN)
+    name, other = run_.name("an-eigen"), run_.name("an-nachbar")
+    uid, other_uid = name.removesuffix(".ics"), other.removesuffix(".ics")
+    text = build_probe_todo(uid, "s30 an-eigen")
+    url = await put_new(session, alice, DEL_OWN, name, text)
+    other_url = await put_new(
+        session, alice, DEL_OWN, other, simple_todo(other_uid, "s30 an-nachbar")
+    )
+    deleted = await delete_with_etag(session, alice, url)
+    names = await trash_names(session, alice, source)
+    rows = run_.rows(uid)
+    in_trash = uid in names
+    note(
+        f"{now_stamp()} | LOESCHEN an-eigen status={deleted.status} "
+        f"im_papierkorb={yes_no(in_trash)} db_deleted_at={trash_mark(rows)} | nutzer={ALICE} "
+        f"auth=basic if_match=ja papierkorb_name={names.get(uid, '-')} "
+        f"datenbank={rows_text(rows)} {describe_error(deleted.body)[:200]}".rstrip()
+    )
+    note_raw(deleted)
+    alive, _, _ = await get_object(session, alice, other_url)
+    control = other_uid not in names and alive.status == 200
+    note(
+        f"KONTROLLE an-eigen nachbar_im_papierkorb={yes_no(other_uid in names)} "
+        f"nachbar_lesbar={yes_no(alive.status == 200)} gegriffen={yes_no(control)}"
+    )
+    run_.controls["an-eigen"] = control
+    restored_ok = False
+    if in_trash:
+        restored = await restore_object(session, alice, source, names[uid])
+        back, _, text1 = await get_object(session, alice, url)
+        rows1 = run_.rows(uid)
+        same_place = (
+            len(rows1) == 1
+            and not rows1[0].deleted
+            and (rows1[0].calendar, rows1[0].uri) == (DEL_OWN, name)
+            and rows1[0].digest == sha_of(text)
+        )
+        note(
+            f"{now_stamp()} | WIEDERHERSTELLUNG an-eigen status={restored.status} "
+            f"uid_gleich={yes_no(has_uid(text1, uid))} inhalt_gleich={yes_no(text1 == text)} | "
+            f"get_danach={back.status} sha256_vorher={sha_of(text)[:12]} "
+            f"sha256_nachher={sha_of(text1)[:12]} db_deleted_at={trash_mark(rows1)} "
+            f"am_alten_ort={yes_no(same_place)} datenbank={rows_text(rows1)} "
+            f"{describe_error(restored.body)[:200]}".rstrip()
+        )
+        note_raw(restored)
+        restored_ok = (
+            200 <= restored.status < 300
+            and back.status == 200
+            and has_uid(text1, uid)
+            and text1 == text
+            and same_place
+        )
+    else:
+        note(
+            "WIEDERHERSTELLUNG an-eigen status=- uid_gleich=nein inhalt_gleich=nein | nicht "
+            "moeglich, das Objekt steht nicht im Papierkorb"
+        )
+    run_.flags["w1"] = (
+        deleted.status == 204 and in_trash and trash_mark(rows) == "gesetzt" and restored_ok
+    )
+
+
+async def shared_setup(run_: DeleteRun) -> None:
+    """Two lists of bob, shared with alice with and without write access."""
+    session = run_.session
+    alice, bob = session.basic(ALICE), session.basic(BOB)
+    for uri, writable in ((DEL_RW, True), (DEL_RO, False)):
+        await make_list(run_, bob, uri)
+        shared = await dav_request(
+            session.client,
+            bob,
+            "POST",
+            caldav.calendar_url(bob, uri),
+            body=share_body(ALICE, writable=writable),
+        )
+        note(
+            f"{now_stamp()} | FREIGABE liste={uri} an={ALICE} schreibrecht={yes_no(writable)} "
+            f"nutzer={BOB} auth=basic status={shared.status}"
+        )
+    home = await dav_request(
+        session.client,
+        alice,
+        "PROPFIND",
+        caldav.calendars_home_url(alice),
+        depth="1",
+        body=caldav.build_discovery_body(),
+    )
+    found = calendar_collections(home.body) if home.status == 207 else []
+    for uri, name, comps in found:
+        note(f"  DISCOVERY liste={uri} name={name} komponenten={','.join(comps)}")
+    for key, uri in (("rw", DEL_RW), ("ro", DEL_RO)):
+        wanted = f"{uri}_shared_by_{BOB}"
+        if any(wanted == seen for seen, _, _ in found):
+            run_.shared[key] = wanted
+    if set(run_.shared) != {"rw", "ro"}:
+        raise RunFailed(f"the shared lists are not in the discovery of {ALICE}: {run_.shared}")
+
+
+async def restore_by_either(run_: DeleteRun, label: str, uid: str, text: str, url: str) -> str:
+    """Try the restore as the deleting account, then as the owner; returns who managed it."""
+    session, source = run_.session, run_.source
+    bob = session.basic(BOB)
+    for who, creds in (("loeschender", session.basic(ALICE)), ("eigentuemer", bob)):
+        names = await trash_names(session, creds, source)
+        if uid not in names:
+            note(
+                f"WIEDERHERSTELLUNG {label} versuch={who} status=- | kein Eintrag im "
+                f"Papierkorb von {creds.user}"
+            )
+            continue
+        restored = await restore_object(session, creds, source, names[uid])
+        back, _, text1 = await get_object(session, bob, url)
+        rows = run_.rows(uid)
+        done = (
+            200 <= restored.status < 300
+            and back.status == 200
+            and has_uid(text1, uid)
+            and text1 == text
+            and trash_mark(rows) == "leer"
+        )
+        note(
+            f"{now_stamp()} | WIEDERHERSTELLUNG {label} versuch={who} status={restored.status} "
+            f"uid_gleich={yes_no(has_uid(text1, uid))} inhalt_gleich={yes_no(text1 == text)} | "
+            f"nutzer={creds.user} get_als_eigentuemer={back.status} "
+            f"db_deleted_at={trash_mark(rows)} datenbank={rows_text(rows)} "
+            f"{describe_error(restored.body)[:200]}".rstrip()
+        )
+        note_raw(restored)
+        if done:
+            return who
+    return "keiner"
+
+
+async def delete_shared(run_: DeleteRun, label: str, key: str) -> tuple[DavResult, str, str, str]:
+    """alice deletes an object of bob's list shared with write access.
+
+    Returns the answer, whose trash bin lists the object, the trash mark of the database
+    row, and who restored it.
+    """
+    session, source = run_.session, run_.source
+    alice, bob = session.basic(ALICE), session.basic(BOB)
+    name = run_.name(key)
+    uid = name.removesuffix(".ics")
+    text = build_probe_todo(uid, f"s30 {key}")
+    owner_url = await put_new(session, bob, DEL_RW, name, text)
+    deleted = await delete_with_etag(
+        session, alice, caldav.object_url(alice, run_.shared["rw"], name)
+    )
+    in_alice = uid in await trash_names(session, alice, source)
+    in_bob = uid in await trash_names(session, bob, source)
+    rows = run_.rows(uid)
+    if in_alice and in_bob:
+        whose = "beide"
+    elif in_alice:
+        whose = "loeschender"
+    else:
+        whose = "eigentuemer" if in_bob else "keiner"
+    note(
+        f"{now_stamp()} | GELOESCHT {label} status={deleted.status} nutzer={ALICE} auth=basic "
+        f"if_match=ja papierkorb_von={whose} db_deleted_at={trash_mark(rows)} "
+        f"datenbank={rows_text(rows)} {describe_error(deleted.body)[:200]}".rstrip()
+    )
+    note_raw(deleted)
+    by = await restore_by_either(run_, label, uid, text, owner_url)
+    return deleted, whose, trash_mark(rows), by
+
+
+async def delete_shared_on(run_: DeleteRun) -> None:
+    """M4.10, W2: the same on a shared list, and the refusal without write access."""
+    session, source = run_.session, run_.source
+    alice, bob = session.basic(ALICE), session.basic(BOB)
+    await shared_setup(run_)
+    deleted, whose, mark, by = await delete_shared(run_, "an-geteilt", "an-geteilt")
+    note(
+        f"LOESCHEN an-geteilt status={deleted.status} papierkorb_von={whose} "
+        f"wiederhergestellt_durch={by} | db_deleted_at_nach_dem_loeschen={mark}"
+    )
+    run_.flags["w2"] = (
+        deleted.status == 204 and whose != "keiner" and mark == "gesetzt" and by != "keiner"
+    )
+    run_.who = by
+    run_.controls["an-geteilt"] = run_.flags.get("w1", False)
+
+    # Whether the owner can restore too, on a second object the deleting account leaves alone.
+    name = run_.name("an-geteilt-eigentuemer")
+    uid = name.removesuffix(".ics")
+    text = simple_todo(uid, "s30 an-geteilt-eigentuemer")
+    owner_url = await put_new(session, bob, DEL_RW, name, text)
+    second = await delete_with_etag(
+        session, alice, caldav.object_url(alice, run_.shared["rw"], name)
+    )
+    names = await trash_names(session, bob, source)
+    if uid in names:
+        restored = await restore_object(session, bob, source, names[uid])
+        back, _, text1 = await get_object(session, bob, owner_url)
+        note(
+            f"{now_stamp()} | WIEDERHERSTELLUNG an-geteilt-eigentuemer status={restored.status} "
+            f"uid_gleich={yes_no(has_uid(text1, uid))} inhalt_gleich={yes_no(text1 == text)} | "
+            f"geloescht_von={ALICE} ({second.status}) wiederhergestellt_von={BOB} "
+            f"get_danach={back.status} datenbank={rows_text(run_.rows(uid))}"
+        )
+    else:
+        note(
+            f"WIEDERHERSTELLUNG an-geteilt-eigentuemer status=- | geloescht_von={ALICE} "
+            f"({second.status}), kein Eintrag im Papierkorb von {BOB}; datenbank="
+            f"{rows_text(run_.rows(uid))}"
+        )
+
+    ro_name = run_.name("an-geteilt-ro")
+    ro_uid = ro_name.removesuffix(".ics")
+    await put_new(session, bob, DEL_RO, ro_name, simple_todo(ro_uid, "s30 an-geteilt-ro"))
+    before = run_.rows(ro_uid)
+    ro_url = caldav.object_url(alice, run_.shared["ro"], ro_name)
+    seen, _, _ = await get_object(session, alice, ro_url)
+    refused = await delete_with_etag(session, alice, ro_url)
+    after = run_.rows(ro_uid)
+    note(
+        f"{now_stamp()} | LOESCHEN an-geteilt-ro status={refused.status} "
+        f"objekt_unveraendert={yes_no(before == after)} | nutzer={ALICE} auth=basic "
+        f"lesen_vorher={seen.status} datenbank={rows_text(after)} "
+        f"{describe_error(refused.body)[:200]}".rstrip()
+    )
+    note_raw(refused)
+
+
+def property_text(result: DavResult, name: str) -> str:
+    """The text of one property of the first response of a PROPFIND, ``fehlt`` if absent."""
+    if result.status != 207:
+        return "fehlt"
+    entries = xml.parse_multistatus(result.body)
+    return (entries[0][1].get(name) or "fehlt") if entries else "fehlt"
+
+
+async def pretest_values(run_: DeleteRun) -> dict[str, str]:
+    """What each pretest candidate answers for alice right now (M4.12)."""
+    session, source = run_.session, run_.source
+    alice = session.basic(ALICE)
+    home_url_ = caldav.calendars_home_url(alice)
+    wanted = propfind_body([source.retention_property])
+    values: dict[str, str] = {}
+    probe = await dav_request(
+        session.client, alice, "PROPFIND", trash_url(alice, source), depth="0", body=wanted
+    )
+    values["papierkorb-propfind"] = str(probe.status)
+    values["frist-eigenschaft"] = property_text(probe, source.retention_property)
+    at_home = await dav_request(
+        session.client, alice, "PROPFIND", home_url_, depth="0", body=wanted
+    )
+    values["frist-eigenschaft-home"] = property_text(at_home, source.retention_property)
+    children = await dav_request(
+        session.client,
+        alice,
+        "PROPFIND",
+        home_url_,
+        depth="1",
+        body=propfind_body([f"{{{xml.DAV}}}resourcetype"]),
+    )
+    listed = xml.parse_multistatus(children.body) if children.status == 207 else []
+    hrefs = [href for href, _ in listed]
+    values["home-kind-trashbin"] = yes_no(
+        any(unquote(href).rstrip("/").endswith(f"/{source.home}") for href in hrefs)
+    )
+    response = await ocs.ocs_get(session.client, alice, "/cloud/capabilities")
+    data = ocs.parse_ocs(response, what="the capabilities")
+    capabilities = data.get("capabilities") if isinstance(data, dict) else None
+    dav_part = capabilities.get("dav") if isinstance(capabilities, dict) else None
+    values["capabilities-dav"] = json.dumps(dav_part, sort_keys=True)
+    options = await dav_request(session.client, alice, "OPTIONS", home_url_)
+    values["dav-kopf"] = yes_no(TRASH_FEATURE in header_of(options, "dav"))
+    return values
+
+
+async def pretest(run_: DeleteRun, state: str) -> None:
+    """Ask every candidate in one state of the trash bin and write one line per candidate."""
+    values = await pretest_values(run_)
+    run_.pretests[state] = values
+    for name in PRETESTS:
+        note(
+            f"VORABTEST {name} zustand={state} wert={values[name][:300]} "
+            f"zeigt={pretest_shows(name, values[name])}"
+        )
+
+
+async def delete_subtask(run_: DeleteRun) -> None:
+    """A21, server side per version: the parent is deleted, what becomes of the sub task."""
+    session = run_.session
+    alice = session.basic(ALICE)
+    parent, child = run_.name("eltern"), run_.name("kind")
+    parent_uid, child_uid = parent.removesuffix(".ics"), child.removesuffix(".ics")
+    parent_url = await put_new(
+        session, alice, DEL_OWN, parent, simple_todo(parent_uid, "s30 eltern")
+    )
+    child_url = await put_new(
+        session,
+        alice,
+        DEL_OWN,
+        child,
+        simple_todo(child_uid, "s30 kind", [f"RELATED-TO:{parent_uid}"]),
+    )
+    _, etag0, text0 = await get_object(session, alice, child_url)
+    rows0 = run_.rows(child_uid)
+    deleted = await delete_with_etag(session, alice, parent_url)
+    got, etag1, text1 = await get_object(session, alice, child_url)
+    rows1 = run_.rows(child_uid)
+    same = got.status == 200 and etag0 == etag1 and text0 == text1 and rows0 == rows1
+    note(
+        f"{now_stamp()} | UNTERAUFGABE loeschen vorhanden={yes_no(got.status == 200)} "
+        f"unveraendert={yes_no(same)} eltern_status={deleted.status} nutzer={ALICE} auth=basic | "
+        f"datenbank kind={rows_text(rows1)} eltern={rows_text(run_.rows(parent_uid))}"
+    )
+    run_.controls["unterauftrag"] = deleted.status == 204
+
+
+def set_switch(run_: DeleteRun, value: str | None, label: str) -> None:
+    """Set or delete the retention key, prove it with occ, restart, prove it again.
+
+    occ on the command line does not clear the cache of the web server (measured in phase
+    25), so every change of the switch is followed by a restart of the container.
+    """
+    container, key = run_.container, run_.source.key
+    if value is None:
+        done = occ(container, "config:app:delete", "dav", key, check=False)
+        note(f"SCHALTER {label} occ config:app:delete dav {key} -> {_one_line(done)[:160]}")
+    else:
+        done = occ(container, "config:app:set", "dav", key, f"--value={value}", check=False)
+        note(
+            f"SCHALTER {label} occ config:app:set dav {key} --value={value} -> "
+            f"{_one_line(done)[:160]}"
+        )
+    before = _one_line(occ(container, "config:app:get", "dav", key, check=False))
+    restarted = docker("restart", container, check=False).strip()
+    wait_for_install(container)
+    wait_for_http(SPIKE_BASE_URL)
+    after = _one_line(occ(container, "config:app:get", "dav", key, check=False))
+    note(
+        f"SCHALTER {label} occ config:app:get dav {key} vor_neustart={before or 'leer'} "
+        f"nach_neustart={after or 'leer'} (docker restart {restarted})"
+    )
+    if after != (value or ""):
+        raise RunFailed(f"the switch {key} reads {after!r} after the restart, not {value!r}")
+
+
+async def switch_off(run_: DeleteRun) -> None:
+    """Switch the trash bin off with the value the source compares against."""
+    set_switch(run_, run_.source.off_value, "aus")
+
+
+async def delete_own_off(run_: DeleteRun) -> None:
+    """M4.11, W3: delete an own task with the trash bin switched off."""
+    session, source = run_.session, run_.source
+    alice = session.basic(ALICE)
+    name = run_.name("aus-eigen")
+    uid = name.removesuffix(".ics")
+    text = build_probe_todo(uid, "s30 aus-eigen")
+    url = await put_new(session, alice, DEL_OWN, name, text)
+    deleted = await delete_with_etag(session, alice, url)
+    names = await trash_names(session, alice, source)
+    rows = run_.rows(uid)
+    attempt, recovered = "nicht moeglich", False
+    if uid in names:
+        restored = await restore_object(session, alice, source, names[uid])
+        attempt = str(restored.status)
+        back, _, text1 = await get_object(session, alice, url)
+        recovered = 200 <= restored.status < 300 and back.status == 200 and text1 == text
+    gone, _, _ = await get_object(session, alice, url)
+    note(
+        f"{now_stamp()} | LOESCHEN aus-eigen status={deleted.status} "
+        f"im_papierkorb={yes_no(uid in names)} db_zeile={'vorhanden' if rows else 'weg'} "
+        f"wiederherstellung={attempt} | nutzer={ALICE} auth=basic if_match=ja "
+        f"get_danach={gone.status} papierkorb_eintraege={len(names)} "
+        f"datenbank={rows_text(rows)} {describe_error(deleted.body)[:200]}".rstrip()
+    )
+    note_raw(deleted)
+    run_.flags["w3_own"] = recovered
+    run_.permanent["eigen"] = deleted.status == 204 and uid not in names and not rows
+    run_.controls["aus-eigen"] = run_.flags.get("w1", False)
+
+
+async def delete_shared_off(run_: DeleteRun) -> None:
+    """The same on the list shared with write access, trash bin switched off."""
+    session, source = run_.session, run_.source
+    alice, bob = session.basic(ALICE), session.basic(BOB)
+    name = run_.name("aus-geteilt")
+    uid = name.removesuffix(".ics")
+    text = build_probe_todo(uid, "s30 aus-geteilt")
+    owner_url = await put_new(session, bob, DEL_RW, name, text)
+    deleted = await delete_with_etag(
+        session, alice, caldav.object_url(alice, run_.shared["rw"], name)
+    )
+    listed = {}
+    for creds in (alice, bob):
+        names = await trash_names(session, creds, source)
+        if uid in names:
+            listed[creds.user] = (creds, names[uid])
+    rows = run_.rows(uid)
+    attempt, recovered = "nicht moeglich", False
+    for creds, entry in listed.values():
+        restored = await restore_object(session, creds, source, entry)
+        attempt = str(restored.status)
+        back, _, text1 = await get_object(session, bob, owner_url)
+        recovered = 200 <= restored.status < 300 and back.status == 200 and text1 == text
+        if recovered:
+            break
+    gone, _, _ = await get_object(session, bob, owner_url)
+    note(
+        f"{now_stamp()} | LOESCHEN aus-geteilt status={deleted.status} "
+        f"im_papierkorb={yes_no(bool(listed))} db_zeile={'vorhanden' if rows else 'weg'} "
+        f"wiederherstellung={attempt} | geloescht_von={ALICE} auth=basic "
+        f"get_als_eigentuemer_danach={gone.status} papierkorb_von={sorted(listed) or 'keinem'} "
+        f"datenbank={rows_text(rows)} {describe_error(deleted.body)[:200]}".rstrip()
+    )
+    note_raw(deleted)
+    run_.flags["w3_shared"] = recovered
+    run_.permanent["geteilt"] = deleted.status == 204 and not listed and not rows
+    run_.controls["aus-geteilt"] = run_.flags.get("w2", False)
+
+
+async def pretest_off(run_: DeleteRun) -> None:
+    """The candidates again with the trash bin off, and which of them tell the two apart."""
+    await pretest(run_, "aus")
+    names = pretest_distinguishing(run_.pretests.get("an", {}), run_.pretests["aus"])
+    note(
+        f"VORABTEST ERGEBNIS unterscheidet={yes_no(bool(names))} "
+        f"kandidat={','.join(names) or 'keiner'}"
+    )
+    run_.flags["w4"] = bool(names)
+    # The two states are proven by behaviour, not by the switch: with the trash bin on the
+    # object came back, with it off the row is gone for good.
+    behaviour = run_.flags.get("w1", False) and run_.permanent.get("eigen", False)
+    note(
+        f"KONTROLLE vorabtest zustand_am_verhalten_belegt={yes_no(behaviour)} "
+        f"(an: wiederhergestellt={yes_no(run_.flags.get('w1', False))}, aus: endgueltig "
+        f"geloescht={yes_no(run_.permanent.get('eigen', False))})"
+    )
+    run_.controls["vorabtest"] = behaviour and "an" in run_.pretests
+
+
+async def retention_cleanup(run_: DeleteRun) -> None:
+    """M4.13: the clean-up run keeps a deleted object by default and removes it after 1 s."""
+    session, source = run_.session, run_.source
+    alice = session.basic(ALICE)
+    set_switch(run_, None, "standard")
+    name = run_.name("frist")
+    uid = name.removesuffix(".ics")
+    url = await put_new(session, alice, DEL_OWN, name, simple_todo(uid, "s30 frist"))
+    deleted = await delete_with_etag(session, alice, url)
+    rows0 = run_.rows(uid)
+    out = occ(run_.container, source.cleanup, check=False)
+    rows1 = run_.rows(uid)
+    standard = "bleibt" if rows1 else "weg"
+    note(
+        f"{now_stamp()} | AUFRAEUMEN standardfrist geloescht={deleted.status} occ "
+        f"{source.cleanup} -> {_one_line(out) or '(keine Ausgabe)'} | datenbank "
+        f"vorher={rows_text(rows0)} nachher={rows_text(rows1)}"
+    )
+    set_switch(run_, "1", "frist-1s")
+    await pretest(run_, "frist-1s")
+    await asyncio.sleep(3)
+    out = occ(run_.container, source.cleanup, check=False)
+    rows2 = run_.rows(uid)
+    short = "bleibt" if rows2 else "weg"
+    note(
+        f"{now_stamp()} | AUFRAEUMEN frist=1 nach 3 s occ {source.cleanup} -> "
+        f"{_one_line(out) or '(keine Ausgabe)'} | datenbank nachher={rows_text(rows2)}"
+    )
+    note(f"FRIST AUFRAEUMEN standard={standard} frist_1s={short}")
+    run_.controls["aufraeumen"] = trash_mark(rows0) == "gesetzt" and standard == "bleibt"
+
+
+def collected_line(version: str, run_: DeleteRun) -> None:
+    """The collected line: ``g`` only if nothing is unmeasured and every control held."""
+    held = {name: run_.controls.get(name, False) for name in CONTROL_SECTIONS}
+    w3 = run_.flags.get("w3_own", False) and run_.flags.get("w3_shared", False)
+    g = not run_.unmeasured and all(held.values())
+    note(
+        f"KONTROLLEN {json.dumps({name: yes_no(ok) for name, ok in held.items()})} "
+        f"ungemessen={run_.unmeasured or 'keine'}"
+    )
+    note(
+        f"LOESCHEN VERSION {version} g={yes_no(g)} w1={yes_no(run_.flags.get('w1', False))} "
+        f"w2={yes_no(run_.flags.get('w2', False))} w3={yes_no(w3)} "
+        f"w4={yes_no(run_.flags.get('w4', False))} wer={run_.who}"
+    )
+
+
+async def delete_sections(session: Session, version: str) -> None:
+    """Every measured section of one version, then the collected line."""
+    section("quelle")
+    source = confirm_sources(SPIKE_CONTAINER)
+    run_ = DeleteRun(
+        session=session,
+        container=SPIKE_CONTAINER,
+        source=source,
+        stamp=datetime.now(UTC).strftime("%H%M%S"),
+    )
+    await measured(run_, "frist", retention_facts(run_))
+    await measured(run_, "an-eigen", delete_own_on(run_))
+    await measured(run_, "an-geteilt", delete_shared_on(run_))
+    await measured(run_, "vorabtest-an", pretest(run_, "an"))
+    await measured(run_, "unterauftrag", delete_subtask(run_))
+    await measured(run_, "aus", switch_off(run_))
+    await measured(run_, "aus-eigen", delete_own_off(run_))
+    await measured(run_, "aus-geteilt", delete_shared_off(run_))
+    await measured(run_, "vorabtest-aus", pretest_off(run_))
+    await measured(run_, "aufraeumen", retention_cleanup(run_))
+    section("ergebnis")
+    collected_line(version, run_)
+
+
+async def block_delete_matrix(tag: str, *, other: bool) -> None:
+    """One version from an empty machine to a removed volume, deleting measured in between."""
+    section(f"delete-matrix nc-tag={tag}, start {now_stamp()}")
+    if other:
+        note(f"RUECKFALL-TAG {tag}: nicht einer der Soll-Tags {DELETE_TAGS} (--allow-other-tag)")
+    delete_preconditions()
+    passwords = {name: secrets.token_urlsafe(24) for name in ("admin", ALICE, BOB)}
+    for name, value in passwords.items():
+        remember_secret(f"SPIKE_PASSWORD_{name}", value)
+    compose_env = {"NC_SPIKE_TAG": tag, "NC_SPIKE_ADMIN_PASSWORD": passwords["admin"]}
+    section("aufbau")
+    started_all = time.perf_counter()
+    try:
+        started = time.perf_counter()
+        output = compose(["up", "-d", "--wait"], compose_env)
+        note(f"docker compose up -d --wait: {time.perf_counter() - started:.1f} s")
+        note(" / ".join(line.strip() for line in output.splitlines()[-4:] if line.strip()))
+        started = time.perf_counter()
+        wait_for_install(SPIKE_CONTAINER)
+        note(f"Installation abgewartet: {time.perf_counter() - started:.1f} s")
+        switched = occ(
+            SPIKE_CONTAINER,
+            "config:system:set",
+            "auth.bruteforce.protection.enabled",
+            "--value=false",
+            "--type=boolean",
+        )
+        note(f"bruteforce protection aus (Wegwerf-Instanz) -> {switched[:120]}")
+        status = occ(SPIKE_CONTAINER, "status")
+        note(status)
+        found = re.search(r"versionstring:\s*(\S+)", status)
+        if found is None:
+            raise RunFailed("occ status names no versionstring")
+        note(f"VERSION OF RECORD {found[1]}")
+        note(f"dbtype: {occ(SPIKE_CONTAINER, 'config:system:get', 'dbtype', check=False)}")
+        memcache = occ(SPIKE_CONTAINER, "config:system:get", "memcache.local", check=False)
+        note(f"memcache.local: {memcache or '(leer, nicht gesetzt)'}")
+        docker_stats()
+        async with new_client() as client:
+            session = Session(env={"NC_MCP_URL": SPIKE_BASE_URL}, client=client)
+            for user in (ALICE, BOB):
+                occ_pw(SPIKE_CONTAINER, passwords[user], "user:add", "--password-from-env", user)
+                note(f"occ user:add --password-from-env {user} (password via stdin)")
+                session.app_passwords[user] = await spike_app_password(
+                    session, user, passwords[user]
+                )
+            await delete_sections(session, found[1])
+        docker_stats()
+    finally:
+        section("abbau")
+        output = compose(["down", "-v"], compose_env, check=False)
+        note(" / ".join(line.strip() for line in output.splitlines()[-4:] if line.strip()))
+        container, volume = spike_leftovers()
+        note(f"ABBAU Container vorhanden: {yes_no(bool(container))}")
+        note(f"ABBAU Volume vorhanden: {yes_no(bool(volume))}")
+        note(f"DAUER {time.perf_counter() - started_all:.0f} s; ENDE {now_stamp()}")
+
+
+def block_delete_verdict() -> int:
+    """Apply the rule to the collected lines of the four raw files and print the outcome.
+
+    Needs no Docker and no environment file. A missing file or a missing collected line
+    leaves that version out, which the rule answers with ``nicht eindeutig``.
+    """
+    rows: list[VersionRow] = []
+    for major in DELETE_MAJORS:
+        path = RAW_DIR / f"loeschen-{major}.txt"
+        text = path.read_text(encoding="utf-8") if path.is_file() else ""
+        found = version_rows(text)
+        if not found:
+            print(f"EINGANG {path.name}: keine Zeile LOESCHEN VERSION")
+        for row in found:
+            flags = " ".join(
+                f"{name}={yes_no(getattr(row, name))}" for name in ("g", "w1", "w2", "w3", "w4")
+            )
+            fits = row.major == major
+            print(
+                f"EINGANG {path.name}: LOESCHEN VERSION {row.version} {flags} wer={row.who}"
+                f"{'' if fits else ' (falsche Version fuer diese Datei, nicht gewertet)'}"
+            )
+            if fits:
+                rows.append(row)
+    word = delete_verdict(rows)
+    print(f"ERGEBNIS LOESCHEN (E13): {word}")
+    print(f"KONSEQUENZ: {consequence(word)}")
+    return 0
+
+
 def block_ui_teardown(session: Session, ui: "UiOptions") -> None:
     """Hand the baseline of the kept run to the rollback and delete the login file.
 
@@ -5125,6 +6129,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--repeat-reason",
         help="why this run repeats an earlier one; written as the line WIEDERHOLUNG Grund",
     )
+    parser.add_argument("--nc-tag", help="the image tag delete-matrix starts, e.g. 35.0.2-apache")
+    parser.add_argument(
+        "--allow-other-tag",
+        action="store_true",
+        help="let delete-matrix start a patch release outside the four planned tags",
+    )
     parser.add_argument("--label", choices=("a", "b"), help="the state ui-snapshot writes")
     parser.add_argument(
         "--seed-recurring",
@@ -5146,8 +6156,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         if len(blocks) > 1:
             parser.error("secret-scan runs on its own")
         return secret_scan(Path(options.env_file))
+    if "delete-verdict" in blocks:
+        if len(blocks) > 1:
+            parser.error("delete-verdict runs on its own")
+        return block_delete_verdict()
     if not options.out:
         parser.error("--out is required for a measuring block")
+    matrix_tag = ""
+    if "delete-matrix" in blocks:
+        if len(blocks) > 1:
+            parser.error("delete-matrix runs on its own, one version per call")
+        try:
+            matrix_tag = validate_delete_tag(
+                options.nc_tag or "", allow_other=options.allow_other_tag
+            )
+        except ValueError as failure:
+            parser.error(str(failure))
     if "nc35-stop" in blocks and blocks[-1] != "nc35-stop":
         parser.error("nc35-stop has to be the last block")
     if {"ui-prepare", "ui-snapshot", "ui-log"} & set(blocks) and not options.ui_file:
@@ -5164,14 +6188,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     out = Path(options.out)
     mode = "angehaengt an bestehende Datei" if out.exists() else "neue Datei"
     header = f"\n# Lauf blocks={','.join(blocks)} start={now_stamp()} ({mode})"
-    env = read_env_file(Path(options.env_file))
+    # The throwaway instance of delete-matrix has its own generated secrets and no ExApp;
+    # the environment file of nc35 is neither needed nor read for it.
+    env = {} if matrix_tag else read_env_file(Path(options.env_file))
     remember_env_secrets(env)
     os.environ.setdefault("PYTHONUTF8", "1")
     if options.repeat_reason:
         note(f"WIEDERHOLUNG Grund: {options.repeat_reason}")
     code = 0
     try:
-        asyncio.run(run_blocks(env, blocks, ui))
+        if matrix_tag:
+            asyncio.run(block_delete_matrix(matrix_tag, other=matrix_tag not in DELETE_TAGS))
+        else:
+            asyncio.run(run_blocks(env, blocks, ui))
     except (RunFailed, ToolError, httpx.HTTPError) as failure:
         note(f"RUN FAILED | {type(failure).__name__}: {str(failure)[:300]}")
         code = 1

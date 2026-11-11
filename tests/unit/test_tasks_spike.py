@@ -946,12 +946,13 @@ def test_parse_version_line_reads_the_major_version_and_the_five_values() -> Non
 
 
 def test_version_rows_lets_a_declared_repeat_replace_the_runs_before_it() -> None:
-    first = "# Lauf blocks=delete-matrix start=a\nLOESCHEN VERSION 33.0.9 g=nein w1=ja w2=ja w3=nein w4=ja wer=keiner\n"
+    head = "# Lauf blocks=delete-matrix start="
+    first = f"{head}a\nLOESCHEN VERSION 33.0.9 g=nein w1=ja w2=ja w3=nein w4=ja wer=keiner\n"
     repeat = (
         "# Lauf blocks=delete-matrix start=b\nWIEDERHOLUNG Grund: Werkzeugfehler\n"
         "LOESCHEN VERSION 33.0.9 g=ja w1=ja w2=ja w3=nein w4=ja wer=eigentuemer\n"
     )
-    plain = "# Lauf blocks=delete-matrix start=c\nLOESCHEN VERSION 33.0.9 g=ja w1=nein w2=ja w3=nein w4=ja wer=keiner\n"
+    plain = f"{head}c\nLOESCHEN VERSION 33.0.9 g=ja w1=nein w2=ja w3=nein w4=ja wer=keiner\n"
     assert [row.g for row in spike.version_rows(first + repeat)] == [True]
     assert [row.g for row in spike.version_rows(first + plain)] == [False, True]
     assert spike.version_rows("# Lauf blocks=delete-matrix start=a\nRUN FAILED | x\n") == []
