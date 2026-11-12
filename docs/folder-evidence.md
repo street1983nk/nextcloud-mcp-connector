@@ -3,7 +3,8 @@
 **Date:** 2026-11-12
 **Subject:** `files_create_folder` measured against real Nextcloud under AppAPI impersonation
 **Status:** measured on Nextcloud 35.0.0 and on Nextcloud 32.0.15; one finding fixed during the
-run, one finding open, two statuses not reproducible
+run, one finding open, two statuses not reproducible. The open finding and the wording for
+`x.part` were settled and measured again the same day, see [Follow-up run](#follow-up-run)
 
 Unit tests say what the code does with an answer. They cannot say which answer a real
 Nextcloud gives. This page records what was run against two running instances, the lower and
@@ -14,6 +15,9 @@ rather than believed. Every quoted line is copied from a raw protocol:
   earlier runs of the same day in
   [raw/nc35-ordner-vorlaeufe.txt](../.planning/phases/31-ordner-anlegen/raw/nc35-ordner-vorlaeufe.txt)
 - Nextcloud 32: [raw/nc32-ordner.txt](../.planning/phases/31-ordner-anlegen/raw/nc32-ordner.txt)
+- the follow-up run:
+  [raw/nc35-nacharbeit.txt](../.planning/phases/31-ordner-anlegen/raw/nc35-nacharbeit.txt) and
+  [raw/nc32-nacharbeit.txt](../.planning/phases/31-ordner-anlegen/raw/nc32-nacharbeit.txt)
 - the test that wrote the lines:
   [tests/integration/test_files_create_folder_live.py](../tests/integration/test_files_create_folder_live.py)
 
@@ -235,6 +239,7 @@ id. The script as a whole ended with a failure, for three reasons outside this t
 later `fetch` takes the first search hit for its marker and now gets the new folder instead of
 the uploaded file, one `fetch` of a mail failed at the mail server of the test instance, and
 the script never calls two of the file tools. The script was not changed in this plan.
+It was corrected afterwards, see [Follow-up run](#follow-up-run).
 
 ```text
 ABNAHME nc-mcp-exapp exit=1 files_create_folder=OK (erster Aufruf created true mit created_folders, zweiter Aufruf created false, dieselbe id) fehlgeschlagen=fetch (Datei), fetch (Mail), nie aufgerufen=files_download, files_read_as_markdown
@@ -302,6 +307,8 @@ reason `permission_denied`.
    file system holds nothing of that name. The tool says "A file, not a folder, already
    exists". Nothing is created and the advice to choose another name is right, but the
    sentence names a file that does not exist. Both versions answer this way.
+   **Fixed after this run:** such a node now gets a sentence that claims no file, see
+   [Follow-up run](#follow-up-run).
 4. **Open: a folder name ending in a space, as a link of a chain.** Every path is trimmed at
    both ends before a request is built. Inside a chain the tool builds the path of each link,
    so a link named `mitte-leer ` is created as `mitte-leer`, and the next link below the name
@@ -309,6 +316,9 @@ reason `permission_denied`.
    file system does not hold. Recorded, not asserted and not changed in this plan: whether to
    refuse such a name or to support it is a decision for the owner. Both versions behave the
    same.
+   **Fixed after this run:** the owner decided to refuse such a name before anything is
+   written, see [Follow-up run](#follow-up-run). The two lines below are the state before
+   that fix.
 
 ```text
 ZUSATZ name-mit-leerzeichen-in-kette nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,PROPFIND:404,PROPFIND:404,PROPFIND:207,MKCOL:201,MKCOL:409 befund=ja | ToolError reason=unknown_id message='The parent folder /ordner31-de78de28/zusatz/mitte-leer  of /ordner31-de78de28/zusatz/mitte-leer /kind does not exist. Already created in this call and left in place: /ordner31-de78de28/zusatz/mitte-leer .'; named as created: ['/ordner31-de78de28/zusatz/mitte-leer ']; file system ls -1A /ordner31-de78de28/zusatz: ['mitte-leer']
@@ -356,7 +366,95 @@ UNGEMESSEN mkcol-404 grund=the MKCOL below a parent that was just deleted answer
   request is on the wire is covered by unit tests only; it was not forced against an
   instance.
 - **Group folders, external storage.** Not rebuilt, see the section above.
-- **Versions between 32 and 35.** Not measured.
+- **Versions between 32 and 35.** Not measured. That includes the answer for `x.part`,
+  which the follow-up run measured on 32 and 35 only.
 - **The acceptance script as a whole.** It called the tool on Nextcloud 32 and both calls
   were fine, but the script itself ended with a failure for reasons outside this tool, see
-  the section on Nextcloud 32.
+  the section on Nextcloud 32. The script was corrected afterwards; what it reports now
+  stands in [Follow-up run](#follow-up-run).
+
+## Follow-up run
+
+Three findings of the run above went to the owner, who decided on 2026-11-12. The same day
+the tool was changed, unit tests first, and the same live test ran again on both instances
+with its expectations moved to the decision. Raw protocols:
+[raw/nc35-nacharbeit.txt](../.planning/phases/31-ordner-anlegen/raw/nc35-nacharbeit.txt) and
+[raw/nc32-nacharbeit.txt](../.planning/phases/31-ordner-anlegen/raw/nc32-nacharbeit.txt).
+Both runs passed: 18 of 18, every case line `ergebnis=ok`, every `BASELINE` line equal.
+
+### A folder name with whitespace at its edge is refused
+
+Before, the path guard trimmed the end of a path, so a name such as `ende-leer ` was
+created as `ende-leer`, and inside a chain the answer named a folder the file system did
+not hold under that name. Now `files_create_folder` refuses such a name before any request:
+whitespace at the start or the end of any segment of the path, with or without `parents`.
+Nothing is created, not even the trimmed name. A space inside a name and a dot at its end
+still pass, because nothing trims them. The other file tools trim as they did.
+
+The refusal is a rule of the tool, not of Nextcloud: asked directly, both versions create a
+folder whose name ends in a space (raw protocols of the first run, lines `MKCOL 'mitte-leer '`).
+The sentence therefore says what is wrong with the name and does not blame the server.
+
+`status=keine` in the lines below means that the measured client sent no request at all,
+not even the tag lookup of the exclusion guard. The names, one line each:
+
+```text
+NAME 'ende-leer ' nc=35.0.0.10 nutzer=alice status=keine ergebnis=ok | ToolError reason=unspecified message="The folder name 'ende-leer ' in '/ordner31-7afc78dc/namen/ende-leer ' starts or ends with whitespace."; file system has it=no; refused before any request=yes; file system has the trimmed name=no
+NAME ' anfang-leer' nc=35.0.0.10 nutzer=alice status=keine ergebnis=ok | ToolError reason=unspecified message="The folder name ' anfang-leer' in '/ordner31-7afc78dc/namen/ anfang-leer' starts or ends with whitespace."; file system has it=no; refused before any request=yes; file system has the trimmed name=no
+NAME 'ende-punkt.' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | {"created": true, "id": "file:23666", "path": "/ordner31-7afc78dc/namen/ende-punkt."}; file system test -d of the answered path
+NAME 'ende-leer ' nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | ToolError reason=unspecified message="The folder name 'ende-leer ' in '/ordner31-3ac7cf1a/namen/ende-leer ' starts or ends with whitespace."; file system has it=no; refused before any request=yes; file system has the trimmed name=no
+NAME ' anfang-leer' nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | ToolError reason=unspecified message="The folder name ' anfang-leer' in '/ordner31-3ac7cf1a/namen/ anfang-leer' starts or ends with whitespace."; file system has it=no; refused before any request=yes; file system has the trimmed name=no
+NAME 'ende-punkt.' nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | {"created": true, "id": "file:457", "path": "/ordner31-3ac7cf1a/namen/ende-punkt."}; file system test -d of the answered path
+```
+
+The chain of the former open finding, with `parents` and without. `befund=nein` now means:
+refused both times, no request, the folder as empty afterwards as before.
+
+```text
+ZUSATZ name-mit-leerzeichen-in-kette nc=35.0.0.10 nutzer=alice status=keine befund=nein | parents=true: ToolError reason=unspecified message="The folder name 'mitte-leer ' in '/ordner31-7afc78dc/zusatz/mitte-leer /kind' starts or ends with whitespace."; parents=false: ToolError reason=unspecified message="The folder name 'mitte-leer ' in '/ordner31-7afc78dc/zusatz/mitte-leer /kind' starts or ends with whitespace."; requests sent: 0; file system ls -1A /ordner31-7afc78dc/zusatz before: [] after: []
+ZUSATZ name-mit-leerzeichen-in-kette nc=32.0.15.1 nutzer=alice status=keine befund=nein | parents=true: ToolError reason=unspecified message="The folder name 'mitte-leer ' in '/ordner31-3ac7cf1a/zusatz/mitte-leer /kind' starts or ends with whitespace."; parents=false: ToolError reason=unspecified message="The folder name 'mitte-leer ' in '/ordner31-3ac7cf1a/zusatz/mitte-leer /kind' starts or ends with whitespace."; requests sent: 0; file system ls -1A /ordner31-3ac7cf1a/zusatz before: [] after: []
+```
+
+The refusal reads the argument only and comes before the exclusion guard is asked. A padded
+name below a tagged folder and the same name below an invented folder therefore get the same
+answer, and neither sends a request; the case kein-ki of the follow-up run compares exactly
+that pair and checks the file system for both spellings of the name. The canary and the live
+pair ran again on both instances with `NC_MCP_REQUIRE_LIVE=1` and passed with the counts of
+the first run.
+
+### `x.part` is no longer called a file
+
+Nextcloud answers the MKCOL for `x.part` with 405 and the read that follows with a node
+that has no folder type and no usable file id (the id -1 on 35, none on 32), while the
+storage holds nothing. A file Nextcloud stores always has a file id. So the tool now says
+"a file" only for a node with one, and gives this node a sentence that claims no more than
+the two answers show:
+
+```text
+NAME 'x.part' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:405,PROPFIND:207 ergebnis=ok | ConflictError reason=unspecified message='/ordner31-7afc78dc/namen/x.part cannot be created as a folder: Nextcloud reports an entry there that is not a folder.'; file system has it=no; the sentence claims no file
+NAME 'x.part' nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:405,PROPFIND:207 ergebnis=ok | ConflictError reason=unspecified message='/ordner31-3ac7cf1a/namen/x.part cannot be created as a folder: Nextcloud reports an entry there that is not a folder.'; file system has it=no; the sentence claims no file
+```
+
+This is the cautious reading on purpose. The tool does not call the name refused by
+Nextcloud, because that picture was measured on 32 and 35 only and a refusal would be the
+next claim nobody read from an answer.
+
+### The acceptance script
+
+The script now takes the id for its `fetch` from the search hit that is the uploaded file,
+not from the first hit, and it calls the two file tools it had left out: all 24 tools of the
+registry answered on Nextcloud 32.
+
+One step is still not a pass on this instance, and the cause is the instance. The mail
+server of the test topology keeps its mail in memory and is empty after every restart
+(`MESSAGES 0`), while the Mail app goes on listing six messages from its own cache. Reading
+the text of one of them fails in the Mail app itself with a server error, also when it is
+asked past the connector. The script checks exactly that and reports the step as a missing
+prerequisite of the instance with an exit code of its own, 3: neither a tool failure nor a
+silent pass. The test mail is delivered by the bootstrap script of the topology only, which
+was not run here, so exit code 0 was not measured.
+
+```text
+MAIL ursache=testinstanz greenmail_laeuft=ja imap_inbox_nachrichten=0 uidnext=1 mail_app_listet=6 mail_app_abruf_nachricht_1=HTTP 500
+ABNAHME nc-mcp-exapp exit=3 werkzeuge=24 nie_aufgerufen=keins fehlgeschlagen=keins voraussetzung=fetch (Mail): die Mail-App der Instanz antwortet selbst HTTP 500
+```

@@ -1,0 +1,1222 @@
+# Plan 31-05b, Rohprotokoll Nextcloud 32 (Topologie nc-mcp-exapp), Beginn 2026-11-12T19:08:43Z, HEAD 8516e1e (Live-Läufe mit bdfc685, Abnahmeskript mit 95ff4da)
+# Nachmessung zu drei Befunden aus 31-05: Leerraum am Rand eines Ordnernamens (D-31-08), Name wie x.part (D-31-09),
+# Abnahmeskript. Live-Test, Kanarie, Live-Paar, Ursache des Mailabrufs, Abnahmeskript. Keine Secret-Werte.
+
+== (1) RAM-Gate und Start ==
+
+RAM frei_host_gb=5.14 schwelle=4.0 ergebnis=ok (vor dem Start, kein eigener Container läuft; Messungen 5395000, 5398276, 5393440 KiB)
+    $ docker ps        (vor dem Start)
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 4 hours
+    $ docker ps -a --filter name=nc35-, --filter name=nc_app_mcp_connector        (nc35 gestoppt)
+    nc35-test-issuer Exited (0) 6 weeks ago
+    nc35-greenmail Exited (143) 6 weeks ago
+    nc35-caddy Exited (0) 48 minutes ago
+    nc35-harp Exited (0) 48 minutes ago
+    nc35-nc Exited (0) 48 minutes ago
+    nc_app_mcp_connector Exited (0) 48 minutes ago
+    HP_SHARED_KEY für Compose aus .env.exapp gelesen (Länge 64, Wert nie ausgegeben)
+    $ docker compose -f compose.exapp.yml start        (kein bootstrap_exapp.sh)
+     Container nc-mcp-exapp-greenmail Starting 
+     Container nc-mcp-exapp-nc Starting 
+     Container nc-mcp-exapp-registry Starting 
+     Container nc-mcp-exapp-registry Started 
+     Container nc-mcp-exapp-greenmail Started 
+     Container nc-mcp-exapp-nc Started 
+     Container nc-mcp-exapp-nc Waiting 
+     Container nc-mcp-exapp-nc Waiting 
+     Container nc-mcp-exapp-nc Healthy 
+     Container nc-mcp-exapp-harp Starting 
+     Container nc-mcp-exapp-nc Healthy 
+     Container nc-mcp-exapp-caddy Starting 
+     Container nc-mcp-exapp-harp Started 
+     Container nc-mcp-exapp-caddy Started 
+    exit=0
+    GET http://127.0.0.1:8081/status.php -> HTTP 200 (Versuch 1)
+RAM frei_host_gb=4.66 schwelle=4.0 ergebnis=ok (nach dem Start, nc-mcp-exapp läuft; Messungen 4885748, 4883156, 4885940 KiB)
+    $ docker ps
+    nc-mcp-exapp-caddy caddy:2 Up 13 seconds
+    nc-mcp-exapp-harp ghcr.io/nextcloud/nextcloud-appapi-harp:release Up 13 seconds (healthy)
+    nc-mcp-exapp-nc nextcloud:32.0.15-apache Up 19 seconds (healthy)
+    nc-mcp-exapp-registry registry:2 Up 19 seconds
+    nc-mcp-exapp-greenmail greenmail/standalone:2.1.12 Up 19 seconds
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 4 hours
+    $ docker stats --no-stream
+    nc-mcp-exapp-caddy 10.78MiB / 5.786GiB 0.02%
+    nc-mcp-exapp-harp 67.28MiB / 5.786GiB 0.08%
+    nc-mcp-exapp-nc 106.1MiB / 5.786GiB 0.00%
+    nc-mcp-exapp-registry 5.301MiB / 5.786GiB 0.03%
+    nc-mcp-exapp-greenmail 109.2MiB / 5.786GiB 0.08%
+    gameworld-dev-gameworld-docker-proxy-1 27.02MiB / 5.786GiB 0.00%
+
+== (2) Instanz, lokaler Prozess, Code des Worktrees ==
+
+VERSION OF RECORD 32.0.15 version=32.0.15.1
+    $ occ status
+      - installed: true
+      - version: 32.0.15.1
+      - versionstring: 32.0.15
+      - edition: 
+      - maintenance: false
+      - needsDbUpgrade: false
+      - productname: Nextcloud
+      - extendedSupport: false
+    $ occ app_api:app:list
+    ExApps:
+    mcp_connector (MCP Connector): 9.9.9 [enabled]
+    Beobachtung: registriert ist jetzt 9.9.9 statt 0.7.2 wie zu Beginn von 31-05. Dort lief ein
+    Impersonationsaufruf mit der erfundenen Versionsnummer 9.9.9 im Kopf (Zeile VERSIONSKOPF in
+    raw/nc32-ordner.txt); ob dieser Aufruf den Eintrag geändert hat, wurde hier nicht untersucht.
+    Nach allen Läufen dieses Protokolls (Kopf 0.7.2 aus .env.exapp) steht weiter 9.9.9 da; die
+    Aufrufe unten antworten trotzdem 200. Nicht verändert (Wegwerf-Instanz).
+PROZESS lokal gestartet port=23001 heartbeat_vom_host=200 (Versuch 1) kommando=uv run --no-sync nc-mcp-exapp (im Worktree, PYTHONPATH=src)
+    Umgebung des Prozesses: nur APP_ID, APP_SECRET, APP_VERSION, NC_MCP_URL und NC_MCP_PUBLIC_URL aus .env.exapp,
+    NEXTCLOUD_URL gleich NC_MCP_URL, APP_PORT=23001, APP_HOST nicht gesetzt, APP_PERSISTENT_STORAGE außerhalb des Repos,
+    ohne NC_MCP_APP_PASSWORD, NC_MCP_STATIC_BEARER, NC_MCP_USER und ohne HP_SHARED_KEY. Version laut pyproject.toml
+    des Worktrees: 0.7.2, HEAD 8516e1e beim Start (danach kamen nur Test und Skript dazu, src unverändert).
+    Erster Startversuch mit der ganzen .env.exapp in der Umgebung brach sofort ab (NotImplementedError in
+    create_unix_server: mit HP_SHARED_KEY will der Prozess einen Unix-Socket, den es unter Windows nicht gibt);
+    zweiter Start mit genau den fünf Namen oben.
+    $ docker exec nc-mcp-exapp-nc php -r "echo file_get_contents(...host.docker.internal:23001/heartbeat...)"
+    {"status":"ok"}
+TOOLS-LIST weg=lokaler-prozess-direkt initialize=200 status=200 werkzeuge=24 files_create_folder=ja
+TOOLS-LIST weg=nextcloud-proxy-mit-app-passwort initialize=200 status=200 werkzeuge=24 files_create_folder=ja
+    Einmalprogramm außerhalb des Repos: initialize, notifications/initialized und tools/list gegen den laufenden
+    lokalen Prozess, einmal direkt auf 127.0.0.1:23001/mcp mit dem AppAPI-Kopf für alice, einmal über den Proxy
+    der Nextcloud (index.php/apps/app_api/proxy/mcp_connector/mcp) mit dem App-Passwort von alice.
+
+== (3) Live-Test unter AppAPI-Impersonation ==
+
+RAM frei_host_gb=4.63 schwelle=4.0 ergebnis=ok (vor dem Live-Test, nc-mcp-exapp und lokaler Prozess laufen; Messungen 4860996, 4851036, 4854572 KiB)
+    Umgebung: set -a && . ./.env.exapp && set +a (Worktree, gitignored), PYTHONPATH=src, PYTHONUTF8=1,
+    keine NC_MCP_E2E-Exporte. Die Ausgabe jedes Laufs ging zuerst in eine Datei außerhalb des Repos,
+    wurde gegen die Werte der Env-Datei geprüft (kein Fund) und erst dann angehängt, ohne den Block
+    'warnings summary' von pytest (ein lokaler Pfad, keine Messung).
+    Geänderte Erwartungen gegenüber 31-05 (Commit bdfc685): NAME 'ende-leer ' und neu NAME ' anfang-leer'
+    verlangen die Ablehnung vor jedem Request (D-31-08), NAME 'x.part' den Satz ohne Datei (D-31-09), die
+    Zeile ZUSATZ ist jetzt eine geprüfte Messung (befund=nein verlangt), ORDNER kein-ki vergleicht zusätzlich
+    getaggt gegen erfunden mit Leerzeichen am Namensende.
+    $ uv run --no-sync pytest tests/integration/test_files_create_folder_live.py -m integration -s --tb=line        (erster Lauf, HEAD bdfc685)
+
+LAUF ordner31 stempel=3ac7cf1a wurzel=/ordner31-3ac7cf1a container=nc-mcp-exapp-nc
+VERSION nc=32.0.15.1 versionstring=32.0.15 (occ status)
+DATENPFAD ls -d exit=0 ausgabe=/var/www/html/data/alice/files
+
+KONTROLLE 1 nc=32.0.15.1 nutzer=alice ergebnis=ok | mode=appapi NC_MCP_APP_PASSWORD or NC_MCP_STATIC_BEARER set in the process=no; the credential is APP_SECRET and no app password
+.
+KONTROLLE 2 nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:401,MKCOL:401 ergebnis=ok | tool: ToolError reason=guard_tripped message='The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld.'; dav.make_folder: ToolError reason=unspecified message='Nextcloud rejected the app password.'; file system has /ordner31-3ac7cf1a/kontrolle-falsch=no
+.
+ORDNER frei nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,MKCOL:201 ergebnis=ok | {"created": true, "id": "file:439", "path": "/ordner31-3ac7cf1a/frei"}; oc:fileid by app password PROPFIND=439; one MKCOL 201; id from oc-fileid, no read; file system test -d /ordner31-3ac7cf1a/frei
+.
+ORDNER vorhanden nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,MKCOL:405,PROPFIND:207 ergebnis=ok | {"created": false, "id": "file:439", "path": "/ordner31-3ac7cf1a/frei"}; oc:fileid by app password PROPFIND=439; MKCOL 405; PROPFIND 207
+.
+ORDNER datei nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,MKCOL:405,PROPFIND:207,systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:207 ergebnis=ok | ConflictError reason=unspecified message='A file, not a folder, already exists at /ordner31-3ac7cf1a/datei.txt.'; sentence of a file at the path; chain below the file: ConflictError reason=unspecified message='A file, not a folder, already exists at /ordner31-3ac7cf1a/datei.txt.'; A5 PROPFIND below the file: PROPFIND /datei.txt/x/y:404, PROPFIND /datei.txt/x:404, PROPFIND /datei.txt:207; no MKCOL below the file; file unchanged (GET with app password); file system test -f /ordner31-3ac7cf1a/datei.txt
+.
+ORDNER eltern-fehlt nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,MKCOL:409 ergebnis=ok | ToolError reason=unknown_id message='The parent folder /ordner31-3ac7cf1a/fehlt of /ordner31-3ac7cf1a/fehlt/kind does not exist.'; one MKCOL 409; file system without /ordner31-3ac7cf1a/fehlt
+.
+ORDNER kette nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:207,MKCOL:201,MKCOL:201,MKCOL:201,MKCOL:201 ergebnis=ok | {"created": true, "created_folders": ["/ordner31-3ac7cf1a/k", "/ordner31-3ac7cf1a/k/a", "/ordner31-3ac7cf1a/k/a/b", "/ordner31-3ac7cf1a/k/a/b/c"], "id": "file:444", "path": "/ordner31-3ac7cf1a/k/a/b/c"}; created_folders top down; oc:fileid by app password PROPFIND=444; four MKCOL 201; file system: all four folders
+.
+ORDNER deckel nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:207 ergebnis=ok | ToolError reason=unspecified message='Creating /ordner31-3ac7cf1a/d/1/2/3/4/5/6/7/8/9/10 needs 11 new folders; one call creates at most 10.'; names the cap of 10; no MKCOL; twelve PROPFIND of the count; file system without /ordner31-3ac7cf1a/d
+.
+ORDNER teilabbruch-wettlauf nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:207,MKCOL:201,MKCOL:405,PROPFIND:207 ergebnis=ok | ConflictError reason=unspecified message='A file, not a folder, already exists at /ordner31-3ac7cf1a/w/x. Already created in this call and left in place: /ordner31-3ac7cf1a/w.'; the addition names what was created; file system test -d /ordner31-3ac7cf1a/w; file system test -f /ordner31-3ac7cf1a/w/x; file system without /ordner31-3ac7cf1a/w/x/y
+.
+ORDNER geteilt-nur-lesen nc=32.0.15.1 nutzer=bob status=systemtags.PROPFIND:207,MKCOL:403,systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:207,MKCOL:403,systemtags.PROPFIND:207,MKCOL:201 ergebnis=ok | ToolError reason=permission_denied message='No permission to create a folder at /mcp-share-13f988b027/neu-3ac7cf1a.'; reason permission_denied; without the addition Already created; ToolError reason=permission_denied message='No permission to create a folder at /mcp-share-13f988b027/k-3ac7cf1a.'; reason permission_denied; without the addition Already created; two MKCOL 403; oc:permissions of /mcp-share-13f988b027 by app password PROPFIND: bob=SGD alice=RGDNVCK; positive control in the own home: {"created": true, "id": "file:447", "path": "/eigen-3ac7cf1a"}; file system of alice without neu-3ac7cf1a and k-3ac7cf1a
+.
+ORDNER kein-ki nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,systemtags.PROPFIND:207,REPORT:207,systemtags.PROPFIND:207,REPORT:207,MKCOL:409,systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | tagged: ToolError reason=unknown_id message='The parent folder /ordner31-3ac7cf1a/gesperrt of /ordner31-3ac7cf1a/gesperrt/neu does not exist.'; invented: ToolError reason=unknown_id message='The parent folder /ordner31-3ac7cf1a/erfunden of /ordner31-3ac7cf1a/erfunden/neu does not exist.'; equal once the folder is renamed; tagged chain: ToolError reason=unknown_id message='The parent folder /ordner31-3ac7cf1a/gesperrt/a of /ordner31-3ac7cf1a/gesperrt/a/b does not exist.'; tagged calls without MKCOL and PROPFIND on files (systemtags.PROPFIND:207,REPORT:207,systemtags.PROPFIND:207,REPORT:207); file system without gesperrt/neu, gesperrt/a and erfunden; positive control offen/neu: {"created": true, "id": "file:450", "path": "/ordner31-3ac7cf1a/offen/neu"}; padded name, tagged: ToolError reason=unspecified message="The folder name 'leer ' in '/ordner31-3ac7cf1a/gesperrt/leer ' starts or ends with whitespace."; invented: ToolError reason=unspecified message="The folder name 'leer ' in '/ordner31-3ac7cf1a/erfunden/leer ' starts or ends with whitespace."; equal once the folder is renamed, no request on either side; file system without gesperrt/leer, with and without the space, and erfunden
+.
+ORDNER sandbox nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201,systemtags.PROPFIND:207,REPORT:207,PROPFIND:404,PROPFIND:404 ergebnis=ok | ToolError reason=unspecified message='The folder path is the root folder, which always exists.'; root refusal without a single request; /a is on the file system at /ordner31-3ac7cf1a/root/a: {"created": true, "id": "file:452", "path": "/ordner31-3ac7cf1a/root/a"}; missing root: ToolError reason=unknown_id message='The parent folder /ordner31-3ac7cf1a/root-fehlt of /ordner31-3ac7cf1a/root-fehlt/a does not exist.'; no MKCOL with a missing root; file system without /ordner31-3ac7cf1a/root-fehlt; file system without /a above the root
+.
+ORDNER teilabbruch-name nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:207,MKCOL:201,MKCOL:201,MKCOL:400 ergebnis=ok | ToolError reason=unspecified message='Nextcloud does not accept the folder name in /ordner31-3ac7cf1a/n/ok/.htaccess. Already created in this call and left in place: /ordner31-3ac7cf1a/n, /ordner31-3ac7cf1a/n/ok.'; the sentence of a refused folder name, for the target or for the refused link; file system holds ['/ordner31-3ac7cf1a/n', '/ordner31-3ac7cf1a/n/ok'], and the sentence says so; no .htaccess on disk
+.
+NAME '.htaccess' nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:400 ergebnis=ok | ToolError reason=unspecified message='Nextcloud does not accept the folder name in /ordner31-3ac7cf1a/namen/.htaccess.'; file system has it=no
+NAME 'x.part' nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:405,PROPFIND:207 ergebnis=ok | ConflictError reason=unspecified message='/ordner31-3ac7cf1a/namen/x.part cannot be created as a folder: Nextcloud reports an entry there that is not a folder.'; file system has it=no; the sentence claims no file
+NAME 'x.filepart' nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:400 ergebnis=ok | ToolError reason=unspecified message='Nextcloud does not accept the folder name in /ordner31-3ac7cf1a/namen/x.filepart.'; file system has it=no
+NAME 'con' nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | {"created": true, "id": "file:456", "path": "/ordner31-3ac7cf1a/namen/con"}; file system test -d of the answered path
+NAME 'ende-leer ' nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | ToolError reason=unspecified message="The folder name 'ende-leer ' in '/ordner31-3ac7cf1a/namen/ende-leer ' starts or ends with whitespace."; file system has it=no; refused before any request=yes; file system has the trimmed name=no
+NAME ' anfang-leer' nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | ToolError reason=unspecified message="The folder name ' anfang-leer' in '/ordner31-3ac7cf1a/namen/ anfang-leer' starts or ends with whitespace."; file system has it=no; refused before any request=yes; file system has the trimmed name=no
+NAME 'ende-punkt.' nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | {"created": true, "id": "file:457", "path": "/ordner31-3ac7cf1a/namen/ende-punkt."}; file system test -d of the answered path
+ORDNER namen nc=32.0.15.1 nutzer=alice status=MKCOL:400,MKCOL:405,MKCOL:400,MKCOL:201,MKCOL:201 ergebnis=ok | '.htaccess': named refusal or real folder; 'x.part': named refusal or real folder; 'x.filepart': named refusal or real folder; 'con': named refusal or real folder; 'ende-leer ': named refusal or real folder; ' anfang-leer': named refusal or real folder; 'ende-punkt.': named refusal or real folder; file system ls -1A /ordner31-3ac7cf1a/namen: ['con', 'ende-punkt.']
+.
+ZUSATZ name-mit-leerzeichen-in-kette nc=32.0.15.1 nutzer=alice status=keine befund=nein | parents=true: ToolError reason=unspecified message="The folder name 'mitte-leer ' in '/ordner31-3ac7cf1a/zusatz/mitte-leer /kind' starts or ends with whitespace."; parents=false: ToolError reason=unspecified message="The folder name 'mitte-leer ' in '/ordner31-3ac7cf1a/zusatz/mitte-leer /kind' starts or ends with whitespace."; requests sent: 0; file system ls -1A /ordner31-3ac7cf1a/zusatz before: [] after: []
+.
+SPERRE versuch=bob-via-share nc=32.0.15.1 LOCK status=501 token=no UNLOCK status=501 tool status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 | LOCK answer: <?xml version="1.0" encoding="utf-8"?> <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns"> <s:exception>Sabre\DAV\Exception\NotImplemented</s:exception> <s:message>There was no plugin in the ...; tool: {"created": true, "id": "file:462", "path": "/ordner31-3ac7cf1a/lock-3ac7cf1a-a/kind"}
+SPERRE versuch=alice-own-token nc=32.0.15.1 LOCK status=501 token=no UNLOCK status=501 tool status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 | LOCK answer: <?xml version="1.0" encoding="utf-8"?> <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns"> <s:exception>Sabre\DAV\Exception\NotImplemented</s:exception> <s:message>There was no plugin in the ...; tool: {"created": true, "id": "file:463", "path": "/ordner31-3ac7cf1a/lock-3ac7cf1a-b/kind"}
+SPERRE versuch=alice-x-user-lock nc=32.0.15.1 LOCK status=501 token=no UNLOCK status=501 tool status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 | LOCK answer: <?xml version="1.0" encoding="utf-8"?> <d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns"> <s:exception>Sabre\DAV\Exception\NotImplemented</s:exception> <s:message>There was no plugin in the ...; tool: {"created": true, "id": "file:464", "path": "/ordner31-3ac7cf1a/lock-3ac7cf1a-c/kind"}
+UNGEMESSEN sperre-423 grund=no LOCK on this instance made the MKCOL answer 423 (three attempts, raw output in the SPERRE lines); the 423 branch is covered by unit tests only
+ORDNER sperre-423 nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201,systemtags.PROPFIND:207,REPORT:207,MKCOL:201,systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | bob-via-share: LOCK 501, MKCOL [201]; alice-own-token: LOCK 501, MKCOL [201]; alice-x-user-lock: LOCK 501, MKCOL [201]; 423 not reproducible on this instance
+.
+QUELLE mkcol-404 nc=32.0.15.1 CorePlugin.php httpMkcol exit=0 lines with NotFound, Conflict or createCollection: 560: $result = $this->server->createCollection($path, $mkcol);
+UNGEMESSEN mkcol-404 grund=the MKCOL below a parent that was just deleted answers [409], not 404; httpMkcol in CorePlugin.php: 560: $result = $this->server->createCollection($path, $mkcol);; the 404 branch is covered by unit tests only
+ORDNER mkcol-404 nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,PROPFIND:404,PROPFIND:207,MKCOL:409 ergebnis=ok | ToolError reason=unknown_id message='The parent folder /ordner31-3ac7cf1a/geloescht-3ac7cf1a of /ordner31-3ac7cf1a/geloescht-3ac7cf1a/kind does not exist.'; MKCOL after the parent was deleted: [409]; file system without /ordner31-3ac7cf1a/geloescht-3ac7cf1a; 404 not reproducible on this instance
+.
+ORDNER kontingent-knapp nc=32.0.15.1 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201,systemtags.PROPFIND:207,REPORT:207,MKCOL:507,systemtags.PROPFIND:207,REPORT:207,MKCOL:507 ergebnis=ok | used 59928850 B, quota before: The setting does not exist for user "alice".; quota used plus 8192 B: {"created": true, "id": "file:467", "path": "/ordner31-3ac7cf1a/q-3ac7cf1a/knapp"}; on disk; quota used plus 1024 B: MKCOL [507] ToolError reason=unspecified message='Not enough space in Nextcloud to create /ordner31-3ac7cf1a/q-3ac7cf1a/eng.'; nothing on disk; quota 1 B: MKCOL [507] ToolError reason=unspecified message='Not enough space in Nextcloud to create /ordner31-3ac7cf1a/q-3ac7cf1a/voll.'; nothing on disk; quota back to: The setting does not exist for user "alice".
+.
+CLEANUP PROPFIND /ordner31-3ac7cf1a: 404
+BASELINE dateien_alice vorher=17 nachher=17 gleich=ja
+BASELINE papierkorb_alice vorher=1 nachher=1 gleich=ja
+BASELINE kontingent_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
+BASELINE tag_zuordnungen vorher=tags=keine zuordnungen=0 nachher=tags=keine zuordnungen=0 gleich=ja
+BASELINE freigaben_alice vorher=3 nachher=3 gleich=ja
+
+18 passed, 1 warning in 20.11s
+exit=0
+
+== (4) Kanarie und Live-Paar mit NC_MCP_REQUIRE_LIVE=1 ==
+
+RAM frei_host_gb=4.51 schwelle=4.0 ergebnis=ok (vor Kanarie und Live-Paar, nc-mcp-exapp und lokaler Prozess laufen; Messungen 4728612, 4725472, 4725412 KiB)
+    $ NC_MCP_REQUIRE_LIVE=1 uv run --no-sync pytest tests/integration/test_canary.py tests/integration/test_pair_equality_live.py -m integration -s --tb=short        (HEAD bdfc685)
+    KANARIE normal geprüft 24 von 24
+    .KANARIE ausfall-500 geprüft 24 von 24
+    .KANARIE ausfall-412 geprüft 24 von 24
+    .KANARIE ausfall-timeout geprüft 24 von 24
+    ..PAARE normal verglichen 15 von 16 (ausnahmen 1)
+    .PAARE 500 verglichen 16 von 16 (ausnahmen 0)
+    .PAARE 412 verglichen 16 von 16 (ausnahmen 0)
+    .PAARE timeout verglichen 16 von 16 (ausnahmen 0)
+    ..
+    10 passed, 1 warning in 119.72s (0:01:59)
+    exit=0
+    Die zwei Protokolle der Phase 28, an die Kanarie und Live-Paar anhängen, wurden danach mit
+    git checkout -- <Datei> zurückgesetzt; die angehängten Zeilen stehen wörtlich hier.
+    Anhang an .planning/phases/28-gates-und-beweise/raw/28-10-canary.txt (562 Zeilen):
+
+    # 28-10 canary normal 2026-11-12 20:11:16 +0100 head=bdfc685 container=nc-mcp-exapp-nc user=alice
+    # kommando: PYTHONUTF8=1 .venv/Scripts/python.exe -m pytest tests/integration/test_canary.py -m integration -s
+    # stamm=kanarie28xa89dc4d9 marker=mk7952585c213e4a009bbc5e986e9160df kontroll-marker=cka04c490e155a4b65801a75b8ab43727a
+    GATE-02 files_search normal {"query": "kanarie28xa89dc4d9"} seite 1: ja (is_error=False {"query":"kanarie28xa89dc4d9","folder":"/","count":4,"items":[{"path":"/kanarie28xa89dc4d9/kanarie28xa89dc4d9-kontrolle-)
+    AUFRUF normal files_search {"query": "kanarie28xa89dc4d9"} seiten=1 is_error=[False] gebucht=['-']
+    KONTROLLE files_search normal {"query": "kanarie28xa89dc4d9"}: ja (kontroll-marker gesehen in 1 seite(n))
+    GATE-02 files_list normal {"path": "/kanarie28xa89dc4d9"} seite 1: ja (is_error=False {"path":"/kanarie28xa89dc4d9","count":2,"items":[{"path":"/kanarie28xa89dc4d9/kanarie28xa89dc4d9-kontrolle-cka04c490e155)
+    AUFRUF normal files_list {"path": "/kanarie28xa89dc4d9"} seiten=1 is_error=[False] gebucht=['-']
+    KONTROLLE files_list normal {"path": "/kanarie28xa89dc4d9"}: ja (kontroll-marker gesehen in 1 seite(n))
+    GATE-02 files_list normal {"path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9"} seite 1: ja (is_error=True Error executing tool files_list: File not found: /kanarie28xa89dc4d9/Gesperrt-a89dc4d9. Hint: List the parent folder fir)
+    AUFRUF normal files_list {"path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_read normal {"path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/inhalt-a89dc4d9.txt"} seite 1: ja (is_error=True Error executing tool files_read: File not found: /kanarie28xa89dc4d9/Gesperrt-a89dc4d9/inhalt-a89dc4d9.txt. Hint: List t)
+    AUFRUF normal files_read {"path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/inhalt-a89dc4d9.txt"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_read normal {"path": "/kanarie28xa89dc4d9/kanarie28xa89dc4d9-kontrolle-cka04c490e155a4b65801a75b8ab43727a.txt"} seite 1: ja (is_error=False {"path":"/kanarie28xa89dc4d9/kanarie28xa89dc4d9-kontrolle-cka04c490e155a4b65801a75b8ab43727a.txt","content":"kontrolle k)
+    AUFRUF normal files_read {"path": "/kanarie28xa89dc4d9/kanarie28xa89dc4d9-kontrolle-cka04c490e155a4b65801a75b8ab43727a.txt"} seiten=1 is_error=[False] gebucht=['-']
+    KONTROLLE files_read normal {"path": "/kanarie28xa89dc4d9/kanarie28xa89dc4d9-kontrolle-cka04c490e155a4b65801a75b8ab43727a.txt"}: ja (kontroll-marker gesehen in 1 seite(n))
+    GATE-02 files_download normal {"path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/inhalt-a89dc4d9.txt"} seite 1: ja (is_error=True Error executing tool files_download: File not found: /kanarie28xa89dc4d9/Gesperrt-a89dc4d9/inhalt-a89dc4d9.txt. Hint: Li)
+    AUFRUF normal files_download {"path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/inhalt-a89dc4d9.txt"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_read_as_markdown normal {"path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/inhalt-a89dc4d9.docx"} seite 1: ja (is_error=True Error executing tool files_read_as_markdown: File not found: /kanarie28xa89dc4d9/Gesperrt-a89dc4d9/inhalt-a89dc4d9.docx.)
+    AUFRUF normal files_read_as_markdown {"path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/inhalt-a89dc4d9.docx"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_read_as_markdown normal {"path": "/kanarie28xa89dc4d9/kanarie28xa89dc4d9-kontrolle-cka04c490e155a4b65801a75b8ab43727a.docx"} seite 1: ja (is_error=False {"path":"/kanarie28xa89dc4d9/kanarie28xa89dc4d9-kontrolle-cka04c490e155a4b65801a75b8ab43727a.docx","content":"kontrolle )
+    AUFRUF normal files_read_as_markdown {"path": "/kanarie28xa89dc4d9/kanarie28xa89dc4d9-kontrolle-cka04c490e155a4b65801a75b8ab43727a.docx"} seiten=1 is_error=[False] gebucht=['-']
+    KONTROLLE files_read_as_markdown normal {"path": "/kanarie28xa89dc4d9/kanarie28xa89dc4d9-kontrolle-cka04c490e155a4b65801a75b8ab43727a.docx"}: ja (kontroll-marker gesehen in 1 seite(n))
+    GATE-02 files_upload normal {"content": "x", "path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/neu-a89dc4d9.txt"} seite 1: ja (is_error=True Error executing tool files_upload: The parent folder /kanarie28xa89dc4d9/Gesperrt-a89dc4d9 of /kanarie28xa89dc4d9/Gesper)
+    AUFRUF normal files_upload {"content": "x", "path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/neu-a89dc4d9.txt"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG files_upload normal {"content": "x", "path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/neu-a89dc4d9.txt"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 files_create_folder normal {"path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/ordner-a89dc4d9"} seite 1: ja (is_error=True Error executing tool files_create_folder: The parent folder /kanarie28xa89dc4d9/Gesperrt-a89dc4d9 of /kanarie28xa89dc4d9)
+    AUFRUF normal files_create_folder {"path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/ordner-a89dc4d9"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG files_create_folder normal {"path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/ordner-a89dc4d9"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 files_create_folder normal {"parents": true, "path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/a-a89dc4d9/b"} seite 1: ja (is_error=True Error executing tool files_create_folder: The parent folder /kanarie28xa89dc4d9/Gesperrt-a89dc4d9/a-a89dc4d9 of /kanarie)
+    AUFRUF normal files_create_folder {"parents": true, "path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/a-a89dc4d9/b"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG files_create_folder normal {"parents": true, "path": "/kanarie28xa89dc4d9/Gesperrt-a89dc4d9/a-a89dc4d9/b"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 notes_search normal {"query": "kanarie28xa89dc4d9"} seite 1: ja (is_error=False {"count":1,"results":[{"id":"note:478","title":"kanarie28xa89dc4d9-kontrolle","excerpt":"cka04c490e155a4b65801a75b8ab437)
+    AUFRUF normal notes_search {"query": "kanarie28xa89dc4d9"} seiten=1 is_error=[False] gebucht=['-']
+    KONTROLLE notes_search normal {"query": "kanarie28xa89dc4d9"}: ja (kontroll-marker gesehen in 1 seite(n))
+    GATE-02 notes_read normal {"note_id": "note:475"} seite 1: ja (is_error=True Error executing tool notes_read: Nextcloud did not find the note 475. Hint: Search for it first; the id or the name is u)
+    AUFRUF normal notes_read {"note_id": "note:475"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 notes_read normal {"note_id": "note:478"} seite 1: ja (is_error=False {"id":"note:478","title":"kanarie28xa89dc4d9-kontrolle","content":"kanarie28xa89dc4d9-kontrolle\ncka04c490e155a4b65801a7)
+    AUFRUF normal notes_read {"note_id": "note:478"} seiten=1 is_error=[False] gebucht=['-']
+    KONTROLLE notes_read normal {"note_id": "note:478"}: ja (kontroll-marker gesehen in 1 seite(n))
+    GATE-02 notes_create normal {"category": "kanarie28xa89dc4d9-kat", "content": "x", "title": "kanarie28xa89dc4d9-neu"} seite 1: ja (is_error=True Error executing tool notes_create: The parent folder /Notes/kanarie28xa89dc4d9-kat of /Notes/kanarie28xa89dc4d9-kat/kana)
+    AUFRUF normal notes_create {"category": "kanarie28xa89dc4d9-kat", "content": "x", "title": "kanarie28xa89dc4d9-neu"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG notes_create normal {"category": "kanarie28xa89dc4d9-kat", "content": "x", "title": "kanarie28xa89dc4d9-neu"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 unified_search normal {"limit": 100, "query": "kanarie28xa89dc4d9"} seite 1: ja (is_error=False {"query":"kanarie28xa89dc4d9","count":9,"results":[{"id":"note:478","title":"kanarie28xa89dc4d9-kontrolle","subline":"ck)
+    AUFRUF normal unified_search {"limit": 100, "query": "kanarie28xa89dc4d9"} seiten=1 is_error=[False] gebucht=['-']
+    KONTROLLE unified_search normal {"limit": 100, "query": "kanarie28xa89dc4d9"}: ja (kontroll-marker gesehen in 1 seite(n))
+    GATE-02 prepare_context normal {"detail": "full", "query": "kanarie28xa89dc4d9"} seite 1: ja (is_error=False {"query":"kanarie28xa89dc4d9","window":{"start":"2026-11-12T19:11:25+00:00","end":"2026-11-19T19:11:25+00:00"},"events":)
+    AUFRUF normal prepare_context {"detail": "full", "query": "kanarie28xa89dc4d9"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 prepare_context normal {"detail": "short", "query": "kanarie28xa89dc4d9"} seite 1: ja (is_error=False {"query":"kanarie28xa89dc4d9","window":{"start":"2026-11-12T19:11:26+00:00","end":"2026-11-19T19:11:26+00:00"},"events":)
+    AUFRUF normal prepare_context {"detail": "short", "query": "kanarie28xa89dc4d9"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 talk_browse normal {"level": "conversations"} seite 1: ja (is_error=False {"level":"conversations","count":6,"results":[{"token":"o7y93k8c","name":"kanarie28xa89dc4d9","type":2,"unread":0,"unrea)
+    AUFRUF normal talk_browse {"level": "conversations"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 talk_browse normal {"level": "messages", "token": "o7y93k8c"} seite 1: ja (is_error=False {"level":"messages","token":"o7y93k8c","conversation":"kanarie28xa89dc4d9","count":1,"results":[{"id":140,"timestamp":17)
+    GATE-02 talk_browse normal {"level": "messages", "token": "o7y93k8c"} seite 2: ja (is_error=False {"level":"messages","token":"o7y93k8c","conversation":"kanarie28xa89dc4d9","count":0,"results":[]})
+    AUFRUF normal talk_browse {"level": "messages", "token": "o7y93k8c"} seiten=2 is_error=[False, False] gebucht=['-', '-']
+    GATE-02 talk_browse normal {"level": "messages", "token": "fqzfcg67"} seite 1: ja (is_error=True Error executing tool talk_browse: The token 'fqzfcg67' is not in the conversation list of this account. Hint: Call talk_)
+    AUFRUF normal talk_browse {"level": "messages", "token": "fqzfcg67"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 talk_send normal {"message": "kanarie28xa89dc4d9 ping", "token": "fqzfcg67"} seite 1: ja (is_error=True Error executing tool talk_send: The token 'fqzfcg67' is not in the conversation list of this account. Hint: Call talk_br)
+    AUFRUF normal talk_send {"message": "kanarie28xa89dc4d9 ping", "token": "fqzfcg67"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG talk_send normal {"message": "kanarie28xa89dc4d9 ping", "token": "fqzfcg67"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 search normal {"query": "kanarie28xa89dc4d9"} seite 1: ja (is_error=False {
+      "results": [
+        {
+          "id": "note:478",
+          "title": "kanarie28xa89dc4d9-kontrolle",
+          "url": "http://127.0)
+    AUFRUF normal search {"query": "kanarie28xa89dc4d9"} seiten=1 is_error=[False] gebucht=['-']
+    KONTROLLE search normal {"query": "kanarie28xa89dc4d9"}: ja (kontroll-marker gesehen in 1 seite(n))
+    GATE-02 fetch normal {"id": "file:469"} seite 1: ja (is_error=True Error executing tool fetch: This account has no file with the id 469. Hint: Run search again and use the id from the fre)
+    AUFRUF normal fetch {"id": "file:469"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 fetch normal {"id": "note:475"} seite 1: ja (is_error=True Error executing tool fetch: Nextcloud did not find the note 475. Hint: Search for it first; the id or the name is unknow)
+    AUFRUF normal fetch {"id": "note:475"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 fetch normal {"id": "message:fqzfcg67:1"} seite 1: ja (is_error=True Error executing tool fetch: The token 'fqzfcg67' is not in the conversation list of this account. Hint: Call talk_browse)
+    AUFRUF normal fetch {"id": "message:fqzfcg67:1"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 fetch normal {"id": "table:11"} seite 1: ja (is_error=False {
+      "id": "table:11",
+      "title": "kanarie28xa89dc4d9-t",
+      "text": "kanarie28xa89dc4d9-t\nRows: 2\nVerweis\n\n{\"title\")
+    AUFRUF normal fetch {"id": "table:11"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 fetch normal {"id": "card:11:14:20"} seite 1: ja (is_error=False {
+      "id": "card:11:14:20",
+      "title": "kanarie28xa89dc4d9",
+      "text": "",
+      "url": "http://127.0.0.1:8081/index.php/apps)
+    AUFRUF normal fetch {"id": "card:11:14:20"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 fetch normal {"id": "event:kanarie28xa89dc4d9:kanarie28xa89dc4d9-8a59e158.ics"} seite 1: ja (is_error=False {
+      "id": "event:kanarie28xa89dc4d9:kanarie28xa89dc4d9-8a59e158.ics",
+      "title": "kanarie28xa89dc4d9",
+      "text": "kanari)
+    AUFRUF normal fetch {"id": "event:kanarie28xa89dc4d9:kanarie28xa89dc4d9-8a59e158.ics"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 calendar_list_events normal {"calendar": "kanarie28xa89dc4d9", "end": "2026-10-06T00:00:00+00:00", "start": "2026-10-05T00:00:00+00:00"} seite 1: ja (is_error=False {"range":{"start":"2026-10-05T00:00:00+00:00","end":"2026-10-06T00:00:00+00:00","timezone":"UTC"},"count":1,"events":[{")
+    AUFRUF normal calendar_list_events {"calendar": "kanarie28xa89dc4d9", "end": "2026-10-06T00:00:00+00:00", "start": "2026-10-05T00:00:00+00:00"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 calendar_create_event normal {"calendar": "kanarie28xa89dc4d9", "end": "2026-10-07T10:00:00+00:00", "start": "2026-10-07T09:00:00+00:00", "summary... seite 1: ja (is_error=False {"id":"event:kanarie28xa89dc4d9:60aa0afe-b72f-4f9a-82d1-8ead7720ec8e.ics","uid":"60aa0afe-b72f-4f9a-82d1-8ead7720ec8e",")
+    AUFRUF normal calendar_create_event {"calendar": "kanarie28xa89dc4d9", "end": "2026-10-07T10:00:00+00:00", "start": "2026-10-07T09:00:00+00:00", "summary... seiten=1 is_error=[False] gebucht=['event event:kanarie28xa89dc4d9:60aa0afe-b72f-4f9a-82d1-8ead7720ec8e.ics']
+    GATE-02 deck_browse normal {"level": "boards"} seite 1: ja (is_error=False {"level":"boards","count":2,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_edit":true},{"id":11,"title":"k)
+    AUFRUF normal deck_browse {"level": "boards"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 deck_browse normal {"board_id": "11", "level": "stacks"} seite 1: ja (is_error=False {"level":"stacks","count":1,"results":[{"id":14,"title":"kanarie28xa89dc4d9","cards":1}]})
+    AUFRUF normal deck_browse {"board_id": "11", "level": "stacks"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 deck_browse normal {"board_id": "11", "level": "cards"} seite 1: ja (is_error=False {"level":"cards","count":1,"results":[{"id":"card:11:14:20","title":"kanarie28xa89dc4d9","stack":"kanarie28xa89dc4d9","u)
+    AUFRUF normal deck_browse {"board_id": "11", "level": "cards"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 deck_create_card normal {"board_id": "11", "stack_id": "14", "title": "kanarie28xa89dc4d9-neu"} seite 1: ja (is_error=False {"id":"card:11:14:21","title":"kanarie28xa89dc4d9-neu","url":"http://127.0.0.1:8081/index.php/apps/deck/card/21"})
+    AUFRUF normal deck_create_card {"board_id": "11", "stack_id": "14", "title": "kanarie28xa89dc4d9-neu"} seiten=1 is_error=[False] gebucht=['card card:11:14:21']
+    GATE-02 contacts_search normal {"query": "kanarie28xa89dc4d9"} seite 1: ja (is_error=False {"query":"kanarie28xa89dc4d9","count":0,"contacts":[]})
+    AUFRUF normal contacts_search {"query": "kanarie28xa89dc4d9"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_browse normal {"level": "tables"} seite 1: ja (is_error=False {"level":"tables","count":2,"results":[{"id":10,"title":"Welcome to Nextcloud Tables!","rowsCount":8,"columnsCount":4,"i)
+    AUFRUF normal tables_browse {"level": "tables"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_browse normal {"level": "columns", "table_id": "11"} seite 1: ja (is_error=False {"level":"columns","count":1,"results":[{"id":14,"title":"Verweis","type":"text","mandatory":false,"subtype":"link","num)
+    AUFRUF normal tables_browse {"level": "columns", "table_id": "11"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_browse normal {"level": "rows", "table_id": "11"} seite 1: ja (is_error=False {"level":"rows","table":"kanarie28xa89dc4d9-t","count":2,"results":[{"Verweis":null},{"Verweis":"{\"title\": \"kanarie28)
+    AUFRUF normal tables_browse {"level": "rows", "table_id": "11"} seiten=1 is_error=[False] gebucht=['-']
+    KONTROLLE tables_browse normal {"level": "rows", "table_id": "11"}: ja (kontroll-marker gesehen in 1 seite(n))
+    GATE-02 tables_create_row normal {"table_id": "11", "values": "{\"Verweis\": \"\"}"} seite 1: ja (is_error=False {"id":33,"table_id":"11","url":"http://127.0.0.1:8081/index.php/apps/tables/#/table/11","values_written":{"Verweis":""}})
+    AUFRUF normal tables_create_row {"table_id": "11", "values": "{\"Verweis\": \"\"}"} seiten=1 is_error=[False] gebucht=['row 33']
+    GATE-02 mail_browse normal {"level": "accounts"} seite 1: ja (is_error=False {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]})
+    AUFRUF normal mail_browse {"level": "accounts"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 mail_browse normal {"account_id": "1", "level": "mailboxes"} seite 1: ja (is_error=False {"level":"mailboxes","count":1,"results":[{"id":1,"name":"INBOX","unread":0,"delimiter":".","special_role":"inbox"}]})
+    AUFRUF normal mail_browse {"account_id": "1", "level": "mailboxes"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 mail_browse normal {"level": "messages", "mailbox_id": "1"} seite 1: ja (is_error=False {"level":"messages","mailbox_id":"1","count":6,"results":[{"id":"mail:1","subject":"Gruesse aus Hamburg, die Masse stehe)
+    AUFRUF normal mail_browse {"level": "messages", "mailbox_id": "1"} seiten=1 is_error=[False] gebucht=['-']
+    KANARIE normal geprüft 24 von 24
+    CURSOR provider=circles cursor=25 treffer=0
+    CURSOR provider=files cursor=25 treffer=4
+    CURSOR provider=tables-search-tables cursor=25 treffer=1
+    CURSOR provider=talk-message cursor=25 treffer=0
+    CLEANUP papierkorb kanarie28xa89dc4d9: leer
+    CLEANUP PROPFIND /kanarie28xa89dc4d9: 404
+    CLEANUP ordner /kanarie28xa89dc4d9/Gesperrt-a89dc4d9/ordner-a89dc4d9: 404
+    CLEANUP ordner /kanarie28xa89dc4d9/Gesperrt-a89dc4d9/a-a89dc4d9: 404
+    CLEANUP PROPFIND /Notes/kanarie28xa89dc4d9-kat: 404
+    CLEANUP notes: leer
+    CLEANUP talk raum kanarie28xa89dc4d9: entfernt
+    CLEANUP share raum 34: 404
+    CLEANUP share user2 35: 404
+    CLEANUP talk datei-raum: entfernt
+    CLEANUP talk datei-raum-nachricht 143: 404
+    CLEANUP table 11: 404
+    CLEANUP kalender kanarie28xa89dc4d9: 404
+    CLEANUP deck board 11: gelöscht
+    CLEANUP share deck 36: 404
+    CLEANUP tag kein-ki: entfernt
+    CLEANUP tool event event:kanarie28xa89dc4d9:60aa0afe-b72f-4f9a-82d1-8ead7720ec8e.ics: 404
+    CLEANUP tool card card:11:14:21: gelöscht
+    CLEANUP tool row 33: 404
+    ZUSAMMENFASSUNG cleanup: 19 Zeilen, 19 gelesen ok, 3 Werkzeug-Einträge
+
+    # 28-10 canary ausfall-500 2026-11-12 20:11:32 +0100 head=bdfc685 container=nc-mcp-exapp-nc user=alice
+    # kommando: PYTHONUTF8=1 .venv/Scripts/python.exe -m pytest tests/integration/test_canary.py -m integration -s
+    # stamm=kanarie28x26b84d8e marker=mk1e00afb38375474fa6b71b9445adc6bc kontroll-marker=ck489596c3ea324e10a9061e12515e93a4
+    GATE-02 files_search ausfall-500 {"query": "kanarie28x26b84d8e"} seite 1: ja (is_error=False {"query":"kanarie28x26b84d8e","folder":"/","count":0,"items":[],"note":"matched on names only; contents are not indexed")
+    AUFRUF ausfall-500 files_search {"query": "kanarie28x26b84d8e"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 files_list ausfall-500 {"path": "/kanarie28x26b84d8e"} seite 1: ja (is_error=False {"path":"/kanarie28x26b84d8e","count":0,"items":[],"degraded":[{"source":"exclusion","reason":"The exclusion check (tag )
+    AUFRUF ausfall-500 files_list {"path": "/kanarie28x26b84d8e"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 files_list ausfall-500 {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e"} seite 1: ja (is_error=False {"path":"/kanarie28x26b84d8e/Gesperrt-26b84d8e","count":0,"items":[],"degraded":[{"source":"exclusion","reason":"The exc)
+    AUFRUF ausfall-500 files_list {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 files_read ausfall-500 {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/inhalt-26b84d8e.txt"} seite 1: ja (is_error=True Error executing tool files_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file)
+    AUFRUF ausfall-500 files_read {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/inhalt-26b84d8e.txt"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_read ausfall-500 {"path": "/kanarie28x26b84d8e/kanarie28x26b84d8e-kontrolle-ck489596c3ea324e10a9061e12515e93a4.txt"} seite 1: ja (is_error=True Error executing tool files_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file)
+    AUFRUF ausfall-500 files_read {"path": "/kanarie28x26b84d8e/kanarie28x26b84d8e-kontrolle-ck489596c3ea324e10a9061e12515e93a4.txt"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_download ausfall-500 {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/inhalt-26b84d8e.txt"} seite 1: ja (is_error=True Error executing tool files_download: The exclusion check (tag kein-ki) could not be answered, so entries that may carry )
+    AUFRUF ausfall-500 files_download {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/inhalt-26b84d8e.txt"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_read_as_markdown ausfall-500 {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/inhalt-26b84d8e.docx"} seite 1: ja (is_error=True Error executing tool files_read_as_markdown: The exclusion check (tag kein-ki) could not be answered, so entries that ma)
+    AUFRUF ausfall-500 files_read_as_markdown {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/inhalt-26b84d8e.docx"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_read_as_markdown ausfall-500 {"path": "/kanarie28x26b84d8e/kanarie28x26b84d8e-kontrolle-ck489596c3ea324e10a9061e12515e93a4.docx"} seite 1: ja (is_error=True Error executing tool files_read_as_markdown: The exclusion check (tag kein-ki) could not be answered, so entries that ma)
+    AUFRUF ausfall-500 files_read_as_markdown {"path": "/kanarie28x26b84d8e/kanarie28x26b84d8e-kontrolle-ck489596c3ea324e10a9061e12515e93a4.docx"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_upload ausfall-500 {"content": "x", "path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/neu-26b84d8e.txt"} seite 1: ja (is_error=True Error executing tool files_upload: The exclusion check (tag kein-ki) could not be answered, so entries that may carry fi)
+    AUFRUF ausfall-500 files_upload {"content": "x", "path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/neu-26b84d8e.txt"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG files_upload ausfall-500 {"content": "x", "path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/neu-26b84d8e.txt"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 files_create_folder ausfall-500 {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/ordner-26b84d8e"} seite 1: ja (is_error=True Error executing tool files_create_folder: The exclusion check (tag kein-ki) could not be answered, so entries that may c)
+    AUFRUF ausfall-500 files_create_folder {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/ordner-26b84d8e"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG files_create_folder ausfall-500 {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/ordner-26b84d8e"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 files_create_folder ausfall-500 {"parents": true, "path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/a-26b84d8e/b"} seite 1: ja (is_error=True Error executing tool files_create_folder: The exclusion check (tag kein-ki) could not be answered, so entries that may c)
+    AUFRUF ausfall-500 files_create_folder {"parents": true, "path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/a-26b84d8e/b"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG files_create_folder ausfall-500 {"parents": true, "path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/a-26b84d8e/b"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 notes_search ausfall-500 {"query": "kanarie28x26b84d8e"} seite 1: ja (is_error=False {"count":0,"results":[],"degraded":[{"source":"exclusion","reason":"The exclusion check (tag kein-ki) could not be answe)
+    AUFRUF ausfall-500 notes_search {"query": "kanarie28x26b84d8e"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 notes_read ausfall-500 {"note_id": "note:486"} seite 1: ja (is_error=True Error executing tool notes_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file)
+    AUFRUF ausfall-500 notes_read {"note_id": "note:486"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 notes_read ausfall-500 {"note_id": "note:489"} seite 1: ja (is_error=True Error executing tool notes_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file)
+    AUFRUF ausfall-500 notes_read {"note_id": "note:489"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 notes_create ausfall-500 {"category": "kanarie28x26b84d8e-kat", "content": "x", "title": "kanarie28x26b84d8e-neu"} seite 1: ja (is_error=True Error executing tool notes_create: The exclusion check (tag kein-ki) could not be answered, so entries that may carry fi)
+    AUFRUF ausfall-500 notes_create {"category": "kanarie28x26b84d8e-kat", "content": "x", "title": "kanarie28x26b84d8e-neu"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG notes_create ausfall-500 {"category": "kanarie28x26b84d8e-kat", "content": "x", "title": "kanarie28x26b84d8e-neu"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 unified_search ausfall-500 {"limit": 100, "query": "kanarie28x26b84d8e"} seite 1: ja (is_error=False {"query":"kanarie28x26b84d8e","count":4,"results":[{"id":"card:12","title":"kanarie28x26b84d8e","url":"http://127.0.0.1:)
+    AUFRUF ausfall-500 unified_search {"limit": 100, "query": "kanarie28x26b84d8e"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 prepare_context ausfall-500 {"detail": "full", "query": "kanarie28x26b84d8e"} seite 1: ja (is_error=False {"query":"kanarie28x26b84d8e","window":{"start":"2026-11-12T19:11:40+00:00","end":"2026-11-19T19:11:40+00:00"},"events":)
+    AUFRUF ausfall-500 prepare_context {"detail": "full", "query": "kanarie28x26b84d8e"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 prepare_context ausfall-500 {"detail": "short", "query": "kanarie28x26b84d8e"} seite 1: ja (is_error=False {"query":"kanarie28x26b84d8e","window":{"start":"2026-11-12T19:11:41+00:00","end":"2026-11-19T19:11:41+00:00"},"events":)
+    AUFRUF ausfall-500 prepare_context {"detail": "short", "query": "kanarie28x26b84d8e"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 talk_browse ausfall-500 {"level": "conversations"} seite 1: ja (is_error=False {"level":"conversations","count":6,"results":[{"token":"4thvmjbf","name":"kanarie28x26b84d8e","type":2,"unread":0,"unrea)
+    AUFRUF ausfall-500 talk_browse {"level": "conversations"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 talk_browse ausfall-500 {"level": "messages", "token": "4thvmjbf"} seite 1: ja (is_error=False {"level":"messages","token":"4thvmjbf","conversation":"kanarie28x26b84d8e","count":1,"results":[{"id":147,"timestamp":17)
+    GATE-02 talk_browse ausfall-500 {"level": "messages", "token": "4thvmjbf"} seite 2: ja (is_error=False {"level":"messages","token":"4thvmjbf","conversation":"kanarie28x26b84d8e","count":0,"results":[]})
+    AUFRUF ausfall-500 talk_browse {"level": "messages", "token": "4thvmjbf"} seiten=2 is_error=[False, False] gebucht=['-', '-']
+    GATE-02 talk_browse ausfall-500 {"level": "messages", "token": "b3fm7c2a"} seite 1: ja (is_error=True Error executing tool talk_browse: The exclusion check (tag kein-ki) could not be answered, so entries that may carry fil)
+    AUFRUF ausfall-500 talk_browse {"level": "messages", "token": "b3fm7c2a"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 talk_send ausfall-500 {"message": "kanarie28x26b84d8e ping", "token": "b3fm7c2a"} seite 1: ja (is_error=True Error executing tool talk_send: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file )
+    AUFRUF ausfall-500 talk_send {"message": "kanarie28x26b84d8e ping", "token": "b3fm7c2a"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG talk_send ausfall-500 {"message": "kanarie28x26b84d8e ping", "token": "b3fm7c2a"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 search ausfall-500 {"query": "kanarie28x26b84d8e"} seite 1: ja (is_error=False {
+      "results": [
+        {
+          "id": "card:12",
+          "title": "kanarie28x26b84d8e",
+          "url": "http://127.0.0.1:8081/a)
+    AUFRUF ausfall-500 search {"query": "kanarie28x26b84d8e"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 fetch ausfall-500 {"id": "file:480"} seite 1: ja (is_error=True Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file cont)
+    AUFRUF ausfall-500 fetch {"id": "file:480"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 fetch ausfall-500 {"id": "note:486"} seite 1: ja (is_error=True Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file cont)
+    AUFRUF ausfall-500 fetch {"id": "note:486"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 fetch ausfall-500 {"id": "message:b3fm7c2a:1"} seite 1: ja (is_error=True Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file cont)
+    AUFRUF ausfall-500 fetch {"id": "message:b3fm7c2a:1"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 fetch ausfall-500 {"id": "table:12"} seite 1: ja (is_error=False {
+      "id": "table:12",
+      "title": "kanarie28x26b84d8e-t",
+      "text": "kanarie28x26b84d8e-t\nRows: 2\nVerweis\n\n",
+      "url")
+    AUFRUF ausfall-500 fetch {"id": "table:12"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 fetch ausfall-500 {"id": "card:12:15:22"} seite 1: ja (is_error=False {
+      "id": "card:12:15:22",
+      "title": "kanarie28x26b84d8e",
+      "text": "",
+      "url": "http://127.0.0.1:8081/index.php/apps)
+    AUFRUF ausfall-500 fetch {"id": "card:12:15:22"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 fetch ausfall-500 {"id": "event:kanarie28x26b84d8e:kanarie28x26b84d8e-29de089d.ics"} seite 1: ja (is_error=False {
+      "id": "event:kanarie28x26b84d8e:kanarie28x26b84d8e-29de089d.ics",
+      "title": "kanarie28x26b84d8e",
+      "text": "kanari)
+    AUFRUF ausfall-500 fetch {"id": "event:kanarie28x26b84d8e:kanarie28x26b84d8e-29de089d.ics"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 calendar_list_events ausfall-500 {"calendar": "kanarie28x26b84d8e", "end": "2026-10-06T00:00:00+00:00", "start": "2026-10-05T00:00:00+00:00"} seite 1: ja (is_error=False {"range":{"start":"2026-10-05T00:00:00+00:00","end":"2026-10-06T00:00:00+00:00","timezone":"UTC"},"count":1,"events":[{")
+    AUFRUF ausfall-500 calendar_list_events {"calendar": "kanarie28x26b84d8e", "end": "2026-10-06T00:00:00+00:00", "start": "2026-10-05T00:00:00+00:00"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 calendar_create_event ausfall-500 {"calendar": "kanarie28x26b84d8e", "end": "2026-10-07T10:00:00+00:00", "start": "2026-10-07T09:00:00+00:00", "summary... seite 1: ja (is_error=False {"id":"event:kanarie28x26b84d8e:f303ffdf-fba0-456e-b78a-5bdcb7156e8e.ics","uid":"f303ffdf-fba0-456e-b78a-5bdcb7156e8e",")
+    AUFRUF ausfall-500 calendar_create_event {"calendar": "kanarie28x26b84d8e", "end": "2026-10-07T10:00:00+00:00", "start": "2026-10-07T09:00:00+00:00", "summary... seiten=1 is_error=[False] gebucht=['event event:kanarie28x26b84d8e:f303ffdf-fba0-456e-b78a-5bdcb7156e8e.ics']
+    GATE-02 deck_browse ausfall-500 {"level": "boards"} seite 1: ja (is_error=False {"level":"boards","count":2,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_edit":true},{"id":12,"title":"k)
+    AUFRUF ausfall-500 deck_browse {"level": "boards"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 deck_browse ausfall-500 {"board_id": "12", "level": "stacks"} seite 1: ja (is_error=False {"level":"stacks","count":1,"results":[{"id":15,"title":"kanarie28x26b84d8e","cards":1}]})
+    AUFRUF ausfall-500 deck_browse {"board_id": "12", "level": "stacks"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 deck_browse ausfall-500 {"board_id": "12", "level": "cards"} seite 1: ja (is_error=False {"level":"cards","count":1,"results":[{"id":"card:12:15:22","title":"kanarie28x26b84d8e","stack":"kanarie28x26b84d8e","u)
+    AUFRUF ausfall-500 deck_browse {"board_id": "12", "level": "cards"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 deck_create_card ausfall-500 {"board_id": "12", "stack_id": "15", "title": "kanarie28x26b84d8e-neu"} seite 1: ja (is_error=False {"id":"card:12:15:23","title":"kanarie28x26b84d8e-neu","url":"http://127.0.0.1:8081/index.php/apps/deck/card/23"})
+    AUFRUF ausfall-500 deck_create_card {"board_id": "12", "stack_id": "15", "title": "kanarie28x26b84d8e-neu"} seiten=1 is_error=[False] gebucht=['card card:12:15:23']
+    GATE-02 contacts_search ausfall-500 {"query": "kanarie28x26b84d8e"} seite 1: ja (is_error=False {"query":"kanarie28x26b84d8e","count":0,"contacts":[]})
+    AUFRUF ausfall-500 contacts_search {"query": "kanarie28x26b84d8e"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_browse ausfall-500 {"level": "tables"} seite 1: ja (is_error=False {"level":"tables","count":2,"results":[{"id":10,"title":"Welcome to Nextcloud Tables!","rowsCount":8,"columnsCount":4,"i)
+    AUFRUF ausfall-500 tables_browse {"level": "tables"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_browse ausfall-500 {"level": "columns", "table_id": "12"} seite 1: ja (is_error=False {"level":"columns","count":1,"results":[{"id":15,"title":"Verweis","type":"text","mandatory":false,"subtype":"link","num)
+    AUFRUF ausfall-500 tables_browse {"level": "columns", "table_id": "12"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_browse ausfall-500 {"level": "rows", "table_id": "12"} seite 1: ja (is_error=False {"level":"rows","table":"kanarie28x26b84d8e-t","count":2,"results":[{"Verweis":null},{"Verweis":null}],"offset":0,"rowsC)
+    AUFRUF ausfall-500 tables_browse {"level": "rows", "table_id": "12"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_create_row ausfall-500 {"table_id": "12", "values": "{\"Verweis\": \"\"}"} seite 1: ja (is_error=False {"id":36,"table_id":"12","url":"http://127.0.0.1:8081/index.php/apps/tables/#/table/12","values_written":{"Verweis":""}})
+    AUFRUF ausfall-500 tables_create_row {"table_id": "12", "values": "{\"Verweis\": \"\"}"} seiten=1 is_error=[False] gebucht=['row 36']
+    GATE-02 mail_browse ausfall-500 {"level": "accounts"} seite 1: ja (is_error=False {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]})
+    AUFRUF ausfall-500 mail_browse {"level": "accounts"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 mail_browse ausfall-500 {"account_id": "1", "level": "mailboxes"} seite 1: ja (is_error=False {"level":"mailboxes","count":1,"results":[{"id":1,"name":"INBOX","unread":0,"delimiter":".","special_role":"inbox"}]})
+    AUFRUF ausfall-500 mail_browse {"account_id": "1", "level": "mailboxes"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 mail_browse ausfall-500 {"level": "messages", "mailbox_id": "1"} seite 1: ja (is_error=False {"level":"messages","mailbox_id":"1","count":6,"results":[{"id":"mail:1","subject":"Gruesse aus Hamburg, die Masse stehe)
+    AUFRUF ausfall-500 mail_browse {"level": "messages", "mailbox_id": "1"} seiten=1 is_error=[False] gebucht=['-']
+    KANARIE ausfall-500 geprüft 24 von 24
+    AUSFALL 500 report-route call_count=28
+    AUSFALL 500 nicht-prüfbar-antworten=27 ['files_search {"query": "kanarie28x26b84d8e"}', 'files_list {"path": "/kanarie28x26b84d8e"}', 'files_list {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e"}', 'files_read {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/inhalt-26b84d8e.txt"}', 'files_read {"path": "/kanarie28x26b84d8e/kanarie28x26b84d8e-kontrolle-ck489596c3ea324e10a9061e12515e93a4.txt"}', 'files_download {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/inhalt-26b84d8e.txt"}', 'files_read_as_markdown {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/inhalt-26b84d8e.docx"}', 'files_read_as_markdown {"path": "/kanarie28x26b84d8e/kanarie28x26b84d8e-kontrolle-ck489596c3ea324e10a9061e12515e93a4.docx"}', 'files_upload {"content": "x", "path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/neu-26b84d8e.txt"}', 'files_create_folder {"path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/ordner-26b84d8e"}', 'files_create_folder {"parents": true, "path": "/kanarie28x26b84d8e/Gesperrt-26b84d8e/a-26b84d8e/b"}', 'notes_search {"query": "kanarie28x26b84d8e"}', 'notes_read {"note_id": "note:486"}', 'notes_read {"note_id": "note:489"}', 'notes_create {"category": "kanarie28x26b84d8e-kat", "content": "x", "title": "kanarie28x26b84d8e-neu"}', 'unified_search {"limit": 100, "query": "kanarie28x26b84d8e"}', 'prepare_context {"detail": "full", "query": "kanarie28x26b84d8e"}', 'prepare_context {"detail": "short", "query": "kanarie28x26b84d8e"}', 'talk_browse {"level": "conversations"}', 'talk_browse {"level": "messages", "token": "4thvmjbf"}', 'talk_browse {"level": "messages", "token": "b3fm7c2a"}', 'talk_send {"message": "kanarie28x26b84d8e ping", "token": "b3fm7c2a"}', 'fetch {"id": "file:480"}', 'fetch {"id": "note:486"}', 'fetch {"id": "message:b3fm7c2a:1"}', 'fetch {"id": "table:12"}', 'tables_browse {"level": "rows", "table_id": "12"}']
+    CURSOR provider=circles cursor=25 treffer=0
+    CURSOR provider=files cursor=25 treffer=0
+    CURSOR provider=tables-search-tables cursor=25 treffer=1
+    CURSOR provider=talk-message cursor=25 treffer=0
+    CLEANUP papierkorb kanarie28x26b84d8e: leer
+    CLEANUP PROPFIND /kanarie28x26b84d8e: 404
+    CLEANUP ordner /kanarie28x26b84d8e/Gesperrt-26b84d8e/ordner-26b84d8e: 404
+    CLEANUP ordner /kanarie28x26b84d8e/Gesperrt-26b84d8e/a-26b84d8e: 404
+    CLEANUP PROPFIND /Notes/kanarie28x26b84d8e-kat: 404
+    CLEANUP notes: leer
+    CLEANUP talk raum kanarie28x26b84d8e: entfernt
+    CLEANUP share raum 37: 404
+    CLEANUP share user2 38: 404
+    CLEANUP talk datei-raum: entfernt
+    CLEANUP talk datei-raum-nachricht 150: 404
+    CLEANUP table 12: 404
+    CLEANUP kalender kanarie28x26b84d8e: 404
+    CLEANUP deck board 12: gelöscht
+    CLEANUP share deck 39: 404
+    CLEANUP tag kein-ki: entfernt
+    CLEANUP tool event event:kanarie28x26b84d8e:f303ffdf-fba0-456e-b78a-5bdcb7156e8e.ics: 404
+    CLEANUP tool card card:12:15:23: gelöscht
+    CLEANUP tool row 36: 404
+    ZUSAMMENFASSUNG cleanup: 19 Zeilen, 19 gelesen ok, 3 Werkzeug-Einträge
+
+    # 28-10 canary ausfall-412 2026-11-12 20:11:47 +0100 head=bdfc685 container=nc-mcp-exapp-nc user=alice
+    # kommando: PYTHONUTF8=1 .venv/Scripts/python.exe -m pytest tests/integration/test_canary.py -m integration -s
+    # stamm=kanarie28xc13b4d9f marker=mk154c5d3d038e4304b49411022d1a6f1f kontroll-marker=ck7fec3911cb71498aa6a6ed7c0805ea38
+    GATE-02 files_search ausfall-412 {"query": "kanarie28xc13b4d9f"} seite 1: ja (is_error=False {"query":"kanarie28xc13b4d9f","folder":"/","count":0,"items":[],"note":"matched on names only; contents are not indexed")
+    AUFRUF ausfall-412 files_search {"query": "kanarie28xc13b4d9f"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 files_list ausfall-412 {"path": "/kanarie28xc13b4d9f"} seite 1: ja (is_error=False {"path":"/kanarie28xc13b4d9f","count":0,"items":[],"degraded":[{"source":"exclusion","reason":"The exclusion check (tag )
+    AUFRUF ausfall-412 files_list {"path": "/kanarie28xc13b4d9f"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 files_list ausfall-412 {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f"} seite 1: ja (is_error=False {"path":"/kanarie28xc13b4d9f/Gesperrt-c13b4d9f","count":0,"items":[],"degraded":[{"source":"exclusion","reason":"The exc)
+    AUFRUF ausfall-412 files_list {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 files_read ausfall-412 {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/inhalt-c13b4d9f.txt"} seite 1: ja (is_error=True Error executing tool files_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file)
+    AUFRUF ausfall-412 files_read {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/inhalt-c13b4d9f.txt"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_read ausfall-412 {"path": "/kanarie28xc13b4d9f/kanarie28xc13b4d9f-kontrolle-ck7fec3911cb71498aa6a6ed7c0805ea38.txt"} seite 1: ja (is_error=True Error executing tool files_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file)
+    AUFRUF ausfall-412 files_read {"path": "/kanarie28xc13b4d9f/kanarie28xc13b4d9f-kontrolle-ck7fec3911cb71498aa6a6ed7c0805ea38.txt"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_download ausfall-412 {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/inhalt-c13b4d9f.txt"} seite 1: ja (is_error=True Error executing tool files_download: The exclusion check (tag kein-ki) could not be answered, so entries that may carry )
+    AUFRUF ausfall-412 files_download {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/inhalt-c13b4d9f.txt"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_read_as_markdown ausfall-412 {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/inhalt-c13b4d9f.docx"} seite 1: ja (is_error=True Error executing tool files_read_as_markdown: The exclusion check (tag kein-ki) could not be answered, so entries that ma)
+    AUFRUF ausfall-412 files_read_as_markdown {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/inhalt-c13b4d9f.docx"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_read_as_markdown ausfall-412 {"path": "/kanarie28xc13b4d9f/kanarie28xc13b4d9f-kontrolle-ck7fec3911cb71498aa6a6ed7c0805ea38.docx"} seite 1: ja (is_error=True Error executing tool files_read_as_markdown: The exclusion check (tag kein-ki) could not be answered, so entries that ma)
+    AUFRUF ausfall-412 files_read_as_markdown {"path": "/kanarie28xc13b4d9f/kanarie28xc13b4d9f-kontrolle-ck7fec3911cb71498aa6a6ed7c0805ea38.docx"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_upload ausfall-412 {"content": "x", "path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/neu-c13b4d9f.txt"} seite 1: ja (is_error=True Error executing tool files_upload: The exclusion check (tag kein-ki) could not be answered, so entries that may carry fi)
+    AUFRUF ausfall-412 files_upload {"content": "x", "path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/neu-c13b4d9f.txt"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG files_upload ausfall-412 {"content": "x", "path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/neu-c13b4d9f.txt"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 files_create_folder ausfall-412 {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/ordner-c13b4d9f"} seite 1: ja (is_error=True Error executing tool files_create_folder: The exclusion check (tag kein-ki) could not be answered, so entries that may c)
+    AUFRUF ausfall-412 files_create_folder {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/ordner-c13b4d9f"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG files_create_folder ausfall-412 {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/ordner-c13b4d9f"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 files_create_folder ausfall-412 {"parents": true, "path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/a-c13b4d9f/b"} seite 1: ja (is_error=True Error executing tool files_create_folder: The exclusion check (tag kein-ki) could not be answered, so entries that may c)
+    AUFRUF ausfall-412 files_create_folder {"parents": true, "path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/a-c13b4d9f/b"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG files_create_folder ausfall-412 {"parents": true, "path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/a-c13b4d9f/b"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 notes_search ausfall-412 {"query": "kanarie28xc13b4d9f"} seite 1: ja (is_error=False {"count":0,"results":[],"degraded":[{"source":"exclusion","reason":"The exclusion check (tag kein-ki) could not be answe)
+    AUFRUF ausfall-412 notes_search {"query": "kanarie28xc13b4d9f"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 notes_read ausfall-412 {"note_id": "note:497"} seite 1: ja (is_error=True Error executing tool notes_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file)
+    AUFRUF ausfall-412 notes_read {"note_id": "note:497"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 notes_read ausfall-412 {"note_id": "note:500"} seite 1: ja (is_error=True Error executing tool notes_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file)
+    AUFRUF ausfall-412 notes_read {"note_id": "note:500"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 notes_create ausfall-412 {"category": "kanarie28xc13b4d9f-kat", "content": "x", "title": "kanarie28xc13b4d9f-neu"} seite 1: ja (is_error=True Error executing tool notes_create: The exclusion check (tag kein-ki) could not be answered, so entries that may carry fi)
+    AUFRUF ausfall-412 notes_create {"category": "kanarie28xc13b4d9f-kat", "content": "x", "title": "kanarie28xc13b4d9f-neu"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG notes_create ausfall-412 {"category": "kanarie28xc13b4d9f-kat", "content": "x", "title": "kanarie28xc13b4d9f-neu"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 unified_search ausfall-412 {"limit": 100, "query": "kanarie28xc13b4d9f"} seite 1: ja (is_error=False {"query":"kanarie28xc13b4d9f","count":4,"results":[{"id":"card:13","title":"kanarie28xc13b4d9f","url":"http://127.0.0.1:)
+    AUFRUF ausfall-412 unified_search {"limit": 100, "query": "kanarie28xc13b4d9f"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 prepare_context ausfall-412 {"detail": "full", "query": "kanarie28xc13b4d9f"} seite 1: ja (is_error=False {"query":"kanarie28xc13b4d9f","window":{"start":"2026-11-12T19:11:53+00:00","end":"2026-11-19T19:11:53+00:00"},"events":)
+    AUFRUF ausfall-412 prepare_context {"detail": "full", "query": "kanarie28xc13b4d9f"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 prepare_context ausfall-412 {"detail": "short", "query": "kanarie28xc13b4d9f"} seite 1: ja (is_error=False {"query":"kanarie28xc13b4d9f","window":{"start":"2026-11-12T19:11:54+00:00","end":"2026-11-19T19:11:54+00:00"},"events":)
+    AUFRUF ausfall-412 prepare_context {"detail": "short", "query": "kanarie28xc13b4d9f"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 talk_browse ausfall-412 {"level": "conversations"} seite 1: ja (is_error=False {"level":"conversations","count":6,"results":[{"token":"3uy3fp3y","name":"kanarie28xc13b4d9f","type":2,"unread":0,"unrea)
+    AUFRUF ausfall-412 talk_browse {"level": "conversations"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 talk_browse ausfall-412 {"level": "messages", "token": "3uy3fp3y"} seite 1: ja (is_error=False {"level":"messages","token":"3uy3fp3y","conversation":"kanarie28xc13b4d9f","count":1,"results":[{"id":154,"timestamp":17)
+    GATE-02 talk_browse ausfall-412 {"level": "messages", "token": "3uy3fp3y"} seite 2: ja (is_error=False {"level":"messages","token":"3uy3fp3y","conversation":"kanarie28xc13b4d9f","count":0,"results":[]})
+    AUFRUF ausfall-412 talk_browse {"level": "messages", "token": "3uy3fp3y"} seiten=2 is_error=[False, False] gebucht=['-', '-']
+    GATE-02 talk_browse ausfall-412 {"level": "messages", "token": "w47ufvne"} seite 1: ja (is_error=True Error executing tool talk_browse: The exclusion check (tag kein-ki) could not be answered, so entries that may carry fil)
+    AUFRUF ausfall-412 talk_browse {"level": "messages", "token": "w47ufvne"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 talk_send ausfall-412 {"message": "kanarie28xc13b4d9f ping", "token": "w47ufvne"} seite 1: ja (is_error=True Error executing tool talk_send: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file )
+    AUFRUF ausfall-412 talk_send {"message": "kanarie28xc13b4d9f ping", "token": "w47ufvne"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG talk_send ausfall-412 {"message": "kanarie28xc13b4d9f ping", "token": "w47ufvne"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 search ausfall-412 {"query": "kanarie28xc13b4d9f"} seite 1: ja (is_error=False {
+      "results": [
+        {
+          "id": "card:13",
+          "title": "kanarie28xc13b4d9f",
+          "url": "http://127.0.0.1:8081/a)
+    AUFRUF ausfall-412 search {"query": "kanarie28xc13b4d9f"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 fetch ausfall-412 {"id": "file:491"} seite 1: ja (is_error=True Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file cont)
+    AUFRUF ausfall-412 fetch {"id": "file:491"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 fetch ausfall-412 {"id": "note:497"} seite 1: ja (is_error=True Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file cont)
+    AUFRUF ausfall-412 fetch {"id": "note:497"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 fetch ausfall-412 {"id": "message:w47ufvne:1"} seite 1: ja (is_error=True Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file cont)
+    AUFRUF ausfall-412 fetch {"id": "message:w47ufvne:1"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 fetch ausfall-412 {"id": "table:13"} seite 1: ja (is_error=False {
+      "id": "table:13",
+      "title": "kanarie28xc13b4d9f-t",
+      "text": "kanarie28xc13b4d9f-t\nRows: 2\nVerweis\n\n",
+      "url")
+    AUFRUF ausfall-412 fetch {"id": "table:13"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 fetch ausfall-412 {"id": "card:13:16:24"} seite 1: ja (is_error=False {
+      "id": "card:13:16:24",
+      "title": "kanarie28xc13b4d9f",
+      "text": "",
+      "url": "http://127.0.0.1:8081/index.php/apps)
+    AUFRUF ausfall-412 fetch {"id": "card:13:16:24"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 fetch ausfall-412 {"id": "event:kanarie28xc13b4d9f:kanarie28xc13b4d9f-45e1b525.ics"} seite 1: ja (is_error=False {
+      "id": "event:kanarie28xc13b4d9f:kanarie28xc13b4d9f-45e1b525.ics",
+      "title": "kanarie28xc13b4d9f",
+      "text": "kanari)
+    AUFRUF ausfall-412 fetch {"id": "event:kanarie28xc13b4d9f:kanarie28xc13b4d9f-45e1b525.ics"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 calendar_list_events ausfall-412 {"calendar": "kanarie28xc13b4d9f", "end": "2026-10-06T00:00:00+00:00", "start": "2026-10-05T00:00:00+00:00"} seite 1: ja (is_error=False {"range":{"start":"2026-10-05T00:00:00+00:00","end":"2026-10-06T00:00:00+00:00","timezone":"UTC"},"count":1,"events":[{")
+    AUFRUF ausfall-412 calendar_list_events {"calendar": "kanarie28xc13b4d9f", "end": "2026-10-06T00:00:00+00:00", "start": "2026-10-05T00:00:00+00:00"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 calendar_create_event ausfall-412 {"calendar": "kanarie28xc13b4d9f", "end": "2026-10-07T10:00:00+00:00", "start": "2026-10-07T09:00:00+00:00", "summary... seite 1: ja (is_error=False {"id":"event:kanarie28xc13b4d9f:98d3ec7c-e817-42eb-8045-7f28054a9627.ics","uid":"98d3ec7c-e817-42eb-8045-7f28054a9627",")
+    AUFRUF ausfall-412 calendar_create_event {"calendar": "kanarie28xc13b4d9f", "end": "2026-10-07T10:00:00+00:00", "start": "2026-10-07T09:00:00+00:00", "summary... seiten=1 is_error=[False] gebucht=['event event:kanarie28xc13b4d9f:98d3ec7c-e817-42eb-8045-7f28054a9627.ics']
+    GATE-02 deck_browse ausfall-412 {"level": "boards"} seite 1: ja (is_error=False {"level":"boards","count":2,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_edit":true},{"id":13,"title":"k)
+    AUFRUF ausfall-412 deck_browse {"level": "boards"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 deck_browse ausfall-412 {"board_id": "13", "level": "stacks"} seite 1: ja (is_error=False {"level":"stacks","count":1,"results":[{"id":16,"title":"kanarie28xc13b4d9f","cards":1}]})
+    AUFRUF ausfall-412 deck_browse {"board_id": "13", "level": "stacks"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 deck_browse ausfall-412 {"board_id": "13", "level": "cards"} seite 1: ja (is_error=False {"level":"cards","count":1,"results":[{"id":"card:13:16:24","title":"kanarie28xc13b4d9f","stack":"kanarie28xc13b4d9f","u)
+    AUFRUF ausfall-412 deck_browse {"board_id": "13", "level": "cards"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 deck_create_card ausfall-412 {"board_id": "13", "stack_id": "16", "title": "kanarie28xc13b4d9f-neu"} seite 1: ja (is_error=False {"id":"card:13:16:25","title":"kanarie28xc13b4d9f-neu","url":"http://127.0.0.1:8081/index.php/apps/deck/card/25"})
+    AUFRUF ausfall-412 deck_create_card {"board_id": "13", "stack_id": "16", "title": "kanarie28xc13b4d9f-neu"} seiten=1 is_error=[False] gebucht=['card card:13:16:25']
+    GATE-02 contacts_search ausfall-412 {"query": "kanarie28xc13b4d9f"} seite 1: ja (is_error=False {"query":"kanarie28xc13b4d9f","count":0,"contacts":[]})
+    AUFRUF ausfall-412 contacts_search {"query": "kanarie28xc13b4d9f"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_browse ausfall-412 {"level": "tables"} seite 1: ja (is_error=False {"level":"tables","count":2,"results":[{"id":10,"title":"Welcome to Nextcloud Tables!","rowsCount":8,"columnsCount":4,"i)
+    AUFRUF ausfall-412 tables_browse {"level": "tables"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_browse ausfall-412 {"level": "columns", "table_id": "13"} seite 1: ja (is_error=False {"level":"columns","count":1,"results":[{"id":16,"title":"Verweis","type":"text","mandatory":false,"subtype":"link","num)
+    AUFRUF ausfall-412 tables_browse {"level": "columns", "table_id": "13"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_browse ausfall-412 {"level": "rows", "table_id": "13"} seite 1: ja (is_error=False {"level":"rows","table":"kanarie28xc13b4d9f-t","count":2,"results":[{"Verweis":null},{"Verweis":null}],"offset":0,"rowsC)
+    AUFRUF ausfall-412 tables_browse {"level": "rows", "table_id": "13"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_create_row ausfall-412 {"table_id": "13", "values": "{\"Verweis\": \"\"}"} seite 1: ja (is_error=False {"id":39,"table_id":"13","url":"http://127.0.0.1:8081/index.php/apps/tables/#/table/13","values_written":{"Verweis":""}})
+    AUFRUF ausfall-412 tables_create_row {"table_id": "13", "values": "{\"Verweis\": \"\"}"} seiten=1 is_error=[False] gebucht=['row 39']
+    GATE-02 mail_browse ausfall-412 {"level": "accounts"} seite 1: ja (is_error=False {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]})
+    AUFRUF ausfall-412 mail_browse {"level": "accounts"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 mail_browse ausfall-412 {"account_id": "1", "level": "mailboxes"} seite 1: ja (is_error=False {"level":"mailboxes","count":1,"results":[{"id":1,"name":"INBOX","unread":0,"delimiter":".","special_role":"inbox"}]})
+    AUFRUF ausfall-412 mail_browse {"account_id": "1", "level": "mailboxes"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 mail_browse ausfall-412 {"level": "messages", "mailbox_id": "1"} seite 1: ja (is_error=False {"level":"messages","mailbox_id":"1","count":6,"results":[{"id":"mail:1","subject":"Gruesse aus Hamburg, die Masse stehe)
+    AUFRUF ausfall-412 mail_browse {"level": "messages", "mailbox_id": "1"} seiten=1 is_error=[False] gebucht=['-']
+    KANARIE ausfall-412 geprüft 24 von 24
+    AUSFALL 412 report-route call_count=56
+    AUSFALL 412 nicht-prüfbar-antworten=27 ['files_search {"query": "kanarie28xc13b4d9f"}', 'files_list {"path": "/kanarie28xc13b4d9f"}', 'files_list {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f"}', 'files_read {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/inhalt-c13b4d9f.txt"}', 'files_read {"path": "/kanarie28xc13b4d9f/kanarie28xc13b4d9f-kontrolle-ck7fec3911cb71498aa6a6ed7c0805ea38.txt"}', 'files_download {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/inhalt-c13b4d9f.txt"}', 'files_read_as_markdown {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/inhalt-c13b4d9f.docx"}', 'files_read_as_markdown {"path": "/kanarie28xc13b4d9f/kanarie28xc13b4d9f-kontrolle-ck7fec3911cb71498aa6a6ed7c0805ea38.docx"}', 'files_upload {"content": "x", "path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/neu-c13b4d9f.txt"}', 'files_create_folder {"path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/ordner-c13b4d9f"}', 'files_create_folder {"parents": true, "path": "/kanarie28xc13b4d9f/Gesperrt-c13b4d9f/a-c13b4d9f/b"}', 'notes_search {"query": "kanarie28xc13b4d9f"}', 'notes_read {"note_id": "note:497"}', 'notes_read {"note_id": "note:500"}', 'notes_create {"category": "kanarie28xc13b4d9f-kat", "content": "x", "title": "kanarie28xc13b4d9f-neu"}', 'unified_search {"limit": 100, "query": "kanarie28xc13b4d9f"}', 'prepare_context {"detail": "full", "query": "kanarie28xc13b4d9f"}', 'prepare_context {"detail": "short", "query": "kanarie28xc13b4d9f"}', 'talk_browse {"level": "conversations"}', 'talk_browse {"level": "messages", "token": "3uy3fp3y"}', 'talk_browse {"level": "messages", "token": "w47ufvne"}', 'talk_send {"message": "kanarie28xc13b4d9f ping", "token": "w47ufvne"}', 'fetch {"id": "file:491"}', 'fetch {"id": "note:497"}', 'fetch {"id": "message:w47ufvne:1"}', 'fetch {"id": "table:13"}', 'tables_browse {"level": "rows", "table_id": "13"}']
+    CURSOR provider=circles cursor=25 treffer=0
+    CURSOR provider=files cursor=25 treffer=0
+    CURSOR provider=tables-search-tables cursor=25 treffer=1
+    CURSOR provider=talk-message cursor=25 treffer=0
+    CLEANUP papierkorb kanarie28xc13b4d9f: leer
+    CLEANUP PROPFIND /kanarie28xc13b4d9f: 404
+    CLEANUP ordner /kanarie28xc13b4d9f/Gesperrt-c13b4d9f/ordner-c13b4d9f: 404
+    CLEANUP ordner /kanarie28xc13b4d9f/Gesperrt-c13b4d9f/a-c13b4d9f: 404
+    CLEANUP PROPFIND /Notes/kanarie28xc13b4d9f-kat: 404
+    CLEANUP notes: leer
+    CLEANUP talk raum kanarie28xc13b4d9f: entfernt
+    CLEANUP share raum 40: 404
+    CLEANUP share user2 41: 404
+    CLEANUP talk datei-raum: entfernt
+    CLEANUP talk datei-raum-nachricht 157: 404
+    CLEANUP table 13: 404
+    CLEANUP kalender kanarie28xc13b4d9f: 404
+    CLEANUP deck board 13: gelöscht
+    CLEANUP share deck 42: 404
+    CLEANUP tag kein-ki: entfernt
+    CLEANUP tool event event:kanarie28xc13b4d9f:98d3ec7c-e817-42eb-8045-7f28054a9627.ics: 404
+    CLEANUP tool card card:13:16:25: gelöscht
+    CLEANUP tool row 39: 404
+    ZUSAMMENFASSUNG cleanup: 19 Zeilen, 19 gelesen ok, 3 Werkzeug-Einträge
+
+    # 28-10 canary ausfall-timeout 2026-11-12 20:12:01 +0100 head=bdfc685 container=nc-mcp-exapp-nc user=alice
+    # kommando: PYTHONUTF8=1 .venv/Scripts/python.exe -m pytest tests/integration/test_canary.py -m integration -s
+    # stamm=kanarie28x8a7bafae marker=mk898cec307c0a48f89e29b1b9fbc065e7 kontroll-marker=ck0fab2cc6b4b44a39986932e9de5bf7ef
+    GATE-02 files_search ausfall-timeout {"query": "kanarie28x8a7bafae"} seite 1: ja (is_error=False {"query":"kanarie28x8a7bafae","folder":"/","count":0,"items":[],"note":"matched on names only; contents are not indexed")
+    AUFRUF ausfall-timeout files_search {"query": "kanarie28x8a7bafae"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 files_list ausfall-timeout {"path": "/kanarie28x8a7bafae"} seite 1: ja (is_error=False {"path":"/kanarie28x8a7bafae","count":0,"items":[],"degraded":[{"source":"exclusion","reason":"The exclusion check (tag )
+    AUFRUF ausfall-timeout files_list {"path": "/kanarie28x8a7bafae"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 files_list ausfall-timeout {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae"} seite 1: ja (is_error=False {"path":"/kanarie28x8a7bafae/Gesperrt-8a7bafae","count":0,"items":[],"degraded":[{"source":"exclusion","reason":"The exc)
+    AUFRUF ausfall-timeout files_list {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 files_read ausfall-timeout {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/inhalt-8a7bafae.txt"} seite 1: ja (is_error=True Error executing tool files_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file)
+    AUFRUF ausfall-timeout files_read {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/inhalt-8a7bafae.txt"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_read ausfall-timeout {"path": "/kanarie28x8a7bafae/kanarie28x8a7bafae-kontrolle-ck0fab2cc6b4b44a39986932e9de5bf7ef.txt"} seite 1: ja (is_error=True Error executing tool files_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file)
+    AUFRUF ausfall-timeout files_read {"path": "/kanarie28x8a7bafae/kanarie28x8a7bafae-kontrolle-ck0fab2cc6b4b44a39986932e9de5bf7ef.txt"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_download ausfall-timeout {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/inhalt-8a7bafae.txt"} seite 1: ja (is_error=True Error executing tool files_download: The exclusion check (tag kein-ki) could not be answered, so entries that may carry )
+    AUFRUF ausfall-timeout files_download {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/inhalt-8a7bafae.txt"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_read_as_markdown ausfall-timeout {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/inhalt-8a7bafae.docx"} seite 1: ja (is_error=True Error executing tool files_read_as_markdown: The exclusion check (tag kein-ki) could not be answered, so entries that ma)
+    AUFRUF ausfall-timeout files_read_as_markdown {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/inhalt-8a7bafae.docx"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_read_as_markdown ausfall-timeout {"path": "/kanarie28x8a7bafae/kanarie28x8a7bafae-kontrolle-ck0fab2cc6b4b44a39986932e9de5bf7ef.docx"} seite 1: ja (is_error=True Error executing tool files_read_as_markdown: The exclusion check (tag kein-ki) could not be answered, so entries that ma)
+    AUFRUF ausfall-timeout files_read_as_markdown {"path": "/kanarie28x8a7bafae/kanarie28x8a7bafae-kontrolle-ck0fab2cc6b4b44a39986932e9de5bf7ef.docx"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 files_upload ausfall-timeout {"content": "x", "path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/neu-8a7bafae.txt"} seite 1: ja (is_error=True Error executing tool files_upload: The exclusion check (tag kein-ki) could not be answered, so entries that may carry fi)
+    AUFRUF ausfall-timeout files_upload {"content": "x", "path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/neu-8a7bafae.txt"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG files_upload ausfall-timeout {"content": "x", "path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/neu-8a7bafae.txt"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 files_create_folder ausfall-timeout {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/ordner-8a7bafae"} seite 1: ja (is_error=True Error executing tool files_create_folder: The exclusion check (tag kein-ki) could not be answered, so entries that may c)
+    AUFRUF ausfall-timeout files_create_folder {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/ordner-8a7bafae"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG files_create_folder ausfall-timeout {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/ordner-8a7bafae"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 files_create_folder ausfall-timeout {"parents": true, "path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/a-8a7bafae/b"} seite 1: ja (is_error=True Error executing tool files_create_folder: The exclusion check (tag kein-ki) could not be answered, so entries that may c)
+    AUFRUF ausfall-timeout files_create_folder {"parents": true, "path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/a-8a7bafae/b"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG files_create_folder ausfall-timeout {"parents": true, "path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/a-8a7bafae/b"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 notes_search ausfall-timeout {"query": "kanarie28x8a7bafae"} seite 1: ja (is_error=False {"count":0,"results":[],"degraded":[{"source":"exclusion","reason":"The exclusion check (tag kein-ki) could not be answe)
+    AUFRUF ausfall-timeout notes_search {"query": "kanarie28x8a7bafae"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 notes_read ausfall-timeout {"note_id": "note:508"} seite 1: ja (is_error=True Error executing tool notes_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file)
+    AUFRUF ausfall-timeout notes_read {"note_id": "note:508"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 notes_read ausfall-timeout {"note_id": "note:511"} seite 1: ja (is_error=True Error executing tool notes_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file)
+    AUFRUF ausfall-timeout notes_read {"note_id": "note:511"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 notes_create ausfall-timeout {"category": "kanarie28x8a7bafae-kat", "content": "x", "title": "kanarie28x8a7bafae-neu"} seite 1: ja (is_error=True Error executing tool notes_create: The exclusion check (tag kein-ki) could not be answered, so entries that may carry fi)
+    AUFRUF ausfall-timeout notes_create {"category": "kanarie28x8a7bafae-kat", "content": "x", "title": "kanarie28x8a7bafae-neu"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG notes_create ausfall-timeout {"category": "kanarie28x8a7bafae-kat", "content": "x", "title": "kanarie28x8a7bafae-neu"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 unified_search ausfall-timeout {"limit": 100, "query": "kanarie28x8a7bafae"} seite 1: ja (is_error=False {"query":"kanarie28x8a7bafae","count":4,"results":[{"id":"card:14","title":"kanarie28x8a7bafae","url":"http://127.0.0.1:)
+    AUFRUF ausfall-timeout unified_search {"limit": 100, "query": "kanarie28x8a7bafae"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 prepare_context ausfall-timeout {"detail": "full", "query": "kanarie28x8a7bafae"} seite 1: ja (is_error=False {"query":"kanarie28x8a7bafae","window":{"start":"2026-11-12T19:12:07+00:00","end":"2026-11-19T19:12:07+00:00"},"events":)
+    AUFRUF ausfall-timeout prepare_context {"detail": "full", "query": "kanarie28x8a7bafae"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 prepare_context ausfall-timeout {"detail": "short", "query": "kanarie28x8a7bafae"} seite 1: ja (is_error=False {"query":"kanarie28x8a7bafae","window":{"start":"2026-11-12T19:12:07+00:00","end":"2026-11-19T19:12:07+00:00"},"events":)
+    AUFRUF ausfall-timeout prepare_context {"detail": "short", "query": "kanarie28x8a7bafae"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 talk_browse ausfall-timeout {"level": "conversations"} seite 1: ja (is_error=False {"level":"conversations","count":6,"results":[{"token":"akbqt45d","name":"kanarie28x8a7bafae","type":2,"unread":0,"unrea)
+    AUFRUF ausfall-timeout talk_browse {"level": "conversations"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 talk_browse ausfall-timeout {"level": "messages", "token": "akbqt45d"} seite 1: ja (is_error=False {"level":"messages","token":"akbqt45d","conversation":"kanarie28x8a7bafae","count":1,"results":[{"id":161,"timestamp":17)
+    GATE-02 talk_browse ausfall-timeout {"level": "messages", "token": "akbqt45d"} seite 2: ja (is_error=False {"level":"messages","token":"akbqt45d","conversation":"kanarie28x8a7bafae","count":0,"results":[]})
+    AUFRUF ausfall-timeout talk_browse {"level": "messages", "token": "akbqt45d"} seiten=2 is_error=[False, False] gebucht=['-', '-']
+    GATE-02 talk_browse ausfall-timeout {"level": "messages", "token": "wb4yfu3x"} seite 1: ja (is_error=True Error executing tool talk_browse: The exclusion check (tag kein-ki) could not be answered, so entries that may carry fil)
+    AUFRUF ausfall-timeout talk_browse {"level": "messages", "token": "wb4yfu3x"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 talk_send ausfall-timeout {"message": "kanarie28x8a7bafae ping", "token": "wb4yfu3x"} seite 1: ja (is_error=True Error executing tool talk_send: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file )
+    AUFRUF ausfall-timeout talk_send {"message": "kanarie28x8a7bafae ping", "token": "wb4yfu3x"} seiten=1 is_error=[True] gebucht=['-']
+    ABWEISUNG talk_send ausfall-timeout {"message": "kanarie28x8a7bafae ping", "token": "wb4yfu3x"}: ja (is_error=[True] gebucht=['-'] befund=[])
+    GATE-02 search ausfall-timeout {"query": "kanarie28x8a7bafae"} seite 1: ja (is_error=False {
+      "results": [
+        {
+          "id": "card:14",
+          "title": "kanarie28x8a7bafae",
+          "url": "http://127.0.0.1:8081/a)
+    AUFRUF ausfall-timeout search {"query": "kanarie28x8a7bafae"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 fetch ausfall-timeout {"id": "file:502"} seite 1: ja (is_error=True Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file cont)
+    AUFRUF ausfall-timeout fetch {"id": "file:502"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 fetch ausfall-timeout {"id": "note:508"} seite 1: ja (is_error=True Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file cont)
+    AUFRUF ausfall-timeout fetch {"id": "note:508"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 fetch ausfall-timeout {"id": "message:wb4yfu3x:1"} seite 1: ja (is_error=True Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file cont)
+    AUFRUF ausfall-timeout fetch {"id": "message:wb4yfu3x:1"} seiten=1 is_error=[True] gebucht=['-']
+    GATE-02 fetch ausfall-timeout {"id": "table:14"} seite 1: ja (is_error=False {
+      "id": "table:14",
+      "title": "kanarie28x8a7bafae-t",
+      "text": "kanarie28x8a7bafae-t\nRows: 2\nVerweis\n\n",
+      "url")
+    AUFRUF ausfall-timeout fetch {"id": "table:14"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 fetch ausfall-timeout {"id": "card:14:17:26"} seite 1: ja (is_error=False {
+      "id": "card:14:17:26",
+      "title": "kanarie28x8a7bafae",
+      "text": "",
+      "url": "http://127.0.0.1:8081/index.php/apps)
+    AUFRUF ausfall-timeout fetch {"id": "card:14:17:26"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 fetch ausfall-timeout {"id": "event:kanarie28x8a7bafae:kanarie28x8a7bafae-788c9a8f.ics"} seite 1: ja (is_error=False {
+      "id": "event:kanarie28x8a7bafae:kanarie28x8a7bafae-788c9a8f.ics",
+      "title": "kanarie28x8a7bafae",
+      "text": "kanari)
+    AUFRUF ausfall-timeout fetch {"id": "event:kanarie28x8a7bafae:kanarie28x8a7bafae-788c9a8f.ics"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 calendar_list_events ausfall-timeout {"calendar": "kanarie28x8a7bafae", "end": "2026-10-06T00:00:00+00:00", "start": "2026-10-05T00:00:00+00:00"} seite 1: ja (is_error=False {"range":{"start":"2026-10-05T00:00:00+00:00","end":"2026-10-06T00:00:00+00:00","timezone":"UTC"},"count":1,"events":[{")
+    AUFRUF ausfall-timeout calendar_list_events {"calendar": "kanarie28x8a7bafae", "end": "2026-10-06T00:00:00+00:00", "start": "2026-10-05T00:00:00+00:00"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 calendar_create_event ausfall-timeout {"calendar": "kanarie28x8a7bafae", "end": "2026-10-07T10:00:00+00:00", "start": "2026-10-07T09:00:00+00:00", "summary... seite 1: ja (is_error=False {"id":"event:kanarie28x8a7bafae:1ca50a4a-4715-4b1e-b0b4-c87feb76c943.ics","uid":"1ca50a4a-4715-4b1e-b0b4-c87feb76c943",")
+    AUFRUF ausfall-timeout calendar_create_event {"calendar": "kanarie28x8a7bafae", "end": "2026-10-07T10:00:00+00:00", "start": "2026-10-07T09:00:00+00:00", "summary... seiten=1 is_error=[False] gebucht=['event event:kanarie28x8a7bafae:1ca50a4a-4715-4b1e-b0b4-c87feb76c943.ics']
+    GATE-02 deck_browse ausfall-timeout {"level": "boards"} seite 1: ja (is_error=False {"level":"boards","count":2,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_edit":true},{"id":14,"title":"k)
+    AUFRUF ausfall-timeout deck_browse {"level": "boards"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 deck_browse ausfall-timeout {"board_id": "14", "level": "stacks"} seite 1: ja (is_error=False {"level":"stacks","count":1,"results":[{"id":17,"title":"kanarie28x8a7bafae","cards":1}]})
+    AUFRUF ausfall-timeout deck_browse {"board_id": "14", "level": "stacks"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 deck_browse ausfall-timeout {"board_id": "14", "level": "cards"} seite 1: ja (is_error=False {"level":"cards","count":1,"results":[{"id":"card:14:17:26","title":"kanarie28x8a7bafae","stack":"kanarie28x8a7bafae","u)
+    AUFRUF ausfall-timeout deck_browse {"board_id": "14", "level": "cards"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 deck_create_card ausfall-timeout {"board_id": "14", "stack_id": "17", "title": "kanarie28x8a7bafae-neu"} seite 1: ja (is_error=False {"id":"card:14:17:27","title":"kanarie28x8a7bafae-neu","url":"http://127.0.0.1:8081/index.php/apps/deck/card/27"})
+    AUFRUF ausfall-timeout deck_create_card {"board_id": "14", "stack_id": "17", "title": "kanarie28x8a7bafae-neu"} seiten=1 is_error=[False] gebucht=['card card:14:17:27']
+    GATE-02 contacts_search ausfall-timeout {"query": "kanarie28x8a7bafae"} seite 1: ja (is_error=False {"query":"kanarie28x8a7bafae","count":0,"contacts":[]})
+    AUFRUF ausfall-timeout contacts_search {"query": "kanarie28x8a7bafae"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_browse ausfall-timeout {"level": "tables"} seite 1: ja (is_error=False {"level":"tables","count":2,"results":[{"id":10,"title":"Welcome to Nextcloud Tables!","rowsCount":8,"columnsCount":4,"i)
+    AUFRUF ausfall-timeout tables_browse {"level": "tables"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_browse ausfall-timeout {"level": "columns", "table_id": "14"} seite 1: ja (is_error=False {"level":"columns","count":1,"results":[{"id":17,"title":"Verweis","type":"text","mandatory":false,"subtype":"link","num)
+    AUFRUF ausfall-timeout tables_browse {"level": "columns", "table_id": "14"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_browse ausfall-timeout {"level": "rows", "table_id": "14"} seite 1: ja (is_error=False {"level":"rows","table":"kanarie28x8a7bafae-t","count":2,"results":[{"Verweis":null},{"Verweis":null}],"offset":0,"rowsC)
+    AUFRUF ausfall-timeout tables_browse {"level": "rows", "table_id": "14"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 tables_create_row ausfall-timeout {"table_id": "14", "values": "{\"Verweis\": \"\"}"} seite 1: ja (is_error=False {"id":42,"table_id":"14","url":"http://127.0.0.1:8081/index.php/apps/tables/#/table/14","values_written":{"Verweis":""}})
+    AUFRUF ausfall-timeout tables_create_row {"table_id": "14", "values": "{\"Verweis\": \"\"}"} seiten=1 is_error=[False] gebucht=['row 42']
+    GATE-02 mail_browse ausfall-timeout {"level": "accounts"} seite 1: ja (is_error=False {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]})
+    AUFRUF ausfall-timeout mail_browse {"level": "accounts"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 mail_browse ausfall-timeout {"account_id": "1", "level": "mailboxes"} seite 1: ja (is_error=False {"level":"mailboxes","count":1,"results":[{"id":1,"name":"INBOX","unread":0,"delimiter":".","special_role":"inbox"}]})
+    AUFRUF ausfall-timeout mail_browse {"account_id": "1", "level": "mailboxes"} seiten=1 is_error=[False] gebucht=['-']
+    GATE-02 mail_browse ausfall-timeout {"level": "messages", "mailbox_id": "1"} seite 1: ja (is_error=False {"level":"messages","mailbox_id":"1","count":6,"results":[{"id":"mail:1","subject":"Gruesse aus Hamburg, die Masse stehe)
+    AUFRUF ausfall-timeout mail_browse {"level": "messages", "mailbox_id": "1"} seiten=1 is_error=[False] gebucht=['-']
+    KANARIE ausfall-timeout geprüft 24 von 24
+    AUSFALL timeout report-route call_count=28
+    AUSFALL timeout nicht-prüfbar-antworten=27 ['files_search {"query": "kanarie28x8a7bafae"}', 'files_list {"path": "/kanarie28x8a7bafae"}', 'files_list {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae"}', 'files_read {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/inhalt-8a7bafae.txt"}', 'files_read {"path": "/kanarie28x8a7bafae/kanarie28x8a7bafae-kontrolle-ck0fab2cc6b4b44a39986932e9de5bf7ef.txt"}', 'files_download {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/inhalt-8a7bafae.txt"}', 'files_read_as_markdown {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/inhalt-8a7bafae.docx"}', 'files_read_as_markdown {"path": "/kanarie28x8a7bafae/kanarie28x8a7bafae-kontrolle-ck0fab2cc6b4b44a39986932e9de5bf7ef.docx"}', 'files_upload {"content": "x", "path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/neu-8a7bafae.txt"}', 'files_create_folder {"path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/ordner-8a7bafae"}', 'files_create_folder {"parents": true, "path": "/kanarie28x8a7bafae/Gesperrt-8a7bafae/a-8a7bafae/b"}', 'notes_search {"query": "kanarie28x8a7bafae"}', 'notes_read {"note_id": "note:508"}', 'notes_read {"note_id": "note:511"}', 'notes_create {"category": "kanarie28x8a7bafae-kat", "content": "x", "title": "kanarie28x8a7bafae-neu"}', 'unified_search {"limit": 100, "query": "kanarie28x8a7bafae"}', 'prepare_context {"detail": "full", "query": "kanarie28x8a7bafae"}', 'prepare_context {"detail": "short", "query": "kanarie28x8a7bafae"}', 'talk_browse {"level": "conversations"}', 'talk_browse {"level": "messages", "token": "akbqt45d"}', 'talk_browse {"level": "messages", "token": "wb4yfu3x"}', 'talk_send {"message": "kanarie28x8a7bafae ping", "token": "wb4yfu3x"}', 'fetch {"id": "file:502"}', 'fetch {"id": "note:508"}', 'fetch {"id": "message:wb4yfu3x:1"}', 'fetch {"id": "table:14"}', 'tables_browse {"level": "rows", "table_id": "14"}']
+    CURSOR provider=circles cursor=25 treffer=0
+    CURSOR provider=files cursor=25 treffer=0
+    CURSOR provider=tables-search-tables cursor=25 treffer=1
+    CURSOR provider=talk-message cursor=25 treffer=0
+    CLEANUP papierkorb kanarie28x8a7bafae: leer
+    CLEANUP PROPFIND /kanarie28x8a7bafae: 404
+    CLEANUP ordner /kanarie28x8a7bafae/Gesperrt-8a7bafae/ordner-8a7bafae: 404
+    CLEANUP ordner /kanarie28x8a7bafae/Gesperrt-8a7bafae/a-8a7bafae: 404
+    CLEANUP PROPFIND /Notes/kanarie28x8a7bafae-kat: 404
+    CLEANUP notes: leer
+    CLEANUP talk raum kanarie28x8a7bafae: entfernt
+    CLEANUP share raum 43: 404
+    CLEANUP share user2 44: 404
+    CLEANUP talk datei-raum: entfernt
+    CLEANUP talk datei-raum-nachricht 164: 404
+    CLEANUP table 14: 404
+    CLEANUP kalender kanarie28x8a7bafae: 404
+    CLEANUP deck board 14: gelöscht
+    CLEANUP share deck 45: 404
+    CLEANUP tag kein-ki: entfernt
+    CLEANUP tool event event:kanarie28x8a7bafae:1ca50a4a-4715-4b1e-b0b4-c87feb76c943.ics: 404
+    CLEANUP tool card card:14:17:27: gelöscht
+    CLEANUP tool row 42: 404
+    ZUSAMMENFASSUNG cleanup: 19 Zeilen, 19 gelesen ok, 3 Werkzeug-Einträge
+    Anhang an .planning/phases/28-gates-und-beweise/raw/28-11-pairs-live.txt (324 Zeilen):
+
+    # 28-11 pairs normal 2026-11-12 20:12:15 +0100 head=bdfc685 container=nc-mcp-exapp-nc user=alice
+    # kommando: PYTHONUTF8=1 .venv/Scripts/python.exe -m pytest tests/integration/test_pair_equality_live.py -m integration -s
+    # stamm=kanarie28xc05c6057 marker=mk781075b7a8ec4637b4d7e06e5d2ae172
+    PAAR normal files_read path: gleich
+    GATE-03 files_read normal path: ja (gleich ("text": "Error executing tool files_read: File not found: <ID>. Hint: List the parent folder first to get the exact spelling of the path.", "type": "text"}], "isError": true, "resultType": "complet...))
+    ABWEISUNG files_read normal path: ja (is_error getaggt=True erfunden=True)
+    PAAR normal files_download path: gleich
+    GATE-03 files_download normal path: ja (gleich ("text": "Error executing tool files_download: File not found: <ID>. Hint: List the parent folder first to get the exact spelling of the path.", "type": "text"}], "isError": true, "resultType": "com...))
+    ABWEISUNG files_download normal path: ja (is_error getaggt=True erfunden=True)
+    PAAR normal files_read_as_markdown path: gleich
+    GATE-03 files_read_as_markdown normal path: ja (gleich ("text": "Error executing tool files_read_as_markdown: File not found: <ID>. Hint: List the parent folder first to get the exact spelling of the path.", "type": "text"}], "isError": true, "resultTyp...))
+    ABWEISUNG files_read_as_markdown normal path: ja (is_error getaggt=True erfunden=True)
+    PAAR normal files_list folder: gleich
+    GATE-03 files_list normal folder: ja (gleich ("text": "Error executing tool files_list: File not found: <ID>. Hint: List the parent folder first to get the exact spelling of the path.", "type": "text"}], "isError": true, "resultType": "complet...))
+    ABWEISUNG files_list normal folder: ja (is_error getaggt=True erfunden=True)
+    PAAR normal files_search folder: gleich
+    GATE-03 files_search normal folder: ja (gleich ("text": "Error executing tool files_search: File not found: <ID>. Hint: List the parent folder first to get the exact spelling of the path.", "type": "text"}], "isError": true, "resultType": "compl...))
+    ABWEISUNG files_search normal folder: ja (is_error getaggt=True erfunden=True)
+    PAAR normal files_upload text: gleich
+    GATE-03 files_upload normal text: ja (gleich ("text": "Error executing tool files_upload: The parent folder <ID> of <ID> does not exist. Hint: Create the missing folder first, in Nextcloud or with files_create_folder where that tool is offered...))
+    ABWEISUNG files_upload normal text: ja (is_error getaggt=True erfunden=True)
+    PAAR normal files_upload binary_chunk1: gleich
+    GATE-03 files_upload normal binary_chunk1: ja (gleich ("text": "Error executing tool files_upload: The parent folder <ID> of <ID> does not exist. Hint: Create the missing folder first, in Nextcloud or with files_create_folder where that tool is offered...))
+    ABWEISUNG files_upload normal binary_chunk1: ja (is_error getaggt=True erfunden=True)
+    PAAR normal files_create_folder path: gleich
+    GATE-03 files_create_folder normal path: ja (gleich ("text": "Error executing tool files_create_folder: The parent folder <ID> of <ID> does not exist. Hint: Create the missing folder first, in Nextcloud or with files_create_folder where that tool is ...))
+    ABWEISUNG files_create_folder normal path: ja (is_error getaggt=True erfunden=True)
+    PAAR normal fetch file: gleich
+    GATE-03 fetch normal file: ja (gleich ("text": "Error executing tool fetch: This account has no file with the id <ID>. Hint: Run search again and use the id from the fresh answer: a file id stops resolving once the file is deleted or th...))
+    ABWEISUNG fetch normal file: ja (is_error getaggt=True erfunden=True)
+    PAAR normal notes_read note: gleich
+    GATE-03 notes_read normal note: ja (gleich ("text": "Error executing tool notes_read: Nextcloud did not find the note <ID>. Hint: Search for it first; the id or the name is unknown to this instance.", "type": "text"}], "isError": true, "resu...))
+    ABWEISUNG notes_read normal note: ja (is_error getaggt=True erfunden=True)
+    PAAR normal fetch note: gleich
+    GATE-03 fetch normal note: ja (gleich ("text": "Error executing tool fetch: Nextcloud did not find the note <ID>. Hint: Search for it first; the id or the name is unknown to this instance.", "type": "text"}], "isError": true, "resultTyp...))
+    ABWEISUNG fetch normal note: ja (is_error getaggt=True erfunden=True)
+    PAAR normal notes_create category: benannte Ausnahme, gemessen als AUSNAHME
+    PAAR normal talk_browse messages: gleich
+    GATE-03 talk_browse normal messages: ja (gleich ("text": "Error executing tool talk_browse: The token '<ID>' is not in the conversation list of this account. Hint: Call talk_browse with level=conversations first; it lists the token of every conve...))
+    ABWEISUNG talk_browse normal messages: ja (is_error getaggt=True erfunden=True)
+    PAAR normal talk_send token: gleich
+    GATE-03 talk_send normal token: ja (gleich ("text": "Error executing tool talk_send: The token '<ID>' is not in the conversation list of this account. Hint: Call talk_browse with level=conversations first; it lists the token of every convers...))
+    ABWEISUNG talk_send normal token: ja (is_error getaggt=True erfunden=True)
+    PAAR normal fetch message: gleich
+    GATE-03 fetch normal message: ja (gleich ("text": "Error executing tool fetch: The token '<ID>' is not in the conversation list of this account. Hint: Call talk_browse with level=conversations first; it lists the token of every conversatio...))
+    ABWEISUNG fetch normal message: ja (is_error getaggt=True erfunden=True)
+    PAAR normal fetch table: Zelle leer ja
+    GATE-03 fetch normal table: ja (browse-zelle=None fetch-zeile='' name-im-json=False zeilen=2 kontrolle-sichtbar=True)
+    PAARE normal verglichen 15 von 16 (ausnahmen 1)
+    CLEANUP uploads/getaggt (vorher 404): 404
+    CLEANUP uploads/erfunden (vorher 207): 404
+    CLEANUP ordner/getaggt /kanarie28xc05c6057/Gesperrt-c05c6057/neu-ordner: 404
+    CLEANUP ordner/erfunden /kanarie28xc05c6057/fehlt-c05c6057/neu-ordner: 404
+    CLEANUP notes-kategorie /Notes/kanarie28xc05c6057-fehlt (vorher 404): 404
+    CLEANUP papierkorb kanarie28xc05c6057: leer
+    CLEANUP PROPFIND /kanarie28xc05c6057: 404
+    CLEANUP ordner /kanarie28xc05c6057/Gesperrt-c05c6057/ordner-c05c6057: 404
+    CLEANUP ordner /kanarie28xc05c6057/Gesperrt-c05c6057/a-c05c6057: 404
+    CLEANUP PROPFIND /Notes/kanarie28xc05c6057-kat: 404
+    CLEANUP notes: leer
+    CLEANUP talk raum kanarie28xc05c6057: entfernt
+    CLEANUP share raum 46: 404
+    CLEANUP share user2 47: 404
+    CLEANUP talk datei-raum: entfernt
+    CLEANUP talk datei-raum-nachricht 171: 404
+    CLEANUP table 15: 404
+    CLEANUP kalender kanarie28xc05c6057: 404
+    CLEANUP deck board 15: gelöscht
+    CLEANUP share deck 48: 404
+    CLEANUP tag kein-ki: entfernt
+    ZUSAMMENFASSUNG cleanup: 21 Zeilen, 21 gelesen ok, 0 Werkzeug-Einträge
+
+    # 28-11 pairs 500 2026-11-12 20:12:28 +0100 head=bdfc685 container=nc-mcp-exapp-nc user=alice
+    # kommando: PYTHONUTF8=1 .venv/Scripts/python.exe -m pytest tests/integration/test_pair_equality_live.py -m integration -s
+    # stamm=kanarie28xc8239651 marker=mk15126813dda74f1da45c630409363a8f
+    PAAR 500 files_read path: gleich
+    GATE-03 files_read 500 path: ja (gleich ("text": "Error executing tool files_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask ...))
+    AUSFALL-TEXT files_read 500 path: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 files_download path: gleich
+    GATE-03 files_download 500 path: ja (gleich ("text": "Error executing tool files_download: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ...))
+    AUSFALL-TEXT files_download 500 path: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 files_read_as_markdown path: gleich
+    GATE-03 files_read_as_markdown 500 path: ja (gleich ("text": "Error executing tool files_read_as_markdown: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it pe...))
+    AUSFALL-TEXT files_read_as_markdown 500 path: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 files_list folder: gleich
+    GATE-03 files_list 500 folder: ja (gleich ("text": "{\"path\":\"<ID>\",\"count\":0,\"items\":[],\"degraded\":[{\"source\":\"exclusion\",\"reason\":\"The exclusion check (tag kein-ki) could not be answered, so entries that may carry file con...))
+    AUSFALL-TEXT files_list 500 folder: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 files_search folder: gleich
+    GATE-03 files_search 500 folder: ja (gleich ("text": "{\"query\":\"kanarie28xc8239651\",\"folder\":\"<ID>\",\"count\":0,\"items\":[],\"note\":\"matched on names only; contents are not indexed\",\"degraded\":[{\"source\":\"exclusion\",\"reason...))
+    AUSFALL-TEXT files_search 500 folder: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 files_upload text: gleich
+    GATE-03 files_upload 500 text: ja (gleich ("text": "Error executing tool files_upload: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, as...))
+    AUSFALL-TEXT files_upload 500 text: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 files_upload binary_chunk1: gleich
+    GATE-03 files_upload 500 binary_chunk1: ja (gleich ("text": "Error executing tool files_upload: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, as...))
+    AUSFALL-TEXT files_upload 500 binary_chunk1: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 files_create_folder path: gleich
+    GATE-03 files_create_folder 500 path: ja (gleich ("text": "Error executing tool files_create_folder: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persi...))
+    AUSFALL-TEXT files_create_folder 500 path: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 fetch file: gleich
+    GATE-03 fetch 500 file: ja (gleich ("text": "Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask an ad...))
+    AUSFALL-TEXT fetch 500 file: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 notes_read note: gleich
+    GATE-03 notes_read 500 note: ja (gleich ("text": "Error executing tool notes_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask ...))
+    AUSFALL-TEXT notes_read 500 note: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 fetch note: gleich
+    GATE-03 fetch 500 note: ja (gleich ("text": "Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask an ad...))
+    AUSFALL-TEXT fetch 500 note: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 notes_create category: gleich
+    GATE-03 notes_create 500 category: ja (gleich ("text": "Error executing tool notes_create: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, as...))
+    AUSFALL-TEXT notes_create 500 category: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 talk_browse messages: gleich
+    GATE-03 talk_browse 500 messages: ja (gleich ("text": "Error executing tool talk_browse: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask...))
+    AUSFALL-TEXT talk_browse 500 messages: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 talk_send token: gleich
+    GATE-03 talk_send 500 token: ja (gleich ("text": "Error executing tool talk_send: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask a...))
+    AUSFALL-TEXT talk_send 500 token: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 fetch message: gleich
+    GATE-03 fetch 500 message: ja (gleich ("text": "Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask an ad...))
+    AUSFALL-TEXT fetch 500 message: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 500 fetch table: Zelle leer ja
+    GATE-03 fetch 500 table: ja (browse-zelle=None fetch-zeile='' name-im-json=False zeilen=2 degraded=True)
+    AUSFALL 500 report-route call_count=32
+    PAARE 500 verglichen 16 von 16 (ausnahmen 0)
+    CLEANUP uploads/getaggt (vorher 404): 404
+    CLEANUP uploads/erfunden (vorher 404): 404
+    CLEANUP ordner/getaggt /kanarie28xc8239651/Gesperrt-c8239651/neu-ordner: 404
+    CLEANUP ordner/erfunden /kanarie28xc8239651/fehlt-c8239651/neu-ordner: 404
+    CLEANUP notes-kategorie /Notes/kanarie28xc8239651-fehlt (vorher 404): 404
+    CLEANUP papierkorb kanarie28xc8239651: leer
+    CLEANUP PROPFIND /kanarie28xc8239651: 404
+    CLEANUP ordner /kanarie28xc8239651/Gesperrt-c8239651/ordner-c8239651: 404
+    CLEANUP ordner /kanarie28xc8239651/Gesperrt-c8239651/a-c8239651: 404
+    CLEANUP PROPFIND /Notes/kanarie28xc8239651-kat: 404
+    CLEANUP notes: leer
+    CLEANUP talk raum kanarie28xc8239651: entfernt
+    CLEANUP share raum 49: 404
+    CLEANUP share user2 50: 404
+    CLEANUP talk datei-raum: entfernt
+    CLEANUP talk datei-raum-nachricht 178: 404
+    CLEANUP table 16: 404
+    CLEANUP kalender kanarie28xc8239651: 404
+    CLEANUP deck board 16: gelöscht
+    CLEANUP share deck 51: 404
+    CLEANUP tag kein-ki: entfernt
+    ZUSAMMENFASSUNG cleanup: 21 Zeilen, 21 gelesen ok, 0 Werkzeug-Einträge
+
+    # 28-11 pairs 412 2026-11-12 20:12:41 +0100 head=bdfc685 container=nc-mcp-exapp-nc user=alice
+    # kommando: PYTHONUTF8=1 .venv/Scripts/python.exe -m pytest tests/integration/test_pair_equality_live.py -m integration -s
+    # stamm=kanarie28x8a2937a5 marker=mk98e8630266ee476caad7ea2ec79f26a8
+    PAAR 412 files_read path: gleich
+    GATE-03 files_read 412 path: ja (gleich ("text": "Error executing tool files_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask ...))
+    AUSFALL-TEXT files_read 412 path: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 files_download path: gleich
+    GATE-03 files_download 412 path: ja (gleich ("text": "Error executing tool files_download: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ...))
+    AUSFALL-TEXT files_download 412 path: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 files_read_as_markdown path: gleich
+    GATE-03 files_read_as_markdown 412 path: ja (gleich ("text": "Error executing tool files_read_as_markdown: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it pe...))
+    AUSFALL-TEXT files_read_as_markdown 412 path: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 files_list folder: gleich
+    GATE-03 files_list 412 folder: ja (gleich ("text": "{\"path\":\"<ID>\",\"count\":0,\"items\":[],\"degraded\":[{\"source\":\"exclusion\",\"reason\":\"The exclusion check (tag kein-ki) could not be answered, so entries that may carry file con...))
+    AUSFALL-TEXT files_list 412 folder: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 files_search folder: gleich
+    GATE-03 files_search 412 folder: ja (gleich ("text": "{\"query\":\"kanarie28x8a2937a5\",\"folder\":\"<ID>\",\"count\":0,\"items\":[],\"note\":\"matched on names only; contents are not indexed\",\"degraded\":[{\"source\":\"exclusion\",\"reason...))
+    AUSFALL-TEXT files_search 412 folder: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 files_upload text: gleich
+    GATE-03 files_upload 412 text: ja (gleich ("text": "Error executing tool files_upload: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, as...))
+    AUSFALL-TEXT files_upload 412 text: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 files_upload binary_chunk1: gleich
+    GATE-03 files_upload 412 binary_chunk1: ja (gleich ("text": "Error executing tool files_upload: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, as...))
+    AUSFALL-TEXT files_upload 412 binary_chunk1: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 files_create_folder path: gleich
+    GATE-03 files_create_folder 412 path: ja (gleich ("text": "Error executing tool files_create_folder: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persi...))
+    AUSFALL-TEXT files_create_folder 412 path: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 fetch file: gleich
+    GATE-03 fetch 412 file: ja (gleich ("text": "Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask an ad...))
+    AUSFALL-TEXT fetch 412 file: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 notes_read note: gleich
+    GATE-03 notes_read 412 note: ja (gleich ("text": "Error executing tool notes_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask ...))
+    AUSFALL-TEXT notes_read 412 note: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 fetch note: gleich
+    GATE-03 fetch 412 note: ja (gleich ("text": "Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask an ad...))
+    AUSFALL-TEXT fetch 412 note: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 notes_create category: gleich
+    GATE-03 notes_create 412 category: ja (gleich ("text": "Error executing tool notes_create: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, as...))
+    AUSFALL-TEXT notes_create 412 category: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 talk_browse messages: gleich
+    GATE-03 talk_browse 412 messages: ja (gleich ("text": "Error executing tool talk_browse: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask...))
+    AUSFALL-TEXT talk_browse 412 messages: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 talk_send token: gleich
+    GATE-03 talk_send 412 token: ja (gleich ("text": "Error executing tool talk_send: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask a...))
+    AUSFALL-TEXT talk_send 412 token: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 fetch message: gleich
+    GATE-03 fetch 412 message: ja (gleich ("text": "Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask an ad...))
+    AUSFALL-TEXT fetch 412 message: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR 412 fetch table: Zelle leer ja
+    GATE-03 fetch 412 table: ja (browse-zelle=None fetch-zeile='' name-im-json=False zeilen=2 degraded=True)
+    AUSFALL 412 report-route call_count=64
+    PAARE 412 verglichen 16 von 16 (ausnahmen 0)
+    CLEANUP uploads/getaggt (vorher 404): 404
+    CLEANUP uploads/erfunden (vorher 404): 404
+    CLEANUP ordner/getaggt /kanarie28x8a2937a5/Gesperrt-8a2937a5/neu-ordner: 404
+    CLEANUP ordner/erfunden /kanarie28x8a2937a5/fehlt-8a2937a5/neu-ordner: 404
+    CLEANUP notes-kategorie /Notes/kanarie28x8a2937a5-fehlt (vorher 404): 404
+    CLEANUP papierkorb kanarie28x8a2937a5: leer
+    CLEANUP PROPFIND /kanarie28x8a2937a5: 404
+    CLEANUP ordner /kanarie28x8a2937a5/Gesperrt-8a2937a5/ordner-8a2937a5: 404
+    CLEANUP ordner /kanarie28x8a2937a5/Gesperrt-8a2937a5/a-8a2937a5: 404
+    CLEANUP PROPFIND /Notes/kanarie28x8a2937a5-kat: 404
+    CLEANUP notes: leer
+    CLEANUP talk raum kanarie28x8a2937a5: entfernt
+    CLEANUP share raum 52: 404
+    CLEANUP share user2 53: 404
+    CLEANUP talk datei-raum: entfernt
+    CLEANUP talk datei-raum-nachricht 185: 404
+    CLEANUP table 17: 404
+    CLEANUP kalender kanarie28x8a2937a5: 404
+    CLEANUP deck board 17: gelöscht
+    CLEANUP share deck 54: 404
+    CLEANUP tag kein-ki: entfernt
+    ZUSAMMENFASSUNG cleanup: 21 Zeilen, 21 gelesen ok, 0 Werkzeug-Einträge
+
+    # 28-11 pairs timeout 2026-11-12 20:12:53 +0100 head=bdfc685 container=nc-mcp-exapp-nc user=alice
+    # kommando: PYTHONUTF8=1 .venv/Scripts/python.exe -m pytest tests/integration/test_pair_equality_live.py -m integration -s
+    # stamm=kanarie28x570f05b6 marker=mke4219f924d3f4cf59bedbabe9cb5a3cf
+    PAAR timeout files_read path: gleich
+    GATE-03 files_read timeout path: ja (gleich ("text": "Error executing tool files_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask ...))
+    AUSFALL-TEXT files_read timeout path: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout files_download path: gleich
+    GATE-03 files_download timeout path: ja (gleich ("text": "Error executing tool files_download: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ...))
+    AUSFALL-TEXT files_download timeout path: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout files_read_as_markdown path: gleich
+    GATE-03 files_read_as_markdown timeout path: ja (gleich ("text": "Error executing tool files_read_as_markdown: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it pe...))
+    AUSFALL-TEXT files_read_as_markdown timeout path: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout files_list folder: gleich
+    GATE-03 files_list timeout folder: ja (gleich ("text": "{\"path\":\"<ID>\",\"count\":0,\"items\":[],\"degraded\":[{\"source\":\"exclusion\",\"reason\":\"The exclusion check (tag kein-ki) could not be answered, so entries that may carry file con...))
+    AUSFALL-TEXT files_list timeout folder: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout files_search folder: gleich
+    GATE-03 files_search timeout folder: ja (gleich ("text": "{\"query\":\"kanarie28x570f05b6\",\"folder\":\"<ID>\",\"count\":0,\"items\":[],\"note\":\"matched on names only; contents are not indexed\",\"degraded\":[{\"source\":\"exclusion\",\"reason...))
+    AUSFALL-TEXT files_search timeout folder: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout files_upload text: gleich
+    GATE-03 files_upload timeout text: ja (gleich ("text": "Error executing tool files_upload: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, as...))
+    AUSFALL-TEXT files_upload timeout text: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout files_upload binary_chunk1: gleich
+    GATE-03 files_upload timeout binary_chunk1: ja (gleich ("text": "Error executing tool files_upload: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, as...))
+    AUSFALL-TEXT files_upload timeout binary_chunk1: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout files_create_folder path: gleich
+    GATE-03 files_create_folder timeout path: ja (gleich ("text": "Error executing tool files_create_folder: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persi...))
+    AUSFALL-TEXT files_create_folder timeout path: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout fetch file: gleich
+    GATE-03 fetch timeout file: ja (gleich ("text": "Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask an ad...))
+    AUSFALL-TEXT fetch timeout file: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout notes_read note: gleich
+    GATE-03 notes_read timeout note: ja (gleich ("text": "Error executing tool notes_read: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask ...))
+    AUSFALL-TEXT notes_read timeout note: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout fetch note: gleich
+    GATE-03 fetch timeout note: ja (gleich ("text": "Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask an ad...))
+    AUSFALL-TEXT fetch timeout note: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout notes_create category: gleich
+    GATE-03 notes_create timeout category: ja (gleich ("text": "Error executing tool notes_create: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, as...))
+    AUSFALL-TEXT notes_create timeout category: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout talk_browse messages: gleich
+    GATE-03 talk_browse timeout messages: ja (gleich ("text": "Error executing tool talk_browse: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask...))
+    AUSFALL-TEXT talk_browse timeout messages: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout talk_send token: gleich
+    GATE-03 talk_send timeout token: ja (gleich ("text": "Error executing tool talk_send: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask a...))
+    AUSFALL-TEXT talk_send timeout token: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout fetch message: gleich
+    GATE-03 fetch timeout message: ja (gleich ("text": "Error executing tool fetch: The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld. Hint: Retry in a minute; if it persists, ask an ad...))
+    AUSFALL-TEXT fetch timeout message: ja (EXCLUSION_UNAVAILABLE genannt)
+    PAAR timeout fetch table: Zelle leer ja
+    GATE-03 fetch timeout table: ja (browse-zelle=None fetch-zeile='' name-im-json=False zeilen=2 degraded=True)
+    AUSFALL timeout report-route call_count=32
+    PAARE timeout verglichen 16 von 16 (ausnahmen 0)
+    CLEANUP uploads/getaggt (vorher 404): 404
+    CLEANUP uploads/erfunden (vorher 404): 404
+    CLEANUP ordner/getaggt /kanarie28x570f05b6/Gesperrt-570f05b6/neu-ordner: 404
+    CLEANUP ordner/erfunden /kanarie28x570f05b6/fehlt-570f05b6/neu-ordner: 404
+    CLEANUP notes-kategorie /Notes/kanarie28x570f05b6-fehlt (vorher 404): 404
+    CLEANUP papierkorb kanarie28x570f05b6: leer
+    CLEANUP PROPFIND /kanarie28x570f05b6: 404
+    CLEANUP ordner /kanarie28x570f05b6/Gesperrt-570f05b6/ordner-570f05b6: 404
+    CLEANUP ordner /kanarie28x570f05b6/Gesperrt-570f05b6/a-570f05b6: 404
+    CLEANUP PROPFIND /Notes/kanarie28x570f05b6-kat: 404
+    CLEANUP notes: leer
+    CLEANUP talk raum kanarie28x570f05b6: entfernt
+    CLEANUP share raum 55: 404
+    CLEANUP share user2 56: 404
+    CLEANUP talk datei-raum: entfernt
+    CLEANUP talk datei-raum-nachricht 192: 404
+    CLEANUP table 18: 404
+    CLEANUP kalender kanarie28x570f05b6: 404
+    CLEANUP deck board 18: gelöscht
+    CLEANUP share deck 57: 404
+    CLEANUP tag kein-ki: entfernt
+    ZUSAMMENFASSUNG cleanup: 21 Zeilen, 21 gelesen ok, 0 Werkzeug-Einträge
+
+    # 28-11 pairs ausnahmen 2026-11-12 20:13:06 +0100 head=bdfc685 container=nc-mcp-exapp-nc user=alice
+    # kommando: PYTHONUTF8=1 .venv/Scripts/python.exe -m pytest tests/integration/test_pair_equality_live.py -m integration -s
+    # stamm=kanarie28x1ed00740 marker=mkbfbcf4638fde431ebce988081040fafa
+    SCHREIBVORGANG notes_create: gebucht note note:569
+    AUSNAHME notes_create category: getaggt=is_error Error executing tool notes_create: The parent folder /Notes/kanarie28x1ed00740-kat of /Notes/kanarie28x1ed00740-kat/kanarie28x1ed00740-neu.md does not exist. Hint: Create the missing folde... erfunden=erfolg id=note:569 title=kanarie28x1ed00740-neu
+    GATE-03 notes_create ausnahme category getaggt abgewiesen: ja (is_error Error executing tool notes_create: The parent folder /Notes/kanarie28x1ed00740-kat of /Notes/kanarie28x1ed00740-kat/kanarie28x1ed00740-neu.md does not exist. Hint: Create the missing folde...)
+    GATE-03 notes_create ausnahme category erfunden angelegt: ja (erfolg id=note:569 title=kanarie28x1ed00740-neu notes-GET 200)
+    CLEANUP notes-kategorie /Notes/kanarie28x1ed00740-fehlt (vorher 207): 404
+    CLEANUP papierkorb kanarie28x1ed00740: leer
+    CLEANUP PROPFIND /kanarie28x1ed00740: 404
+    CLEANUP ordner /kanarie28x1ed00740/Gesperrt-1ed00740/ordner-1ed00740: 404
+    CLEANUP ordner /kanarie28x1ed00740/Gesperrt-1ed00740/a-1ed00740: 404
+    CLEANUP PROPFIND /Notes/kanarie28x1ed00740-kat: 404
+    CLEANUP notes: leer
+    CLEANUP talk raum kanarie28x1ed00740: entfernt
+    CLEANUP share raum 58: 404
+    CLEANUP share user2 59: 404
+    CLEANUP talk datei-raum: entfernt
+    CLEANUP talk datei-raum-nachricht 199: 404
+    CLEANUP table 19: 404
+    CLEANUP kalender kanarie28x1ed00740: 404
+    CLEANUP deck board 19: gelöscht
+    CLEANUP share deck 60: 404
+    CLEANUP tag kein-ki: entfernt
+    CLEANUP tool note note:569: 404
+    ZUSAMMENFASSUNG cleanup: 18 Zeilen, 18 gelesen ok, 1 Werkzeug-Einträge
+
+== (5) Ursache des gescheiterten Mailabrufs (Befund 3 aus 31-05, Teil 2) ==
+
+MAIL ursache=testinstanz greenmail_laeuft=ja imap_inbox_nachrichten=0 uidnext=1 mail_app_listet=6 mail_app_abruf_nachricht_1=HTTP 500
+    GreenMail hält die Post nur im Arbeitsspeicher. Nach jedem Stopp und Start der Topologie ist das Postfach
+    leer (MESSAGES 0, UIDNEXT 1). Die Mail-App der Nextcloud listet ihre sechs Nachrichten weiter aus ihrem
+    eigenen Cache (mail_browse im Abschnitt 6: count 6), der Volltext kommt aber per IMAP und scheitert.
+    Kein Fehler des Werkzeugs und kein Fehler des Skripts: der Abruf an der Mail-App vorbei am Connector
+    (App-Passwort von alice) antwortet selbst 500. Die Testpost liefert nur scripts/bootstrap_exapp.sh
+    (deliver_test_mail), das in diesem Plan nicht laufen darf; nichts wurde neu zugestellt.
+    $ docker inspect nc-mcp-exapp-greenmail (State)
+    status=running started=2026-11-12T19:08:44.860797358Z restarts=0
+    $ docker exec nc-mcp-exapp-nc curl imap://greenmail:3143 STATUS INBOX (MESSAGES UIDNEXT UIDVALIDITY)   (Konto alice, GreenMail prüft kein Passwort)
+    * STATUS "INBOX" (MESSAGES 0 UIDNEXT 1 UIDVALIDITY 1794510526)
+    curl_exit=0
+    $ docker exec nc-mcp-exapp-nc curl imap://greenmail:3143 LIST
+    * LIST () "." "INBOX"
+    curl_exit=0
+    $ occ mail:account:export alice (ohne Passwortzeilen)
+    Account 1:
+    - E-Mail: alice@example.test
+    - Name: Alice Spike
+    - Provision: none ID: N/A
+    - Protocol: IMAP
+    - IMAP user: alice
+    - IMAP host: greenmail:3143, security: none
+    - SMTP user: alice
+    - SMTP host: greenmail:3025, security: none
+    $ curl -u alice:<App-Passwort> -H "OCS-APIRequest: true" <NC_MCP_URL>/ocs/v2.php/apps/mail/message/1
+    {"ocs":{"meta":{"status":"failure","statuscode":500,"message":""},"data":"Could not connect to IMAP server. Please check your logs."}}
+    HTTP 500
+
+== (6) Abnahmeskript auf der Wegwerf-Instanz ==
+
+RAM frei_host_gb=4.44 schwelle=4.0 ergebnis=ok (vor dem Abnahmeskript, nc-mcp-exapp und lokaler Prozess laufen; Messungen 4657840, 4653856, 4655236 KiB)
+    $ NC_MCP_USER=$NC_MCP_TEST_USER NC_MCP_APP_PASSWORD=$NC_MCP_TEST_APP_PASSWORD uv run --no-sync python scripts/acceptance_all_tools.py        (Stand des Skripts: Commit 95ff4da)
+    INFO mcp_connector.entry_stdio: MCP Connector is serving over stdio
+    starting nc-mcp.exe over stdio against http://127.0.0.1:8081
+
+    tools/list: 24 tools: calendar_create_event, calendar_list_events, contacts_search, deck_browse, deck_create_card, fetch, files_create_folder, files_download, files_list, files_read, files_read_as_markdown, files_search, files_upload, mail_browse, notes_create, notes_read, notes_search, prepare_context, search, tables_browse, tables_create_row, talk_browse, talk_send, unified_search
+
+      OK      files_upload           {"path":"/abnahmee83d656e88-20261112-201506.md","etag":"\"780d33549e2f57c2a239146d324ef670
+      OK      files_create_folder    {"path":"/abnahmee83d656e88-20261112-201506-ordner/a/b","created":true,"id":"file:573","cr
+      OK      files_create_folder    {"path":"/abnahmee83d656e88-20261112-201506-ordner/a/b","created":false,"id":"file:573","c
+      OK      files_search           {"query":"abnahmee83d656e88","folder":"/","count":2,"items":[{"path":"/abnahmee83d656e88-2
+      OK      files_list             {"path":"/","count":19,"items":[{"path":"/abnahme0a4f51708b-20261112-191615-ordner","name"
+      OK      files_read             {"path":"/abnahmee83d656e88-20261112-201506.md","content":"# abnahmee83d656e88\nAbnahmelau
+      OK      files_download         {"path":"/abnahmee83d656e88-20261112-201506.md","size":54,"content_type":"text/markdown","
+      OK      files_upload           {"path":"/abnahmee83d656e88-20261112-201506.docx","etag":"\"2179794d558cb0b8a161091ba3cce6
+      OK      files_read_as_markdown {"path":"/abnahmee83d656e88-20261112-201506.docx","content":"Abnahmelauf abnahmee83d656e88
+      OK      calendar_create_event  {"id":"event:personal:45530fe8-4fa8-4f74-b08f-29f499714fc8.ics","uid":"45530fe8-4fa8-4f74-
+      OK      calendar_list_events   {"range":{"start":"2026-11-13T18:15:08+00:00","end":"2026-11-13T21:15:08+00:00","timezone"
+      OK      notes_create           {"id":"note:577","title":"Abnahme abnahmee83d656e88","category":"","modified":1794510909,"
+      OK      notes_search           {"count":1,"results":[{"id":"note:577","title":"Abnahme abnahmee83d656e88","excerpt":"Abna
+      OK      notes_read             {"id":"note:577","title":"Abnahme abnahmee83d656e88","content":"Abnahmelauf abnahmee83d656
+      OK      deck_browse            {"level":"boards","count":1,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_e
+      OK      deck_browse            {"level":"stacks","count":4,"results":[{"id":1,"title":"Custom lists - click to rename!","
+      OK      deck_create_card       {"id":"card:1:1:33","title":"Abnahme abnahmee83d656e88","url":"http://127.0.0.1:8081/index
+      OK      tables_browse          {"level":"tables","count":1,"results":[{"id":10,"title":"Welcome to Nextcloud Tables!","ro
+      OK      tables_browse          {"level":"columns","count":4,"results":[{"id":10,"title":"What","type":"text","mandatory":
+      OK      tables_create_row      {"id":53,"table_id":"10","url":"http://127.0.0.1:8081/index.php/apps/tables/#/table/10","v
+      OK      talk_browse            {"level":"conversations","count":5,"results":[{"token":"f7rgfwke","name":"MCP-Talk-offen-G
+      OK      talk_browse            {"level":"messages","token":"f7rgfwke","conversation":"MCP-Talk-offen-Grüße-aus-Hamburg","
+      OK      talk_send              {"sent":true,"id":202,"token":"f7rgfwke","conversation":"MCP-Talk-offen-Grüße-aus-Hamburg"
+      OK      mail_browse            {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]}
+      OK      mail_browse            {"level":"mailboxes","count":1,"results":[{"id":1,"name":"INBOX","unread":0,"delimiter":".
+      OK      mail_browse            {"level":"messages","mailbox_id":"1","count":6,"results":[{"id":"mail:1","subject":"Gruess
+      OK      contacts_search        {"query":"a","count":0,"contacts":[]}
+      OK      unified_search         {"query":"abnahmee83d656e88","count":7,"results":[{"id":"note:577","title":"Abnahme abnahm
+      OK      prepare_context        {"query":"abnahmee83d656e88","window":{"start":"2026-11-12T19:15:13+00:00","end":"2026-11-
+      OK      search                 { "results": [ { "id": "note:577", "title": "Abnahme abnahmee83d656e88", "url": "http://12
+      OK      fetch                  { "id": "file:570", "title": "abnahmee83d656e88-20261112-201506.md", "text": "# abnahmee83
+    [11/12/26 20:15:14] INFO     Tool 'fetch' failed: 'Error          server.py:453
+                                 executing tool fetch: The Mail app                
+                                 could not read the message 1 from                 
+                                 the mail server of this account.                  
+                                 Hint: Open Mail in Nextcloud and                  
+                                 check that account: the usual causes              
+                                 are a mail server that cannot be                  
+                                 reached, a password the mail server               
+                                 rejects, or a mailbox that has never              
+                                 been synchronised.'                               
+      PREREQ  fetch                  the Mail app of this instance itself answers HTTP 500 for mail:1: its mail server does not
+      OK      fetch                  { "id": "message:f7rgfwke:138", "title": "MCP-Talk-offen-Grüße-aus-Hamburg", "text": "From
+      OK      fetch                  { "id": "table:10", "title": "Welcome to Nextcloud Tables!", "text": "Welcome to Nextcloud
+
+    PREREQ: fetch: the Mail app of this instance itself answers HTTP 500 for mail:1: its mail server does not hand out a message it lists
+
+    INCOMPLETE: all 24 tools of the registry answered, but 1 step met a missing prerequisite of the test instance (see PREREQ above). This is not a pass.
+
+    === acceptance matrix ===
+    OK      files_upload           {"path":"/abnahmee83d656e88-20261112-201506.md","etag":"\"780d33549e2f57c2a239146d324ef670\"","created":true}
+    OK      files_create_folder    {"path":"/abnahmee83d656e88-20261112-201506-ordner/a/b","created":true,"id":"file:573","created_folders":["/ab
+    OK      files_create_folder    {"path":"/abnahmee83d656e88-20261112-201506-ordner/a/b","created":false,"id":"file:573","created_folders":[]}
+    OK      files_search           {"query":"abnahmee83d656e88","folder":"/","count":2,"items":[{"path":"/abnahmee83d656e88-20261112-201506-ordne
+    OK      files_list             {"path":"/","count":19,"items":[{"path":"/abnahme0a4f51708b-20261112-191615-ordner","name":"abnahme0a4f51708b-
+    OK      files_read             {"path":"/abnahmee83d656e88-20261112-201506.md","content":"# abnahmee83d656e88\nAbnahmelauf Phase 1, Straßenba
+    OK      files_download         {"path":"/abnahmee83d656e88-20261112-201506.md","size":54,"content_type":"text/markdown","offset":0,"bytes":54
+    OK      files_upload           {"path":"/abnahmee83d656e88-20261112-201506.docx","etag":"\"2179794d558cb0b8a161091ba3cce68f\"","created":true
+    OK      files_read_as_markdown {"path":"/abnahmee83d656e88-20261112-201506.docx","content":"Abnahmelauf abnahmee83d656e88\n","content_type":"
+    OK      calendar_create_event  {"id":"event:personal:45530fe8-4fa8-4f74-b08f-29f499714fc8.ics","uid":"45530fe8-4fa8-4f74-b08f-29f499714fc8","
+    OK      calendar_list_events   {"range":{"start":"2026-11-13T18:15:08+00:00","end":"2026-11-13T21:15:08+00:00","timezone":"UTC"},"count":2,"e
+    OK      notes_create           {"id":"note:577","title":"Abnahme abnahmee83d656e88","category":"","modified":1794510909,"url":"http://127.0.0
+    OK      notes_search           {"count":1,"results":[{"id":"note:577","title":"Abnahme abnahmee83d656e88","excerpt":"Abnahmelauf abnahmee83d6
+    OK      notes_read             {"id":"note:577","title":"Abnahme abnahmee83d656e88","content":"Abnahmelauf abnahmee83d656e88","category":"","
+    OK      deck_browse            {"level":"boards","count":1,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_edit":true}]}
+    OK      deck_browse            {"level":"stacks","count":4,"results":[{"id":1,"title":"Custom lists - click to rename!","cards":2},{"id":2,"t
+    OK      deck_create_card       {"id":"card:1:1:33","title":"Abnahme abnahmee83d656e88","url":"http://127.0.0.1:8081/index.php/apps/deck/card/
+    OK      tables_browse          {"level":"tables","count":1,"results":[{"id":10,"title":"Welcome to Nextcloud Tables!","rowsCount":8,"columnsC
+    OK      tables_browse          {"level":"columns","count":4,"results":[{"id":10,"title":"What","type":"text","mandatory":false,"subtype":"lin
+    OK      tables_create_row      {"id":53,"table_id":"10","url":"http://127.0.0.1:8081/index.php/apps/tables/#/table/10","values_written":{"Wha
+    OK      talk_browse            {"level":"conversations","count":5,"results":[{"token":"f7rgfwke","name":"MCP-Talk-offen-Grüße-aus-Hamburg","t
+    OK      talk_browse            {"level":"messages","token":"f7rgfwke","conversation":"MCP-Talk-offen-Grüße-aus-Hamburg","count":1,"results":[
+    OK      talk_send              {"sent":true,"id":202,"token":"f7rgfwke","conversation":"MCP-Talk-offen-Grüße-aus-Hamburg","timestamp":1794510
+    OK      mail_browse            {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]}
+    OK      mail_browse            {"level":"mailboxes","count":1,"results":[{"id":1,"name":"INBOX","unread":0,"delimiter":".","special_role":"in
+    OK      mail_browse            {"level":"messages","mailbox_id":"1","count":6,"results":[{"id":"mail:1","subject":"Gruesse aus Hamburg, die M
+    OK      contacts_search        {"query":"a","count":0,"contacts":[]}
+    OK      unified_search         {"query":"abnahmee83d656e88","count":7,"results":[{"id":"note:577","title":"Abnahme abnahmee83d656e88","sublin
+    OK      prepare_context        {"query":"abnahmee83d656e88","window":{"start":"2026-11-12T19:15:13+00:00","end":"2026-11-19T19:15:13+00:00"},
+    OK      search                 { "results": [ { "id": "note:577", "title": "Abnahme abnahmee83d656e88", "url": "http://127.0.0.1:8081/apps/no
+    OK      fetch                  { "id": "file:570", "title": "abnahmee83d656e88-20261112-201506.md", "text": "# abnahmee83d656e88\nAbnahmelauf
+    PREREQ  fetch                  the Mail app of this instance itself answers HTTP 500 for mail:1: its mail server does not hand out a message it lists
+    OK      fetch                  { "id": "message:f7rgfwke:138", "title": "MCP-Talk-offen-Grüße-aus-Hamburg", "text": "From: alice\nAbnahmelauf
+    OK      fetch                  { "id": "table:10", "title": "Welcome to Nextcloud Tables!", "text": "Welcome to Nextcloud Tables!\nRows: 9\nW
+    exit=3
+ABNAHME nc-mcp-exapp exit=3 werkzeuge=24 nie_aufgerufen=keins fehlgeschlagen=keins voraussetzung=fetch (Mail): die Mail-App der Instanz antwortet selbst HTTP 500
+    Alle 24 Werkzeuge der Registry wurden gerufen und haben geantwortet: files_download und files_read_as_markdown
+    sind neu dabei, fetch der Datei nimmt die Id der hochgeladenen Datei (file:570) statt des ersten Treffers.
+    Exit 3 ist der eigene Code des Skripts für eine fehlende Voraussetzung der Testinstanz (Abschnitt 5); Exit 0
+    ist auf dieser Instanz ohne neu zugestellte Testpost nicht erreichbar und wurde deshalb nicht gemessen.
+    Das Skript hinterlässt seine Objekte in der Wegwerf-Instanz (zwei Dateien, Ordnerkette, Termin, Notiz, Karte,
+    Zeile, Talk-Nachricht), wie vorgesehen; der Connector kann nicht löschen.
+
+== (7) Stopp ==
+
+PROZESS lokal beendet pid=15784 (python.exe, Kind von uv) port_23001_frei=ja
+    $ docker compose -f compose.exapp.yml stop
+     Container nc-mcp-exapp-registry Stopping 
+     Container nc-mcp-exapp-harp Stopping 
+     Container nc-mcp-exapp-caddy Stopping 
+     Container nc-mcp-exapp-greenmail Stopping 
+     Container nc-mcp-exapp-registry Stopped 
+     Container nc-mcp-exapp-harp Stopped 
+     Container nc-mcp-exapp-caddy Stopped 
+     Container nc-mcp-exapp-nc Stopping 
+     Container nc-mcp-exapp-greenmail Stopped 
+     Container nc-mcp-exapp-nc Stopped 
+    exit=0
+    $ docker ps
+    gameworld-dev-gameworld-docker-proxy-1 Up 4 hours
+    $ docker volume ls --filter name=nc-mcp-exapp
+    nc-mcp-exapp_nextcloud-exapp-data
+    nc-mcp-exapp_registry-exapp-data
+GESTOPPT nc-mcp-exapp volume_bleibt=ja
