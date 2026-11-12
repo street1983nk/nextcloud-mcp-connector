@@ -28,6 +28,10 @@ Die Anforderungen FOLD-01 bis FOLD-06 und die fünf Erfolgskriterien in ROADMAP.
 ### Schreibrecht
 - **D-31-05:** Keine Vorprüfung des Schreibrechts. Das Werkzeug wertet die Ablehnung des Servers aus: 403 ergibt die Meldung "keine Rechte" und nennt, was in diesem Aufruf schon angelegt wurde. (Owner, 12.11.2026, Auswahl "Nur Ablehnung auswerten")
 
+### Namen am Rand
+- **D-31-08:** Trägt ein Segment des Zielpfads Leerraum am Anfang oder Ende, lehnt `files_create_folder` VORAB ab, vor jedem Schreiben und ohne etwas anzulegen, statt den Namen still zu kürzen; das gilt für jedes Segment, mit und ohne `parents`, und `safe_path` bleibt für alle anderen Werkzeuge, wie es ist. (Owner, 2026-11-12, wörtlich "Ok" auf diese Empfehlung nach Befund 2 aus 31-05; Plan 31-05b)
+- **D-31-09:** Antwortet Nextcloud auf einen Namen wie `x.part` mit 405 und danach mit einem Knoten, der kein Ordner ist und keine gültige Datei-Id trägt, sagt das Werkzeug nur, dass der Name als Ordner nicht anlegbar und von einem Nicht-Ordner belegt ist, und nennt keine Datei, die es nicht gibt. (Owner, 2026-11-12, wörtlich "Ok" auf diese Empfehlung nach Befund 5 aus 31-05; Plan 31-05b)
+
 ### Live-Beweis
 - **D-31-06:** Der Live-Beweis des Werkzeugs läuft auf Nextcloud 32 und 35 (unteres und oberes Ende des Store-Fensters), unter AppAPI-Impersonation. (Owner, 12.11.2026, Auswahl "32 und 35, ACL aus Phase 30")
 - **D-31-07:** Für den Gruppenordner mit ACL gilt die Rohantwort aus Phase 30 (docs/spike-tasks.md, Abschnitte 2.2, 2.4 und 12.2). Der Gruppenordner wird in dieser Phase nicht erneut live aufgebaut. Der geteilte Ordner ohne Schreibrecht wird live belegt, wie Erfolgskriterium 3 es verlangt.
