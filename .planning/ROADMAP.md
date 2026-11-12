@@ -203,9 +203,10 @@ Messbericht: `docs/spike-tasks.md`; Rohprotokolle unter `.planning/phases/30-mes
 **Plans**: TBD
 **Abtrennbare Teile, je ein eigener Plan**: Abhaken und Wiederöffnen (TMOD-03); Felder ändern (TMOD-04); Verschieben (TMOD-08); Löschen (TMOD-07, nur bei positivem Spike-Ergebnis). 0.8.0 bleibt ohne jeden dieser Teile releasefähig; ein Teil fällt nur per Owner-Entscheid heraus, außer dem Löschen, dessen Ausgang E13 vorab geregelt hat
 **Research flag**: ja. Die Recherche vom 11.11.2026 deckt ändernde Zugriffe nicht ab; die Planung dieser Phase stützt sich auf den Messbericht aus Phase 30 und braucht eine eigene kurze Recherche zum Erhalt fremder Eigenschaften mit `icalendar`
+**Aus Phase 30**: Ergebniswort für das Löschen "wiederherstellbar" (docs/spike-tasks.md Abschnitt 4.5): TMOD-07 ist planbar, mit den Auflagen von dort. Das Abbruchkriterium zu `MOVE` ist nicht ausgelöst: TMOD-08 ist planbar, der Kopf `Overwrite: F` ist Pflicht. Das Abbruchkriterium MESS-05 ist nicht ausgelöst. Owner-Entscheid vom 12.11.2026 (docs/spike-tasks.md Abschnitt 10.4): wiederkehrende Aufgaben bleiben abgelehnt (A15), Unteraufgaben werden beim Abhaken mit abgehakt (A16), Unteraufgaben ziehen beim Verschieben mit und werden mitgelöscht (A21). Das Erfolgskriterium 1 ("Unteraufgaben bleiben dabei unberührt") steht dazu im Widerspruch; sein Wortlaut ist am Checkpoint nicht freigegeben worden und hier deshalb unverändert, er ist vor der Planung der Phase nachzuziehen
 **Offene Punkte für die discuss-phase (nicht entschieden)**:
 
-  - E15: eigener Admin-Schalter für die ändernden Werkzeuge oder nur die Abschaltung des Bundles `tasks` (Owner-Checkpoint in Phase 30)
+  - E15 entschieden am 12.11.2026: eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge, ab Werk aus, nach dem Vorbild `NC_MCP_FILES_UPDATE` (Option "Empfehlung aus Abschnitt 10.3 übernehmen"), siehe docs/spike-tasks.md Abschnitt 10. Offen bleibt, welche Werkzeuge der Schalter im Einzelnen umfasst
   - Reicht die im selben Aufruf gelesene ETag, oder gibt das Modell die ETag aus `tasks_read` mit (Präzedenz `files_update`)?
   - Felder leeren (Fälligkeit entfernen, Elternbezug lösen) und der endgültige Name von `tasks_complete`
 

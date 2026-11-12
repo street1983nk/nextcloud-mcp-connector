@@ -1,6 +1,6 @@
 # Mess-Spike Aufgaben und Ordner (MESS-01 bis MESS-06)
 
-**Status:** Messung abgeschlossen, Owner-Entscheid E15 offen. Alle sechs Messpunkte (MESS-01 bis MESS-06, Abschnitte 1 bis 6) und das Inventar (Abschnitt 7) sind gemessen. Keines der Abbruchkriterien ist ausgelöst (MESS-01, MESS-05, MESS-06 für das Verschieben); das Löschen trägt das Ergebniswort "wiederherstellbar" (Abschnitt 4.5). Abschnitt 8 führt jede Annahme mit ihrem Status, Abschnitt 9 die Übergabe an die Phasen 31 bis 33, Abschnitt 10 die Entscheidungsgrundlage für E15 mit einer Empfehlung nach vorab festgelegter Regel, Abschnitt 11 alles, was ungemessen blieb. Der Entscheid des Owners (Abschnitt 10.4) steht aus; bis dahin fließt nichts in die Planung der Phasen 31 bis 33
+**Status:** abgeschlossen, Owner-Entscheid E15 vom 2026-11-12. Alle sechs Messpunkte (MESS-01 bis MESS-06, Abschnitte 1 bis 6) und das Inventar (Abschnitt 7) sind gemessen. Keines der Abbruchkriterien ist ausgelöst (MESS-01, MESS-05, MESS-06 für das Verschieben); das Löschen trägt das Ergebniswort "wiederherstellbar" (Abschnitt 4.5). Abschnitt 8 führt jede Annahme mit ihrem Status, Abschnitt 9 die Übergabe an die Phasen 31 bis 33, Abschnitt 10 die Entscheidungsgrundlage für E15 mit einer Empfehlung nach vorab festgelegter Regel, Abschnitt 11 alles, was ungemessen blieb. Der Entscheid des Owners steht in Abschnitt 10.4: eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge, ab Werk aus; die Phasen 31 bis 33 können auf diesem Bericht geplant werden
 **Messzeitraum:** 2026-11-11 11:55 UTC (erster Messlauf, `raw/nc35-mkcol.txt`) bis 2026-11-12 01:30 UTC (letzter Lauf, `raw/fixtures.txt`), gelesen aus den Zeilen `# Lauf` der Rohdateien. Plan 30-05 hat den Bericht am 2026-11-12 abgeschlossen und dabei nichts gemessen
 **Nextcloud:** 35.0.0 (Build 35.0.0.10), gelesen mit `occ status` am 2026-11-11 aus dem laufenden Container `nc35-nc`. Das Image heißt `nextcloud:35.0.0-apache-local` und ist lokal aus dem veröffentlichten Quellpaket gebaut (`compose.nc35.yml`, Kopfkommentar). Für die Löschmatrix (Abschnitt 4.3) liefen am 2026-11-11 nacheinander vier Wegwerf-Instanzen aus `compose.spike-tags.yml` mit den offiziellen Images; ihre Fassungen of record, je gelesen mit `occ status` in der laufenden Instanz, sind 32.0.15, 33.0.9, 34.0.4, 35.0.2 (Zeile `VERSION OF RECORD` in `raw/loeschen-32.txt` bis `raw/loeschen-35.txt`). Für Discovery, Abfragen und Kosten (Abschnitte 5 und 6) liefen am 2026-11-12 nacheinander sechs weitere Wegwerf-Instanzen mit denselben Images: 32.0.15, 33.0.9, 34.0.4 und 35.0.2 aus `compose.spike-tags.yml`, dazu 35.0.2 zweimal für die Kosten, einmal mit SQLite und einmal aus `compose.spike-tags-pg.yml` (Zeile `VERSION OF RECORD` in `raw/discovery-32.txt` bis `raw/discovery-35.txt`, `raw/kosten-sqlite.txt` und `raw/kosten-pg.txt`)
 **AppAPI:** `app_api` 35.0.0, gelesen mit `occ app:list --output=json` derselben Instanz am 2026-11-11
@@ -983,13 +983,13 @@ Die folgenden Listen nennen je Phase, was sie aus diesem Bericht übernimmt. Sie
 - **Pflegefelder** (Abschnitte 3.2 und 3.5, A14): der Server speichert wörtlich und pflegt kein Feld. `LAST-MODIFIED` und `DTSTAMP` setzt die Tasks-App selbst; `SEQUENCE` schreibt sie nie.
 - **Felder und Zeitformat beim Abhaken und Wiederöffnen** (Abschnitt 3.5, A12): abhaken setzt `STATUS:COMPLETED`, `PERCENT-COMPLETE:100` und `COMPLETED` in UTC mit `Z`; wieder öffnen setzt `STATUS:NEEDS-ACTION` und entfernt `COMPLETED` und `PERCENT-COMPLETE`. In beiden Fällen ziehen `LAST-MODIFIED` und `DTSTAMP` nach.
 - **Kein Schreibrecht** (Abschnitte 3.3, 4.1 und 4.3): `PUT`, `MOVE` und `DELETE` in eine nur lesbare geteilte Liste antworten 404 mit "could not be found", ein Deck-Kalender als Ziel 403. Ein 404 nach erfolgreichem Lesen heißt nicht "gelöscht". Das Schreibrecht ist vorab aus der Discovery lesbar (Abschnitt 5.2).
-- **Wiederholung** (Abschnitte 3.4 und 3.6, A15): ein `PUT` am Master, der `STATUS:COMPLETED` setzt, erledigt die ganze Serie; die Tasks-App schiebt stattdessen `DUE` weiter. Die Vorgabe "ablehnen" aus TMOD-01 bleibt von der Messung her bestehen.
-- **Unteraufgaben beim Abhaken** (Abschnitte 3.4 und 3.6, A16): der Server fasst die Unteraufgabe nicht an, die Tasks-App hakt sie mit einem eigenen `PUT` ab. TMOD-03 sagt "nicht mit abhaken, sofern MESS-05 nichts anderes ergibt"; gemessen ist, dass die App es anders tut. Dieser Bericht entscheidet das nicht.
+- **Wiederholung** (Abschnitte 3.4 und 3.6, A15): ein `PUT` am Master, der `STATUS:COMPLETED` setzt, erledigt die ganze Serie; die Tasks-App schiebt stattdessen `DUE` weiter. Die Vorgabe "ablehnen" aus TMOD-01 bleibt von der Messung her bestehen. Entscheid des Owners in 10.4: sie bleibt.
+- **Unteraufgaben beim Abhaken** (Abschnitte 3.4 und 3.6, A16): der Server fasst die Unteraufgabe nicht an, die Tasks-App hakt sie mit einem eigenen `PUT` ab. TMOD-03 sagt "nicht mit abhaken, sofern MESS-05 nichts anderes ergibt"; gemessen ist, dass die App es anders tut. Die Abschnitte 1 bis 9 entscheiden das nicht; der Entscheid des Owners steht in 10.4: dem Verhalten der Tasks-App folgen und mit abhaken.
 - **Kopfzeilen und Verhalten von `MOVE`** (Abschnitt 4.1, A19): 201, UID, Text und ETag bleiben erhalten. `Overwrite: F` ist Pflicht, sonst überschreibt der Server ein belegtes Ziel mit 204 und das verdrängte Objekt liegt im Papierkorb. `If-Match` wirkt. Eine gleiche UID in der Zielliste ergibt 409. Der Server prüft nicht, ob das Ziel Aufgaben führen darf: die Regel "Ziel ist eine beschreibbare Aufgabenliste" setzt der Connector aus der Discovery durch. Vom Kopf `Destination` zählt nur der Pfad.
-- **Unteraufgaben beim Verschieben und Löschen** (Abschnitt 4.2, A21): der Server nimmt Unteraufgaben nicht mit, die Tasks-App nimmt sie mit je einem eigenen Aufruf mit. Nach dem Wortlaut von A21 folgt der Connector dem Gemessenen; TMOD-07 und TMOD-08 nennen als Vorgabe das Ablehnen, "sofern MESS-06 nichts anderes nahelegt". Reihenfolge, Verhalten bei einem Teilfehler und `If-Match` je Objekt plant Phase 33.
+- **Unteraufgaben beim Verschieben und Löschen** (Abschnitt 4.2, A21): der Server nimmt Unteraufgaben nicht mit, die Tasks-App nimmt sie mit je einem eigenen Aufruf mit. Nach dem Wortlaut von A21 folgt der Connector dem Gemessenen; TMOD-07 und TMOD-08 nennen als Vorgabe das Ablehnen, "sofern MESS-06 nichts anderes nahelegt". Entscheid des Owners in 10.4: der Connector folgt dem Gemessenen, die Kinder ziehen mit und werden mitgelöscht. Reihenfolge, Verhalten bei einem Teilfehler und `If-Match` je Objekt plant Phase 33.
 - **Ergebniswort samt Auflagen** (Abschnitt 4.5, A18): "wiederherstellbar". Vorab-Test vor jedem Löschen (`PROPFIND` mit `Depth: 0` auf die Papierkorb-Sammlung nach `{http://nextcloud.com/ns}trash-bin-retention-duration`, nur eine Zahl größer 0 zählt), die Frist nennen, wer wiederherstellen kann, und die Kopfzeile `X-NC-CalDAV-No-Trashbin` nie senden. Bei abgeschaltetem Papierkorb löscht `DELETE` endgültig (Abschnitt 4.4).
 - **Inventar** (Abschnitt 7.1, A17): 114 Fundstellen. 62 davon sind Phase 33 zugeordnet (Gates, Annotationen, Audit, Kanarie), 52 der Phase 34 (Server-Instruktion, Store-Text, Doku).
-- **E15** (Abschnitt 10): bis der Entscheid in 10.4 steht, ist offen, ob die ändernden Werkzeuge einen eigenen Admin-Schalter bekommen. TMOD-01 ist so formuliert, dass beide Antworten ohne Umbau gehen.
+- **E15** (Abschnitt 10): entschieden am 2026-11-12, siehe 10.4. Die ändernden Aufgaben-Werkzeuge bekommen einen eigenen Admin-Schalter, ab Werk aus, nach dem Vorbild `NC_MCP_FILES_UPDATE`. Welche Werkzeuge der Schalter im Einzelnen umfasst, hat der Owner nicht eigens festgelegt; das klärt die discuss-phase von Phase 33.
 
 ### 9.4 Hinweise für die discuss-phase
 
@@ -1065,7 +1065,29 @@ Diese Empfehlung ist keine Entscheidung. Die Entscheidung steht allein in 10.4.
 
 ### 10.4 Entscheid
 
-Offen, Checkpoint 30-05
+**Entschieden am 2026-11-12.** Gewählte Option: `empfehlung` (Empfehlung aus Abschnitt 10.3 übernehmen). Das heißt: eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge, ab Werk aus, nach dem Vorbild `NC_MCP_FILES_UPDATE`.
+
+Wörtliche Antwort des Owners, vom Orchestrator übermittelt (Kanal: Claude-Code-Sitzung): "Empfehlungen übernehmen"
+
+Was dem Owner im Kurzformat vorlag, nach der Angabe des Orchestrators:
+
+- E15 mit den Optionen des Plans 30-05 und der Empfehlung nach der Regel aus 10.3: eigener Schalter, Auslöser S1, kein ungemessener Auslöser. Dazu der Hinweis aus 10.3, dass der Auslöser nur das Löschen betrifft und dass Umfang und Werkszustand eines Schalters aus keinem Messwert folgen.
+- Kein Abbruchkriterium ist ausgelöst (MESS-01 nein, MESS-05 nein, MESS-06 MOVE nein, Löschwort "wiederherstellbar").
+- Drei Punkte aus Abschnitt 9.3, je mit einem Vorschlag des Orchestrators (Tabelle unten).
+
+Lesart des Orchestrators, kein Zitat: der Plural der Antwort deckt die Empfehlung zu E15 und die drei Vorschläge zu A15, A16 und A21.
+
+**Abbruchkriterien.** Keines der vier Kriterien aus Abschnitt 9 ist ausgelöst; eine Antwort des Owners dazu war nicht nötig und liegt nicht vor.
+
+**Die drei Punkte aus Abschnitt 9.3.** Für alle drei gilt dieselbe wörtliche Antwort, "Empfehlungen übernehmen".
+
+| Punkt | Vorschlag des Orchestrators, wie vorgelegt | Entscheid | Folge |
+|-------|--------------------------------------------|-----------|-------|
+| A15, wiederkehrende Aufgaben | die Vorgabe "ablehnen" bleibt bestehen | übernommen | TMOD-01 bleibt im Wortlaut: ändernde Zugriffe auf wiederkehrende Aufgaben werden abgelehnt |
+| A16, Unteraufgaben beim Abhaken | dem Verhalten der Tasks-App folgen und mit abhaken | übernommen | TMOD-03 ist in `.planning/REQUIREMENTS.md` nachgezogen: das Abhaken einer Elternaufgabe hakt ihre Unteraufgaben mit ab |
+| A21, Kinder beim Verschieben und Löschen | der Connector folgt dem Gemessenen: die Kinder ziehen mit und werden mitgelöscht | übernommen | TMOD-07 und TMOD-08 sind in `.planning/REQUIREMENTS.md` nachgezogen; Reihenfolge, Teilfehler und `If-Match` je Objekt plant Phase 33 |
+
+**Was der Entscheid nicht festlegt.** Welche Werkzeuge der Schalter im Einzelnen umfasst, hat der Owner nicht eigens gesagt. Es gilt der Wortlaut der vorgelegten Option ("für die ändernden Aufgaben-Werkzeuge, ab Werk aus"); die Feinheiten klärt die discuss-phase von Phase 33. Der Name des Schalters und der Wortlaut seiner Texte sind ebenfalls nicht entschieden.
 
 ## 11. Was ungemessen blieb
 
