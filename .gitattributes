@@ -13,3 +13,9 @@ deploy/Caddyfile.staging text eol=lf
 # The calendar objects of the measuring spike (phase 30) are raw evidence and later
 # fixtures: they keep the bytes the server sent, CRLF line ends included.
 .planning/phases/30-mess-spike-aufgaben-und-ordner/raw/**/*.ics -text
+
+# The fixtures plan 30-04 derives from them are copies of those bytes; the two
+# discovery answers are kept as the server sent them as well.
+tests/fixtures/tasks_app/*.ics -text
+tests/fixtures/caldav_home_fresh_account.xml -text
+tests/fixtures/caldav_home_task_lists.xml -text

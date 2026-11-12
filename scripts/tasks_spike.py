@@ -31,6 +31,14 @@ sub tasks, and ``DELETE`` with the restore out of the calendar trash bin),
 deleting with the calendar trash bin on and off, for shared lists, the retention and the
 pretest; it needs no environment file and ends with ``down -v``), ``delete-verdict`` (the
 decision rule of E13 over the four raw files of the delete matrix, no Docker),
+``discovery-matrix`` (one throwaway instance per ``--nc-tag``; ``--parts`` picks
+``discovery``: a fresh account after its first login and a prepared one with every kind of
+collection, ``query``: six ``calendar-query`` filters against the same filter applied here,
+``provider``: the link of the search provider ``tasks``), ``cost`` (``--db sqlite`` or
+``--db pg``: one list with 2000 tasks, the series of the modes ``offen`` and ``alle``,
+``calendar-search`` once, and the proposal of the derivation rule), ``vtodo-create`` (a
+create-only ``PUT`` of a VTODO under impersonation on nc35), ``fixtures`` (no Docker: the
+objects the Tasks app wrote in plan 30-02 and the discovery answers as test fixtures),
 ``nc35-stop`` (``docker stop`` of the
 same four containers) and ``secret-scan`` (the gate over every raw protocol of the phase
 folder and the report before a commit). Whatever the measuring blocks created is taken back
@@ -52,20 +60,24 @@ import base64
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import secrets
+import statistics
 import subprocess
 import sys
 import time
-from collections.abc import Coroutine, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Coroutine, Iterable, Mapping, Sequence
+from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlsplit
 
 import httpx
+import icalendar
 from lxml import etree
 
 from mcp_connector import config
@@ -134,6 +146,10 @@ BLOCKS = (
     "ui-evaluate-move",
     "delete-matrix",
     "delete-verdict",
+    "discovery-matrix",
+    "cost",
+    "vtodo-create",
+    "fixtures",
     "nc35-stop",
     "secret-scan",
 )
@@ -5226,9 +5242,15 @@ def pretest_distinguishing(on: Mapping[str, str], off: Mapping[str, str]) -> lis
     ]
 
 
-def compose(action: Sequence[str], compose_env: Mapping[str, str], *, check: bool = True) -> str:
-    """One ``docker compose`` call on the throwaway file; secrets only in ``compose_env``."""
-    argv = ["docker", "compose", "-f", str(REPO_ROOT / SPIKE_COMPOSE), *action]
+def compose(
+    action: Sequence[str],
+    compose_env: Mapping[str, str],
+    *,
+    check: bool = True,
+    file: str = SPIKE_COMPOSE,
+) -> str:
+    """One ``docker compose`` call on a throwaway file; secrets only in ``compose_env``."""
+    argv = ["docker", "compose", "-f", str(REPO_ROOT / file), *action]
     return run(argv, env=compose_env, check=check)
 
 
@@ -5991,6 +6013,2029 @@ def block_delete_verdict() -> int:
     return 0
 
 
+# --- plan 30-04: discovery, queries, provider link, search cost, fixtures (MESS-03, MESS-04) ---
+
+SPIKE_PG_COMPOSE = "compose.spike-tags-pg.yml"
+SPIKE_PG_CONTAINER = "nc-spike-tags-pg"
+SPIKE_PG_DB_CONTAINER = "nc-spike-tags-pgdb"
+#: Every throwaway container and volume of both compose files carries this in its name.
+SPIKE_NAME_FILTER = "nc-spike-tags"
+COST_DBS = ("sqlite", "pg")
+DISCOVERY_PARTS = ("discovery", "query", "provider")
+
+FRESH = "fresh30"
+LIST_TASKS = f"{PREFIX}-aufgaben"
+LIST_MIXED = f"{PREFIX}-gemischt"
+LIST_SUBSCRIBED = f"{PREFIX}-abo"
+LIST_DELETED = f"{PREFIX}-geloescht"
+LIST_COST = f"{PREFIX}-kosten"
+LIST_CREATE = f"{PREFIX}-anlegen"
+#: The source of the subscription: the loopback of the instance itself, the discard port.
+#: Nothing listens there and nothing outside the container is ever asked (T-30-22).
+SUBSCRIPTION_SOURCE = "http://127.0.0.1:9/keine.ics"
+
+#: What the discovery of plan 30-04 asks for per collection.
+DISCOVERY_PROPS = (
+    f"{{{xml.DAV}}}resourcetype",
+    f"{{{xml.DAV}}}displayname",
+    f"{{{xml.CAL}}}supported-calendar-component-set",
+    f"{{{xml.CS}}}source",
+    f"{{{xml.DAV}}}current-user-privilege-set",
+    f"{{{OC_SHARE_NS}}}read-only",
+)
+#: The kinds a task tool may ever use, before the component set is looked at.
+TASK_LIST_KINDS = ("aufgabenliste", "gemischt", "geteilt-schreibbar", "geteilt-nur-lesen")
+#: The kinds the prepared account of the discovery part has to show (positive control M5.2).
+PREPARED_KINDS = (
+    "aufgabenliste",
+    "gemischt",
+    "abo",
+    "papierkorb",
+    "scheduling",
+    "geteilt-schreibbar",
+    "geteilt-nur-lesen",
+    "deck",
+)
+
+TODO_MODES = ("alle", "offen", "erledigt", "fenster", "text", "eltern")
+#: The six queries of M5.3 as ``(name in the protocol, mode)``.
+QUERIES = (
+    ("ohne-filter", "alle"),
+    ("offen", "offen"),
+    ("fenster", "fenster"),
+    ("text", "text"),
+    ("eltern", "eltern"),
+    ("erledigt", "erledigt"),
+)
+QUERY_WINDOW = ("20261119T000000Z", "20261122T000000Z")
+QUERY_TERM = "q-offen"
+QUERY_PARENT = "q-offen-im-fenster"
+#: The eight tasks of M5.3 with the lines that make them what their name says.
+QUERY_TASKS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("q-offen-undatiert", ()),
+    (QUERY_PARENT, ("DUE:20261120T100000Z",)),
+    ("q-offen-ausserhalb", ("DUE:20270301T100000Z",)),
+    ("q-erledigt", ("STATUS:COMPLETED", "PERCENT-COMPLETE:100", "COMPLETED:20261110T090000Z")),
+    ("q-abgebrochen", ("STATUS:CANCELLED",)),
+    ("q-in-arbeit", ("STATUS:IN-PROCESS", "PERCENT-COMPLETE:50", "DUE:20261121T080000Z")),
+    ("q-wiederkehrend", ("DTSTART:20261101T080000Z", "DUE:20261101T090000Z", "RRULE:FREQ=DAILY")),
+    ("q-kind", ()),
+)
+
+COST_TASKS = 2000
+COST_DONE = 1900
+COST_TERM = "kostenprobe"
+COST_TERM_TASKS = 10
+WARMUP_RUNS = 3
+MEASURED_RUNS = 15
+LONG_TIMEOUT_SECONDS = 300.0
+
+FIXTURE_DIR = REPO_ROOT / "tests" / "fixtures" / "tasks_app"
+FIXTURE_FRESH = REPO_ROOT / "tests" / "fixtures" / "caldav_home_fresh_account.xml"
+FIXTURE_LISTS = REPO_ROOT / "tests" / "fixtures" / "caldav_home_task_lists.xml"
+RAW_FRESH = "discovery-frisch"
+RAW_PREPARED = "discovery-vorbereitet"
+#: ``(kind, fixture file, snapshot state, SUMMARY in the browser session of plan 30-02)``.
+#: The state is ``a`` (before the changes of round B) for everything but the two kinds
+#: that only exist after them.
+FIXTURE_FILES: tuple[tuple[str, str, str, str], ...] = (
+    ("ganztag", "all_day.ics", "a", "s30 ganztag"),
+    ("uhrzeit", "with_time.ics", "a", "s30 uhrzeit"),
+    ("unteraufgabe", "subtask.ics", "a", "s30 kind-abhaken"),
+    ("unteraufgabe", "subtask_parent.ics", "a", "s30 eltern-abhaken"),
+    ("wiederkehrend", "recurring.ics", "a", "s30 wiederkehrend"),
+    ("tags", "tags.ics", "a", "s30 tags"),
+    ("abgehakt", "completed.ics", "b", "s30 abhaken"),
+    ("wieder-geoeffnet", "reopened.ics", "b", "s30 wieder-oeffnen"),
+)
+#: Hosts a discovery answer may name: XML namespaces and the loopback of the instance.
+_PROBE_HOSTS = (
+    "127.0.0.1",
+    "127.0.0.1:9",
+    "127.0.0.1:8083",
+    "sabredav.org",
+    "sabre.io",
+    "owncloud.org",
+    "nextcloud.org",
+    "nextcloud.com",
+    "calendarserver.org",
+    "apple.com",
+)
+_PROVIDER_LINK = re.compile(r"/apps/tasks/(?:#/)?calendars/([^/?#]+)/tasks/([^/?#]+)$")
+
+#: The calendars of one principal as the table has them: uri, component set, trash mark.
+PHP_CALENDARS_OF = (
+    _PHP_BOOT
+    + r"""
+$db = \OCP\Server::get(\OCP\IDBConnection::class);
+$qb = $db->getQueryBuilder();
+$qb->select('uri', 'components', 'deleted_at')->from('calendars')
+    ->where($qb->expr()->eq(
+        'principaluri', $qb->createNamedParameter('principals/users/' . $argv[1])
+    ))
+    ->orderBy('id');
+$out = [];
+foreach ($qb->executeQuery()->fetchAll() as $row) {
+    $out[] = $row['uri'] . ':' . $row['components'] . ':'
+        . ($row['deleted_at'] === null ? 'leer' : 'gesetzt');
+}
+echo count($out), ' ', implode(' ', $out), "\n";
+"""
+)
+
+#: The live objects of one calendar of one principal, counted in the database.
+PHP_COUNT_LIST_OBJECTS = (
+    _PHP_BOOT
+    + r"""
+$db = \OCP\Server::get(\OCP\IDBConnection::class);
+$qb = $db->getQueryBuilder();
+$qb->select($qb->func()->count('*', 'n'))->from('calendarobjects', 'o')
+    ->join('o', 'calendars', 'c', $qb->expr()->eq('o.calendarid', 'c.id'))
+    ->where($qb->expr()->eq(
+        'c.principaluri', $qb->createNamedParameter('principals/users/' . $argv[1])
+    ))
+    ->andWhere($qb->expr()->eq('c.uri', $qb->createNamedParameter($argv[2])))
+    ->andWhere($qb->expr()->eq('o.calendartype', $qb->createNamedParameter(0)))
+    ->andWhere($qb->expr()->isNull('o.deleted_at'));
+echo $qb->executeQuery()->fetchOne(), "\n";
+"""
+)
+
+
+# --- pure helpers of plan 30-04 ----------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class Collection:
+    """One collection of a calendar home, with only the properties the server found."""
+
+    uri: str
+    display: str
+    types: tuple[str, ...]
+    components: tuple[str, ...]
+    #: ``None`` if the property came back as not found; else its text, possibly empty.
+    read_only: str | None
+    privileges: tuple[str, ...]
+    source: str
+
+
+def _local_names(parent: etree._Element | None) -> tuple[str, ...]:
+    if parent is None:
+        return ()
+    return tuple(etree.QName(child).localname for child in parent if isinstance(child.tag, str))
+
+
+def parse_home(body: str | bytes) -> list[Collection]:
+    """Every collection below a calendar home; the home itself (the shortest path) drops out.
+
+    Only the properties of a 2xx propstat count: a property the server names under 404 is
+    absent, which is the difference between ``read_only=fehlt`` and an empty value.
+    """
+    root = xml.parse_root(body)
+    responses = root.findall(f"{{{xml.DAV}}}response")
+    paths = [
+        urlsplit((response.findtext(f"{{{xml.DAV}}}href") or "").strip()).path.rstrip("/")
+        for response in responses
+    ]
+    home = min((path for path in paths if path), key=len, default="")
+    found: list[Collection] = []
+    for response, path in zip(responses, paths, strict=True):
+        if not path or path == home:
+            continue
+        props: dict[str, etree._Element] = {}
+        for propstat in response.findall(f"{{{xml.DAV}}}propstat"):
+            if " 2" not in (propstat.findtext(f"{{{xml.DAV}}}status") or ""):
+                continue
+            for child in propstat.findall(f"{{{xml.DAV}}}prop/*"):
+                if isinstance(child.tag, str):
+                    props[child.tag] = child
+        comp_set = props.get(f"{{{xml.CAL}}}supported-calendar-component-set")
+        privilege_set = props.get(f"{{{xml.DAV}}}current-user-privilege-set")
+        read_only = props.get(f"{{{OC_SHARE_NS}}}read-only")
+        source = props.get(f"{{{xml.CS}}}source")
+        name = props.get(f"{{{xml.DAV}}}displayname")
+        privileges: list[str] = []
+        if privilege_set is not None:
+            for privilege in privilege_set:
+                privileges.extend(_local_names(privilege))
+        found.append(
+            Collection(
+                uri=unquote(path.rsplit("/", 1)[-1]),
+                display=(name.text or "").strip() if name is not None else "",
+                types=_local_names(props.get(f"{{{xml.DAV}}}resourcetype")),
+                components=tuple(
+                    (comp.get("name") or "").upper()
+                    for comp in (comp_set if comp_set is not None else ())
+                    if isinstance(comp.tag, str)
+                ),
+                read_only=None if read_only is None else (read_only.text or "").strip(),
+                privileges=tuple(privileges),
+                source=(
+                    (source.findtext(f"{{{xml.DAV}}}href") or "").strip()
+                    if source is not None
+                    else ""
+                ),
+            )
+        )
+    return found
+
+
+def classify_collection(entry: Collection) -> str:
+    """The kind of one collection, by the marks a connector can read in the discovery.
+
+    The order is the order of exclusion: a Deck calendar is ``deck`` whatever its component
+    set says, and a share is told apart by the read-only property before its components.
+    """
+    if entry.uri.startswith("app-generated--"):
+        return "deck"
+    if entry.uri == TRASH or "trash-bin" in entry.types:
+        return "papierkorb"
+    if entry.uri in ("inbox", "outbox") or {"schedule-inbox", "schedule-outbox"} & set(entry.types):
+        return "scheduling"
+    if "subscribed" in entry.types:
+        return "abo"
+    if "_shared_by_" in entry.uri:
+        read_only = entry.read_only is not None and entry.read_only.lower() not in (
+            "",
+            "0",
+            "false",
+        )
+        return "geteilt-nur-lesen" if read_only else "geteilt-schreibbar"
+    if not entry.components:
+        return "ohne-komponenten"
+    if "VTODO" in entry.components:
+        return "gemischt" if "VEVENT" in entry.components else "aufgabenliste"
+    return "terminkalender" if "VEVENT" in entry.components else "andere"
+
+
+def task_lists(entries: Iterable[Collection]) -> list[Collection]:
+    """The collections a task tool may use: the right kind and ``VTODO`` in the set."""
+    return [
+        entry
+        for entry in entries
+        if classify_collection(entry) in TASK_LIST_KINDS and "VTODO" in entry.components
+    ]
+
+
+def writable(entry: Collection) -> bool:
+    """Whether the privilege set of the asking account carries a writing privilege."""
+    return bool({"write", "write-content", "bind", "all"} & set(entry.privileges))
+
+
+def build_todo_filter(
+    mode: str, start: str = "", end: str = "", *, term: str = "", parent_uid: str = ""
+) -> bytes:
+    """A ``calendar-query`` for the VTODOs of one list, narrowed the way ``mode`` says.
+
+    ``alle`` has no narrowing filter, ``offen`` is the one prop-filter the Tasks app uses
+    (``COMPLETED`` not defined), ``erledigt`` its opposite, ``fenster`` a time-range,
+    ``text`` a text-match at ``SUMMARY`` and ``eltern`` one at ``RELATED-TO``. Built with
+    lxml: a term is always text, never markup.
+    """
+    if mode not in TODO_MODES:
+        raise ValueError(f"mode {mode!r} is not one of {', '.join(TODO_MODES)}")
+    root = etree.Element(f"{{{xml.CAL}}}calendar-query", nsmap={"d": xml.DAV, "c": xml.CAL})
+    prop = etree.SubElement(root, f"{{{xml.DAV}}}prop")
+    etree.SubElement(prop, f"{{{xml.DAV}}}getetag")
+    etree.SubElement(prop, f"{{{xml.CAL}}}calendar-data")
+    scope = etree.SubElement(root, f"{{{xml.CAL}}}filter")
+    outer = etree.SubElement(scope, f"{{{xml.CAL}}}comp-filter", name="VCALENDAR")
+    todo = etree.SubElement(outer, f"{{{xml.CAL}}}comp-filter", name="VTODO")
+    if mode == "offen":
+        completed = etree.SubElement(todo, f"{{{xml.CAL}}}prop-filter", name="COMPLETED")
+        etree.SubElement(completed, f"{{{xml.CAL}}}is-not-defined")
+    elif mode == "erledigt":
+        etree.SubElement(todo, f"{{{xml.CAL}}}prop-filter", name="COMPLETED")
+    elif mode == "fenster":
+        if not start or not end:
+            raise ValueError("mode fenster needs start and end")
+        etree.SubElement(todo, f"{{{xml.CAL}}}time-range", start=start, end=end)
+    elif mode in ("text", "eltern"):
+        name, needle = ("SUMMARY", term) if mode == "text" else ("RELATED-TO", parent_uid)
+        if not needle:
+            raise ValueError(f"mode {mode} needs a value to match")
+        matched = etree.SubElement(todo, f"{{{xml.CAL}}}prop-filter", name=name)
+        match = etree.SubElement(
+            matched, f"{{{xml.CAL}}}text-match", attrib={"match-type": "contains"}
+        )
+        match.text = needle
+    return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+
+def objects_in(report_body: str | bytes) -> list[str]:
+    """The calendar texts of a REPORT answer, in the order the server sent them."""
+    root = xml.parse_root(report_body)
+    return [element.text or "" for element in root.iter(f"{{{xml.CAL}}}calendar-data")]
+
+
+def names_in(report_body: str | bytes) -> set[str]:
+    """The SUMMARY values of a REPORT answer."""
+    names = {property_value(text, "SUMMARY") for text in objects_in(report_body)}
+    return names - {""}
+
+
+def _moment(text: str, name: str) -> str:
+    """The value of a time property as ``YYYYMMDDTHHMMSSZ`` for comparing, else empty."""
+    value = property_value(text, name)
+    form = value_form(value)
+    if form == "utc":
+        return value
+    if form == "floating":
+        return f"{value}Z"
+    return f"{value}T000000Z" if form == "date" else ""
+
+
+def client_filter(
+    objects: Iterable[str],
+    mode: str,
+    start: str = "",
+    end: str = "",
+    *,
+    term: str = "",
+    parent_uid: str = "",
+) -> set[str]:
+    """The names the connector wants from a query, filtered here instead of in the server.
+
+    This is the counter probe of M5.3 and at the same time the semantics TASK-02 asks for:
+    a due window never takes an undated task, and a recurring task counts with the dates
+    it carries, without expansion. A difference to the server's answer is a finding.
+    """
+    if mode not in TODO_MODES:
+        raise ValueError(f"mode {mode!r} is not one of {', '.join(TODO_MODES)}")
+    wanted: set[str] = set()
+    for text in objects:
+        completed = bool(property_value(text, "COMPLETED"))
+        if mode == "offen":
+            keep = not completed
+        elif mode == "erledigt":
+            keep = completed
+        elif mode == "fenster":
+            moments = [_moment(text, "DUE"), _moment(text, "DTSTART")]
+            keep = any(start <= moment < end for moment in moments if moment)
+        elif mode == "text":
+            keep = term.casefold() in property_value(text, "SUMMARY").casefold()
+        elif mode == "eltern":
+            keep = property_value(text, "RELATED-TO") == parent_uid
+        else:
+            keep = True
+        if keep:
+            wanted.add(property_value(text, "SUMMARY"))
+    return wanted - {""}
+
+
+def same_sets(by_version: Mapping[str, Mapping[str, Iterable[str]]]) -> dict[str, list[str]]:
+    """Per query the versions whose hit set differs; an empty list means all are equal.
+
+    The reference is the most frequent set (the first one on a tie). A version that has no
+    answer for a query differs: a missing measurement is never an equal one.
+    """
+    queries: list[str] = []
+    for sets in by_version.values():
+        queries.extend(name for name in sets if name not in queries)
+    result: dict[str, list[str]] = {}
+    for query in queries:
+        answers = {
+            version: frozenset(sets[query]) if query in sets else None
+            for version, sets in by_version.items()
+        }
+        known = [answer for answer in answers.values() if answer is not None]
+        reference = max(known, key=known.count)
+        result[query] = [version for version, answer in answers.items() if answer != reference]
+    return result
+
+
+def provider_link_parts(link: str) -> tuple[str, str] | None:
+    """Calendar URI and object name out of a link of the search provider ``tasks``.
+
+    Only the form ``.../apps/tasks/calendars/<uri>/tasks/<name>`` (with or without ``#/``)
+    resolves. Anything else is ``None``: a link of another form is never guessed at.
+    """
+    match = _PROVIDER_LINK.search(link.strip())
+    if match is None:
+        return None
+    return unquote(match[1]), unquote(match[2])
+
+
+def proposal(median_all_seconds: float, max_seconds: float) -> str:
+    """The derivation rule of plan 30-04 for cap and time budget, applied to two numbers.
+
+    ``median_all_seconds`` is the reference value (median of mode ``alle`` at 2000 tasks),
+    ``max_seconds`` the largest measured maximum. A proposal for phase 32, not a product
+    value.
+    """
+    budget = max(1, math.ceil(2 * max_seconds - 1e-9))
+    tail = (
+        f"das Doppelte des größten gemessenen Maximalwerts {max_seconds:.3f} s, "
+        "aufgerundet auf volle Sekunden); zweite Größe ist die "
+        "Antwortgröße in Bytes je Modus"
+    )
+    if median_all_seconds <= 1.0:
+        return (
+            f"Bezugswert {median_all_seconds:.3f} s (höchstens 1,0 s): eine Abfrage je "
+            "Liste ohne zusätzlichen Deckel unterhalb von 2000 Objekten, "
+            f"Zeitbudget je Liste {budget} s ({tail}"
+        )
+    return (
+        f"Bezugswert {median_all_seconds:.3f} s (über 1,0 s): Standardmodus offen als "
+        "einziger Weg ohne Hinweis; Modus alle mit ehrlicher Notiz und "
+        f"Zeitbudget je Liste {budget} s ({tail}; der Deckel der zurückgegebenen "
+        "Aufgaben folgt der Antwortgröße, nicht der Laufzeit"
+    )
+
+
+def summarize(values: Sequence[float]) -> dict[str, float]:
+    """min, median, the second largest value and max of one series.
+
+    With 15 runs the 95th percentile is no measured value, so the key says what it is.
+    """
+    if len(values) < 2:
+        raise ValueError("a series needs at least two values")
+    ordered = sorted(values)
+    return {
+        "min": ordered[0],
+        "median": statistics.median(ordered),
+        "p95_second_largest": ordered[-2],
+        "max": ordered[-1],
+    }
+
+
+def _span(values: Sequence[int]) -> str:
+    if not values:
+        return "-"
+    low, high = min(values), max(values)
+    return str(low) if low == high else f"{low}..{high}"
+
+
+def series_line(
+    label: str,
+    statuses: Sequence[int],
+    hits: Sequence[int],
+    sizes: Sequence[int],
+    stats: Mapping[str, float],
+) -> str:
+    """One protocol line per measured series, wall clock in milliseconds.
+
+    Status, hits and bytes are spans, so a series that changed its answer midway cannot
+    hide behind its last run.
+    """
+    status = "/".join(str(value) for value in sorted(set(statuses)))
+    return (
+        f"{label} status={status} treffer={_span(hits)} bytes={_span(sizes)} "
+        f"min={stats['min'] * 1000:.0f} median={stats['median'] * 1000:.0f} "
+        f"p95_zweitgroesster={stats['p95_second_largest'] * 1000:.0f} "
+        f"max={stats['max'] * 1000:.0f} (n={len(statuses)})"
+    )
+
+
+def pick_fixtures[T](
+    objects_a: Mapping[str, T], objects_b: Mapping[str, T]
+) -> tuple[dict[str, tuple[str, str, T]], list[str]]:
+    """``({fixture file: (kind, state, object)}, missing kinds)`` by the SUMMARY alone.
+
+    A kind whose object is not there is named as missing and gets no stand-in; a sub task
+    without its parent is no pair and counts as missing as a whole.
+    """
+    picked: dict[str, tuple[str, str, T]] = {}
+    missing: list[str] = []
+    kinds: list[str] = []
+    for kind, _, _, _ in FIXTURE_FILES:
+        if kind not in kinds:
+            kinds.append(kind)
+    for kind in kinds:
+        rows = [entry for entry in FIXTURE_FILES if entry[0] == kind]
+        sources = [
+            (objects_a if state == "a" else objects_b).get(summary) for _, _, state, summary in rows
+        ]
+        if any(source is None for source in sources):
+            missing.append(kind)
+            continue
+        for (_, name, state, _), source in zip(rows, sources, strict=True):
+            if source is not None:
+                picked[name] = (kind, state, source)
+    return picked, missing
+
+
+def probe_values_only(text: str, users: Iterable[str]) -> list[str]:
+    """Everything in a discovery answer that is no probe value; empty means it may be kept.
+
+    Checked are account names in paths and principals, host names of URLs and anything
+    that looks like a mail address (counted, never quoted).
+    """
+    allowed = set(users)
+    offences: set[str] = set()
+    for pattern in (
+        r"/calendars/([^/<\"\s]+)",
+        r"principals/users/([^/<\"\s]+)",
+        r"_shared_by_([^/<\"\s]+)",
+    ):
+        offences.update(
+            f"konto {name}" for name in re.findall(pattern, text) if unquote(name) not in allowed
+        )
+    offences.update(
+        f"host {host}"
+        for host in re.findall(r"https?://([^/\s<\"]+)", text)
+        if host not in _PROBE_HOSTS
+    )
+    addresses = re.findall(r"[\w.+-]+@[\w-]+\.[\w.-]+", text)
+    if addresses:
+        offences.add(f"adresse x{len(addresses)}")
+    return sorted(offences)
+
+
+def time_form(value: Any) -> str:
+    """The form of a time value as icalendar read it; the counter probe of ``value_form``."""
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return "floating"
+        return "utc" if value.utcoffset() == timedelta(0) and value.tzname() == "UTC" else "tzid"
+    return "date" if isinstance(value, date) else "other"
+
+
+def raw_body_from_protocol(protocol: str, label: str) -> bytes | None:
+    """The body ``note_raw_body`` wrote under ``label``, byte for byte, or ``None``.
+
+    The last block with that label counts (a repeated run replaces the earlier one). The
+    body is only handed out if its sha256 is the one the run noted for the bytes it got.
+    """
+    pattern = re.compile(
+        rf"(?ms)^ROHANTWORT-ANFANG {re.escape(label)} .*?sha256=([0-9a-f]{{64}})\n(.*?)"
+        rf"^ROHANTWORT-ENDE {re.escape(label)}$"
+    )
+    blocks = pattern.findall(protocol)
+    if not blocks:
+        return None
+    digest, block = blocks[-1]
+    lines = [line[4:] if line.startswith("    ") else line for line in block.split("\n")[:-1]]
+    body = "\n".join(lines).encode()
+    return body if hashlib.sha256(body).hexdigest() == digest else None
+
+
+# --- the throwaway instance of plan 30-04 ------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class SpikeSetup:
+    """Compose file and containers of one throwaway instance, and the dbtype it must name."""
+
+    compose_file: str
+    container: str
+    #: Empty for SQLite: the database lives inside the Nextcloud container.
+    db_container: str
+    dbtype: str
+
+    def containers(self) -> tuple[str, ...]:
+        return (self.container, self.db_container) if self.db_container else (self.container,)
+
+
+def spike_setup(db: str) -> SpikeSetup:
+    """The SQLite instance of ``compose.spike-tags.yml`` or the PostgreSQL pair next to it."""
+    if db == "sqlite":
+        return SpikeSetup(SPIKE_COMPOSE, SPIKE_CONTAINER, "", "sqlite3")
+    if db == "pg":
+        return SpikeSetup(SPIKE_PG_COMPOSE, SPIKE_PG_CONTAINER, SPIKE_PG_DB_CONTAINER, "pgsql")
+    raise ValueError(f"--db {db!r} is not one of {', '.join(COST_DBS)}")
+
+
+def any_spike_leftovers() -> tuple[str, str]:
+    """Container and volume ids of any throwaway instance, SQLite or PostgreSQL pair."""
+    container = docker("ps", "-a", "-q", "--filter", f"name={SPIKE_NAME_FILTER}", check=False)
+    volume = docker("volume", "ls", "-q", "--filter", f"name={SPIKE_NAME_FILTER}", check=False)
+    return " ".join(container.split()), " ".join(volume.split())
+
+
+def throwaway_preconditions() -> None:
+    """Never next to nc35, never a second throwaway instance or an old volume, enough RAM."""
+    section("vorbedingungen")
+    running = docker("ps", "--format", "{{.Names}}", check=False).split()
+    standing = [name for name in running if name in NC35_CONTAINERS]
+    if standing:
+        raise RunFailed(f"nc35 erst stoppen: {standing} laufen noch (--block nc35-stop)")
+    ram_gate(())
+    container, volume = any_spike_leftovers()
+    note(f"VORBEDINGUNG Container {SPIKE_NAME_FILTER}* vorhanden: {yes_no(bool(container))}")
+    note(f"VORBEDINGUNG Volume {SPIKE_NAME_FILTER}* vorhanden: {yes_no(bool(volume))}")
+    if container or volume:
+        raise RunFailed("a throwaway container or volume is still there; down -v it first")
+
+
+@dataclass
+class Instance:
+    """One running throwaway instance: session, containers, version, generated passwords."""
+
+    session: Session
+    setup: SpikeSetup
+    version: str
+    passwords: dict[str, str]
+    stamp: str
+
+    @property
+    def container(self) -> str:
+        return self.setup.container
+
+    def login(self, user: str) -> Credentials:
+        """Credentials with the login password itself, for an account without a token."""
+        return Credentials(
+            base_url=SPIKE_BASE_URL, user=user, secret=self.passwords[user], mode=MODE_BASIC
+        )
+
+
+@asynccontextmanager
+async def throwaway_instance(tag: str, db: str, users: Sequence[str]) -> AsyncIterator[Instance]:
+    """One version from an empty machine to removed volumes, with accounts in between."""
+    setup = spike_setup(db)
+    throwaway_preconditions()
+    passwords = {name: secrets.token_urlsafe(24) for name in ("admin", *users)}
+    for name, value in passwords.items():
+        remember_secret(f"SPIKE_PASSWORD_{name}", value)
+    compose_env = {"NC_SPIKE_TAG": tag, "NC_SPIKE_ADMIN_PASSWORD": passwords["admin"]}
+    if setup.db_container:
+        compose_env["NC_SPIKE_DB_PASSWORD"] = secrets.token_urlsafe(24)
+        remember_secret("SPIKE_DB_PASSWORD", compose_env["NC_SPIKE_DB_PASSWORD"])
+    section("aufbau")
+    started_all = time.perf_counter()
+    container = setup.container
+    try:
+        started = time.perf_counter()
+        output = compose(["up", "-d", "--wait"], compose_env, file=setup.compose_file)
+        note(
+            f"docker compose -f {setup.compose_file} up -d --wait: "
+            f"{time.perf_counter() - started:.1f} s"
+        )
+        note(" / ".join(line.strip() for line in output.splitlines()[-4:] if line.strip()))
+        started = time.perf_counter()
+        wait_for_install(container)
+        note(f"Installation abgewartet: {time.perf_counter() - started:.1f} s")
+        switched = occ(
+            container,
+            "config:system:set",
+            "auth.bruteforce.protection.enabled",
+            "--value=false",
+            "--type=boolean",
+        )
+        note(f"bruteforce protection aus (Wegwerf-Instanz) -> {switched[:120]}")
+        status = occ(container, "status")
+        note(status)
+        found = re.search(r"versionstring:\s*(\S+)", status)
+        if found is None:
+            raise RunFailed("occ status names no versionstring")
+        note(f"VERSION OF RECORD {found[1]}")
+        dbtype = occ(container, "config:system:get", "dbtype", check=False)
+        note(f"dbtype: {dbtype}")
+        if dbtype != setup.dbtype:
+            raise RunFailed(f"dbtype is {dbtype!r}, not {setup.dbtype}")
+        if setup.db_container:
+            psql = ["exec", setup.db_container, "psql", "-U", "nextcloud", "-d", "nextcloud"]
+            note(f"select version(): {docker(*psql, '-tAc', 'select version()').strip()}")
+            note(f"show shared_buffers: {docker(*psql, '-tAc', 'show shared_buffers').strip()}")
+            digest = docker(
+                "image",
+                "inspect",
+                "--format",
+                "{{index .RepoDigests 0}}",
+                "postgres:17-alpine",
+                check=False,
+            ).strip()
+            note(f"postgres-Image: {digest}")
+        memcache = occ(container, "config:system:get", "memcache.local", check=False)
+        note(f"memcache.local: {memcache or '(leer, nicht gesetzt)'}")
+        docker_stats()
+        async with new_client() as client:
+            session = Session(env={"NC_MCP_URL": SPIKE_BASE_URL}, client=client)
+            for user in users:
+                occ_pw(container, passwords[user], "user:add", "--password-from-env", user)
+                note(f"occ user:add --password-from-env {user} (password via stdin)")
+                try:
+                    token = new_app_password(container, user, passwords[user], f"SPIKE_APP_{user}")
+                except RunFailed as failure:
+                    note(
+                        f"BEFUND occ user:auth-tokens:add --name scheitert auf dieser Version "
+                        f"({_one_line(str(failure))[-160:]}); Rueckfall getapppassword"
+                    )
+                    token = await ocs_app_password(session, user, passwords[user])
+                session.app_passwords[user] = token
+            yield Instance(
+                session=session,
+                setup=setup,
+                version=found[1],
+                passwords=passwords,
+                stamp=datetime.now(UTC).strftime("%H%M%S"),
+            )
+        docker_stats()
+    finally:
+        section("abbau")
+        output = compose(["down", "-v"], compose_env, file=setup.compose_file, check=False)
+        note(" / ".join(line.strip() for line in output.splitlines()[-4:] if line.strip()))
+        left_container, left_volume = any_spike_leftovers()
+        note(f"ABBAU Container vorhanden: {yes_no(bool(left_container))}")
+        note(f"ABBAU Volume vorhanden: {yes_no(bool(left_volume))}")
+        note(f"DAUER {time.perf_counter() - started_all:.0f} s; ENDE {now_stamp()}")
+
+
+async def ocs_app_password(session: Session, user: str, password: str) -> str:
+    """An app password over ``/ocs/v2.php/core/getapppassword``, the login in the header."""
+    response = await session.client.get(
+        f"{SPIKE_BASE_URL}/ocs/v2.php/core/getapppassword",
+        headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+        auth=(user, password),
+    )
+    try:
+        token = str(response.json()["ocs"]["data"]["apppassword"])
+    except (ValueError, KeyError, TypeError):
+        token = ""
+    if len(token) < 20:
+        raise RunFailed(f"getapppassword for {user} answered {response.status_code}, no token")
+    remember_secret(f"SPIKE_APP_{user}", token)
+    note(f"GET /ocs/v2.php/core/getapppassword als {user} -> HTTP {response.status_code} (kept)")
+    return token
+
+
+async def part(name: str, work: Coroutine[Any, Any, None]) -> None:
+    """One measured part; a failure makes it ``ungemessen`` instead of ending the run."""
+    section(name)
+    try:
+        await work
+    except Exception as failure:
+        reason = f"{type(failure).__name__}: {_one_line(str(failure))[:240]}"
+        note(f"BLOCK FAILED | {name} | {reason}")
+        note(f"ABSCHNITT {name} ungemessen grund={reason}")
+
+
+def note_raw_body(label: str, result: DavResult) -> None:
+    """A whole answer body in the protocol, so that it can be read back byte for byte."""
+    digest = hashlib.sha256(result.body).hexdigest()
+    note(
+        f"ROHANTWORT-ANFANG {label} status={result.status} bytes={len(result.body)} sha256={digest}"
+    )
+    for line in result.body.decode("utf-8", errors="replace").split("\n"):
+        note(f"    {line}")
+    note(f"ROHANTWORT-ENDE {label}")
+
+
+def calendars_db(container: str, user: str) -> tuple[int, str]:
+    """Count and ``uri:components:trash mark`` of the calendars of ``user`` in the table."""
+    line = php(container, PHP_CALENDARS_OF, user)
+    count, _, listing = line.partition(" ")
+    return (int(count) if count.isdigit() else -1), listing.strip()
+
+
+def app_version(container: str, app: str) -> str:
+    """The version of an enabled app on ``container``, empty if it is not enabled."""
+    data = _json_or_text(occ(container, "app:list", "--output=json", check=False))
+    enabled = data.get("enabled", {}) if isinstance(data, dict) else {}
+    return str(enabled.get(app, "")) if isinstance(enabled, dict) else ""
+
+
+async def propfind_home(session: Session, creds: Credentials, user: str = "") -> DavResult:
+    """The discovery of plan 30-04: PROPFIND Depth 1 on a calendar home."""
+    url = f"{creds.base_url}{DAV_CALENDARS}{quote(user or creds.user, safe='')}/"
+    return await dav_request(
+        session.client, creds, "PROPFIND", url, depth="1", body=propfind_body(DISCOVERY_PROPS)
+    )
+
+
+def collection_lines(entries: Sequence[Collection]) -> None:
+    """One ``SAMMLUNG`` line per collection, with the marks ``classify_collection`` used."""
+    for entry in entries:
+        read_only = "fehlt" if entry.read_only is None else (entry.read_only or "leer")
+        note(
+            f"SAMMLUNG uri={entry.uri} art={classify_collection(entry)} "
+            f"komponenten={','.join(entry.components) or 'keine'} read_only={read_only} "
+            f"schreibrecht={yes_no(writable(entry))} typen={','.join(entry.types) or 'keine'}"
+            f"{f' quelle={entry.source}' if entry.source else ''} name={entry.display or '-'}"
+        )
+
+
+# --- discovery-matrix: fresh account (M5.1) ------------------------------------------------------
+
+
+def form_login(base_url: str, user: str, password: str) -> int:
+    """The login over the web form, with a cookie jar of its own; returns the last status."""
+    with httpx.Client(follow_redirects=True, timeout=60.0) as browser:
+        page = browser.get(f"{base_url}/login")
+        token = re.search(r'data-requesttoken="([^"]+)"', page.text)
+        if token is None:
+            return 0
+        answer = browser.post(
+            f"{base_url}/login",
+            data={
+                "user": user,
+                "password": password,
+                "requesttoken": token[1],
+                "timezone": "Europe/Berlin",
+                "timezone_offset": "1",
+            },
+        )
+        return answer.status_code
+
+
+async def first_login(inst: Instance, user: str) -> str:
+    """Log ``user`` in for the first time; returns the way that created a calendar."""
+    session = inst.session
+    response = await session.client.get(
+        f"{SPIKE_BASE_URL}/ocs/v2.php/cloud/user",
+        headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+        auth=(user, inst.passwords[user]),
+    )
+    count, listing = calendars_db(inst.container, user)
+    note(
+        f"{now_stamp()} | ERSTANMELDUNG versuch=basic GET /ocs/v2.php/cloud/user nutzer={user} "
+        f"status={response.status_code} kalender_db_danach={count} {listing}"
+    )
+    if count > 0:
+        return "basic"
+    status = form_login(SPIKE_BASE_URL, user, inst.passwords[user])
+    count, listing = calendars_db(inst.container, user)
+    note(
+        f"{now_stamp()} | ERSTANMELDUNG versuch=formular GET /login, POST /login nutzer={user} "
+        f"status={status} kalender_db_danach={count} {listing}"
+    )
+    return "formular" if count > 0 else "keiner"
+
+
+async def discovery_fresh(inst: Instance) -> None:
+    """M5.1: an account after its real first login, and how many task lists it has."""
+    session, container = inst.session, inst.container
+    inst.passwords[FRESH] = secrets.token_urlsafe(24)
+    remember_secret(f"SPIKE_PASSWORD_{FRESH}", inst.passwords[FRESH])
+    occ_pw(container, inst.passwords[FRESH], "user:add", "--password-from-env", FRESH)
+    note(f"occ user:add --password-from-env {FRESH} (password via stdin)")
+    count, listing = calendars_db(container, FRESH)
+    before = await propfind_home(session, inst.login("admin"), FRESH)
+    collections = len(parse_home(before.body)) if before.status == 207 else 0
+    note(
+        f"FRISCHES KONTO vor_anmeldung status={before.status} sammlungen={collections} "
+        f"kalender_db={count} {listing} (PROPFIND Depth 1 als admin auf calendars/{FRESH}/: "
+        "das Konto selbst hat sich noch nie angemeldet, eine Anfrage in seinem Namen waere "
+        f"schon die Anmeldung) | {describe_error(before.body)[:160]}"
+    )
+    way = await first_login(inst, FRESH)
+    note(f"ERSTANMELDUNG weg={way}")
+    result = await propfind_home(session, inst.login(FRESH))
+    note(
+        f"{now_stamp()} | PROPFIND Depth 1 calendars/{FRESH}/ nutzer={FRESH} auth=basic "
+        f"status={result.status} bytes={len(result.body)}"
+    )
+    note_raw_body(RAW_FRESH, result)
+    if result.status != 207:
+        raise RunFailed(f"the discovery of {FRESH} answered {result.status}")
+    entries = parse_home(result.body)
+    calendars = [entry for entry in entries if "calendar" in entry.types]
+    shown = ",".join(f"{entry.uri}({'+'.join(entry.components)})" for entry in calendars)
+    note(f"FRISCHES KONTO aufgabenlisten={len(task_lists(entries))} kalender={shown or 'keine'}")
+    collection_lines(entries)
+    if way == "keiner":
+        note(
+            "FRISCHES KONTO ungemessen grund=weder die Anfrage mit Basic noch das Web-Formular "
+            "hat einen Standardkalender erzeugt; die Antwort ohne Kalender ist gesichert"
+        )
+    listed = occ(container, "dav:list-calendars", FRESH, check=False)
+    for line in listed.splitlines():
+        note(f"  occ dav:list-calendars {FRESH}: {line}")
+    count, listing = calendars_db(container, FRESH)
+    with_todo = sum(
+        1 for item in listing.split() if item.endswith(":leer") and "VTODO" in item.upper()
+    )
+    note(
+        f"GEGENPROBE frisches konto kalender_db={count} {listing} aufgabenlisten_db={with_todo} "
+        "(Tabelle calendars, Spalte components, per PHP und nicht ueber DAV)"
+    )
+
+
+# --- discovery-matrix: prepared account (M5.2) ---------------------------------------------------
+
+
+def subscription_body(name: str, source: str) -> bytes:
+    """The extended MKCOL that creates a calendar subscription, as the Calendar app sends it."""
+    root = etree.Element(f"{{{xml.DAV}}}mkcol", nsmap={"d": xml.DAV, "cs": xml.CS})
+    prop = etree.SubElement(etree.SubElement(root, f"{{{xml.DAV}}}set"), f"{{{xml.DAV}}}prop")
+    kind = etree.SubElement(prop, f"{{{xml.DAV}}}resourcetype")
+    etree.SubElement(kind, f"{{{xml.DAV}}}collection")
+    etree.SubElement(kind, f"{{{xml.CS}}}subscribed")
+    etree.SubElement(prop, f"{{{xml.DAV}}}displayname").text = name
+    href = etree.SubElement(etree.SubElement(prop, f"{{{xml.CS}}}source"), f"{{{xml.DAV}}}href")
+    href.text = source
+    return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+
+async def make_calendar(
+    session: Session, creds: Credentials, uri: str, components: Sequence[str] = ("VTODO",)
+) -> None:
+    """A calendar of the account of ``creds`` with the given component set, as a SETUP line."""
+    made = await dav_request(
+        session.client,
+        creds,
+        "MKCALENDAR",
+        caldav.calendar_url(creds, uri),
+        body=mkcalendar_body(uri, components),
+    )
+    note(
+        f"{now_stamp()} | SETUP MKCALENDAR liste={uri} nutzer={creds.user} "
+        f"auth={auth_label(creds)} status={made.status} komponenten={','.join(components)}"
+    )
+    if made.status != 201:
+        raise RunFailed(f"MKCALENDAR {uri} answered {made.status}")
+
+
+async def deck_calendar(session: Session, creds: Credentials) -> str:
+    """A Deck board of the account of ``creds`` over the REST interface; returns its id."""
+    response = await session.client.post(
+        f"{creds.base_url}/index.php/apps/deck/api/v1.0/boards",
+        json={"title": DECK_BOARD, "color": "0082c9"},
+        headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+        auth=creds.auth(),
+    )
+    try:
+        data = response.json()
+    except ValueError:
+        data = {}
+    board_id = str(data.get("id") or "") if isinstance(data, dict) else ""
+    note(
+        f"{now_stamp()} | SETUP DECK POST /index.php/apps/deck/api/v1.0/boards titel={DECK_BOARD} "
+        f"nutzer={creds.user} auth={auth_label(creds)} status={response.status_code} "
+        f"board_id={board_id or '-'}"
+    )
+    return board_id
+
+
+async def prepare_account(inst: Instance) -> None:
+    """Everything the discovery of alice has to show besides the task list."""
+    session, container = inst.session, inst.container
+    alice, bob = session.basic(ALICE), session.basic(BOB)
+    await make_calendar(session, alice, LIST_MIXED, ("VEVENT", "VTODO"))
+    made = await dav_request(
+        session.client,
+        alice,
+        "MKCOL",
+        caldav.calendar_url(alice, LIST_SUBSCRIBED),
+        body=subscription_body(LIST_SUBSCRIBED, SUBSCRIPTION_SOURCE),
+    )
+    note(
+        f"{now_stamp()} | SETUP MKCOL abo={LIST_SUBSCRIBED} quelle={SUBSCRIPTION_SOURCE} "
+        f"nutzer={ALICE} auth=basic status={made.status} | {describe_error(made.body)[:160]}"
+    )
+    await make_calendar(session, alice, LIST_DELETED)
+    gone = await dav_request(
+        session.client, alice, "DELETE", caldav.calendar_url(alice, LIST_DELETED)
+    )
+    count, listing = calendars_db(container, ALICE)
+    note(
+        f"{now_stamp()} | SETUP DELETE kalender={LIST_DELETED} nutzer={ALICE} auth=basic "
+        f"status={gone.status} kalender_db={count} {listing}"
+    )
+    for uri, writable_ in ((LIST_RW, True), (LIST_RO, False)):
+        await make_calendar(session, bob, uri)
+        shared = await dav_request(
+            session.client,
+            bob,
+            "POST",
+            caldav.calendar_url(bob, uri),
+            body=share_body(ALICE, writable=writable_),
+        )
+        note(
+            f"{now_stamp()} | FREIGABE liste={uri} an={ALICE} schreibrecht={yes_no(writable_)} "
+            f"nutzer={BOB} auth=basic status={shared.status}"
+        )
+    installed = _one_line(occ(container, "app:install", "deck", check=False))
+    version = app_version(container, "deck")
+    note(f"occ app:install deck -> {installed[:200]}")
+    if not version:
+        note(f"DECK ungemessen grund=occ app:install deck: {installed[:200] or 'keine Ausgabe'}")
+        return
+    note(f"DECK-APP version={version} (gelesen mit occ app:list --output=json)")
+    board_id = await deck_calendar(session, alice)
+    if not board_id:
+        note("DECK ungemessen grund=die Deck-REST-Schnittstelle hat kein Board angelegt")
+
+
+async def discovery_prepared(inst: Instance) -> None:
+    """M5.2: every kind of collection in the discovery answer of the prepared account."""
+    session, container = inst.session, inst.container
+    alice = session.basic(ALICE)
+    await prepare_account(inst)
+    result = await propfind_home(session, alice)
+    note(
+        f"{now_stamp()} | PROPFIND Depth 1 calendars/{ALICE}/ nutzer={ALICE} auth=basic "
+        f"status={result.status} bytes={len(result.body)}"
+    )
+    note_raw_body(RAW_PREPARED, result)
+    if result.status != 207:
+        raise RunFailed(f"the discovery of {ALICE} answered {result.status}")
+    entries = parse_home(result.body)
+    collection_lines(entries)
+    kinds = {entry.uri: classify_collection(entry) for entry in entries}
+    seen = sorted(set(kinds.values()))
+    lacking = [kind for kind in PREPARED_KINDS if kind not in seen]
+    note(f"ARTEN vorhanden={','.join(seen)} fehlen={','.join(lacking) or 'keine'}")
+    note(f"POSITIVKONTROLLE aufgabenlisten_{ALICE}={len(task_lists(entries))} (mindestens 1)")
+
+    by_uri = {entry.uri: entry for entry in entries}
+    read_only = by_uri.get(f"{LIST_RO}_shared_by_{BOB}")
+    read_write = by_uri.get(f"{LIST_RW}_shared_by_{BOB}")
+
+    def shown(entry: Collection | None) -> str:
+        if entry is None:
+            return "sammlung-fehlt"
+        return "fehlt" if entry.read_only is None else (entry.read_only or "leer")
+
+    readable = read_only is not None and kinds[read_only.uri] == "geteilt-nur-lesen"
+    told_apart = readable and (read_write is None or kinds[read_write.uri] == "geteilt-schreibbar")
+    note(
+        f"READ-ONLY EIGENSCHAFT abrufbar={yes_no(told_apart)} nur_lesen={shown(read_only)} "
+        f"schreibbar={shown(read_write)} schreibrecht_nur_lesen="
+        f"{yes_no(writable(read_only)) if read_only else '-'} schreibrecht_schreibbar="
+        f"{yes_no(writable(read_write)) if read_write else '-'} (A4)"
+    )
+    trash = by_uri.get(TRASH)
+    deleted_listed = LIST_DELETED in by_uri
+    note(
+        f"PAPIERKORB in_discovery={yes_no(trash is not None)} komponenten="
+        f"{(','.join(trash.components) or 'keine') if trash else 'keine'} "
+        f"typen={(','.join(trash.types) or 'keine') if trash else '-'} "
+        f"geloeschter_kalender_im_home={yes_no(deleted_listed)} "
+        f"aufgabenliste_laut_auswertung={yes_no(trash in task_lists(entries))} (A5)"
+    )
+    home_path = f"{DAV_CALENDARS}{ALICE}/"
+    event_uris = {ref.uri for ref in caldav.parse_calendar_home(result.body, home_path)}
+    task_uris = {entry.uri for entry in task_lists(entries)}
+    note(
+        f"GEMISCHT in_beiden={yes_no(LIST_MIXED in event_uris and LIST_MIXED in task_uris)} "
+        f"terminfilter={yes_no(LIST_MIXED in event_uris)} "
+        f"aufgabenfilter={yes_no(LIST_MIXED in task_uris)} (A11; Terminfilter ist "
+        "caldav.parse_calendar_home des Connectors, Aufgabenfilter ist task_lists)"
+    )
+    note(
+        f"TERMINFILTER heute liefert={','.join(sorted(event_uris)) or 'keine'} "
+        f"AUFGABENFILTER liefert={','.join(sorted(task_uris)) or 'keine'}"
+    )
+    note("FOEDERIERT ungemessen grund=zweite Instanz noetig, in dieser Phase nicht vorgesehen")
+
+    for label, entry in (("nur-lesen", read_only), ("schreibbar", read_write)):
+        if entry is None:
+            note(f"SCHREIBVERSUCH {label} ungemessen grund=die Freigabe fehlt in der Discovery")
+            continue
+        uid = f"s30-schreibversuch-{label}-{inst.stamp}"
+        url = caldav.object_url(alice, entry.uri, f"{uid}.ics")
+        put = await put_object(
+            session, alice, url, simple_todo(uid, f"s30 {label}"), if_none_match="*"
+        )
+        rows = db_rows(uid, container)
+        note(
+            f"{now_stamp()} | SCHREIBVERSUCH {label} PUT create-only liste={entry.uri} "
+            f"nutzer={ALICE} auth=basic status={put.status} angelegt_db={yes_no(bool(rows))} "
+            f"| {describe_error(put.body)[:160]}"
+        )
+    listed = occ(container, "dav:list-calendars", ALICE, check=False)
+    for line in listed.splitlines():
+        note(f"  occ dav:list-calendars {ALICE}: {line}")
+    count, listing = calendars_db(container, ALICE)
+    in_home = sum(1 for entry in entries if "calendar" in entry.types)
+    note(
+        f"GEGENPROBE vorbereitetes konto kalender_db={count} {listing} | Sammlungen mit "
+        f"resourcetype calendar in der Discovery={in_home} (eigene Kalender; Freigaben, Deck "
+        "und Abos stehen nicht in der Tabelle calendars dieses Kontos)"
+    )
+
+
+# --- discovery-matrix: queries (M5.3) and provider link (M5.4) -----------------------------------
+
+
+@dataclass
+class QueryState:
+    """The tasks of the query part: name to UID, and the texts as they were sent."""
+
+    uids: dict[str, str] = field(default_factory=dict)
+    texts: dict[str, str] = field(default_factory=dict)
+
+
+async def query_setup(inst: Instance, state: QueryState) -> None:
+    """The eight tasks of M5.3 in the task list of alice."""
+    session = inst.session
+    alice = session.basic(ALICE)
+    for name, _ in QUERY_TASKS:
+        state.uids[name] = f"s30-{name}-{inst.stamp}"
+    for name, lines in QUERY_TASKS:
+        extra = (f"RELATED-TO:{state.uids[QUERY_PARENT]}",) if name == "q-kind" else lines
+        state.texts[name] = simple_todo(state.uids[name], name, extra)
+        await put_new(session, alice, LIST_TASKS, f"{state.uids[name]}.ics", state.texts[name])
+
+
+async def query_part(inst: Instance, state: QueryState) -> None:
+    """M5.3: six queries, each with the set the server sent and the set filtered here."""
+    session = inst.session
+    alice = session.basic(ALICE)
+    url = caldav.calendar_url(alice, LIST_TASKS)
+    start, end = QUERY_WINDOW
+    arguments = {"term": QUERY_TERM, "parent_uid": state.uids[QUERY_PARENT]}
+    note(
+        f"ABFRAGEN liste={LIST_TASKS} nutzer={ALICE} auth=basic REPORT calendar-query Depth 1; "
+        f"fenster={start}..{end} text={QUERY_TERM} eltern=UID von {QUERY_PARENT}; client ist "
+        "die Menge, die der Connector will (derselbe Filter im Skript ueber die ungefilterte "
+        "Antwort), gleich=nein ist ein Befund ueber den Serverfilter"
+    )
+    unfiltered: list[str] = []
+    for name, mode in QUERIES:
+        body = build_todo_filter(mode, start, end, **arguments)
+        result = await dav_request(session.client, alice, "REPORT", url, depth="1", body=body)
+        if result.status != 207:
+            note(
+                f"ABFRAGE {name} status={result.status} treffer=ungemessen | "
+                f"{describe_error(result.body)[:200]}"
+            )
+            continue
+        hits = names_in(result.body)
+        note(f"ABFRAGE {name} status={result.status} treffer={','.join(sorted(hits)) or 'keine'}")
+        if mode == "alle":
+            unfiltered = objects_in(result.body)
+            wanted = set(state.texts)
+        elif not unfiltered:
+            note(f"ABFRAGE {name} client=ungemessen grund=die ungefilterte Antwort fehlt")
+            continue
+        else:
+            wanted = client_filter(unfiltered, mode, start, end, **arguments)
+        note(
+            f"ABFRAGE {name} client={','.join(sorted(wanted)) or 'keine'} "
+            f"gleich={yes_no(hits == wanted)}"
+            f"{'' if hits == wanted else f' nur_server={sorted(hits - wanted)}'}"
+            f"{'' if hits == wanted else f' nur_client={sorted(wanted - hits)}'}"
+        )
+
+
+async def provider_search(session: Session, creds: Credentials, term: str) -> tuple[int, list[str]]:
+    """One search of the provider ``tasks``: status and the links of the entries."""
+    response = await session.client.get(
+        f"{creds.base_url}/ocs/v2.php/search/providers/tasks/search",
+        params={"term": term},
+        headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+        auth=creds.auth(),
+    )
+    try:
+        entries = response.json()["ocs"]["data"]["entries"]
+    except (ValueError, KeyError, TypeError):
+        entries = []
+    links = [
+        str(entry.get("resourceUrl", ""))
+        for entry in (entries if isinstance(entries, list) else [])
+        if isinstance(entry, dict)
+    ]
+    note(
+        f"{now_stamp()} | GET /ocs/v2.php/search/providers/tasks/search?term={term} "
+        f"nutzer={creds.user} auth={auth_label(creds)} status={response.status_code} "
+        f"eintraege={len(links)} | {_one_line(response.text)[:300]}"
+    )
+    return response.status_code, links
+
+
+async def provider_ids(session: Session, creds: Credentials) -> str:
+    """The ids of the search providers the instance offers this account."""
+    response = await session.client.get(
+        f"{creds.base_url}/ocs/v2.php/search/providers",
+        headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+        auth=creds.auth(),
+    )
+    try:
+        data = response.json()["ocs"]["data"]
+    except (ValueError, KeyError, TypeError):
+        data = []
+    ids = sorted(str(entry.get("id")) for entry in data if isinstance(entry, dict))
+    return f"status={response.status_code} tasks_dabei={yes_no('tasks' in ids)} ids={','.join(ids)}"
+
+
+async def provider_part(inst: Instance, state: QueryState) -> None:
+    """M5.4: the link of the search provider ``tasks`` and what it resolves to."""
+    session, container = inst.session, inst.container
+    alice = session.basic(ALICE)
+    note(f"PROVIDER liste vor_installation {await provider_ids(session, alice)}")
+    before, links_before = await provider_search(session, alice, QUERY_TERM)
+    note(f"PROVIDER tasks app_nie_installiert status={before} eintraege={len(links_before)}")
+    installed = _one_line(occ(container, "app:install", "tasks", check=False))
+    note(f"occ app:install tasks -> {installed[:200]}")
+    version = app_version(container, "tasks")
+    note(f"TASKS-APP version={version or 'nicht aktiv'} (gelesen mit occ app:list --output=json)")
+    if not version:
+        raise RunFailed(f"the Tasks app is not enabled: {installed[:200]}")
+    note(f"PROVIDER liste app_an {await provider_ids(session, alice)}")
+    _, links = await provider_search(session, alice, QUERY_TERM)
+    note(f"PROVIDER tasks treffer={len(links)} link={links[0] if links else '-'}")
+    for link in links[1:]:
+        note(f"  weiterer link={link}")
+    parts = provider_link_parts(links[0]) if links else None
+    if parts is None:
+        note(
+            "PROVIDER aufloesung ungemessen grund="
+            f"{'kein Treffer' if not links else 'die Form des Links ist nicht die erwartete'}"
+        )
+    else:
+        calendar_uri, object_name = parts
+        url = caldav.object_url(alice, calendar_uri, object_name)
+        result, _, text = await get_object(session, alice, url)
+        wanted = object_name.removesuffix(".ics")
+        ours = wanted in state.uids.values()
+        note(
+            f"PROVIDER aufloesung status={result.status} uid_gleich="
+            f"{yes_no(result.status == 200 and has_uid(text, wanted) and ours)} "
+            f"kalender={calendar_uri} objekt={object_name} (GET auf die aus dem Link gebaute "
+            "DAV-URL; die UID der angelegten Aufgabe ist ihr Objektname ohne .ics)"
+        )
+    disabled = _one_line(occ(container, "app:disable", "tasks", check=False))
+    note(f"occ app:disable tasks -> {disabled[:160]}")
+    note(f"docker restart {container} -> {docker('restart', container).strip()}")
+    wait_for_http(SPIKE_BASE_URL)
+    wait_for_install(container)
+    note(f"PROVIDER liste app_aus {await provider_ids(session, alice)}")
+    status, links_off = await provider_search(session, alice, QUERY_TERM)
+    note(f"PROVIDER tasks app_aus treffer={len(links_off)} status={status}")
+
+
+async def block_discovery_matrix(tag: str, parts: Sequence[str], *, other: bool) -> None:
+    """One version: discovery of a fresh and a prepared account, queries, provider link."""
+    section(f"discovery-matrix nc-tag={tag} parts={','.join(parts)}, start {now_stamp()}")
+    if other:
+        note(f"RUECKFALL-TAG {tag}: nicht einer der Soll-Tags {DELETE_TAGS} (--allow-other-tag)")
+    async with throwaway_instance(tag, "sqlite", (ALICE, BOB)) as inst:
+        section("liste")
+        await make_calendar(inst.session, inst.session.basic(ALICE), LIST_TASKS)
+        if "discovery" in parts:
+            await part("frisches-konto", discovery_fresh(inst))
+            await part("sammlungsarten", discovery_prepared(inst))
+        state = QueryState()
+        if "query" in parts or "provider" in parts:
+            await part("abfragen-aufbau", query_setup(inst, state))
+        if "query" in parts:
+            await part("abfragen", query_part(inst, state))
+        if "provider" in parts:
+            await part("provider", provider_part(inst, state))
+
+
+# --- cost (M6.1 to M6.3) -------------------------------------------------------------------------
+
+
+def cost_todo(number: int) -> tuple[str, str]:
+    """Object name and text of task ``number`` of the cost list.
+
+    The first ``COST_DONE`` are checked off the way the Tasks app writes it, the rest is
+    open, and the last ``COST_TERM_TASKS`` of the open ones carry the search term.
+    """
+    uid = f"s30-kosten-{number:04d}"
+    summary = f"s30 kosten {number:04d}"
+    if number >= COST_TASKS - COST_TERM_TASKS:
+        summary += f" {COST_TERM}"
+    extra = [
+        (
+            "DESCRIPTION:Eine Aufgabe der Kostenmessung mit einer Beschreibung von "
+            "ueblicher Laenge\\, damit die Antwort nicht kuenstlich klein ausfaellt."
+        ),
+        f"DUE:202612{number % 28 + 1:02d}T100000Z",
+        "CATEGORIES:spike30",
+    ]
+    if number < COST_DONE:
+        extra += ["STATUS:COMPLETED", "PERCENT-COMPLETE:100", "COMPLETED:20261101T100000Z"]
+    return f"{uid}.ics", simple_todo(uid, summary, extra)
+
+
+async def cost_build(inst: Instance) -> None:
+    """One list with 2000 tasks over DAV, 1900 of them done, and the database count."""
+    session = inst.session
+    alice = session.basic(ALICE)
+    await make_calendar(session, alice, LIST_COST)
+    # SQLite answers two writes at once with "database is locked" (measured in plan 30-02),
+    # so the build is serial there; PostgreSQL takes the four the plan allows.
+    parallel = 4 if inst.setup.db_container else 1
+    gate = asyncio.Semaphore(parallel)
+    repeated = 0
+    failed: list[str] = []
+
+    async def put(number: int) -> None:
+        nonlocal repeated
+        name, text = cost_todo(number)
+        url = caldav.object_url(alice, LIST_COST, name)
+        async with gate:
+            status = 0
+            for attempt in range(6):
+                try:
+                    made = await put_object(session, alice, url, text, if_none_match="*")
+                    status = made.status
+                except httpx.HTTPError:
+                    status = 0
+                if status in (201, 204) or (status == 412 and attempt):
+                    return
+                if 0 < status < 500:
+                    break
+                repeated += 1
+                await asyncio.sleep(0.5 * (attempt + 1))
+            failed.append(f"{name}:{status}")
+
+    started = time.perf_counter()
+    await asyncio.gather(*(put(number) for number in range(COST_TASKS)))
+    seconds = time.perf_counter() - started
+    if failed:
+        raise RunFailed(f"{len(failed)} PUT of the cost list failed, first: {failed[:3]}")
+    _, sample = cost_todo(0)
+    note(
+        f"AUFBAU aufgaben={COST_TASKS} erledigt={COST_DONE} dauer_s={seconds:.0f} "
+        f"offen={COST_TASKS - COST_DONE} mit_suchbegriff={COST_TERM_TASKS} "
+        f"gleichzeitig={parallel} wiederholte_put={repeated} objekt_bytes={len(sample.encode())} "
+        f"(PUT create-only ueber DAV als {ALICE}, Liste {LIST_COST})"
+    )
+    rows = php(inst.container, PHP_COUNT_LIST_OBJECTS, ALICE, LIST_COST)
+    note(
+        f"GEGENPROBE datenbank zeilen={rows} erwartet={COST_TASKS} "
+        f"gleich={yes_no(rows == str(COST_TASKS))} (Tabelle calendarobjects, per PHP)"
+    )
+    if rows != str(COST_TASKS):
+        raise RunFailed(f"the database holds {rows} objects of {LIST_COST}, not {COST_TASKS}")
+
+
+def cpu_percent(container: str) -> float | None:
+    """The CPU share ``docker stats --no-stream`` reports for ``container`` right now."""
+    output = docker("stats", "--no-stream", "--format", "{{.CPUPerc}}", container, check=False)
+    match = re.search(r"([0-9]+(?:\.[0-9]+)?)%", output)
+    return float(match[1]) if match else None
+
+
+async def wait_until_idle(containers: Sequence[str]) -> float:
+    """Seconds until every container is idle again, at most ``LONG_TIMEOUT_SECONDS``.
+
+    A request the client gave up on keeps running in PHP and in the database; a run started
+    next to it would measure two requests at once.
+    """
+    started = time.perf_counter()
+    while time.perf_counter() - started < LONG_TIMEOUT_SECONDS:
+        loads = [cpu_percent(container) for container in containers]
+        if all(load is not None and load < IDLE_CPU_PERCENT for load in loads):
+            break
+        await asyncio.sleep(5)
+    return time.perf_counter() - started
+
+
+def response_count(result: DavResult) -> int:
+    """The number of objects a REPORT answer carries; 0 for anything but a Multi-Status."""
+    if result.status != 207:
+        return 0
+    return len(xml.parse_root(result.body).findall(f"{{{xml.DAV}}}response"))
+
+
+@dataclass
+class Series:
+    """One measured series: the warm runs, and what happened if the client limit was hit."""
+
+    results: list[DavResult] = field(default_factory=list)
+    timed_out: bool = False
+    single: DavResult | None = None
+
+    def stats(self) -> dict[str, float] | None:
+        if len(self.results) < 2:
+            return None
+        return summarize([result.seconds for result in self.results])
+
+
+async def measure_series(
+    inst: Instance,
+    label: str,
+    method: str,
+    url: str,
+    *,
+    depth: str | None = None,
+    body: bytes | None = None,
+) -> Series:
+    """``WARMUP_RUNS`` discarded runs, then ``MEASURED_RUNS`` measured ones, one client.
+
+    A run over the 60 s client limit is a measured outcome, not a tool failure: the series
+    stops there, the protocol names the limit, and one single run with 300 s says how long
+    the answer really takes.
+    """
+    creds = inst.session.basic(ALICE)
+    containers = inst.setup.containers()
+    waited = await wait_until_idle(containers)
+    note(f"  {label}: Instanz ruht nach {waited:.0f} s (docker stats CPU unter 10 %)")
+    series = Series()
+    warm_done = 0
+    async with new_client() as client:
+        try:
+            for _ in range(WARMUP_RUNS):
+                await dav_request(client, creds, method, url, depth=depth, body=body)
+                warm_done += 1
+            for _ in range(MEASURED_RUNS):
+                series.results.append(
+                    await dav_request(client, creds, method, url, depth=depth, body=body)
+                )
+        except httpx.TimeoutException as failure:
+            series.timed_out = True
+            note(
+                f"{label} ZEITLIMIT {TIMEOUT.read:.0f} s ueberschritten "
+                f"({type(failure).__name__}) nach {warm_done} von {WARMUP_RUNS} "
+                f"Aufwaermlaeufen und {len(series.results)} von {MEASURED_RUNS} Messlaeufen; "
+                "Reihe abgebrochen"
+            )
+    if series.timed_out:
+        waited = await wait_until_idle(containers)
+        note(f"  {label}: der abgebrochene Lauf rechnete weiter, Ruhe nach {waited:.0f} s")
+        long_client = httpx.AsyncClient(
+            follow_redirects=False,
+            timeout=httpx.Timeout(LONG_TIMEOUT_SECONDS),
+            cookies=NoCookieJar(),
+        )
+        async with long_client:
+            try:
+                series.single = await dav_request(
+                    long_client, creds, method, url, depth=depth, body=body
+                )
+            except httpx.TimeoutException as failure:
+                note(
+                    f"{label} EINZELLAUF zeitlimit={LONG_TIMEOUT_SECONDS:.0f} s: keine Antwort "
+                    f"({type(failure).__name__})"
+                )
+        if series.single is not None:
+            note(
+                f"{label} EINZELLAUF zeitlimit={LONG_TIMEOUT_SECONDS:.0f} s "
+                f"status={series.single.status} treffer={response_count(series.single)} "
+                f"bytes={len(series.single.body)} ms={series.single.seconds * 1000:.0f}"
+            )
+    return series
+
+
+def note_series(label: str, series: Series, *, hits: bool = True) -> None:
+    """The line of one series, and the Sabre message of a failed run if there was one."""
+    stats = series.stats()
+    if stats is None:
+        return
+    results = series.results
+    note(
+        series_line(
+            label,
+            [result.status for result in results],
+            [response_count(result) for result in results] if hits else [],
+            [len(result.body) for result in results],
+            stats,
+        )
+    )
+    failed = [result for result in results if result.status >= 400]
+    if failed:
+        note(
+            f"  {label} fehler={describe_error(failed[0].body)[:200]} "
+            f"({len(failed)} von {len(results)})"
+        )
+
+
+def calendar_search_body(term: str, limit: int, offset: int) -> bytes:
+    """The Nextcloud REPORT ``calendar-search`` for VTODOs whose SUMMARY carries ``term``.
+
+    The element names are read from ``CalendarSearchReport.php`` of the dav app (namespace
+    ``http://nextcloud.com/ns``): a filter with comp-filter, prop-filter and search-term,
+    then limit and offset.
+    """
+    space = "http://nextcloud.com/ns"
+    root = etree.Element(
+        f"{{{space}}}calendar-search", nsmap={"d": xml.DAV, "c": xml.CAL, "nc": space}
+    )
+    prop = etree.SubElement(root, f"{{{xml.DAV}}}prop")
+    etree.SubElement(prop, f"{{{xml.DAV}}}getetag")
+    etree.SubElement(prop, f"{{{xml.CAL}}}calendar-data")
+    scope = etree.SubElement(root, f"{{{space}}}filter")
+    etree.SubElement(scope, f"{{{space}}}comp-filter", name="VTODO")
+    etree.SubElement(scope, f"{{{space}}}prop-filter", name="SUMMARY")
+    etree.SubElement(scope, f"{{{space}}}search-term").text = term
+    etree.SubElement(root, f"{{{space}}}limit").text = str(limit)
+    etree.SubElement(root, f"{{{space}}}offset").text = str(offset)
+    return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+
+async def cost_calendar_search(inst: Instance, all_objects: Sequence[str]) -> None:
+    """M6.2: one call of ``calendar-search`` on the calendar home with Depth 2."""
+    session = inst.session
+    alice = session.basic(ALICE)
+    await wait_until_idle(inst.setup.containers())
+    wanted = client_filter(all_objects, "text", term=COST_TERM)
+    try:
+        result = await dav_request(
+            session.client,
+            alice,
+            "REPORT",
+            caldav.calendars_home_url(alice),
+            depth="2",
+            body=calendar_search_body(COST_TERM, 50, 0),
+        )
+    except httpx.TimeoutException as failure:
+        note(
+            f"KOSTEN calendar-search ungemessen grund=Zeitlimit {TIMEOUT.read:.0f} s "
+            f"({type(failure).__name__})"
+        )
+        return
+    if result.status != 207:
+        for line in raw_answer(result.status, result.reason, result.headers, result.body):
+            note(line)
+        note(
+            f"KOSTEN calendar-search ungemessen grund=status {result.status} "
+            f"{describe_error(result.body)[:200]}"
+        )
+        return
+    hits = names_in(result.body)
+    note(
+        f"KOSTEN calendar-search status={result.status} treffer={response_count(result)} "
+        f"bytes={len(result.body)} ms={result.seconds * 1000:.0f} (ein Aufruf, REPORT auf dem "
+        f"Kalender-Home, Depth 2, Suchbegriff {COST_TERM}, comp-filter VTODO, prop-filter "
+        "SUMMARY, limit 50, offset 0)"
+    )
+    note(
+        f"GEGENPROBE calendar-search namen_gleich={yes_no(hits == wanted)} "
+        f"erwartet={len(wanted)} server={len(hits)} (dieselben Namen clientseitig aus der "
+        f"Antwort alle gefiltert; Positivkontrolle: der Suchbegriff steht in "
+        f"{COST_TERM_TASKS} vorbereiteten Aufgaben)"
+    )
+
+
+async def cost_series(inst: Instance) -> None:
+    """M6.1 to M6.3: the series of both modes, calendar-search once, the reference values."""
+    alice = inst.session.basic(ALICE)
+    list_url = caldav.calendar_url(alice, LIST_COST)
+    docker_stats()
+    measured: dict[str, Series] = {}
+    for mode in ("offen", "alle"):
+        measured[mode] = await measure_series(
+            inst,
+            f"KOSTEN {mode}",
+            "REPORT",
+            list_url,
+            depth="1",
+            body=build_todo_filter(mode),
+        )
+        note_series(f"KOSTEN {mode}", measured[mode])
+    everything = measured["alle"].results[-1:] or [
+        result for result in [measured["alle"].single] if result is not None
+    ]
+    all_objects = objects_in(everything[0].body) if everything else []
+    open_client = client_filter(all_objects, "offen")
+    open_hits = [response_count(result) for result in measured["offen"].results[-1:]]
+    note(
+        f"GEGENPROBE offen treffer_server={open_hits[0] if open_hits else 'ungemessen'} "
+        f"erwartet={COST_TASKS - COST_DONE} alle_treffer={len(all_objects)} "
+        f"erwartet_alle={COST_TASKS} alle_ohne_completed={len(open_client)} (Objekte ohne "
+        "COMPLETED, clientseitig in der Antwort alle gezaehlt)"
+    )
+    await cost_calendar_search(inst, all_objects)
+    discovery = await measure_series(
+        inst,
+        "BEZUG discovery",
+        "PROPFIND",
+        caldav.calendars_home_url(alice),
+        depth="1",
+        body=caldav.build_discovery_body(),
+    )
+    stats = discovery.stats()
+    if stats is not None:
+        codes = sorted({result.status for result in discovery.results})
+        note(
+            f"BEZUG discovery median={stats['median'] * 1000:.0f} status={codes} "
+            f"max={stats['max'] * 1000:.0f} (ms, n={len(discovery.results)}, PROPFIND Depth 1)"
+        )
+    status_php = await measure_series(
+        inst, "BEZUG status.php", "GET", f"{SPIKE_BASE_URL}/status.php"
+    )
+    stats = status_php.stats()
+    if stats is not None:
+        codes = sorted({result.status for result in status_php.results})
+        note(
+            f"BEZUG status.php median={stats['median'] * 1000:.0f} status={codes} "
+            f"max={stats['max'] * 1000:.0f} (ms, n={len(status_php.results)})"
+        )
+    docker_stats()
+
+    def worst(series: Series) -> float | None:
+        found = series.stats()
+        if found is not None and not series.timed_out:
+            return found["max"]
+        if series.single is not None:
+            return series.single.seconds
+        return LONG_TIMEOUT_SECONDS if series.timed_out else None
+
+    all_stats = measured["alle"].stats()
+    reference = (
+        all_stats["median"]
+        if all_stats is not None and not measured["alle"].timed_out
+        else worst(measured["alle"])
+    )
+    maxima = [value for value in (worst(measured["offen"]), worst(measured["alle"])) if value]
+    if reference is None or not maxima:
+        note("VORSCHLAG ungemessen grund=die Reihe alle lieferte keinen Wert")
+        return
+    note(
+        f"VORSCHLAG {proposal(reference, max(maxima))} (nur mit den Zahlen dieser Datenbank "
+        f"{inst.setup.dbtype}; die Ableitungsregel nimmt als Bezugswert den größeren "
+        "Median beider Datenbanken, der Bericht wendet sie auf beide Dateien an)"
+    )
+
+
+async def block_cost(tag: str, db: str, *, other: bool) -> None:
+    """The cost of the task search at 2000 tasks on one throwaway instance."""
+    section(f"cost db={db} nc-tag={tag}, start {now_stamp()}")
+    if other:
+        note(f"RUECKFALL-TAG {tag}: nicht einer der Soll-Tags {DELETE_TAGS} (--allow-other-tag)")
+    async with throwaway_instance(tag, db, (ALICE,)) as inst:
+        section("datenaufbau")
+        await cost_build(inst)
+        section("kosten")
+        await cost_series(inst)
+
+
+# --- vtodo-create on nc35 (M5.5) -----------------------------------------------------------------
+
+
+async def create_only_pair(session: Session, creds: Credentials, key: str) -> tuple[int, int, bool]:
+    """A create-only PUT and a second one on the same name: both codes, and ``unchanged``."""
+    uid = f"s30-anlegen-{key}"
+    name = f"{uid}.ics"
+    url = caldav.object_url(creds, LIST_CREATE, name)
+    text = simple_todo(uid, f"s30 anlegen {key}")
+    since = container_now()
+    await asyncio.sleep(1)
+    first = await put_object(session, creds, url, text, if_none_match="*")
+    label = auth_label(creds)
+    note(
+        f"VTODO anlegen auth={label} status={first.status} nutzer={creds.user} "
+        f"If-None-Match=* objekt={LIST_CREATE}/{name} etag={etag_kind(header_of(first, 'etag'))} "
+        f"| {describe_error(first.body)[:160]}"
+    )
+    rows = db_rows(uid)
+    stored = rows[0].digest if len(rows) == 1 else ""
+    note(
+        f"  GEGENPROBE datenbank zeilen={len(rows)} {rows_text(rows)} "
+        f"gesendet={sha_of(text)} gleich={yes_no(stored == sha_of(text))}"
+    )
+    if label == "appapi":
+        lines = impersonation_lines(since, creds.user, "PUT")
+        note(f"  KONTROLLE exapp_impersonation.log PUT-Zeilen von {creds.user}: {len(lines)}")
+        for line in lines[-1:]:
+            note(f"    {line[:300]}")
+        basic = session.basic(creds.user)
+        status, objects = await report(
+            session,
+            basic,
+            LIST_CREATE,
+            report_body("calendar-multiget", [urlsplit(url).path]),
+        )
+        same = any(plain(data) == plain(text) for _, _, data in objects)
+        note(
+            f"  GEGENPROBE REPORT calendar-multiget auth=basic status={status} "
+            f"objekte={len(objects)} text_gleich={yes_no(same)}"
+        )
+    second = await put_object(
+        session, creds, url, set_summary(text, f"s30 anlegen {key} zweiter"), if_none_match="*"
+    )
+    after = db_rows(uid)
+    unchanged = len(after) == 1 and after[0].digest == stored and bool(stored)
+    _, _, read_back = await get_object(session, creds, url)
+    unchanged = unchanged and plain(read_back) == plain(text)
+    note(
+        f"VTODO anlegen zweiter status={second.status} objekt_unveraendert={yes_no(unchanged)} "
+        f"auth={label} | {describe_error(second.body)[:160]}"
+    )
+    return first.status, second.status, unchanged
+
+
+async def block_vtodo_create(session: Session) -> None:
+    """M5.5: a create-only PUT of a VTODO under AppAPI impersonation, and with an app password."""
+    section("vtodo-create")
+    ram_gate(NC35_CONTAINERS)
+    stamp = datetime.now(UTC).strftime("%H%M%S")
+    appapi, basic = session.appapi(USER_A), session.basic(USER_A)
+    await make_calendar(session, appapi, LIST_CREATE)
+    impersonated = await create_only_pair(session, appapi, f"appapi-{stamp}")
+    uid = f"s30-anlegen-falsch-{stamp}"
+    wrong = await put_object(
+        session,
+        session.appapi(USER_A, "0" * 64),
+        caldav.object_url(appapi, LIST_CREATE, f"{uid}.ics"),
+        simple_todo(uid, "s30 anlegen falsch"),
+        if_none_match="*",
+    )
+    note(
+        f"VTODO anlegen falsches_secret status={wrong.status} "
+        f"angelegt_db={yes_no(bool(db_rows(uid)))}"
+    )
+    with_password = await create_only_pair(session, basic, f"basic-{stamp}")
+    note(
+        f"VTODO GLEICH appapi_basic={yes_no(impersonated == with_password)} "
+        f"appapi={impersonated[0]}/{impersonated[1]}/{yes_no(impersonated[2])} "
+        f"basic={with_password[0]}/{with_password[1]}/{yes_no(with_password[2])}"
+    )
+    board_id = ""
+    try:
+        section("deck-discovery")
+        deck = app_version(NC_CONTAINER, "deck")
+        note(f"DECK-APP version={deck or 'nicht aktiv'} (occ app:list --output=json)")
+        if deck:
+            board_id = await deck_calendar(session, basic)
+        result = await propfind_home(session, appapi)
+        note(
+            f"{now_stamp()} | PROPFIND Depth 1 calendars/{USER_A}/ nutzer={USER_A} auth=appapi "
+            f"status={result.status} bytes={len(result.body)}"
+        )
+        if result.status == 207:
+            collection_lines(parse_home(result.body))
+    finally:
+        if board_id:
+            gone = await session.client.delete(
+                f"{basic.base_url}/index.php/apps/deck/api/v1.0/boards/{board_id}",
+                headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+                auth=basic.auth(),
+            )
+            note(f"RUECKBAU DECK DELETE boards/{board_id} status={gone.status_code}")
+
+
+# --- fixtures (M5.6, no Docker) ------------------------------------------------------------------
+
+#: The mark a fixture of each kind has to carry, so that a file named after a kind is one.
+_FIXTURE_MARKS: dict[str, tuple[str, str]] = {
+    "all_day.ics": ("DUE als Datum", r"(?m)^DUE;VALUE=DATE:\d{8}\r?$"),
+    "with_time.ics": ("DUE mit Uhrzeit", r"(?m)^DUE(;[^:\r\n]*)?:\d{8}T\d{6}Z?\r?$"),
+    "subtask.ics": ("RELATED-TO", r"(?m)^RELATED-TO"),
+    "subtask_parent.ics": ("kein RELATED-TO", r"(?m)\A(?![\s\S]*^RELATED-TO)"),
+    "recurring.ics": ("RRULE", r"(?m)^RRULE:"),
+    "tags.ics": ("CATEGORIES", r"(?m)^CATEGORIES"),
+    "completed.ics": (
+        "STATUS:COMPLETED und COMPLETED",
+        r"(?ms)\A(?=.*^STATUS:COMPLETED)(?=.*^COMPLETED:)",
+    ),
+    "reopened.ics": ("STATUS:NEEDS-ACTION", r"(?m)^STATUS:NEEDS-ACTION"),
+}
+
+PROVENANCE_TEXT = """# Provenance of the fixtures in this directory
+
+Every `.ics` file here is an object the Nextcloud Tasks app wrote. Nothing was edited: each
+file is a byte for byte copy of a raw file of the measuring spike of phase 30 (plan 30-02,
+browser session; plan 30-04, block `fixtures` of `scripts/tasks_spike.py`), CRLF line ends
+included.
+
+- Nextcloud: {nextcloud} (`occ status` of the running instance, raw file `{nextcloud_file}`)
+- Tasks app: {tasks} (`occ app:list` of the running instance, raw file `{tasks_file}`;
+  every object also names it in its `PRODID`)
+- Database: SQLite
+- Date of the session: {date}
+- Account: `spike30ui`, a measuring account that existed only for this session; language
+  German, browser time zone Europe/Berlin
+- Raw files: `.planning/phases/30-mess-spike-aufgaben-und-ordner/raw/ui-a/` (state before
+  the changes of round B) and `raw/ui-b/` (state after them)
+
+| File | Kind | State | Raw file | sha256 |
+|------|------|-------|----------|--------|
+{rows}
+
+`subtask.ics` and `subtask_parent.ics` belong together: `RELATED-TO` of the first is the
+`UID` of the second, and both lay in the same list.
+
+Kinds without a file here were not written by the app in that session and were not rebuilt
+by hand: {missing}.
+
+{discovery}
+"""
+
+
+def ui_objects(state: str) -> dict[str, Path]:
+    """The raw objects of one snapshot state of plan 30-02, by their SUMMARY."""
+    found: dict[str, Path] = {}
+    for path in sorted((RAW_DIR / f"ui-{state}").glob("*.ics")):
+        text = path.read_bytes().decode("utf-8", errors="replace")
+        summary = property_value(text, "SUMMARY")
+        if summary:
+            found[summary] = path
+    return found
+
+
+def _first(pattern: str, text: str) -> str:
+    match = re.search(pattern, text)
+    return match[1] if match else "(not readable)"
+
+
+def write_provenance(
+    rows: Sequence[str], missing: Sequence[str], discovery_files: Sequence[str]
+) -> None:
+    """``PROVENANCE.md`` with the versions the raw protocols name."""
+    modify = (RAW_DIR / "nc35-aendern.txt").read_text(encoding="utf-8", errors="replace")
+    session = (RAW_DIR / UI_PROTOCOL).read_text(encoding="utf-8", errors="replace")
+    discovery_file = RAW_DIR / "discovery-35.txt"
+    discovery = (
+        discovery_file.read_text(encoding="utf-8", errors="replace")
+        if discovery_file.is_file()
+        else ""
+    )
+    discovery_version = _first(r"(?m)^VERSION OF RECORD (\S+)", discovery)
+    text = PROVENANCE_TEXT.format(
+        nextcloud=_first(r"(?m)^VERSION OF RECORD (\S+)", modify),
+        nextcloud_file="raw/nc35-aendern.txt",
+        tasks=_first(r"(?m)^TASKS-APP version=(\S+)", modify),
+        tasks_file="raw/nc35-aendern.txt",
+        date=_first(r"(?m)^# Lauf blocks=ui-snapshot start=(\d{4}-\d{2}-\d{2})", session),
+        rows="\n".join(rows),
+        missing=", ".join(missing) or "none",
+        discovery=(
+            f"The discovery answers next to this directory ({', '.join(discovery_files)}) are "
+            f"unchanged answers of a throwaway Nextcloud {discovery_version} (raw file "
+            "`raw/discovery-35.txt`), asked for by the accounts `fresh30` and `alice`."
+            if discovery_files
+            else "No discovery answer was kept as a fixture; the protocol names the reason."
+        ),
+    )
+    (FIXTURE_DIR / "PROVENANCE.md").write_text(text, encoding="ascii", newline="\n")
+
+
+def fixture_objects(discovery_files: Sequence[str]) -> list[str]:
+    """M5.6: copy the picked objects unchanged, name what is missing; returns the files."""
+    state_a, state_b = ui_objects("a"), ui_objects("b")
+    picked, missing = pick_fixtures(state_a, state_b)
+    FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
+    rows: list[str] = []
+    written: list[str] = []
+    reasons = dict.fromkeys(missing, "kein Objekt mit dieser SUMMARY in raw/ui-a oder raw/ui-b")
+    for name, (kind, state, source) in picked.items():
+        data = source.read_bytes()
+        text = data.decode("utf-8", errors="replace")
+        what, pattern = _FIXTURE_MARKS[name]
+        by_app = "Nextcloud Tasks" in property_value(text, "PRODID")
+        if not by_app or re.search(pattern, text) is None:
+            reasons[kind] = (
+                f"{source.name} traegt das Merkmal nicht ({what}) oder stammt nicht von der "
+                "Tasks-App (PRODID)"
+            )
+            continue
+        target = FIXTURE_DIR / name
+        target.write_bytes(data)
+        digest = hashlib.sha256(data).hexdigest()
+        same = hashlib.sha256(target.read_bytes()).hexdigest() == digest
+        raw_name = f"raw/ui-{state}/{source.name}"
+        note(
+            f"FIXTURE {kind} quelle={raw_name} sha256_gleich={yes_no(same)} datei="
+            f"tests/fixtures/tasks_app/{name} sha256={digest} merkmal={what} prodid_tasks_app=ja"
+        )
+        rows.append(f"| `{name}` | {kind} | {state} | `{raw_name}` | `{digest}` |")
+        written.append(name)
+    for kind, reason in reasons.items():
+        note(f"FIXTURE {kind} fehlt grund={reason}")
+    untouched_a, untouched_b = state_a.get("s30 unberuehrt"), state_b.get("s30 unberuehrt")
+    same = (
+        untouched_a is not None
+        and untouched_b is not None
+        and untouched_a.read_bytes() == untouched_b.read_bytes()
+    )
+    note(f"KONTROLLE s30 unberuehrt in_beiden_staenden_gleich={yes_no(same)} (Positivkontrolle)")
+    write_provenance(rows, sorted(reasons), discovery_files)
+    note("PROVENANCE tests/fixtures/tasks_app/PROVENANCE.md geschrieben")
+    return written
+
+
+def fixture_assumptions(written: Sequence[str]) -> None:
+    """A2 and A3 read from the fixtures, A3 once more with icalendar."""
+    session = (RAW_DIR / UI_PROTOCOL).read_text(encoding="utf-8", errors="replace")
+    texts = {
+        name: (FIXTURE_DIR / name).read_bytes().decode("utf-8", errors="replace")
+        for name in written
+    }
+    if "subtask.ics" in texts and "subtask_parent.ics" in texts:
+        child, parent = texts["subtask.ics"], texts["subtask_parent.ics"]
+        line = _line_of(child, "RELATED-TO")
+        reltype = re.search(r"RELTYPE=([^;:]+)", line)
+        lists = []
+        for text in (child, parent):
+            summary = re.escape(property_value(text, "SUMMARY"))
+            found = re.search(
+                rf"(?m)^UI-OBJEKT stand=a liste=(\S+) name=\S+ summary={summary} ", session
+            )
+            lists.append(found[1] if found else "?")
+        same_list = lists[0] == lists[1] and lists[0] != "?"
+        note(
+            f"A2 related_to_gleich_eltern_uid="
+            f"{yes_no(property_value(child, 'RELATED-TO') == uid_of(parent))} "
+            f"gleiche_liste={yes_no(same_list)} reltype={reltype[1] if reltype else 'fehlt'} "
+            f"related_to={property_value(child, 'RELATED-TO')} eltern_uid={uid_of(parent)} "
+            f"liste_kind={lists[0]} liste_eltern={lists[1]} (Listen aus den Zeilen UI-OBJEKT "
+            f"stand=a in raw/{UI_PROTOCOL})"
+        )
+    else:
+        note("A2 ungemessen grund=die Fixtures der Unteraufgabe und ihrer Elternaufgabe fehlen")
+    names = ("DUE", "DTSTART", "COMPLETED")
+    by_line: dict[str, set[str]] = {name: set() for name in names}
+    by_library: dict[str, set[str]] = {name: set() for name in names}
+    for file_name, text in texts.items():
+        todo = next(iter(icalendar.Calendar.from_ical(text).walk("VTODO")))
+        shown = []
+        for name in names:
+            line = _line_of(text, name)
+            if not line:
+                continue
+            form = value_form(line)
+            by_line[name].add(form)
+            by_library[name].add(time_form(todo.decoded(name)))
+            shown.append(f"{name}={form}")
+        note(f"ZEITFORM fixture={file_name} {' '.join(shown) or '(keine Zeitangabe)'}")
+
+    def joined(forms: Mapping[str, set[str]]) -> str:
+        return " ".join(
+            f"{name.lower()}={'+'.join(sorted(forms[name])) or 'fehlt'}" for name in names
+        )
+
+    note(f"A3 zeitform {joined(by_line)} (value_form ueber die Zeile, alle Fixtures)")
+    note(
+        f"A3 gegenprobe icalendar {joined(by_library)} gleich={yes_no(by_line == by_library)} "
+        "(dieselben Werte mit der Bibliothek icalendar gelesen)"
+    )
+    floating = any("floating" in forms for forms in by_line.values())
+    note(
+        f"A3 schwebend_vorhanden={yes_no(floating)} tzid_vorhanden="
+        f"{yes_no(any('tzid' in forms for forms in by_line.values()))}"
+    )
+
+
+def fixture_discovery() -> list[str]:
+    """The two discovery answers of Nextcloud 35 as fixtures, unchanged or not at all."""
+    source = RAW_DIR / "discovery-35.txt"
+    protocol = source.read_text(encoding="utf-8", errors="replace") if source.is_file() else ""
+    created: list[str] = []
+    for label, target, users in (
+        (RAW_FRESH, FIXTURE_FRESH, (FRESH,)),
+        (RAW_PREPARED, FIXTURE_LISTS, (ALICE, BOB)),
+    ):
+        shown = target.relative_to(REPO_ROOT).as_posix()
+        body = raw_body_from_protocol(protocol, label)
+        if body is None:
+            note(
+                f"FIXTURE discovery {shown} nicht angelegt grund=die Rohantwort {label} fehlt in "
+                f"raw/{source.name} oder ihr sha256 stimmt nicht"
+            )
+            continue
+        offences = probe_values_only(body.decode("utf-8", errors="replace"), users)
+        if offences:
+            note(
+                f"FIXTURE discovery {shown} nicht angelegt grund=Werte, die keine Probewerte "
+                f"sind: {offences}"
+            )
+            continue
+        target.write_bytes(body)
+        digest = hashlib.sha256(target.read_bytes()).hexdigest()
+        entries = parse_home(body)
+        note(
+            f"FIXTURE discovery {shown} quelle=raw/{source.name} ({label}) "
+            f"sha256_gleich={yes_no(digest == hashlib.sha256(body).hexdigest())} sha256={digest} "
+            f"bytes={len(body)} sammlungen={len(entries)} "
+            f"aufgabenlisten={len(task_lists(entries))} "
+            "nur_probewerte=ja"
+        )
+        created.append(f"`{target.name}`")
+    return created
+
+
+def query_sets(protocol: str) -> dict[str, set[str]]:
+    """The hit sets of the ``ABFRAGE`` lines of one raw file; a later run replaces an earlier."""
+    sets: dict[str, set[str]] = {}
+    for name, hits in re.findall(r"(?m)^ABFRAGE (\S+) status=207 treffer=(\S+)$", protocol):
+        sets[name] = set() if hits == "keine" else set(hits.split(","))
+    return sets
+
+
+def fixture_queries() -> None:
+    """A1: the hit sets of the six queries, compared over the four versions."""
+    by_version: dict[str, dict[str, set[str]]] = {}
+    for major in DELETE_MAJORS:
+        path = RAW_DIR / f"discovery-{major}.txt"
+        protocol = path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+        versions = re.findall(r"(?m)^VERSION OF RECORD (\S+)", protocol)
+        by_version[versions[-1] if versions else f"{major} (keine Datei)"] = query_sets(protocol)
+    differing = same_sets(by_version)
+    for name, _ in QUERIES:
+        if name not in differing:
+            note(f"A1 abfrage={name} ungemessen grund=keine Zeile ABFRAGE in den Rohdateien")
+            continue
+        versions = differing[name]
+        reference = next(
+            (
+                sets[name]
+                for version, sets in by_version.items()
+                if version not in versions and name in sets
+            ),
+            set(),
+        )
+        note(
+            f"A1 abfrage={name} gleich={yes_no(not versions)} abweichend="
+            f"{','.join(versions) or 'keine'} treffer={','.join(sorted(reference)) or 'keine'}"
+        )
+    complete = all(name in differing for name, _ in QUERIES) and len(by_version) == 4
+    equal = complete and not any(differing.values())
+    note(
+        f"A1 alle_sechs_abfragen_auf_allen_versionen_gleich={yes_no(equal)} "
+        f"versionen={','.join(by_version)} vollstaendig={yes_no(complete)}"
+    )
+
+
+def block_fixtures() -> None:
+    """Fixtures out of the raw objects of plan 30-02 and the raw answers of this plan."""
+    section(f"fixtures, start {now_stamp()}")
+    section("discovery-fixtures")
+    discovery_files = fixture_discovery()
+    section("objekte der tasks-app")
+    written = fixture_objects(discovery_files)
+    section("annahmen A2 und A3")
+    fixture_assumptions(written)
+    section("abfragen A1")
+    fixture_queries()
+
+
 def block_ui_teardown(session: Session, ui: "UiOptions") -> None:
     """Hand the baseline of the kept run to the rollback and delete the login file.
 
@@ -6064,6 +8109,8 @@ async def run_blocks(env: Mapping[str, str], blocks: Sequence[str], ui: UiOption
                     await block_move(session)
                 elif name == "ui-evaluate-move":
                     block_ui_evaluate_move()
+                elif name == "vtodo-create":
+                    await block_vtodo_create(session)
                 elif name == "inventory" and block_inventory():
                     raise RunFailed("inventory incomplete: an unruled hit or a missed place")
             keep = any(name in KEEP_BLOCKS for name in blocks)
@@ -6129,7 +8176,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--repeat-reason",
         help="why this run repeats an earlier one; written as the line WIEDERHOLUNG Grund",
     )
-    parser.add_argument("--nc-tag", help="the image tag delete-matrix starts, e.g. 35.0.2-apache")
+    parser.add_argument(
+        "--nc-tag",
+        help="the image tag delete-matrix, discovery-matrix and cost start, e.g. 35.0.2-apache",
+    )
+    parser.add_argument(
+        "--parts",
+        default=",".join(DISCOVERY_PARTS),
+        help=f"the parts of discovery-matrix, comma separated: {', '.join(DISCOVERY_PARTS)}",
+    )
+    parser.add_argument("--db", choices=COST_DBS, help="the database of the block cost")
     parser.add_argument(
         "--allow-other-tag",
         action="store_true",
@@ -6163,9 +8219,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not options.out:
         parser.error("--out is required for a measuring block")
     matrix_tag = ""
-    if "delete-matrix" in blocks:
+    throwaway = [name for name in ("delete-matrix", "discovery-matrix", "cost") if name in blocks]
+    parts = [name.strip() for name in str(options.parts).split(",") if name.strip()]
+    if "fixtures" in blocks and len(blocks) > 1:
+        parser.error("fixtures runs on its own")
+    if throwaway:
         if len(blocks) > 1:
-            parser.error("delete-matrix runs on its own, one version per call")
+            parser.error(f"{throwaway[0]} runs on its own, one version per call")
+        if "cost" in blocks and not options.db:
+            parser.error("--db is required for cost")
+        if "discovery-matrix" in blocks and (
+            not parts or any(name not in DISCOVERY_PARTS for name in parts)
+        ):
+            parser.error(f"--parts takes {', '.join(DISCOVERY_PARTS)}, comma separated")
         try:
             matrix_tag = validate_delete_tag(
                 options.nc_tag or "", allow_other=options.allow_other_tag
@@ -6188,17 +8254,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     out = Path(options.out)
     mode = "angehaengt an bestehende Datei" if out.exists() else "neue Datei"
     header = f"\n# Lauf blocks={','.join(blocks)} start={now_stamp()} ({mode})"
-    # The throwaway instance of delete-matrix has its own generated secrets and no ExApp;
-    # the environment file of nc35 is neither needed nor read for it.
-    env = {} if matrix_tag else read_env_file(Path(options.env_file))
+    # A throwaway instance has its own generated secrets and no ExApp, and the block
+    # fixtures talks to nothing; the environment file of nc35 is neither needed nor read.
+    standalone = bool(matrix_tag) or "fixtures" in blocks
+    env = {} if standalone else read_env_file(Path(options.env_file))
     remember_env_secrets(env)
     os.environ.setdefault("PYTHONUTF8", "1")
     if options.repeat_reason:
         note(f"WIEDERHOLUNG Grund: {options.repeat_reason}")
     code = 0
     try:
-        if matrix_tag:
-            asyncio.run(block_delete_matrix(matrix_tag, other=matrix_tag not in DELETE_TAGS))
+        other = matrix_tag not in DELETE_TAGS
+        if "delete-matrix" in blocks:
+            asyncio.run(block_delete_matrix(matrix_tag, other=other))
+        elif "discovery-matrix" in blocks:
+            asyncio.run(block_discovery_matrix(matrix_tag, parts, other=other))
+        elif "cost" in blocks:
+            asyncio.run(block_cost(matrix_tag, options.db, other=other))
+        elif "fixtures" in blocks:
+            block_fixtures()
         else:
             asyncio.run(run_blocks(env, blocks, ui))
     except (RunFailed, ToolError, httpx.HTTPError) as failure:

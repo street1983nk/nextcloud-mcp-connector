@@ -999,7 +999,7 @@ def test_pretest_distinguishing_keeps_only_candidates_right_in_both_states() -> 
 
 # --- plan 30-04: discovery, queries, provider link, cost rule, fixtures ---------------------
 
-_HOME = """<?xml version="1.0"?>
+_HOME_3004 = """<?xml version="1.0"?>
 <d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav"
     xmlns:cs="http://calendarserver.org/ns/" xmlns:oc="http://owncloud.org/ns">
   <d:response><d:href>/remote.php/dav/calendars/alice/</d:href>
@@ -1032,12 +1032,12 @@ def _entry(uri: str, comps: str = "", types: str = "<cal:calendar/>", extra: str
 
 
 def _kinds(*entries: str) -> dict[str, str]:
-    body = _HOME.format(entries="\n".join(entries))
+    body = _HOME_3004.format(entries="\n".join(entries))
     return {entry.uri: spike.classify_collection(entry) for entry in spike.parse_home(body)}
 
 
 def test_parse_home_drops_the_home_itself_and_reads_only_found_properties() -> None:
-    body = _HOME.format(entries=_entry("personal", "VEVENT"))
+    body = _HOME_3004.format(entries=_entry("personal", "VEVENT"))
     entries = spike.parse_home(body)
     assert [entry.uri for entry in entries] == ["personal"]
     assert entries[0].components == ("VEVENT",)
@@ -1075,9 +1075,9 @@ def test_classify_collection_names_every_kind_of_the_discovery() -> None:
 
 
 def test_task_lists_counts_only_lists_a_task_tool_may_use() -> None:
-    fresh = spike.parse_home(_HOME.format(entries=_entry("personal", "VEVENT")))
+    fresh = spike.parse_home(_HOME_3004.format(entries=_entry("personal", "VEVENT")))
     assert spike.task_lists(fresh) == []
-    body = _HOME.format(
+    body = _HOME_3004.format(
         entries="\n".join(
             [
                 _entry("app-generated--deck--board-7", "VEVENT,VTODO"),
@@ -1145,17 +1145,17 @@ def test_build_todo_filter_refuses_an_unknown_mode_and_never_makes_the_term_a_ta
     assert "&lt;c:evil/&gt;" in body
 
 
-def _todo(summary: str, *extra: str) -> str:
+def _query_todo(summary: str, *extra: str) -> str:
     return spike.simple_todo(summary, summary, extra)
 
 
 _OBJECTS = (
-    _todo("q-offen-undatiert"),
-    _todo("q-offen-im-fenster", "DUE:20261120T100000Z"),
-    _todo("q-offen-ausserhalb", "DUE:20270301T100000Z"),
-    _todo("q-erledigt", "STATUS:COMPLETED", "COMPLETED:20261110T090000Z"),
-    _todo("q-ganztag", "DUE;VALUE=DATE:20261121"),
-    _todo("q-kind", "RELATED-TO:q-offen-im-fenster"),
+    _query_todo("q-offen-undatiert"),
+    _query_todo("q-offen-im-fenster", "DUE:20261120T100000Z"),
+    _query_todo("q-offen-ausserhalb", "DUE:20270301T100000Z"),
+    _query_todo("q-erledigt", "STATUS:COMPLETED", "COMPLETED:20261110T090000Z"),
+    _query_todo("q-ganztag", "DUE;VALUE=DATE:20261121"),
+    _query_todo("q-kind", "RELATED-TO:q-offen-im-fenster"),
 )
 
 
@@ -1306,3 +1306,43 @@ def test_probe_values_only_names_everything_that_is_no_probe_value() -> None:
     assert "konto khaled" in offences
     assert "host example.org" in offences
     assert any(offence.startswith("adresse ") for offence in offences)
+
+
+def test_raw_body_from_protocol_hands_out_the_bytes_only_if_their_hash_holds() -> None:
+    import hashlib
+
+    body = b'<?xml version="1.0"?>\n<d:multistatus xmlns:d="DAV:">\n  <d:response/>\n</d:x>\n'
+    digest = hashlib.sha256(body).hexdigest()
+    lines = [f"    {line}" for line in body.decode().split("\n")]
+    protocol = "\n".join(
+        [
+            "== frisches-konto ==",
+            f"ROHANTWORT-ANFANG discovery-frisch status=207 bytes={len(body)} sha256={digest}",
+            *lines,
+            "ROHANTWORT-ENDE discovery-frisch",
+            "FRISCHES KONTO aufgabenlisten=0 kalender=personal(VEVENT)",
+            "",
+        ]
+    )
+    assert spike.raw_body_from_protocol(protocol, "discovery-frisch") == body
+    assert spike.raw_body_from_protocol(protocol, "discovery-vorbereitet") is None
+    # one changed character and the answer is no longer the one the run received
+    assert (
+        spike.raw_body_from_protocol(
+            protocol.replace("<d:response/>", "<d:x/>"), "discovery-frisch"
+        )
+        is None
+    )
+
+
+def test_time_form_reads_what_icalendar_decoded() -> None:
+    from datetime import UTC, date, datetime
+    from zoneinfo import ZoneInfo
+
+    assert spike.time_form(datetime(2026, 11, 20, 9, 15, tzinfo=UTC)) == "utc"
+    assert spike.time_form(datetime(2026, 11, 20, 9, 15)) == "floating"
+    assert (
+        spike.time_form(datetime(2026, 11, 20, 9, 15, tzinfo=ZoneInfo("Europe/Berlin"))) == "tzid"
+    )
+    assert spike.time_form(date(2026, 11, 20)) == "date"
+    assert spike.time_form("20261120") == "other"
