@@ -262,3 +262,444 @@ ZUSATZENTSCHEID park34 owner=entfernen-freigegeben datum=2026-11-12
     Protokoll; benannte Volumes von ihm werden nicht gelöscht, nur gemeldet.
     Alles andere bleibt unberührt (nc35-*, nc_app_mcp_connector, nc_app_mcp_connector_data,
     nc-mcp-nc35_*, fremde Container, Volumes, Netze und Images).
+
+== Task 3: Strecke Nextcloud 32 ==
+
+Stand Task 3, 2026-11-12 (Europe/Berlin). Zeiten aus nextcloud.log sind UTC.
+Alle Docker-Schritte liefen seriell. Dieses Protokoll enthält keine Secret-Werte.
+
+== (1) RAM-Gate und Ausgangslage ==
+
+RAM frei_host_gb=5.05 schwelle=4.0 ergebnis=ok
+    Gemessen 5291360 KiB vor dem ersten Docker-Schritt. Es lief nur der fremde Container
+    gameworld-dev-gameworld-docker-proxy-1; nc35 und nc-mcp-exapp liefen nicht, es gab
+    also nichts Eigenes zu stoppen.
+    $ FreePhysicalMemory
+    5291360
+    $ docker ps
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 18 minutes
+    $ docker ps -a (all)
+    gameworld-bbfffc1d-482fcbf388a7 db682caec367 Exited (0) 9 days ago
+    gameworld-788fff30-7e6b1a1882ce db682caec367 Exited (255) 8 days ago
+    gameworld-788fff30-ad44ba45e4b7 db682caec367 Exited (255) 8 days ago
+    gameworld-788fff30-7fd6ebad0a59 db682caec367 Exited (0) 13 days ago
+    gameworld-788fff30-61b8b16f78ee db682caec367 Exited (0) 13 days ago
+    gameworld-788fff30-b6c185c2bb70 db682caec367 Exited (0) 13 days ago
+    gameworld-788fff30-6fad6914c3be db682caec367 Exited (0) 13 days ago
+    gameworld-788fff30-ff2295234c42 db682caec367 Exited (255) 8 days ago
+    gameworld-788fff30-e032336f9b6d db682caec367 Exited (255) 8 days ago
+    gameworld-devfront-devfront-1 nginx:1.29-alpine Exited (0) 2 weeks ago
+    nc_app_findling_backend ghcr.io/street1983nk/findling_backend:1.5.0 Exited (0) 3 weeks ago
+    findling-accept-frontproxy nginx:1.27-alpine Exited (0) 3 weeks ago
+    findling-accept-harp 603fdf5ca280 Exited (0) 3 weeks ago
+    findling-accept-nextcloud nextcloud:34.0.3-apache Exited (0) 3 weeks ago
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 18 minutes
+    gameworld-dev-app-1 nextcloud:34.0.3-apache Exited (255) 8 days ago
+    nc_app_mcp_connector 127.0.0.1:5000/mcp_connector:0.3.2 Exited (0) 12 hours ago
+    findling-harp-frontproxy nginx:1.27-alpine Exited (255) 3 weeks ago
+    findling-harp-registry registry:2 Exited (255) 3 weeks ago
+    findling-harp-proxy 603fdf5ca280 Exited (0) 3 weeks ago
+    findling-harp-nextcloud nextcloud:34.0.3-apache Exited (137) 3 weeks ago
+    nc35-test-issuer caddy:2 Exited (0) 6 weeks ago
+    nc35-greenmail greenmail/standalone:2.1.12 Exited (143) 6 weeks ago
+    nc35-caddy caddy:2 Exited (0) 12 hours ago
+    nc35-harp ghcr.io/nextcloud/nextcloud-appapi-harp:release Exited (0) 12 hours ago
+    nc35-nc nextcloud:35.0.0-apache-local Exited (0) 12 hours ago
+    nc_app_mcp_connector_park34 127.0.0.1:5000/mcp_connector:0.1.11 Exited (0) 6 weeks ago
+    n8n-mcp-test-loopback alpine/socat Exited (143) 6 weeks ago
+    n8n-mcp-test n8nio/n8n:latest Exited (143) 6 weeks ago
+    nc-mcp-exapp-greenmail greenmail/standalone:2.1.12 Exited (143) 6 weeks ago
+    nc-mcp-exapp-nc nextcloud:34.0.3-apache Exited (0) 6 weeks ago
+    nc-mcp-exapp-caddy caddy:2 Exited (0) 6 weeks ago
+    nc-mcp-exapp-harp ghcr.io/nextcloud/nextcloud-appapi-harp:release Exited (0) 6 weeks ago
+    nc-mcp-exapp-registry registry:2 Exited (2) 6 weeks ago
+    findling-nextcloud nextcloud:34.0.3-apache Exited (137) 3 weeks ago
+    nc-mcp-test nextcloud:34-apache Exited (255) 2 months ago
+    infranode-redis-dev redis:7.4-alpine Exited (0) 4 months ago
+
+PARK34 mounts=1 benanntes_volume=nc_app_mcp_connector_data geloescht=nein
+    Mounts des Containers nc_app_mcp_connector_park34 vor dem Entfernen:
+    $ park34 inspect
+    /nc_app_mcp_connector_park34 status=exited image=127.0.0.1:5000/mcp_connector:0.1.11 labels_project=
+    type=volume name=nc_app_mcp_connector_data source=/var/lib/docker/volumes/nc_app_mcp_connector_data/_data dest=/nc_app_mcp_connector_data rw=true
+    $ net containers
+    Befund: Der Container hing an dem benannten Volume nc_app_mcp_connector_data. Das
+    Volume wurde nicht gelöscht (docker rm ohne -v) und steht in der Volume-Liste nach dem
+    Abbau unverändert.
+    Die Netzliste von nc-mcp-exapp-net zeigte vor dem Abbau keinen laufenden Container.
+
+== (2) Abbau nach ENTSCHEID owner=option-a ==
+
+ABBAU park34 entfernt=ja compose_down_v exit=0 volumes_nc-mcp-exapp_danach=0
+    Abweichung von der Reihenfolge des Plans: Der Plan nennt park34 nicht. Nach dem
+    Zusatzentscheid wurde er vor dem down -v entfernt, damit kein Container mehr am Netz
+    nc-mcp-exapp-net hängt.
+    HP_SHARED_KEY wurde mit `openssl rand -hex 32` in der Shell erzeugt (Länge 64) und nie
+    ausgegeben.
+    HP_SHARED_KEY laenge=64
+    GATE frei_kib=5334464
+    $ docker rm nc_app_mcp_connector_park34
+    nc_app_mcp_connector_park34
+    exit=0
+    $ docker compose -f compose.exapp.yml down -v
+     Container nc-mcp-exapp-caddy Stopping
+     Container nc-mcp-exapp-registry Stopping
+     Container nc-mcp-exapp-greenmail Stopping
+     Container nc-mcp-exapp-harp Stopping
+     Container nc-mcp-exapp-registry Stopped
+     Container nc-mcp-exapp-registry Removing
+     Container nc-mcp-exapp-greenmail Stopped
+     Container nc-mcp-exapp-greenmail Removing
+     Container nc-mcp-exapp-harp Stopped
+     Container nc-mcp-exapp-harp Removing
+     Container nc-mcp-exapp-caddy Stopped
+     Container nc-mcp-exapp-caddy Removing
+     Container nc-mcp-exapp-greenmail Removed
+     Container nc-mcp-exapp-harp Removed
+     Container nc-mcp-exapp-registry Removed
+     Container nc-mcp-exapp-caddy Removed
+     Container nc-mcp-exapp-nc Stopping
+     Container nc-mcp-exapp-nc Stopped
+     Container nc-mcp-exapp-nc Removing
+     Container nc-mcp-exapp-nc Removed
+     Network nc-mcp-exapp-net Removing
+     Volume nc-mcp-exapp_nextcloud-exapp-data Removing
+     Volume nc-mcp-exapp_registry-exapp-data Removing
+     Volume nc-mcp-exapp_registry-exapp-data Removed
+     Network nc-mcp-exapp-net Removed
+     Volume nc-mcp-exapp_nextcloud-exapp-data Removed
+    exit=0
+    $ docker volume ls --filter name=nc-mcp-exapp
+    DRIVER    VOLUME NAME
+    $ docker network ls --filter name=nc-mcp-exapp
+    NETWORK ID   NAME      DRIVER    SCOPE
+    $ docker ps -a --filter name=nc-mcp-exapp
+    $ docker ps -a --filter name=nc_app_mcp_connector
+    nc_app_mcp_connector 127.0.0.1:5000/mcp_connector:0.3.2 Exited (0) 12 hours ago
+    $ docker volume ls (named, nicht anonym)
+    findling-accept_harp-certs
+    findling-accept_nextcloud
+    findling-dev_nextcloud
+    findling-harp143_backend_data
+    findling-harp_harp-certs
+    findling-harp_nextcloud
+    gameworld-788fff30-6fad6914c3be
+    gameworld-788fff30-7e6b1a1882ce
+    gameworld-788fff30-7fd6ebad0a59
+    gameworld-788fff30-61b8b16f78ee
+    gameworld-788fff30-ad44ba45e4b7
+    gameworld-788fff30-b6c185c2bb70
+    gameworld-788fff30-e032336f9b6d
+    gameworld-788fff30-ff2295234c42
+    gameworld-a60510fd-5e6197f6c48b
+    gameworld-a60510fd-f4217246124b
+    gameworld-bbfffc1d-482fcbf388a7
+    gameworld-dev_nextcloud
+    n8n-mcp-test-data
+    nc-mcp-nc35_nc35-harp-certs
+    nc-mcp-nc35_nextcloud-nc35-data
+    nc_app_findling_backend_data
+    nc_app_mcp_connector_data
+    nextcloud-mcp-connector_nextcloud-test-data
+    anonyme_volumes=96
+    Vergleich mit der Liste vor dem Abbau: benannte Volumes vorher 26, nachher 24, es
+    fehlen genau nc-mcp-exapp_nextcloud-exapp-data und nc-mcp-exapp_registry-exapp-data.
+    Anonyme Volumes vorher 96, nachher 96. Container vorher 37, am Ende des Tasks 36
+    (es fehlt genau nc_app_mcp_connector_park34; die fünf Container von nc-mcp-exapp
+    wurden neu angelegt).
+
+== (3) Aufbau auf nextcloud:32.0.15-apache ==
+
+AUFBAU compose_up exit=0 image=nextcloud:32.0.15-apache
+    GATE frei_kib=5272812
+    $ NC_EXAPP_NEXTCLOUD_IMAGE=nextcloud:32.0.15-apache docker compose -f compose.exapp.yml up -d --wait
+     Network nc-mcp-exapp-net Creating
+     Network nc-mcp-exapp-net Created
+     Volume nc-mcp-exapp_registry-exapp-data Creating
+     Volume nc-mcp-exapp_registry-exapp-data Created
+     Volume nc-mcp-exapp_nextcloud-exapp-data Creating
+     Volume nc-mcp-exapp_nextcloud-exapp-data Created
+     Container nc-mcp-exapp-registry Creating
+     Container nc-mcp-exapp-greenmail Creating
+     Container nc-mcp-exapp-nc Creating
+     Container nc-mcp-exapp-registry Created
+     Container nc-mcp-exapp-greenmail Created
+     Container nc-mcp-exapp-nc Created
+     Container nc-mcp-exapp-caddy Creating
+     Container nc-mcp-exapp-harp Creating
+     Container nc-mcp-exapp-harp Created
+     Container nc-mcp-exapp-caddy Created
+     Container nc-mcp-exapp-nc Starting
+     Container nc-mcp-exapp-registry Starting
+     Container nc-mcp-exapp-greenmail Starting
+     Container nc-mcp-exapp-greenmail Started
+     Container nc-mcp-exapp-nc Started
+     Container nc-mcp-exapp-nc Waiting
+     Container nc-mcp-exapp-nc Waiting
+     Container nc-mcp-exapp-registry Started
+     Container nc-mcp-exapp-nc Healthy
+     Container nc-mcp-exapp-caddy Starting
+     Container nc-mcp-exapp-nc Healthy
+     Container nc-mcp-exapp-harp Starting
+     Container nc-mcp-exapp-harp Started
+     Container nc-mcp-exapp-caddy Started
+     Container nc-mcp-exapp-registry Waiting
+     Container nc-mcp-exapp-caddy Waiting
+     Container nc-mcp-exapp-nc Waiting
+     Container nc-mcp-exapp-harp Waiting
+     Container nc-mcp-exapp-greenmail Waiting
+     Container nc-mcp-exapp-caddy Healthy
+     Container nc-mcp-exapp-nc Healthy
+     Container nc-mcp-exapp-greenmail Healthy
+     Container nc-mcp-exapp-registry Healthy
+     Container nc-mcp-exapp-harp Healthy
+    exit=0
+    nc-mcp-exapp-caddy caddy:2 Up 10 seconds
+    nc-mcp-exapp-harp ghcr.io/nextcloud/nextcloud-appapi-harp:release Up 10 seconds (healthy)
+    nc-mcp-exapp-nc nextcloud:32.0.15-apache Up 31 seconds (healthy)
+    nc-mcp-exapp-registry registry:2 Up 31 seconds
+    nc-mcp-exapp-greenmail greenmail/standalone:2.1.12 Up 31 seconds
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 19 minutes
+
+RAM frei_host_gb=2.90 schwelle=4.0 ergebnis=zu wenig (nach dem Aufbau, vor dem Bootstrap)
+    Erste Messung 3039408 KiB, danach sechs in Folge: 3051308, 3029052, 3291692, 3257084,
+    3267436, 3264424 KiB.
+    $ docker stats --no-stream --format "{{.Name}} {{.MemUsage}} {{.CPUPerc}}"
+    nc-mcp-exapp-caddy 10.48MiB / 5.786GiB 0.00%
+    nc-mcp-exapp-harp 75.63MiB / 5.786GiB 0.49%
+    nc-mcp-exapp-nc 262.7MiB / 5.786GiB 0.00%
+    nc-mcp-exapp-registry 4.379MiB / 5.786GiB 0.00%
+    nc-mcp-exapp-greenmail 112.4MiB / 5.786GiB 0.11%
+    gameworld-dev-gameworld-docker-proxy-1 27.89MiB / 5.786GiB 0.00%
+    Größter Host-Prozess: vmmemWSL mit 4308 MB, die Container selbst belegten rund 0.5 GB.
+    Abweichung vom Rahmen: Die Abhilfe (drop_caches und compact_memory in der Docker-VM,
+    75 s warten, einmal neu messen) ist dort nur für leeres Docker vorgesehen. Hier lief
+    die eigene, eben gestartete Instanz und der fremde Proxy-Container. Die Abhilfe wurde
+    trotzdem einmal ausgeführt, weil sie keine Daten und keinen Container anfasst; bis zur
+    grünen Messung lief kein weiterer Docker-Schritt.
+    $ wsl -d docker-desktop sh -c "sync; echo 3 > /proc/sys/vm/drop_caches; echo 1 > /proc/sys/vm/compact_memory"
+    exit=0
+    (75 s gewartet)
+    5980972        (KiB, 5.70 GiB)
+RAM frei_host_gb=5.70 schwelle=4.0 ergebnis=ok (nach der Abhilfe)
+    Weitere Messungen vor den folgenden Docker-Schritten: 5402664, 5444292, 5301396,
+    5939876 KiB, alle über der Schwelle.
+
+== (3a) Bootstrap, erster Versuch ==
+
+BOOTSTRAP versuch=1 modus=--manual exit=1 fehler=heartbeat
+    $ NC_EXAPP_NEXTCLOUD_IMAGE=nextcloud:32.0.15-apache bash scripts/bootstrap_exapp.sh --manual
+    Ausgabe gefiltert: Zeilen mit secret, password, passwort, token, key oder schlüssel
+    sind entfernt (35 Zeilen roh, 34 nach dem Filter).
+    == ExApp topology bootstrap ==
+    nextcloud: installed
+    app notes: installed
+    app deck: installed
+    app tables: installed
+    app mail: installed
+    app spreed: installed
+    user alice: created
+    user bob: created
+    mail account alice: created on greenmail:3143 (id 1)
+    test mails alice: delivered 6 over greenmail:3025
+    mail sync alice: account 1 synchronised
+    calendar alice/personal: present (attempt 1)
+    addressbook alice/contacts: created
+    calendar bob/personal: present (attempt 1)
+    files home alice: initialised
+    files home bob: initialised
+    share folder /mcp-share-13f988b027: created
+    file alice/mcp-share-13f988b027/mcp-shared-file-13f988b027.md: created
+    file alice/mcp-private-13f988b027.md: created
+    share auto accept: on (test instance)
+    share /mcp-share-13f988b027 to bob: create answered 200
+    read-only share /mcp-share-13f988b027 to bob: present (attempt 2)
+    talk conversation MCP-Talk-offen-Grüße-aus-Hamburg: created (f7rgfwke)
+    talk conversation MCP-Talk-offen-Grüße-aus-Hamburg: readonly=0
+    talk conversation MCP-Talk-nurlesen-Straße-ohne-Ausgang: created (fj9zjzp7)
+    talk conversation MCP-Talk-nurlesen-Straße-ohne-Ausgang: readonly=1
+    bruteforce protection: disabled (test instance)
+    rate limit protection: disabled (test instance)
+    app app_api: enabled
+    daemon harp_proxy_docker: registered
+    daemon manual_install: registered
+    ERROR: could not register the ExApp in manual-install mode:
+    ExApp mcp_connector heartbeat check failed. Make sure that Nextcloud instance and ExApp can reach it other.
+    Folge: .env.exapp wurde nicht geschrieben (das Skript schreibt sie erst nach der
+    Registrierung). Das dabei erzeugte APP_SECRET lag damit nur in der Instanz.
+    $ occ app_api:app:list
+    ExApps:
+    mcp_connector (MCP Connector): 0.7.2 [disabled]
+
+== (3b) Zweiter Versuch, nur auf Aufrufebene ==
+
+WIEDERHOLUNG grund=manual-modus erwartet laufenden lokalen Prozess, app registriert aber nicht aktiv
+    Abweichung vom Wortlaut des Plans: Der Plan sieht vor, den lokalen Prozess mit den
+    Werten aus .env.exapp zu starten und `occ app_api:app:enable` auszuführen. Die Datei
+    gab es nach dem ersten Versuch nicht, das Secret der Registrierung war also nicht
+    greifbar. Der zweite Versuch folgte deshalb dem Weg, den das Skript selbst in seinem
+    Block FALLBACK 2 beschreibt: App abmelden, ein neues Secret in .env.exapp vorgeben
+    (das Skript übernimmt einen vorhandenen Wert), lokalen Prozess starten, Bootstrap
+    erneut aufrufen. Kein Skript, keine Compose-Datei und kein Produktcode wurde geändert.
+    $ occ app_api:app:unregister mcp_connector
+    ExApp mcp_connector successfully unregistered.
+    exit=0
+    $ occ app_api:app:list
+    ExApps:
+    .env.exapp im Worktree angelegt, eine Zeile, nur der Name APP_SECRET (64 Hex aus
+    `openssl rand -hex 32`, umask 077, Wert nie ausgegeben).
+    Lokaler Prozess: `nc-mcp-exapp` über uv run --no-sync, 127.0.0.1:23001, APP_ID,
+    APP_VERSION 0.7.2, NC_MCP_URL http://127.0.0.1:8081, APP_PERSISTENT_STORAGE im
+    Scratchpad außerhalb des Repos, ohne NC_MCP_APP_PASSWORD und NC_MCP_STATIC_BEARER.
+    $ curl http://127.0.0.1:23001/heartbeat        (vom Host)
+    200
+    $ docker exec nc-mcp-exapp-nc php -r 'echo file_get_contents("http://host.docker.internal:23001/heartbeat");'
+    {"status":"ok"}
+    Der Prozess war also vom Host und aus dem Nextcloud-Container heraus erreichbar.
+
+BOOTSTRAP versuch=2 modus=--manual exit=1 fehler=heartbeat
+    Ausgabe gefiltert wie oben (33 Zeilen roh, 33 nach dem Filter).
+    == ExApp topology bootstrap ==
+    nextcloud: installed
+    app notes: enabled
+    app deck: enabled
+    app tables: enabled
+    app mail: enabled
+    app spreed: enabled
+    user alice: exists
+    user bob: exists
+    mail account alice: exists on greenmail:3143 (id 1)
+    test mails alice: already there (6 in INBOX)
+    mail sync alice: account 1 synchronised
+    calendar alice/personal: present (attempt 1)
+    addressbook alice/contacts: already there
+    calendar bob/personal: present (attempt 1)
+    files home alice: initialised
+    files home bob: initialised
+    share folder /mcp-share-68a7e41169: created
+    file alice/mcp-share-68a7e41169/mcp-shared-file-68a7e41169.md: created
+    file alice/mcp-private-68a7e41169.md: created
+    share auto accept: on (test instance)
+    share /mcp-share-68a7e41169 to bob: create answered 200
+    read-only share /mcp-share-68a7e41169 to bob: present (attempt 2)
+    talk conversation MCP-Talk-offen-Grüße-aus-Hamburg: exists (f7rgfwke)
+    talk conversation MCP-Talk-offen-Grüße-aus-Hamburg: readonly=0
+    talk conversation MCP-Talk-nurlesen-Straße-ohne-Ausgang: exists (fj9zjzp7)
+    talk conversation MCP-Talk-nurlesen-Straße-ohne-Ausgang: readonly=1
+    bruteforce protection: disabled (test instance)
+    rate limit protection: disabled (test instance)
+    app app_api: enabled
+    daemon harp_proxy_docker: exists
+    ERROR: could not register the ExApp in manual-install mode:
+    ExApp mcp_connector heartbeat check failed. Make sure that Nextcloud instance and ExApp can reach it other.
+    Nebenwirkung: Der zweite Lauf hat einen zweiten Freigabeordner angelegt
+    (mcp-share-68a7e41169 neben mcp-share-13f988b027 aus dem ersten Lauf), weil die
+    vorgegebene .env.exapp nur APP_SECRET trug und der Name nicht festgehalten war.
+
+== (4) Belege ==
+
+VERSION OF RECORD 32.0.15 version=32.0.15.1
+EXAPP mcp_connector registriert=ja aktiv=nein
+ENVDATEI ignoriert=ja inhalt=nur APP_SECRET (Bootstrap nicht bis zum Schreiben gekommen)
+APPAPI fassung=32.0.0
+    $ occ status
+      - installed: true
+      - version: 32.0.15.1
+      - versionstring: 32.0.15
+      - edition:
+      - maintenance: false
+      - needsDbUpgrade: false
+      - productname: Nextcloud
+      - extendedSupport: false
+    $ occ app_api:daemon:list
+    Registered ExApp daemon configs:
+    +-----+-------------------+---------------------+----------------+----------+----------------------------+--------------+---------+------------------+-------------------------+
+    | Def | Name              | Display name        | Deploy ID      | Protocol | Host                       | NC Url       | Is HaRP | HaRP FRP Address | HaRP Docker Socket Port |
+    +-----+-------------------+---------------------+----------------+----------+----------------------------+--------------+---------+------------------+-------------------------+
+    | *   | harp_proxy_docker | Harp Proxy (Docker) | docker-install | http     | appapi-harp:8780           | http://caddy | yes     | appapi-harp:8782 | 24000                   |
+    |     | manual_install    | Manual Install      | manual-install | http     | host.docker.internal:23001 | http://caddy | no      | (none)           | (none)                  |
+    +-----+-------------------+---------------------+----------------+----------+----------------------------+--------------+---------+------------------+-------------------------+
+    $ occ app_api:app:list
+    ExApps:
+    mcp_connector (MCP Connector): 0.7.2 [disabled]
+    $ occ app:list | grep app_api
+      - app_api: 32.0.0
+    $ git check-ignore -v .env.exapp
+    .gitignore:6:.env.exapp	.env.exapp
+    $ Variablennamen .env.exapp
+    APP_SECRET
+
+URSACHE heartbeat_url=http://host.docker.internal:23001:23001 fehler=Invalid host
+    Laut nextcloud.log hängt AppAPI 32.0.0 den Port der App an den Host des Daemons an.
+    Das Skript registriert den Daemon manual_install mit dem Host
+    "host.docker.internal:23001" (Port schon enthalten), daraus wird eine Adresse mit
+    doppeltem Port, die AppAPI als ungültig ablehnt. Der lokale Prozess hat von Nextcloud
+    keine einzige Anfrage gesehen; sein Zugriffslog zeigt nur die zwei Kontrollabrufe:
+    $ Prozesslog (Zugriffszeilen)
+    INFO:     127.0.0.1:55317 - "GET /heartbeat HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:55319 - "GET /heartbeat HTTP/1.1" 200 OK
+    $ grep -i "app_api\|heartbeat\|exapp" data/nextcloud.log | tail -8        (letzte drei Zeilen)
+    {"reqId":"18liZOIgQDRxvWfCIg6D","level":2,"time":"2026-11-12T13:48:27+00:00","remoteAddr":"","user":"--","app":"app_api","method":"","url":"--","scriptName":"occ","message":"Failed heartbeat on http://host.docker.internal:23001:23001 for 590 times. Most recent status=0, error: Invalid host: \"host.docker.internal:23001\"","userAgent":"--","version":"32.0.15.1","occ_command":["occ","app_api:app:register"],"data":{"app":"app_api"}}
+    {"reqId":"18liZOIgQDRxvWfCIg6D","level":2,"time":"2026-11-12T13:48:37+00:00","remoteAddr":"","user":"--","app":"app_api","method":"","url":"--","scriptName":"occ","message":"Failed heartbeat on http://host.docker.internal:23001:23001 for 600 times. Most recent status=0, error: Invalid host: \"host.docker.internal:23001\"","userAgent":"--","version":"32.0.15.1","occ_command":["occ","app_api:app:register"],"data":{"app":"app_api"}}
+    {"reqId":"18liZOIgQDRxvWfCIg6D","level":3,"time":"2026-11-12T13:48:38+00:00","remoteAddr":"","user":"--","app":"app_api","method":"","url":"--","scriptName":"occ","message":"ExApp mcp_connector heartbeat check failed. Make sure that Nextcloud instance and ExApp can reach it other.","userAgent":"--","version":"32.0.15.1","occ_command":["occ","app_api:app:register"],"data":{"app":"app_api"}}
+    Nicht gemessen: ob die Registrierung mit einem Daemon-Host ohne Port
+    ("host.docker.internal") auf 32 durchläuft. Das wäre ein dritter Versuch oder eine
+    Änderung an scripts/bootstrap_exapp.sh; beides schließt der Plan aus.
+
+== (5) Kontrollen ==
+
+KONTROLLE a status=nicht gemessen
+KONTROLLE b status=nicht gemessen
+KONTROLLE c status=nicht gemessen
+    Die Kontrollen setzen eine aktive ExApp voraus. Die App ist registriert, aber nicht
+    aktiv; nach dem gescheiterten zweiten Versuch wurde nichts weiter versucht.
+
+== (6) und (7) Abbruch, Prozess beendet, Instanz gestoppt ==
+
+PROZESS lokal beendet=ja port=23001
+    heartbeat_vor=200
+    prozess_pid=20628
+    python
+    ERFOLGREICH: Der Prozess mit PID 20628 (untergeordnetem Prozess von PID 7864) wurde beendet.
+    heartbeat_nach=000
+
+GESTOPPT nc-mcp-exapp volume_bleibt=ja
+    $ docker compose -f compose.exapp.yml stop
+     Container nc-mcp-exapp-greenmail Stopping
+     Container nc-mcp-exapp-registry Stopping
+     Container nc-mcp-exapp-caddy Stopping
+     Container nc-mcp-exapp-harp Stopping
+     Container nc-mcp-exapp-registry Stopped
+     Container nc-mcp-exapp-caddy Stopped
+     Container nc-mcp-exapp-harp Stopped
+     Container nc-mcp-exapp-nc Stopping
+     Container nc-mcp-exapp-greenmail Stopped
+     Container nc-mcp-exapp-nc Stopped
+    exit=0
+    $ docker ps
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 45 minutes
+    $ docker ps -a --filter name=nc-mcp-exapp
+    nc-mcp-exapp-caddy caddy:2 Exited (0) 2 seconds ago
+    nc-mcp-exapp-harp ghcr.io/nextcloud/nextcloud-appapi-harp:release Exited (0) 2 seconds ago
+    nc-mcp-exapp-nc nextcloud:32.0.15-apache Exited (137) Less than a second ago
+    nc-mcp-exapp-registry registry:2 Exited (2) 2 seconds ago
+    nc-mcp-exapp-greenmail greenmail/standalone:2.1.12 Exited (143) 1 second ago
+    $ docker volume ls --filter name=nc-mcp-exapp
+    DRIVER    VOLUME NAME
+    local     nc-mcp-exapp_nextcloud-exapp-data
+    local     nc-mcp-exapp_registry-exapp-data
+    $ docker ps -a --filter name=nc35-
+    nc35-test-issuer caddy:2 Exited (0) 6 weeks ago
+    nc35-greenmail greenmail/standalone:2.1.12 Exited (143) 6 weeks ago
+    nc35-caddy caddy:2 Exited (0) 12 hours ago
+    nc35-harp ghcr.io/nextcloud/nextcloud-appapi-harp:release Exited (0) 12 hours ago
+    nc35-nc nextcloud:35.0.0-apache-local Exited (0) 12 hours ago
+    nc_app_mcp_connector 127.0.0.1:5000/mcp_connector:0.3.2 Exited (0) 12 hours ago
+    nc-mcp-exapp-nc endete mit Exit 137 (nach Ablauf der Stop-Frist von docker compose
+    beendet). nc35 blieb gestoppt und unberührt. Es läuft nur der fremde Container
+    gameworld-dev-gameworld-docker-proxy-1, wie vor dem Task.
+    Zustand im Volume: Nextcloud 32.0.15.1 installiert, alice und bob mit Testdaten,
+    Daemons harp_proxy_docker und manual_install registriert, mcp_connector 0.7.2
+    registriert und nicht aktiv; das zugehörige APP_SECRET steht in .env.exapp im Worktree.
+
+STRECKE NC32 ergebnis=abgebrochen grund=manual-registrierung scheitert am heartbeat, AppAPI 32.0.0 baut host.docker.internal:23001:23001 (Invalid host), zwei Versuche
