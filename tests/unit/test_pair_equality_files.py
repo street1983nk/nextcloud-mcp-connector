@@ -63,6 +63,7 @@ COVERED = {
     ("files_search", "folder"),
     ("files_upload", "text"),
     ("files_upload", "binary_chunk1"),
+    ("files_create_folder", "path"),
     ("fetch", "file"),
 }
 #: The cases of the family that are named exceptions (D-28-16), each with its own test.
@@ -592,6 +593,59 @@ async def test_files_upload_first_binary_chunk_answers_like_an_invented_folder(
     )
     _assert_equal(tagged, unknown, mode, PARENT_MISSING)
     assert '"isError": true' in tagged
+
+
+# --- files_create_folder: one folder, without parents --------------------------------------
+
+
+def _mkcol(path: str, status: int, seen: list[respx.Route] | None = None) -> Mocks:
+    """The MKCOL of one folder below the home; ``seen`` collects the route for counting."""
+
+    def mocks(mock: respx.MockRouter) -> None:
+        route = mock.route(method="MKCOL", url=f"{FILES}{path}").mock(
+            return_value=httpx.Response(status)
+        )
+        if seen is not None:
+            seen.append(route)
+
+    return mocks
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("mode", GUARD_MODES)
+async def test_files_create_folder_in_a_tagged_folder_answers_like_an_invented_parent(
+    mode: str, unexpected: list[str]
+) -> None:
+    """A new folder below a tagged folder against a new folder below a missing parent.
+
+    Only without ``parents``: with it the invented side would simply be created, so the
+    case has no natural counterpart (the chain is covered by
+    tests/unit/test_files_create_folder_exclusion.py).
+
+    The tagged side must not send its MKCOL at all, which is why its 201 route is counted.
+    The 409 route of the invented side is the positive control of that count: it is reached
+    whenever the guard answers, so a zero on the tagged side is not a route that never
+    matches.
+    """
+    path = "/Projekt/neu"
+    invented = f"{INVENTED_FOLDER}/neu"
+    accepted: list[respx.Route] = []
+    refused: list[respx.Route] = []
+    tagged, unknown = await pair(
+        "files_create_folder",
+        {"path": path},
+        {"path": invented},
+        path,
+        invented,
+        _mkcol(path, 201, accepted),
+        _mkcol(invented, 409, refused),
+        mode,
+        unexpected,
+    )
+    _assert_equal(tagged, unknown, mode, PARENT_MISSING)
+    assert '"isError": true' in tagged
+    assert [route.call_count for route in accepted] == [0], "no MKCOL into a tagged folder"
+    assert [route.call_count for route in refused] == [1 if mode in ANSWERED else 0]
 
 
 # --- coverage and time ----------------------------------------------------------------------

@@ -101,6 +101,17 @@ from mcp_connector.server import mcp
 #               it taken.
 #   Budget      unchanged at 18000: 15440 + 15 percent = 17756, and the next 500 above it
 #               is 18000, so the convention lands on the number that already stands.
+#
+#   Measurement 2026-11-12, all 24 curated tools registered (files_create_folder of
+#               FOLD-01): 16222 bytes. The tool itself is 515 bytes, far below the per tool
+#               ceiling, which stays where it is. The house rule (measurement plus 15
+#               percent, rounded up to the next 500) reads on this number: 16222 + 15 percent
+#               = 18656, rounded up to the next 500 = 19000 bytes.
+#   Budget      stays at 18000 for now: re-anchored by the house rule on the measured end
+#               state of the milestone (E1, TASK-08 in phase 32), and this measurement fits
+#               below it. The 19000 above is the arithmetic of today and not a decision: the
+#               task tools of phase 32 move the measurement again, and a budget is lifted
+#               against the number that needs it, once, at the end.
 BUDGET_BYTES = 18_000
 
 # The second claim, and the one that actually reports a regression. A total with headroom

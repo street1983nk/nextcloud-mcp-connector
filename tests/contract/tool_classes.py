@@ -71,6 +71,10 @@ FILE_WRITERS: dict[str, str] = {
         "Creates a file at a path and checks _writable before every write "
         "(tools/files.py:484-529, :705-725)."
     ),
+    "files_create_folder": (
+        "Creates folders with MKCOL and checks _writable before every MKCOL "
+        "(tools/files.py:669-762, :708, :748)."
+    ),
     "notes_create": (
         "Creates a note file in a category folder and checks folder and candidate file "
         "(tools/notes.py:213-298)."
@@ -127,6 +131,7 @@ PAIR_CASES: dict[tuple[str, str], str] = {
     ("files_search", "folder"): "files",
     ("files_upload", "text"): "files",
     ("files_upload", "binary_chunk1"): "files",
+    ("files_create_folder", "path"): "files",
     ("fetch", "file"): "files",
     ("notes_read", "note"): "apps",
     ("fetch", "note"): "apps",
