@@ -237,3 +237,108 @@ def test_the_parent_hint_names_the_folder_tool_and_the_web_way() -> None:
 
     assert "files_create_folder" in hint
     assert "in Nextcloud" in hint
+
+
+# --- probe_folder: the lean read of folder creation (D-31-05) -----------------------------
+
+
+def multistatus(fileid: str, *, folder: bool) -> httpx.Response:
+    body = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<d:multistatus xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns"><d:response>'
+        f"<d:href>/remote.php/dav/files/{USER}{TARGET}</d:href><d:propstat><d:prop>"
+        f"<oc:fileid>{fileid}</oc:fileid>"
+        f"<d:resourcetype>{'<d:collection/>' if folder else ''}</d:resourcetype>"
+        "</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>"
+        "</d:response></d:multistatus>"
+    )
+    return httpx.Response(207, content=body.encode(), headers={"Content-Type": "application/xml"})
+
+
+async def probed(
+    client: httpx.AsyncClient, creds: Credentials, response: httpx.Response
+) -> tuple[dict | None, httpx.Request]:
+    with respx.mock(assert_all_called=True) as mock:
+        mock.route(method="PROPFIND", url=TARGET_URL).mock(return_value=response)
+        result = await dav.probe_folder(client, creds, TARGET)
+        assert mock.calls.call_count == 1
+        request = mock.calls[0].request
+    return result, request
+
+
+async def probe_refused(client: httpx.AsyncClient, creds: Credentials, status: int) -> ToolError:
+    with respx.mock(assert_all_called=True) as mock:
+        mock.route(method="PROPFIND", url=TARGET_URL).mock(return_value=httpx.Response(status))
+        with pytest.raises(ToolError) as caught:
+            await dav.probe_folder(client, creds, TARGET)
+    return caught.value
+
+
+@pytest.mark.anyio
+async def test_probe_reports_a_folder_with_its_id(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    result, _ = await probed(client, creds, multistatus("120", folder=True))
+
+    assert result == {"path": TARGET, "is_collection": True, "fileid": "120"}
+
+
+@pytest.mark.anyio
+async def test_probe_reports_a_file_as_not_a_folder(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    result, _ = await probed(client, creds, multistatus("121", folder=False))
+
+    assert result == {"path": TARGET, "is_collection": False, "fileid": "121"}
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("status", [404, 409])
+async def test_probe_reads_404_and_409_as_missing(
+    client: httpx.AsyncClient, creds: Credentials, status: int
+) -> None:
+    """409 is a node below a file (assumption A5): missing, not a status without a name."""
+    result, _ = await probed(client, creds, httpx.Response(status))
+
+    assert result is None
+
+
+@pytest.mark.anyio
+async def test_probe_names_a_refused_name(client: httpx.AsyncClient, creds: Credentials) -> None:
+    error = await probe_refused(client, creds, 400)
+
+    assert triple(error) == triple(dav.name_rejected(TARGET))
+    assert error.message == f"Nextcloud does not accept the folder name in {TARGET}."
+    assert "unexpected status" not in error.message
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("status", [403, 500])
+async def test_probe_hands_every_other_status_to_the_shared_sentences(
+    client: httpx.AsyncClient, creds: Credentials, status: int
+) -> None:
+    error = await probe_refused(client, creds, status)
+
+    assert triple(error) == triple(shared_error(status))
+
+
+@pytest.mark.anyio
+async def test_probe_asks_for_the_node_type_and_the_id_and_nothing_else(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    _, request = await probed(client, creds, multistatus("120", folder=True))
+
+    assert request.headers["depth"] == "0"
+    assert b"resourcetype" in request.content
+    assert b"fileid" in request.content
+    assert b"permissions" not in request.content, "D-31-05: no rights pre-check"
+    assert b"getcontentlength" not in request.content
+
+
+@pytest.mark.anyio
+async def test_the_mkcol_name_refusal_is_the_public_factory(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    error = await refused(client, creds, 400)
+
+    assert triple(error) == triple(dav.name_rejected(TARGET))

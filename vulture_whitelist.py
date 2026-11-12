@@ -37,6 +37,10 @@ talk_send
 mail_browse
 contacts_search
 
+# --- Tool logic ahead of its registration ---------------------------------------------
+# Temporary: registered as files_create_folder in plan 31-03; remove there.
+create_folder
+
 # --- Framework entry points -----------------------------------------------------------
 # health: registered with @mcp.custom_route and checked by tests/unit/test_transport_
 #   security.py and the client matrix, which waits for it before every run.

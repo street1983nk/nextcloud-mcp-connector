@@ -89,6 +89,21 @@ def parent_missing(path: str) -> ToolError:
     )
 
 
+def name_rejected(path: str) -> ToolError:
+    """The error of a folder name Nextcloud does not accept: a 400 on a folder request.
+
+    The one source of this sentence, shared by the MKCOL and by the read that counts the
+    missing folders of a chain, where an invalid name answers 400 before anything exists.
+    """
+    return ToolError(
+        message=f"Nextcloud does not accept the folder name in {path}.",
+        hint=(
+            "Avoid reserved names such as .htaccess, a backslash, a trailing space or "
+            "dot, and very long names."
+        ),
+    )
+
+
 _STAT_PROPS = (
     f"{{{xml.DAV}}}getcontentlength",
     f"{{{xml.DAV}}}getcontenttype",
@@ -97,6 +112,13 @@ _STAT_PROPS = (
     f"{{{xml.DAV}}}resourcetype",
     f"{{{xml.OC}}}fileid",
     f"{{{xml.OC}}}permissions",
+)
+
+#: The two properties folder creation reads, and nothing else: is there a folder, and
+#: which id does it have. No rights pre-check, the 403 is the answer (D-31-05).
+_PROBE_PROPS = (
+    f"{{{xml.DAV}}}resourcetype",
+    f"{{{xml.OC}}}fileid",
 )
 
 #: Selected for every search hit. Only queryable properties may appear in the comparison,
@@ -214,6 +236,59 @@ async def stat(client: httpx.AsyncClient, creds: Credentials, path: str) -> dict
         "fileid": props.get(f"{{{xml.OC}}}fileid", ""),
         "permissions": props.get(f"{{{xml.OC}}}permissions", ""),
         "is_collection": f"{{{xml.DAV}}}collection" in resourcetype,
+    }
+
+
+def _probe_body() -> bytes:
+    """Build the lean PROPFIND body of :func:`probe_folder` with lxml (threat T-01-11)."""
+    root = etree.Element(
+        f"{{{xml.DAV}}}propfind",
+        nsmap={"d": xml.DAV, "oc": xml.OC},
+    )
+    prop = etree.SubElement(root, f"{{{xml.DAV}}}prop")
+    for name in _PROBE_PROPS:
+        etree.SubElement(prop, name)
+    return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+
+async def probe_folder(
+    client: httpx.AsyncClient,
+    creds: Credentials,
+    path: str,
+) -> dict[str, Any] | None:
+    """Read whether a node exists and is a folder, plus its file id; ``None`` when missing.
+
+    The read of folder creation, kept apart from :func:`stat` for two reasons. It asks for
+    the node type and the id only: no rights pre-check, the 403 is the answer (D-31-05).
+    And it names the two answers a chain of missing folders meets and ``_check`` has no
+    sentence for: 409 is a node below a file and counts as missing like a 404, 400 is a
+    name Nextcloud refuses before anything exists.
+    """
+    target = safe_path(path)
+    response = await client.request(
+        "PROPFIND",
+        files_url(creds, target),
+        headers={"Depth": "0", "Content-Type": "application/xml"},
+        content=_probe_body(),
+        auth=creds.auth(),
+    )
+    if response.status_code in (404, 409):
+        return None
+    if response.status_code == 400:
+        raise name_rejected(target)
+    _check(response, target)
+
+    entries = xml.parse_multistatus(response.content)
+    if not entries:
+        raise ToolError(
+            message=f"Nextcloud returned no properties for {target}.",
+            hint="Check the path in the Nextcloud web interface and try again.",
+        )
+    props = entries[0][1]
+    return {
+        "path": target,
+        "is_collection": f"{{{xml.DAV}}}collection" in props.get(f"{{{xml.DAV}}}resourcetype", ""),
+        "fileid": props.get(f"{{{xml.OC}}}fileid", ""),
     }
 
 
@@ -1058,13 +1133,7 @@ def _check_mkcol(response: httpx.Response, path: str) -> None:
             reason=REASON_PERMISSION_DENIED,
         )
     if status == 400:
-        raise ToolError(
-            message=f"Nextcloud does not accept the folder name in {path}.",
-            hint=(
-                "Avoid reserved names such as .htaccess, a backslash, a trailing space or "
-                "dot, and very long names."
-            ),
-        )
+        raise name_rejected(path)
     if status in (404, 409):
         raise parent_missing(path)
     if status == 423:

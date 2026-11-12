@@ -13,8 +13,9 @@ The two list tools add another guard: every answer that had to stop early says s
 ``truncated`` and hands out a cursor handle, so a folder with ten thousand entries costs
 one page, not one context window (threat T-01-34).
 
-``upload`` is the only write in this package, and it can only create. Everything that
-could turn it into a replace is refused before the request or by Nextcloud itself.
+``upload`` and ``create_folder`` are the only writes in this package that add something,
+and both can only create. Everything that could turn an upload into a replace is refused
+before the request or by Nextcloud itself; a folder that already exists is left as it is.
 """
 
 import asyncio
@@ -23,6 +24,7 @@ import re
 import tempfile
 import uuid
 from collections.abc import AsyncIterator, Mapping
+from posixpath import dirname
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -54,6 +56,10 @@ HARD_DOWNLOAD_BYTES = 8 * 1024 * 1024
 HARD_UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024
 MIN_UPLOAD_CHUNK_BYTES = 5 * 1024 * 1024
 MAX_UPLOAD_CHUNKS = 10_000
+
+#: How many folders one ``create_folder`` call may add (D-31-01). Counted before the
+#: first write, so the cap alone never leaves half a chain behind.
+MAX_NEW_FOLDERS = 10
 
 DEFAULT_SEARCH_LIMIT = 25
 #: Nextcloud's own default cap for a search without an explicit limit. Going past it would
@@ -658,6 +664,212 @@ async def upload(
 
     await _writable(clients, target)
     return await dav.put_new_file(clients.client, clients.creds, target, data, content_type)
+
+
+async def create_folder(
+    clients: NcClients,
+    *,
+    path: str,
+    parents: bool = False,
+) -> dict[str, Any]:
+    """Create a folder, with ``parents`` also its missing parent folders, top down.
+
+    The answer is ``path``, ``created`` and the ``id`` of the folder; with ``parents`` it
+    also lists the folders this call really added as ``created_folders`` (D-31-03). A
+    folder that is already there is a success with ``created`` false, and its id comes
+    out of the one read that tells a folder from a file (D-31-04); a file at the path is
+    a conflict.
+
+    D-31-01: with ``parents`` the missing folders are counted from the target upwards
+    before anything is written. More than :data:`MAX_NEW_FOLDERS` of them is refused with
+    the counted number, and nothing is created.
+
+    D-31-02: when a folder of the chain fails after others were created, the sentence of
+    that failure stays as it is and names what this call left in place.
+
+    D-31-05: no rights pre-check, the 403 is the answer. Without ``parents`` no read goes
+    out before the write at all.
+
+    A target tagged ``kein-ki``, or below a tagged folder, is refused before any request
+    with the sentence of a missing parent folder, and nothing is written while the tag
+    check cannot be answered: :func:`_writable` runs first and again before every single
+    write of the chain. The sandbox root is never created and never the target.
+    """
+    target = dav.safe_path(path)
+    root = config.files_root()
+    if target == root:
+        raise ToolError(
+            message="The folder path is the root folder, which always exists.",
+            hint="Name a folder below the root, for example /Projects/2026.",
+        )
+
+    # Before any request: a PROPFIND ahead of the check would itself tell an existing
+    # path from a missing one.
+    await _writable(clients, target)
+
+    if not parents:
+        try:
+            made = await dav.make_folder(clients.client, clients.creds, target)
+        except ToolError as err:
+            raise _parent_missing_of(err, target) from None
+        if not made["created"]:
+            existing = await _existing_folder(clients, target)
+            return _folder_answer(target, False, existing["fileid"])
+        fileid = made["fileid"] or await _late_fileid(clients, target)
+        return _folder_answer(target, True, fileid)
+
+    missing, found = await _missing_folders(clients, target, root)
+    if found is not None and not found["is_collection"]:
+        raise _file_in_the_way(found["path"])
+    if found is not None and found["path"] == target:
+        return _folder_answer(target, False, found["fileid"], [])
+    if found is None and root != "/":
+        # The sandbox root is only ever read. It is not this tool's to create.
+        base = await _probe(clients, root, target)
+        if base is None:
+            raise dav.parent_missing(target)
+        if not base["is_collection"]:
+            raise _file_in_the_way(root)
+    if len(missing) > MAX_NEW_FOLDERS:
+        raise ToolError(
+            message=(
+                f"Creating {target} needs {len(missing)} new folders; one call creates "
+                f"at most {MAX_NEW_FOLDERS}."
+            ),
+            hint="Create the upper part of the path first, then call again with the rest.",
+        )
+
+    created: list[str] = []
+    fileid = ""
+    for segment in reversed(missing):
+        try:
+            # The target is what is checked, never the segment: every segment is an
+            # ancestor of the target, so the one cached answer of this call covers it.
+            await _writable(clients, target)
+            made = await dav.make_folder(clients.client, clients.creds, segment)
+            if made["created"]:
+                created.append(segment)
+                fileid = made["fileid"]
+            else:
+                # Somebody else was faster. A folder there is fine and is not ours to list.
+                fileid = (await _existing_folder(clients, segment))["fileid"]
+        except ToolError as err:
+            raise _with_created(_parent_missing_of(err, target), created) from None
+
+    made_target = bool(created) and created[-1] == target
+    if made_target and not fileid:
+        fileid = await _late_fileid(clients, target)
+    return _folder_answer(target, made_target, fileid, created)
+
+
+async def _missing_folders(
+    clients: NcClients, target: str, root: str
+) -> tuple[list[str], dict[str, Any] | None]:
+    """Count the missing folders from ``target`` upwards, up to the first node that exists.
+
+    Returns the missing paths bottom up and that first existing node, or ``None`` for it
+    when every candidate below the root is missing. The root itself is never a candidate.
+    """
+    missing: list[str] = []
+    candidate = target
+    while dav.within(candidate, root) and candidate != root:
+        node = await _probe(clients, candidate, target)
+        if node is not None:
+            return missing, node
+        missing.append(candidate)
+        candidate = dirname(candidate) or "/"
+    return missing, None
+
+
+async def _probe(clients: NcClients, node: str, target: str) -> dict[str, Any] | None:
+    """``dav.probe_folder`` of ``node``; a refused name is reported for the ``target``."""
+    try:
+        return await dav.probe_folder(clients.client, clients.creds, node)
+    except ToolError as err:
+        if _same_error(err, dav.name_rejected(node)):
+            raise dav.name_rejected(target) from None
+        raise
+
+
+async def _existing_folder(clients: NcClients, path: str) -> dict[str, Any]:
+    """The node behind a 405 of a folder creation: a folder, or a conflict.
+
+    Nextcloud words the 405 the same for a folder and a file, so one read decides, and
+    the same read hands out the id (D-31-04).
+    """
+    node = await dav.probe_folder(clients.client, clients.creds, path)
+    if node is None:
+        raise ConflictError(
+            message=f"{path} changed concurrently while the folder was created.",
+            hint="List the parent folder and try again.",
+        )
+    if not node["is_collection"]:
+        raise _file_in_the_way(path)
+    return node
+
+
+async def _late_fileid(clients: NcClients, target: str) -> str:
+    """The id of a folder whose creation answer carried none, or an empty string.
+
+    Best-effort by design: once Nextcloud accepted the write, no follow-up read may turn
+    the answer into an error, or the caller would retry a write that happened.
+    """
+    try:
+        node = await dav.probe_folder(clients.client, clients.creds, target)
+    except (httpx.HTTPError, ToolError):
+        return ""
+    return node["fileid"] if node is not None else ""
+
+
+def _file_in_the_way(path: str) -> ConflictError:
+    return ConflictError(
+        message=f"A file, not a folder, already exists at {path}.",
+        hint="Choose another name; this tool never replaces a file.",
+    )
+
+
+def _same_error(left: ToolError, right: ToolError) -> bool:
+    return (left.message, left.hint, left.reason) == (right.message, right.hint, right.reason)
+
+
+def _parent_missing_of(err: ToolError, target: str) -> ToolError:
+    """Name the target, not the segment, in the refusal of a missing parent.
+
+    The guard refuses a withheld target with ``dav.parent_missing(target)``; a real 404
+    or 409 inside a chain has to be that very object, or the two could be told apart.
+    """
+    return dav.parent_missing(target) if err.reason == REASON_UNKNOWN_ID else err
+
+
+def _with_created(err: ToolError, created: list[str]) -> ToolError:
+    """Append what this call already created to the sentence of a failure (D-31-02).
+
+    With nothing created the error comes back untouched, so it stays byte for byte the
+    error of its branch.
+    """
+    if not created:
+        return err
+    kept = ", ".join(created)
+    return type(err)(
+        message=f"{err.message} Already created in this call and left in place: {kept}.",
+        hint=err.hint,
+        reason=err.reason,
+    )
+
+
+def _folder_answer(
+    path: str,
+    created: bool,
+    fileid: str,
+    created_folders: list[str] | None = None,
+) -> dict[str, Any]:
+    """The answer shape of ``create_folder``; an id that could not be read is left out."""
+    answer: dict[str, Any] = {"path": path, "created": created}
+    if fileid:
+        answer["id"] = ids.encode_file(fileid)
+    if created_folders is not None:
+        answer["created_folders"] = created_folders
+    return answer
 
 
 def _openai_download_url(value: str) -> str:
