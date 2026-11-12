@@ -21,6 +21,16 @@ gets stronger by it rather than weaker, because a tool the registry gained and n
 added to this run is named by it. The output is a matrix of tool name, verdict and the
 first line of the answer, so a failure is attributable without a rerun.
 
+Exit code 1 means a tool failed or was never called. Exit code 3 means that every tool
+answered and one step met a missing prerequisite of the test instance (verdict ``PREREQ``):
+that is neither a pass nor a tool failure, and the line names what the instance lacks. The
+one such step is the full text of a mail. The Mail app lists messages out of its own cache,
+so a mail server that lost them still shows a list; the GreenMail of the test topology keeps
+mail in memory and is empty after every restart. When ``fetch`` fails on a listed message,
+the script asks the Mail app of the instance for the same message with the same account,
+past the connector. Only when the Mail app itself answers with a server error is the step a
+``PREREQ``; if the Mail app answers and the tool did not, it is a ``FAIL``.
+
 The calls build on each other on purpose: the file uploaded in step one is the file that
 ``files_read``, ``unified_search``, ``search`` and ``fetch`` look for later. A tool that
 answers "no hits" for an object created seconds earlier is a failure, not an empty result,
@@ -63,6 +73,7 @@ import zipfile
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import httpx
 from mcp import Client, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.types import TextContent
@@ -73,6 +84,12 @@ REQUIRED_ENV = ("NC_MCP_URL", "NC_MCP_USER", "NC_MCP_APP_PASSWORD")
 #: constant because the chain below would otherwise carry the same string five times, and five
 #: copies of a tool name are five places to miss when that tool is renamed.
 MAIL_BROWSE = "mail_browse"
+
+#: The verdict of a step that met a missing prerequisite of the test instance: not a pass,
+#: not a tool failure. It has an exit code of its own, see the module docstring.
+PREREQ = "PREREQ"
+EXIT_PREREQ = 3
+SERVER_ERROR = 500
 
 #: The type of the one document this run converts with ``files_read_as_markdown``.
 DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -90,11 +107,17 @@ class Report:
 
     def add(self, tool: str, verdict: str, detail: str) -> None:
         flat = " ".join(str(detail).split())
-        self.rows.append((tool, verdict, flat[:110]))
+        # A missing prerequisite keeps its whole reason: it is the one line somebody has
+        # to act on outside this repository.
+        self.rows.append((tool, verdict, flat if verdict == PREREQ else flat[:110]))
         print(f"  {verdict:<7} {tool:<22} {flat[:90]}", flush=True)
 
     def failures(self) -> list[str]:
         return [tool for tool, verdict, _ in self.rows if verdict == "FAIL"]
+
+    def prerequisites(self) -> list[str]:
+        """The full reason of every step that met a missing prerequisite of the instance."""
+        return [f"{tool}: {detail}" for tool, verdict, detail in self.rows if verdict == PREREQ]
 
     def called(self) -> set[str]:
         return {tool for tool, verdict, _ in self.rows if verdict in ("OK", "SKIP")}
@@ -391,8 +414,11 @@ async def run(client: Client, report: Report) -> set[str]:
     # number would be a request about somebody's mail, and message: and table: are no
     # different. Where the id is missing, the reason says whether the instance holds no such
     # object or the read before it failed.
+    if mail_id:
+        await _fetch_mail(client, report, mail_id)
+    else:
+        report.add("fetch", "SKIP", mail_reason)
     for identifier, reason in (
-        (mail_id, mail_reason),
         (message_id, message_reason),
         _table_to_fetch(listing),
     ):
@@ -556,6 +582,61 @@ async def _mail_message_id(client: Client, report: Report) -> tuple[str, str]:
     return identifier, ""
 
 
+async def _fetch_mail(client: Client, report: Report, identifier: str) -> None:
+    """``fetch`` of one listed mail, with a failure sorted into tool or test instance.
+
+    A failed ``fetch`` of a mail has two possible owners. The connector, and then it is a
+    FAIL like any other. Or the mail server behind the Mail app, which is not a connector
+    feature: the Mail app lists messages from its cache and reads the text over IMAP, so
+    a mail server that lost its mail (the GreenMail of the test topology after a restart)
+    fails exactly here and nowhere before. The Mail app is therefore asked directly, past
+    the connector. A server error from the Mail app itself makes this a PREREQ, a missing
+    prerequisite of the instance, which is never counted as a pass; any other answer
+    leaves the FAIL where it belongs.
+    """
+    try:
+        result = await client.call_tool("fetch", {"id": identifier})
+    # Broad on purpose, as in ``call``: one broken tool must land in the matrix.
+    except Exception as exc:
+        report.add("fetch", "FAIL", f"{type(exc).__name__}: {exc}")
+        return
+    payload = text_of(result)
+    if not result.is_error:
+        report.add("fetch", "OK", payload)
+        return
+    status = await _mail_app_status(identifier)
+    if status is not None and status >= SERVER_ERROR:
+        report.add(
+            "fetch",
+            PREREQ,
+            f"the Mail app of this instance itself answers HTTP {status} for {identifier}: "
+            "its mail server does not hand out a message it lists",
+        )
+        return
+    asked = "did not answer" if status is None else f"answers HTTP {status}"
+    report.add("fetch", "FAIL", f"{payload} (the Mail app itself {asked} for that message)")
+
+
+async def _mail_app_status(identifier: str) -> int | None:
+    """The status the Mail app gives for one message when asked past the connector.
+
+    Same instance, same account, same app password as the server under test, and nothing
+    of the answer but its status is used. ``None`` when the request itself failed.
+    """
+    number = identifier.rsplit(":", 1)[-1]
+    url = f"{os.environ['NC_MCP_URL'].rstrip('/')}/ocs/v2.php/apps/mail/message/{number}"
+    try:
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=False) as direct:
+            response = await direct.get(
+                url,
+                headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+                auth=(os.environ["NC_MCP_USER"], os.environ["NC_MCP_APP_PASSWORD"]),
+            )
+    except httpx.HTTPError:
+        return None
+    return response.status_code
+
+
 def _preferred_mailbox(payload: dict[str, Any]) -> str:
     """The ``databaseId`` of the inbox of an account, or of the first mailbox it lists.
 
@@ -618,8 +699,19 @@ async def main() -> int:
         print(f"\nFAIL: never called: {', '.join(sorted(never_called))}", file=sys.stderr)
     if failures:
         print(f"FAIL: {len(failures)} tools failed: {', '.join(failures)}", file=sys.stderr)
+    prerequisites = report.prerequisites()
+    for line in prerequisites:
+        print(f"\nPREREQ: {line}", file=sys.stderr)
     if never_called or failures:
         return 1
+    if prerequisites:
+        print(
+            f"\nINCOMPLETE: all {len(registry)} tools of the registry answered, but "
+            f"{len(prerequisites)} step met a missing prerequisite of the test instance "
+            "(see PREREQ above). This is not a pass.",
+            file=sys.stderr,
+        )
+        return EXIT_PREREQ
 
     print(f"\nOK: all {len(registry)} tools of the registry answered over stdio.")
     return 0
