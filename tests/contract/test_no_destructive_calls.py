@@ -603,6 +603,194 @@ def test_the_put_gate_flags_each_planted_bypass() -> None:
         assert findings == [], f"the gate flagged a legitimate PUT:\n{source}"
 
 
+#: Every MKCOL call in the production code, counted. MKCOL is the one verb besides PUT that
+#: creates something in the user's files, so it gets a positive statement instead of a
+#: needle: where it may live, what it may carry, and how many of them there are (FOLD-05,
+#: T-31-10). A third call is a review event.
+EXPECTED_MKCOL_CALLS = 2  # chunk staging folder + files_create_folder
+
+#: The one module that may send a MKCOL, in the spelling of :data:`CHUNK_ASSEMBLY_MOVE`.
+MKCOL_HOME = "nextcloud/clients/dav.py"
+
+#: The keywords that give an httpx request a body. A MKCOL with a body is an extended MKCOL
+#: (RFC 5689) that can set properties on the new collection, which no tool here may do.
+_MKCOL_BODY_KEYWORDS = frozenset({"content", "data", "json", "files"})
+
+
+def _is_mkcol_constant(node: ast.AST | None) -> bool:
+    return isinstance(node, ast.Constant) and node.value == "MKCOL"
+
+
+def _mkcol_findings(relative: str, tree: ast.AST) -> tuple[list[str], int]:
+    """Every MKCOL in ``tree`` that leaves the one allowed form, plus the count.
+
+    The allowed form is ``<client>.request("MKCOL", ...)`` inside :data:`MKCOL_HOME` with
+    spelled-out keywords, none of which carries a body. The verb passed as ``method=`` is
+    reported instead of counted: the pin only sees the positional spelling, so the keyword
+    spelling would be a MKCOL the count never notices.
+    """
+    findings: list[str] = []
+    seen = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        if any(kw.arg == "method" and _is_mkcol_constant(kw.value) for kw in node.keywords):
+            findings.append(f"{relative}:{node.lineno}: MKCOL passed as keyword")
+            continue
+        if not (
+            isinstance(node.func, ast.Attribute)
+            and node.func.attr == "request"
+            and bool(node.args)
+            and _is_mkcol_constant(node.args[0])
+        ):
+            continue
+        seen += 1
+        if relative != MKCOL_HOME:
+            findings.append(f"{relative}:{node.lineno}: MKCOL outside {MKCOL_HOME}")
+        if any(kw.arg in _MKCOL_BODY_KEYWORDS for kw in node.keywords):
+            findings.append(f"{relative}:{node.lineno}: MKCOL with a body")
+        if any(kw.arg is None for kw in node.keywords):
+            findings.append(
+                f"{relative}:{node.lineno}: MKCOL with unpacked keywords, which may hide a body"
+            )
+    return findings, seen
+
+
+def _mkcol_literals(tree: ast.AST) -> list[int]:
+    """The line of every string constant ``"MKCOL"`` in code; docstrings do not count.
+
+    Comments never reach the syntax tree, and a docstring that merely talks about the verb
+    contains it without being equal to it. The pieces of an f-string are constants of their
+    own, so ``f"MKCOL"`` is seen as well.
+    """
+    docstrings: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        first = node.body[0] if node.body else None
+        if (
+            isinstance(first, ast.Expr)
+            and isinstance(first.value, ast.Constant)
+            and isinstance(first.value.value, str)
+        ):
+            docstrings.add(id(first.value))
+    return sorted(
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and _is_mkcol_constant(node)
+        and id(node) not in docstrings
+    )
+
+
+def _parsed_sources() -> list[tuple[str, ast.Module]]:
+    return [
+        (
+            path.relative_to(SRC).as_posix(),
+            ast.parse(path.read_text(encoding="utf-8"), filename=str(path)),
+        )
+        for path in _source_files()
+    ]
+
+
+def test_every_mkcol_lives_in_dav_and_carries_no_body() -> None:
+    """FOLD-05: two MKCOL calls, both in the DAV client, neither with a body."""
+    findings: list[str] = []
+    total = 0
+    home_literals = 0
+    for relative, tree in _parsed_sources():
+        found, seen = _mkcol_findings(relative, tree)
+        findings.extend(found)
+        total += seen
+        if relative == MKCOL_HOME:
+            home_literals = len(_mkcol_literals(tree))
+
+    assert findings == [], "MKCOL outside its one allowed form:\n" + "\n".join(findings)
+    assert total == EXPECTED_MKCOL_CALLS, (
+        f"the production code carries {total} MKCOL calls, the gate expects "
+        f"{EXPECTED_MKCOL_CALLS}; a new MKCOL is a review event, update the pin deliberately"
+    )
+    assert home_literals == total, (
+        f"{MKCOL_HOME} spells the verb {home_literals} times but sends it in {total} counted "
+        "calls; a verb held in a variable or handed to build_request walks past the count"
+    )
+
+
+def test_no_mkcol_literal_outside_dav() -> None:
+    """The verb is spelled in one module only, whatever call form would carry it."""
+    findings = [
+        f"{relative}:{lineno}: the literal MKCOL outside {MKCOL_HOME}"
+        for relative, tree in _parsed_sources()
+        if relative != MKCOL_HOME
+        for lineno in _mkcol_literals(tree)
+    ]
+    assert findings == [], "MKCOL spelled outside the DAV client:\n" + "\n".join(findings)
+
+
+#: Shapes the MKCOL gate must flag, as (file, source, counted calls). The third is the
+#: keyword spelling: it is reported and deliberately not counted. The fourth hides the
+#: keywords from the reader of the call, and a body with them.
+_PLANTED_MKCOLS = [
+    (
+        MKCOL_HOME,
+        'async def f(client, url):\n    await client.request("MKCOL", url, content=b"<x/>")\n',
+        1,
+    ),
+    (
+        "tools/files.py",
+        'async def f(client, url):\n    await client.request("MKCOL", url)\n',
+        1,
+    ),
+    (
+        MKCOL_HOME,
+        'async def f(client, url):\n    await client.request(method="MKCOL", url=url)\n',
+        0,
+    ),
+    (
+        MKCOL_HOME,
+        'async def f(client, url, extra):\n    await client.request("MKCOL", url, **extra)\n',
+        1,
+    ),
+]
+
+#: The form the two real calls have, and a docstring that only talks about the verb.
+_HONEST_MKCOL = (
+    'async def f(client, url, auth):\n    """Send "MKCOL" without a body."""\n'
+    '    await client.request("MKCOL", url, headers={"Destination": url}, auth=auth)\n'
+)
+
+#: Spellings of the verb no call check sees, each of which the literal check must report.
+_PLANTED_MKCOL_LITERALS = [
+    'VERB = "MKCOL"\n',
+    'async def f(client, url):\n    await client.send(client.build_request("MKCOL", url))\n',
+    'async def f(client, url):\n    await client.request(f"MKCOL", url)\n',
+    'def f():\n    """Explain."""\n    return "MKCOL"\n',
+]
+
+
+def test_the_mkcol_gate_flags_each_planted_bypass() -> None:
+    """The needle is proven against the shapes it exists for, not assumed (counter proof)."""
+    for relative, source, counted in _PLANTED_MKCOLS:
+        findings, seen = _mkcol_findings(relative, ast.parse(source))
+        assert seen == counted, source
+        assert findings, f"the gate missed a planted MKCOL bypass in {relative}:\n{source}"
+
+    findings, seen = _mkcol_findings(MKCOL_HOME, ast.parse(_HONEST_MKCOL))
+    assert seen == 1, _HONEST_MKCOL
+    assert findings == [], f"the gate flagged the legitimate MKCOL form:\n{_HONEST_MKCOL}"
+    assert len(_mkcol_literals(ast.parse(_HONEST_MKCOL))) == 1, (
+        "the one literal is the verb of the call; the docstring does not count"
+    )
+
+    for source in _PLANTED_MKCOL_LITERALS:
+        assert _mkcol_literals(ast.parse(source)), (
+            f"the literal check missed a planted spelling:\n{source}"
+        )
+    assert _mkcol_literals(ast.parse('"""MKCOL"""\n')) == [], (
+        "a docstring is prose, even one that is exactly the verb"
+    )
+
+
 def _is_own_sql(relative: str, text: str) -> bool:
     """True for a statement against our own store file, false for anything else."""
     return relative in FILES_WITH_OWN_SQL and any(form in text for form in SQL_DELETE_FORMS)
