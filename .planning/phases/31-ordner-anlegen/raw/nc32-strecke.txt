@@ -1,0 +1,248 @@
+BASIS 91c3b5113c541999d3d3363ab71c6b26a9dd41c9
+
+Rohprotokoll Plan 31-01, Strecke Nextcloud 32 unter AppAPI-Impersonation
+Stand Task 1, 2026-11-12 (Europe/Berlin), Docker Server 29.5.2
+Arbeitsort: Worktree tasks-080, Branch plan/v1.8-tasks-080
+In diesem Task liefen nur lesende Docker-Befehle. Kein Container wurde gestartet,
+gestoppt oder gelöscht, kein Volume und kein Netz verändert.
+Dieses Protokoll enthält keine Secret-Werte.
+
+== (0) Basis der Phase ==
+
+    $ git log -1 --format=%s
+    docs(31): create phase plan
+    $ git ls-files --error-unmatch 31-01-PLAN.md bis 31-06-PLAN.md
+    alle sechs gefunden
+    $ git diff --quiet HEAD -- .planning/phases/31-ordner-anlegen/ ; echo $?
+    0
+    $ git rev-parse HEAD > 31-BASE.txt ; cat 31-BASE.txt ; wc -l < 31-BASE.txt
+    91c3b5113c541999d3d3363ab71c6b26a9dd41c9
+    1
+
+== (1) RAM-Gate ==
+
+RAM frei_host_gb=3.59 schwelle=4.0 ergebnis=zu wenig
+    $ powershell -NoProfile -Command "(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory"
+    3759424        (KiB, erste Messung, vor dem Inventar)
+    3862016        (KiB, zweite Messung, nach dem Inventar, 3.68 GiB)
+    2814804        (KiB, dritte Messung, am Ende des Tasks, 2.68 GiB)
+    $ docker ps --format "{{.Names}} {{.Image}} {{.Status}}"        (vorher)
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up About a minute
+    $ docker stats --no-stream --format "{{.Name}} {{.MemUsage}} {{.CPUPerc}}"
+    gameworld-dev-gameworld-docker-proxy-1 25.47MiB / 5.786GiB 0.00%
+
+RAM folge=kein Containerstart in diesem Task
+    Das Gate ist rot. Der einzige laufende Container ist fremd (gameworld-dev-*), er ist
+    weder Nextcloud noch Datenbank noch mcp_connector und wurde nicht angefasst.
+    Die Abhilfe des Rahmens (drop_caches in der Docker-VM, 75 s warten) gilt nur bei leerem
+    Docker; Docker ist nicht leer, sie wurde deshalb nicht ausgeführt.
+    Vor Task 3 muss das Gate erneut gemessen werden und grün sein.
+
+== (2) Inventar ==
+
+VOLUME nc-mcp-exapp_nextcloud-exapp-data vorhanden=ja
+    $ docker volume ls --filter name=nc-mcp-exapp
+    DRIVER    VOLUME NAME
+    local     nc-mcp-exapp_nextcloud-exapp-data
+    local     nc-mcp-exapp_registry-exapp-data
+    $ docker volume inspect nc-mcp-exapp_nextcloud-exapp-data --format '{{.CreatedAt}} {{json .Labels}}'
+    2026-08-20T04:37:57Z {"com.docker.compose.config-hash":"7956791bfc7c306daeeda3243d0813a5a20db5f9de9a835b5bda06e512e830da","com.docker.compose.project":"nc-mcp-exapp","com.docker.compose.version":"5.1.4","com.docker.compose.volume":"nextcloud-exapp-data"}
+    $ docker system df -v | grep nc-mcp-exapp_
+    nc-mcp-exapp_registry-exapp-data                                   1         576.9MB
+    nc-mcp-exapp_nextcloud-exapp-data                                  1         1.662GB
+
+CONTAINER nc-mcp-exapp-nc vorhanden=ja image=nextcloud:34.0.3-apache
+    $ docker ps -a --filter name=nc-mcp-exapp --format "{{.Names}} {{.Image}} {{.Status}}"
+    nc-mcp-exapp-greenmail greenmail/standalone:2.1.12 Exited (143) 6 weeks ago
+    nc-mcp-exapp-nc nextcloud:34.0.3-apache Exited (0) 6 weeks ago
+    nc-mcp-exapp-caddy caddy:2 Exited (0) 6 weeks ago
+    nc-mcp-exapp-harp ghcr.io/nextcloud/nextcloud-appapi-harp:release Exited (0) 6 weeks ago
+    nc-mcp-exapp-registry registry:2 Exited (2) 6 weeks ago
+    $ docker inspect nc-mcp-exapp-nc --format '{{.Config.Image}} | {{.State.Status}} | {{.State.FinishedAt}} | {{range .Mounts}}{{.Name}}->{{.Destination}} {{end}}'
+    nextcloud:34.0.3-apache | exited | 2026-10-01T02:56:18.173421994Z | nc-mcp-exapp_nextcloud-exapp-data->/var/www/html
+    $ docker ps -a --filter label=com.docker.compose.project=nc-mcp-exapp --format "{{.Names}}"
+    nc-mcp-exapp-greenmail
+    nc-mcp-exapp-nc
+    nc-mcp-exapp-caddy
+    nc-mcp-exapp-harp
+    nc-mcp-exapp-registry
+
+EXAPP-CONTAINER nc_app_mcp_connector vorhanden=ja laeuft=nein netz=nc-mcp-nc35-net
+EXAPP-CONTAINER nc_app_mcp_connector_park34 vorhanden=ja laeuft=nein netz=nc-mcp-exapp-net
+    $ docker ps -a --filter name=nc_app_mcp_connector --format "{{.Names}} {{.Image}} {{.Status}}"
+    nc_app_mcp_connector 127.0.0.1:5000/mcp_connector:0.3.2 Exited (0) 12 hours ago
+    nc_app_mcp_connector_park34 127.0.0.1:5000/mcp_connector:0.1.11 Exited (0) 6 weeks ago
+    $ docker inspect <name> --format '{{.Name}} image={{.Config.Image}} netze={{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'
+    /nc_app_mcp_connector image=127.0.0.1:5000/mcp_connector:0.3.2 netze=nc-mcp-nc35-net
+    /nc_app_mcp_connector_park34 image=127.0.0.1:5000/mcp_connector:0.1.11 netze=nc-mcp-exapp-net
+    Befund: nc_app_mcp_connector_park34 trägt kein Compose-Label des Projekts nc-mcp-exapp
+    (er fehlt in der Liste nach Label oben), hängt aber am Netz nc-mcp-exapp-net. Der Plan
+    nennt diesen Container nicht. Ein down -v entfernt ihn nicht; was mit dem Netz geschieht,
+    an dem er hängt, ist hier nicht gemessen.
+
+NC35 laeuft=nein
+    $ docker ps -a --filter name=nc35- --format "{{.Names}} {{.Image}} {{.Status}}"
+    nc35-test-issuer caddy:2 Exited (0) 6 weeks ago
+    nc35-greenmail greenmail/standalone:2.1.12 Exited (143) 6 weeks ago
+    nc35-caddy caddy:2 Exited (0) 12 hours ago
+    nc35-harp ghcr.io/nextcloud/nextcloud-appapi-harp:release Exited (0) 12 hours ago
+    nc35-nc nextcloud:35.0.0-apache-local Exited (0) 12 hours ago
+
+NETZ nc-mcp-exapp-net vorhanden=ja
+    $ docker network ls --filter name=nc-mcp-exapp
+    NETWORK ID     NAME               DRIVER    SCOPE
+    95326f3b7ca6   nc-mcp-exapp-net   bridge    local
+
+IMAGE nextcloud:32.0.15-apache lokal=ja
+    $ docker image ls nextcloud --format "{{.Repository}}:{{.Tag}}"
+    nextcloud:33-apache
+    nextcloud:35.0.2-apache
+    nextcloud:32.0.15-apache
+    nextcloud:35
+    nextcloud:34.0.4-apache
+    nextcloud:33.0.9-apache
+    nextcloud:35.0.0-apache-local
+    nextcloud:33.0.8-apache
+    nextcloud:34.0.3-apache
+    nextcloud:34-apache
+    nextcloud:33.0.7-apache
+    $ docker image ls 127.0.0.1:5000/mcp_connector --format "{{.Repository}}:{{.Tag}} {{.CreatedSince}}"
+    127.0.0.1:5000/mcp_connector:0.3.2 6 weeks ago
+    127.0.0.1:5000/mcp_connector:0.2.1 7 weeks ago
+    127.0.0.1:5000/mcp_connector:0.1.13 8 weeks ago
+    127.0.0.1:5000/mcp_connector:0.1.11 2 months ago
+    127.0.0.1:5000/mcp_connector:0.1.9 2 months ago
+    127.0.0.1:5000/mcp_connector:0.1.7 2 months ago
+    127.0.0.1:5000/mcp_connector:0.1.3 2 months ago
+    127.0.0.1:5000/mcp_connector:0.1.2 2 months ago
+    127.0.0.1:5000/mcp_connector:0.1.1 2 months ago
+    127.0.0.1:5000/mcp_connector:0.1.0 2 months ago
+    (Diese Images liegen im lokalen Image-Speicher des Hosts, zusätzlich zum Inhalt des
+    Registry-Volumes.)
+
+== (3) Fassung im Volume, ohne Start ==
+
+VOLUME fassung=34.0.3
+    Abweichung vom Plan: Der Plan sieht `docker run --rm -v ...:/d alpine:3 cat /d/version.php`
+    vor. Weil das RAM-Gate rot ist, wurde kein Container gestartet. Gelesen wurde über
+    `docker cp` aus dem gestoppten Container nc-mcp-exapp-nc, der das Volume unter
+    /var/www/html eingehängt hat (Mount siehe oben). Das ist nur lesend und startet nichts.
+    $ docker cp nc-mcp-exapp-nc:/var/www/html/version.php ./version.php ; cat ./version.php
+    <?php
+    $OC_Version = array(34,0,3,2);
+    $OC_VersionString = '34.0.3';
+    $OC_Edition = '';
+    $OC_Channel = 'stable';
+    $OC_VersionCanBeUpgradedFrom = array (
+      'nextcloud' =>
+      array (
+        '33.0' => true,
+        '34.0' => true,
+      ),
+      'owncloud' =>
+      array (
+        '10.13' => true,
+        '10.14' => true,
+        '10.15' => true,
+        '10.16' => true,
+      ),
+    );
+    $OC_Build = '2026-08-13T10:44:56+00:00 b11c68e25d6030187e02477d3d82013405f62965';
+    $vendor = 'nextcloud';
+
+VOLUME installiert=ja config_version=34.0.3.2
+    $ docker cp nc-mcp-exapp-nc:/var/www/html/config/config.php ./config.php ; grep -E "'(version|installed)'" ./config.php
+      'version' => '34.0.3.2',
+      'installed' => true,
+    (Nur diese zwei Zeilen wurden gelesen, die Kopie lag im Scratchpad außerhalb des Repos
+    und ist gelöscht.)
+
+VOLUME downgrade_auf_32=nicht möglich
+    Die Fassung im Volume (34.0.3) liegt über 32. Nextcloud verweigert Downgrades, das Volume
+    läuft also nicht mit nextcloud:32.0.15-apache weiter (Plan, Schritt 3).
+
+VOLUME nutzerdaten=admin,alice,bob,jane
+    $ docker cp nc-mcp-exapp-nc:/var/www/html/data - | tar -t | (erste Ebene)
+    .htaccess
+    .ncdata
+    admin
+    alice
+    appdata_ocltibiciwv5
+    bob
+    exapp_impersonation.log
+    flow.log
+    index.html
+    jane
+    nextcloud.db
+    nextcloud.log
+
+== (3b) Gehört die .env.exapp des Hauptcheckouts zu diesem Volume? ==
+
+ENVDATEI hauptcheckout vorhanden=ja geaendert=2026-09-07 worktree vorhanden=nein
+    $ ls -la --time-style=long-iso <checkout>/.env.exapp <checkout>/.env.nc35
+    C:/Users/Student/nextcloud-mcp-connector:
+      -rw-r--r-- 1 Student 197121 2591 2026-09-07 20:18 .env.exapp
+      -rw-r--r-- 1 Student 197121 2590 2026-10-01 13:26 .env.nc35
+    C:/Users/Student/nextcloud-mcp-connector-worktrees/tasks-080:
+      .env.exapp: No such file or directory
+      .env.nc35: No such file or directory
+    Variablennamen der Datei im Hauptcheckout (Werte nicht ausgegeben):
+    NC_MCP_URL NC_MCP_EXAPP_BASE NC_MCP_PUBLIC_URL NC_MCP_TEST_USER NC_MCP_TEST_APP_PASSWORD
+    NC_MCP_TEST_USER2 NC_MCP_TEST_APP_PASSWORD2 NC_MCP_TEST_SHARED_DIR NC_MCP_TEST_SHARED_FILE
+    NC_MCP_TEST_PRIVATE_FILE NC_MCP_TEST_SHARED_MARKER NC_MCP_TEST_TALK_ROOM
+    NC_MCP_TEST_TALK_READONLY_ROOM NC_MCP_TEST_PASSWORD NC_MCP_TEST_PASSWORD2 APP_ID APP_SECRET
+    APP_VERSION HP_SHARED_KEY
+    Nicht geheime Werte:
+    NC_MCP_URL=http://127.0.0.1:8081
+    NC_MCP_EXAPP_BASE=http://127.0.0.1:8081/exapps/mcp_connector
+    NC_MCP_TEST_USER=alice
+    NC_MCP_TEST_USER2=bob
+    NC_MCP_TEST_SHARED_DIR=mcp-share-04d2eb7d6d
+    APP_ID=mcp_connector
+    APP_VERSION=0.1.11
+
+ENVDATEI gehoert_zum_volume=ja belege=2
+    Beleg 1: Der Freigabeordner aus NC_MCP_TEST_SHARED_DIR (Zufallssuffix je Instanz) liegt
+    im Volume im Home von alice.
+    $ docker cp nc-mcp-exapp-nc:/var/www/html/data/alice/files/mcp-share-04d2eb7d6d - | tar -t
+    mcp-share-04d2eb7d6d/
+    mcp-share-04d2eb7d6d/mcp-shared-file-04d2eb7d6d.md
+    Gegenprobe mit einem Namen, den es nicht geben darf:
+    $ docker cp nc-mcp-exapp-nc:/var/www/html/data/alice/files/mcp-share-0000000000 -
+    Error response from daemon: Could not find the file /var/www/html/data/alice/files/mcp-share-0000000000 in container nc-mcp-exapp-nc
+    Beleg 2: HP_SHARED_KEY der Datei und HP_SHARED_KEY in der Umgebung des Containers
+    nc-mcp-exapp-harp sind gleich (Vergleich über SHA-256 beider Werte, beide nicht leer,
+    kein Wert ausgegeben).
+    gleich=ja
+    Nicht gemessen: ob APP_SECRET und die beiden App-Passwörter der Datei in der Datenbank
+    des Volumes noch gelten (dazu müsste die Instanz laufen).
+    Einschränkung: APP_VERSION der Datei ist 0.1.11, die Datei ist vom 2026-09-07, der
+    Container lief zuletzt am 2026-10-01. Die Datei kann also älter sein als der letzte
+    Stand der Registrierung im Volume.
+
+ENVDATEI ignoriert=ja
+    $ git check-ignore -v .env.exapp
+    .gitignore:6:.env.exapp	.env.exapp
+
+HARPCERTS hauptcheckout vorhanden=ja worktree vorhanden=nein
+    $ ls -d <checkout>/.harp-certs
+    C:/Users/Student/nextcloud-mcp-connector/.harp-certs/
+    C:/Users/Student/nextcloud-mcp-connector-worktrees/tasks-080/.harp-certs: No such file or directory
+
+== (4) Laufende Container ==
+
+LAEUFT nc35=nein nc-mcp-exapp=nein fremd=gameworld-dev-gameworld-docker-proxy-1
+    In diesem Task wurde nichts gestoppt. Es gibt für Task 3 nichts Eigenes zu stoppen.
+    $ docker ps --format "{{.Names}} {{.Image}} {{.Status}}"        (nachher)
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 3 minutes
+    $ docker ps -a --filter name=nc-mcp-exapp --format "{{.Names}} {{.Image}} {{.Status}}"        (nachher)
+    nc-mcp-exapp-greenmail greenmail/standalone:2.1.12 Exited (143) 6 weeks ago
+    nc-mcp-exapp-nc nextcloud:34.0.3-apache Exited (0) 6 weeks ago
+    nc-mcp-exapp-caddy caddy:2 Exited (0) 6 weeks ago
+    nc-mcp-exapp-harp ghcr.io/nextcloud/nextcloud-appapi-harp:release Exited (0) 6 weeks ago
+    nc-mcp-exapp-registry registry:2 Exited (2) 6 weeks ago
+    Die Liste der laufenden Container ist vorher und nachher gleich (ein fremder Container).
+
+== (5) Abschluss Task 1 ==
+
+ENTSCHEID NOETIG volume_abbau=ja
