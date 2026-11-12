@@ -3,37 +3,37 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: executing
-last_updated: "2026-11-12T01:45:00.000Z"
+last_updated: "2026-11-12T07:22:00.000Z"
 last_activity: 2026-11-12
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 5
-  completed_plans: 4
-  percent: 80
+  completed_plans: 5
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-11-11)
+See: .planning/PROJECT.md (updated 2026-11-12)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) läuft: 30-01 bis 30-04 sind ausgeführt, als Nächstes folgt 30-05.
+**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) ist mit 30-01 bis 30-05 ausgeführt, der Owner hat E15 am 12.11.2026 entschieden; als Nächstes folgt die Planung von Phase 31.
 
 ## Current Position
 
-Phase: 30 von 30 bis 34 (Mess-Spike Aufgaben und Ordner), in Ausführung
-Plan: 30-05 von 30-01 bis 30-05 ist der nächste; 30-01 bis 30-04 sind abgeschlossen
-Status: 30-04 ausgeführt (MESS-03 und MESS-04 gemessen: frisches Konto ohne Aufgabenliste, Sammlungsarten in der Discovery, Abfragen auf 32 bis 35 gleich, Kosten bei 2000 Aufgaben auf SQLite und PostgreSQL, Fixtures der Tasks-App), nächster Schritt Ausführung 30-05
-Last activity: 2026-11-12, Plan 30-04 ausgeführt (Discovery auf 32.0.15 und 35.0.2, Abfragen auf 32 bis 35, Provider-Link, Kosten der Aufgabensuche auf SQLite und PostgreSQL, create-only PUT unter Impersonation auf nc35, Fixtures), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
+Phase: 30 von 30 bis 34 (Mess-Spike Aufgaben und Ordner), alle fünf Pläne ausgeführt
+Plan: 30-01 bis 30-05 sind abgeschlossen; in Phase 30 ist kein Plan mehr offen
+Status: 30-05 ausgeführt (Messbericht abgeschlossen, kein Abbruchkriterium ausgelöst, Owner-Entscheid E15 vom 12.11.2026: eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge, ab Werk aus), nächster Schritt Planung von Phase 31
+Last activity: 2026-11-12, Plan 30-05 ausgeführt (Bericht Abschnitte 8 bis 11, Block report-check, Owner-Entscheid E15 samt A15, A16, A21 in Bericht 10.4, PROJECT.md, REQUIREMENTS.md und ROADMAP.md), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 176
+- Total plans completed: 177
 - Average duration: 35 min
 - Total execution time: 15.2 hours
 
@@ -64,7 +64,7 @@ Last activity: 2026-11-12, Plan 30-04 ausgeführt (Discovery auf 32.0.15 und 35.
 | 27 | 10 | - | - |
 | 28 | 12 | - | - |
 | 29 | 9 | - | - |
-| 30 | 4 | 385 min | 96 min |
+| 30 | 5 | 385 min (P01 bis P04) | 96 min (P01 bis P04) |
 
 **Recent Trend:**
 
@@ -220,6 +220,7 @@ Last activity: 2026-11-12, Plan 30-04 ausgeführt (Discovery auf 32.0.15 und 35.
 | Phase 30 P02 | 100 min | 3 tasks | 11 files |
 | Phase 30 P03 | 75 min | 3 tasks | 9 files |
 | Phase 30 P04 | 180 min | 3 tasks | 23 files |
+| Phase 30 P05 | nicht gemessen | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -813,6 +814,10 @@ Recent decisions affecting current work:
 - [Phase 30]: 30-04: Der Suchprovider `tasks` gehört zur dav-App und liefert nur bei aktiver Tasks-App Treffer; Link `<Instanz>/apps/tasks/calendars/<uri>/tasks/<name>`, ohne Raten auf Kalender-URI und Objektname auflösbar (35.0.2, Tasks 0.18.1). Create-only `PUT` eines VTODO unter Impersonation auf nc35: 201, zweiter 412, Objekt unverändert
 - [Phase 30]: 30-04: A2 und A3 belegt für Tasks 0.18.1: `RELATED-TO` ist die UID der Elternaufgabe, ohne `RELTYPE`, gleiche Liste; Zeiten nur UTC und Datum, nie schwebend, nie `TZID`. Acht Fixtures unter `tests/fixtures/tasks_app/`, byte-gleich mit den Rohobjekten; für die Zeitformen mit Zone und schwebend gibt es keine von der App geschriebenen Objekte
 - [Phase 30]: 30-04: Lehren für die Messstrecke: nach `occ app:install` oder `app:disable` den Webserver neu starten, sonst antwortet die App über HTTP mit 404 (APCu); die Docker-VM hält nach dem Abbau einer Instanz Seitencache, der dem Host als belegter Speicher fehlt (vor einem Lauf `drop_caches` bei abgebauter Instanz); Fixtures brauchen `-text` in `.gitattributes`
+- [Phase 30]: 30-05: E15 entschieden (Owner, 12.11.2026, Claude-Code-Sitzung, vom Orchestrator übermittelt, wörtlich "Empfehlungen übernehmen"): Option empfehlung, also eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge, ab Werk aus, nach dem Vorbild `NC_MCP_FILES_UPDATE`. Empfehlung nach vorab festgelegter Regel, Auslöser S1 (Löschwort wiederherstellbar), kein Auslöser ungemessen. Nicht festgelegt: welche Werkzeuge der Schalter im Einzelnen umfasst (discuss-phase von Phase 33). Bericht 10.4
+- [Phase 30]: 30-05: mit derselben Antwort entschieden (Lesart des Orchestrators: der Plural deckt E15 und die drei Vorschläge): A15 wiederkehrende Aufgaben bleiben für ändernde Zugriffe abgelehnt; A16 das Abhaken einer Elternaufgabe hakt ihre Unteraufgaben mit ab, wie die Tasks-App; A21 Unteraufgaben ziehen beim Verschieben mit und werden mitgelöscht. TMOD-01, TMOD-03, TMOD-07 und TMOD-08 sind in REQUIREMENTS.md nachgezogen
+- [Phase 30]: 30-05: kein Abbruchkriterium ausgelöst (MESS-01 nein, MESS-05 nein, MESS-06 MOVE nein, Löschwort wiederherstellbar); die Phasen 31, 32 und 33 samt TMOD-07 und TMOD-08 sind planbar. Annahmen: 14 belegt, 5 widerlegt (A5, A9, A16, A17, A19), keine als Ganzes ungemessen (Bericht 8)
+- [Phase 30]: 30-05: der Bericht prüft sich selbst (`--block report-check`: Überschriften, Zitate gegen die Rohdateien, Annahmen, Abbruchzeilen, Ergebniswort, Striche, Geheimnisse, Kopfblock); die Empfehlungsregel für E15 ist die getestete Funktion `e15_recommendation()`
 
 ### Pending Todos
 
@@ -833,10 +838,10 @@ Recent decisions affecting current work:
 - Phase 30 offen vor der Ausführung von 30-03: Lesart der Löschregel (E13 wörtlich gegen TMOD-07 mit Vorab-Test), siehe 30-03-PLAN.md, Abschnitt Entscheidungsregel
 - Phase 30 braucht in 30-02 eine Browser-Sitzung in der Tasks-App (Owner oder Hauptsitzung mit Playwright); im Repo ist kein Browser-Treiber installiert und es wird keiner installiert
 - Phase 30 RAM: schwere Läufe nur bei mindestens 4 GB freiem Host-RAM, nie parallel zu einem anderen Docker-Lauf, immer nur eine Nextcloud-Instanz (Gate im Messskript)
-- v1.8 offene Owner-Entscheidung E15: eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge (Präzedenz NC_MCP_FILES_UPDATE) oder nur die Abschaltung des Bundles `tasks`; dem Owner noch nicht vorgelegt, Checkpoint am Ende von Phase 30
-- v1.8: kein Abbruchkriterium der Phase 30 ist bisher ausgelöst. Belegt sind seit 30-01 `MKCOL` auf `files/` (201), seit 30-02 `PUT` mit `If-Match` (204, veraltet 412) und der Erhalt fremder Eigenschaften, seit 30-03 `MOVE` zwischen Aufgabenlisten (201), seit 30-04 der create-only `PUT` eines VTODO (201, zweiter 412), jeweils unter Impersonation auf Nextcloud 35.0.0 mit SQLite; 32 bis 34 unter Impersonation ungemessen, dort gibt es keine ExApp-Registrierung. Das Löschen ist auf 32 bis 35 mit App-Passwort gemessen
+- v1.8 E15 ist entschieden (Owner, 12.11.2026): eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge, ab Werk aus, nach dem Vorbild NC_MCP_FILES_UPDATE; offen für die discuss-phase von Phase 33 bleibt, welche Werkzeuge der Schalter im Einzelnen umfasst
+- v1.8: kein Abbruchkriterium der Phase 30 ist ausgelöst (Stand nach 30-05, Bericht Abschnitt 9). Belegt sind seit 30-01 `MKCOL` auf `files/` (201), seit 30-02 `PUT` mit `If-Match` (204, veraltet 412) und der Erhalt fremder Eigenschaften, seit 30-03 `MOVE` zwischen Aufgabenlisten (201), seit 30-04 der create-only `PUT` eines VTODO (201, zweiter 412), jeweils unter Impersonation auf Nextcloud 35.0.0 mit SQLite; 32 bis 34 unter Impersonation ungemessen, dort gibt es keine ExApp-Registrierung. Das Löschen ist auf 32 bis 35 mit App-Passwort gemessen
 - Phase 30, DI-30-01 ist erledigt: die Umgebung des Worktrees tasks-080 trägt das Extra `documents`, der volle Lauf war in 30-02 ohne Ausnahmen grün
-- Phase 30, für den Owner-Checkpoint in 30-05: die Tasks-App hakt Unteraufgaben mit ab und schreibt wiederkehrende Aufgaben fort; die Vorgaben aus TMOD-03 (nicht mit abhaken) und TMOD-01 (wiederkehrende ablehnen) weichen davon ab und brauchen einen ausdrücklichen Entscheid
+- Phase 30, Owner-Checkpoint in 30-05 erledigt (12.11.2026): wiederkehrende Aufgaben bleiben abgelehnt (A15), Unteraufgaben werden beim Abhaken mit abgehakt (A16), Unteraufgaben ziehen beim Verschieben mit und werden mitgelöscht (A21). Offen daraus: das Erfolgskriterium 1 der Phase 33 in ROADMAP.md ("Unteraufgaben bleiben dabei unberührt") widerspricht A16 und ist vor der Planung von Phase 33 nachzuziehen; PROJECT.md nennt bei E13 und unter Out of Scope noch den alten Stand (DOC-05)
 - v1.8 ändernde Zugriffe, Verschieben und Löschen sind von der Recherche vom 11.11.2026 nicht abgedeckt; alles dazu ist Annahme bis zum Messbericht (REQUIREMENTS.md, A12 bis A19, A21)
 - v1.8 Testinstanz weicht vom Produktionsfall ab: `personal` trägt dort VEVENT,VTODO,VJOURNAL, ein frisches echtes Konto hat keine Aufgabenliste; der Fall braucht einen eigenen Test (TASK-03)
 - v1.8 Schreibzusage: mit Phase 33 stimmt "create-only, keine destruktiven Writes" nicht mehr wörtlich; Präzisierung an allen Stellen ist Pflicht vor dem Release (DOC-05), das Destruktiv-Gate bekommt eng benannte Ausnahmen
@@ -885,14 +890,14 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 ## Session Continuity
 
 Last session: 2026-11-12
-Stopped at: Completed 30-04-PLAN.md (Discovery, Abfrageverhalten auf 32 bis 35, Kosten der Aufgabensuche, Fixtures der Tasks-App), lokal committet auf plan/v1.8-tasks-080, nicht gepusht; nc35 zurückgebaut und gestoppt, keine Wegwerf-Instanz und kein Volume übrig
-Nächster Schritt: Ausführung 30-05 (Messbericht abschließen, Übergabe an die Phasen 31 bis 33, Owner-Checkpoint E15)
+Stopped at: Completed 30-05-PLAN.md (Messbericht abgeschlossen, Owner-Entscheid E15 festgehalten, Übergabe an die Phasen 31 bis 33), lokal committet auf plan/v1.8-tasks-080, nicht gepusht; in diesem Plan lief kein Docker
+Nächster Schritt: Phase 30 verifizieren und abschließen, danach Planung von Phase 31 (Ordner anlegen)
 Resume file: None
 
 ## Operator Next Steps
 
 - Roadmap und Anforderungen für v1.8 prüfen (.planning/ROADMAP.md, .planning/REQUIREMENTS.md); der Branch plan/v1.8-tasks-080 ist nur lokal, Push oder PR nur nach Owner-Entscheid
-- E15 entscheiden (Admin-Schalter für ändernde Aufgaben-Werkzeuge), spätestens am Checkpoint von Phase 30
-- Phase 30: 30-01 bis 30-04 sind ausgeführt, Befunde in docs/spike-tasks.md (Abschnitte 1 bis 7) und in den vier SUMMARY-Dateien; weiter mit 30-05. Für den Owner-Checkpoint in 30-05 aus 30-03: Unteraufgaben beim Verschieben und Löschen mitnehmen (A21), Mindestfrist des Papierkorbs für TMOD-07, Übernahme des Ergebnisworts in REQUIREMENTS.md. Aus 30-04 für die Übergabe: TASK-01 braucht den resourcetype `calendar` als Bedingung (gelöschte Kalender und Abonnements tragen `VTODO`), der heutige Terminfilter prüft ihn nicht; ein Konto hinter der ExApp kann ganz ohne Kalender sein; Vorschlag für Deckel und Zeitbudget von `tasks_search` steht in Bericht 6 (Untergrenze, Einzelhost)
+- E15 ist entschieden (12.11.2026, eigener Admin-Schalter, ab Werk aus); in der discuss-phase von Phase 33 festlegen, welche Werkzeuge er umfasst
+- Phase 30: 30-01 bis 30-05 sind ausgeführt, Befunde in docs/spike-tasks.md (Abschnitte 1 bis 12, Übergabe je Phase in 9.1 bis 9.3, Entscheid in 10.4) und in den fünf SUMMARY-Dateien. Vor der Planung von Phase 33: Erfolgskriterium 1 in ROADMAP.md nach A16 nachziehen (Wortlaut braucht die Freigabe des Owners), Mindestfrist des Papierkorbs für TMOD-07 klären. Aus 30-04 für Phase 32: TASK-01 braucht den resourcetype `calendar` als Bedingung (gelöschte Kalender und Abonnements tragen `VTODO`), der heutige Terminfilter prüft ihn nicht; ein Konto hinter der ExApp kann ganz ohne Kalender sein; Vorschlag für Deckel und Zeitbudget von `tasks_search` steht in Bericht 6 (Untergrenze, Einzelhost). MESS-03 und MESS-04 tragen in REQUIREMENTS.md noch keinen Haken, obwohl 30-04 sie gemessen hat
 - Für 30-02 die Browser-Sitzung in der Tasks-App einplanen (zwölf nummerierte Schritte in zwei Runden, nc35 läuft dabei)
 - Issue-Antworten in #32 und #44 erst nach dem Store-Release von 0.8.0

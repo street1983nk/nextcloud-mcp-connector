@@ -118,7 +118,7 @@ Kein Milestone-Audit (wie v1.5 und v1.6): Aussagen aus den fünf Phase-Verifikat
 
 ### v1.8 Tasks-Bundle und Ordner anlegen (Phasen 30-34), IN PLANUNG
 
-- [ ] **Phase 30: Mess-Spike Aufgaben und Ordner** - Alles, was Recherche und Planung nur annehmen, wird gegen echte Nextcloud-Instanzen gemessen, bevor Produktcode entsteht; zuerst `MKCOL` unter AppAPI-Impersonation, mit Abbruchkriterien
+- [x] **Phase 30: Mess-Spike Aufgaben und Ordner** - Alles, was Recherche und Planung nur annehmen, wird gegen echte Nextcloud-Instanzen gemessen, bevor Produktcode entsteht; zuerst `MKCOL` unter AppAPI-Impersonation, mit Abbruchkriterien (completed 2026-11-12)
 - [ ] **Phase 31: Ordner anlegen** - `files_create_folder` legt Ordner an, wahlweise mit fehlenden Elternordnern, hinter der ganzen v1.7-Kette aus Ausschluss, Sandbox, Paartest, Kanarie und Audit; allein releasefähig
 - [ ] **Phase 32: Tasks-Bundle suchen, lesen, anlegen** - `tasks_search`, `tasks_read` und `tasks_create` über CalDAV VTODO als zehnte Familie, samt `task:`-Id über `fetch`; ohne Phase 33 releasefähig
 - [ ] **Phase 33: Aufgaben ändern** - Abhaken, Wiederöffnen, Felder ändern und Verschieben einer einzelnen Aufgabe, nur mit gelesener ETag; Löschen nur bei positivem Spike-Ergebnis; jeder Teil abtrennbar
@@ -148,7 +148,7 @@ Plans:
 - [x] 30-02-PLAN.md: Ändernde Zugriffe: `PUT` mit `If-Match` und Erhalt fremder Eigenschaften unter Impersonation, Browser-Sitzung in der Tasks-App, Inventar der Gates und Zusagen (MESS-05; A12 bis A17)
 - [x] 30-03-PLAN.md: `MOVE` unter Impersonation, Unteraufgaben, Löschen mit Papierkorb an und aus auf 32 bis 35, Ergebniswort nach E13 (MESS-06; A18, A19, A21)
 - [x] 30-04-PLAN.md: Aufgaben-Discovery, Abfrageverhalten auf 32 bis 35, Kosten bei 2000 Aufgaben auf SQLite und PostgreSQL, Fixtures der Tasks-App (MESS-03, MESS-04; A1 bis A6, A11)
-- [ ] 30-05-PLAN.md: Messbericht abschließen, Übergabe der Abbruchkriterien an die Phasen 31 bis 33, Owner-Checkpoint E15 (Schlusssatz von MESS-06)
+- [x] 30-05-PLAN.md: Messbericht abschließen, Übergabe der Abbruchkriterien an die Phasen 31 bis 33, Owner-Checkpoint E15 (Schlusssatz von MESS-06)
 
 Messbericht: `docs/spike-tasks.md`; Rohprotokolle unter `.planning/phases/30-mess-spike-aufgaben-und-ordner/raw/`
 **Abbruchkriterien**: MESS-01 (kein 201 für `MKCOL` unter Impersonation: Phase 31 wird nicht geplant), MESS-05 (`If-Match` geht nicht oder fremde Eigenschaften gehen verloren: Owner entscheidet über Phase 33), MESS-06 (`MOVE` geht nicht: TMOD-08 wird nicht geplant; Löschen nicht eindeutig wiederherstellbar: TMOD-07 entfällt ohne Rückfrage)
@@ -258,7 +258,7 @@ Messbericht: `docs/spike-tasks.md`; Rohprotokolle unter `.planning/phases/30-mes
 | 27. Familien-Anschluss und Sandbox-Parität | v1.7 | 10/10 | Complete    | 2026-09-28 |
 | 28. Gates und Beweise | v1.7 | 12/12 | Complete    | 2026-10-01 |
 | 29. Prüfkommando und Doku | v1.7 | 9/9 | Complete    | 2026-10-01 |
-| 30. Mess-Spike Aufgaben und Ordner | v1.8 | 4/5 | In Progress | - |
+| 30. Mess-Spike Aufgaben und Ordner | v1.8 | 5/5 | Complete    | 2026-11-12 |
 | 31. Ordner anlegen | v1.8 | 0/TBD | Not started | - |
 | 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 0/TBD | Not started | - |
 | 33. Aufgaben ändern | v1.8 | 0/TBD | Not started | - |
@@ -307,7 +307,7 @@ Zugeordnet: 34/34 (Phase 30: 6, Phase 31: 6, Phase 32: 9, Phase 33: 8, Phase 34:
 
 ## Next
 
-Aktiver Milestone: v1.8. Phase 30 läuft: 30-01 bis 30-04 sind ausgeführt (11. und 12.11.2026; MESS-01 bis MESS-05 gemessen, MESS-06 gemessen bis auf die Vorlage von E15 in 30-05; die Abbruchkriterien zu MESS-01, MESS-05 und MESS-06 MOVE nicht ausgelöst, Ergebniswort für das Löschen "wiederherstellbar", Inventar A17 liegt vor; seit 30-04 Discovery auf 32.0.15 und 35.0.2, Abfragen auf 32 bis 35, Kosten bei 2000 Aufgaben auf SQLite und PostgreSQL und die Fixtures der Tasks-App; Bericht `docs/spike-tasks.md`); nächster Schritt ist 30-05. Reihenfolge: 30, 31, 32, 33, 34; Phase 31 ist allein releasefähig, Phase 32 ohne Phase 33. Unverändert außerhalb dieses Milestones: files_update-Weiterentwicklung und die F13-Spur (milestones/v1.6-REQUIREMENTS.md).
+Aktiver Milestone: v1.8. Phase 30 ist ausgeführt: 30-01 bis 30-05 (11. und 12.11.2026; MESS-01 bis MESS-06 gemessen; die Abbruchkriterien zu MESS-01, MESS-05 und MESS-06 MOVE nicht ausgelöst, Ergebniswort für das Löschen "wiederherstellbar", Inventar A17 liegt vor; jede Annahme A1 bis A19 und A21 trägt im Bericht `docs/spike-tasks.md`, Abschnitt 8, ihren Status). Der Owner hat E15 am 12.11.2026 entschieden ("Empfehlungen übernehmen"): eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge, ab Werk aus; mit derselben Antwort A15 (wiederkehrende Aufgaben bleiben abgelehnt), A16 (Unteraufgaben beim Abhaken mit abhaken) und A21 (Unteraufgaben ziehen mit und werden mitgelöscht), Bericht Abschnitt 10.4. Nächster Schritt ist die Planung von Phase 31; vor der Planung von Phase 33 ist dort das Erfolgskriterium 1 nach A16 nachzuziehen. Reihenfolge: 30, 31, 32, 33, 34; Phase 31 ist allein releasefähig, Phase 32 ohne Phase 33. Unverändert außerhalb dieses Milestones: files_update-Weiterentwicklung und die F13-Spur (milestones/v1.6-REQUIREMENTS.md).
 
 ---
 *Roadmap created: 2026-08-14 (granularity: coarse, mode: mvp); v1.0 abgeschlossen: 2026-08-20; v1.1 abgeschlossen: 2026-08-20 (Phase 7 deferred); v1.2 abgeschlossen: 2026-08-25 (Release 0.1.8 live); v1.3 abgeschlossen: 2026-08-26 (Release 0.1.9 live); v1.4 abgeschlossen: 2026-08-28 (Release 0.1.10 live); v1.5 abgeschlossen: 2026-08-31 (Release 0.1.11, openDesk-Spike, Audit-Log; Abschluss nachgetragen 2026-09-18); v1.6 aufgesetzt: 2026-09-18 (Phasen 20-24, 15 Requirements, granularity coarse); v1.6 abgeschlossen: 2026-09-26 (Token-Exchange-Pfad komplett, 15/15 Requirements, kein Release); v1.7 aufgesetzt: 2026-09-26 (Phasen 25-29, 14 Requirements, granularity coarse); v1.7 abgeschlossen: 2026-10-01 (kein-ki-Filter komplett, 14/14 Requirements, kein Release; Release 0.4.0 nach PR #14); v1.8 Roadmap geschrieben: 2026-11-11 (Phasen 30-34, 34 Requirements, granularity coarse; Owner-Entscheide E1 bis E14)*
