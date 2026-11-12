@@ -27,14 +27,15 @@ from typing import Any
 
 import pytest
 from mcp import Client
+from mcp.types import ToolAnnotations
 
-from mcp_connector.server import mcp
+from mcp_connector.server import CREATE_IDEMPOTENT, CREATE_ONLY, READ_ONLY, UPDATE_EXISTING, mcp
 from mcp_connector.tools import mail as mail_tools
 
 README = Path(__file__).resolve().parents[2] / "README.md"
 DOCS = Path(__file__).resolve().parents[2] / "docs"
 
-# The curated set (D-03 to D-09). A set comparison, not a subset check: a twenty-third tool
+# The curated set (D-03 to D-09). A set comparison, not a subset check: a twenty-fifth tool
 # fails this file just as loudly as a missing one. Counter proof for the reviewer: adding
 # ``@mcp.tool`` for a ``files_delete`` anywhere under ``server/reg_*.py`` turns
 # ``test_the_curated_set_is_complete_and_only_the_chatgpt_profile_has_a_schema`` and
@@ -47,6 +48,7 @@ EXPECTED_TOOLS = {
     "files_download",
     "files_read_as_markdown",
     "files_upload",
+    "files_create_folder",
     "calendar_list_events",
     "calendar_create_event",
     "notes_search",
@@ -78,6 +80,12 @@ CREATE_TOOLS = {
     "tables_create_row",
     "talk_send",
 }
+
+# The one write that is a no-op the second time (E5, FOLD-03): the folder is there after the
+# first call, a second call with the same path answers created false and changes nothing. It
+# is a set of its own and not a seventh member of CREATE_TOOLS, because that set promises
+# "a second call is a second object", which would be a lie here.
+IDEMPOTENT_CREATE_TOOLS = {"files_create_folder"}
 
 # The documented exception to the schema diet: ChatGPT reads structured content (D-14).
 STRUCTURED_TOOLS = {"search", "fetch"}
@@ -158,10 +166,10 @@ async def test_files_upload_is_annotated_as_create_only() -> None:
 
 
 @pytest.mark.anyio
-async def test_the_six_file_tools_are_complete_and_read_first() -> None:
-    """D-03 and TOOL-14: search, list, read, read_as_markdown, download and upload.
+async def test_the_seven_file_tools_are_complete_and_read_first() -> None:
+    """D-03, TOOL-14 and FOLD-01: the six file tools before it plus create_folder.
 
-    Only upload writes.
+    Only upload and create_folder write.
     """
     async with Client(mcp, raise_exceptions=True) as client:
         tools = {tool.name: tool for tool in (await client.list_tools()).tools}
@@ -173,7 +181,7 @@ async def test_the_six_file_tools_are_complete_and_read_first() -> None:
         "files_read_as_markdown",
         "files_download",
     )
-    for name in (*readers, "files_upload"):
+    for name in (*readers, "files_upload", "files_create_folder"):
         assert name in tools, f"{name} is part of the curated file set (D-03)"
         assert tools[name].output_schema is None, "structured_output=False (schema diet)"
 
@@ -557,12 +565,12 @@ async def test_prepare_context_is_listed_as_a_bundling_read() -> None:
 
 @pytest.mark.anyio
 async def test_the_curated_set_is_complete_and_only_the_chatgpt_profile_has_a_schema() -> None:
-    """The whole surface in one assertion: 23 tools, and the diet holds for 21 of them."""
+    """The whole surface in one assertion: 24 tools, and the diet holds for 22 of them."""
     async with Client(mcp, raise_exceptions=True) as client:
         tools = {tool.name: tool for tool in (await client.list_tools()).tools}
 
     assert set(tools) == EXPECTED_TOOLS
-    assert len(tools) == 23, "the curated set is twenty-three tools, no more and no fewer"
+    assert len(tools) == 24, "the curated set is twenty-four tools, no more and no fewer"
 
     with_schema = {name for name, tool in tools.items() if tool.output_schema is not None}
     assert with_schema == STRUCTURED_TOOLS, (
@@ -741,9 +749,44 @@ def _properties(schema: dict[str, Any]) -> list[tuple[str, Any]]:
     return found
 
 
+def _check_annotations(name: str, annotations: ToolAnnotations | None) -> None:
+    """Hold the annotations of one tool against the class its name belongs to.
+
+    One function for the live registry and for the planted counter proof below, so the
+    gate that runs and the gate that is proven to bite are the same lines.
+    """
+    assert annotations is not None, f"{name} has no annotations"
+    assert annotations.open_world_hint is False, (
+        f"{name} talks to one known Nextcloud, never to the open web"
+    )
+    if name == "files_update":
+        assert annotations.read_only_hint is False
+        assert annotations.destructive_hint is True
+        assert annotations.idempotent_hint is False
+    elif name in IDEMPOTENT_CREATE_TOOLS:
+        assert annotations.read_only_hint is False, f"{name} writes and must say so"
+        assert annotations.destructive_hint is False, (
+            f"{name} can only create, never replace or delete"
+        )
+        assert annotations.idempotent_hint is True, (
+            f"a second {name} call with the same path changes nothing and answers "
+            "created false (E5), so the tool is idempotent and must say so"
+        )
+    elif name in CREATE_TOOLS:
+        assert annotations.read_only_hint is False, f"{name} writes and must say so"
+        assert annotations.destructive_hint is False, (
+            f"{name} can only create, never replace or delete"
+        )
+        assert annotations.idempotent_hint is False, (
+            f"a second {name} call is a second object, not a no-op"
+        )
+    else:
+        assert annotations.read_only_hint is True, f"{name} only reads"
+
+
 @pytest.mark.anyio
 async def test_every_tool_carries_honest_annotations() -> None:
-    """D-16 over the whole registry: six create-only tools, fifteen pure reads.
+    """D-16 over the whole registry: six create-only tools and one idempotent create tool.
 
     The write count is the number that did **not** move in phase 10, and the assertion below
     says so by comparing against the frozen ``CREATE_TOOLS`` rather than against a literal:
@@ -754,27 +797,38 @@ async def test_every_tool_carries_honest_annotations() -> None:
 
     assert set(tools) == EXPECTED_TOOLS, "the curated set is frozen (D-03 to D-09)"
     assert CREATE_TOOLS < EXPECTED_TOOLS, "every write tool must be part of the curated set"
+    assert len(CREATE_TOOLS) == 6, "the create-only paths stay six; a folder is not a seventh"
+    assert IDEMPOTENT_CREATE_TOOLS < EXPECTED_TOOLS, (
+        "the idempotent create tool must be part of the curated set"
+    )
+    assert not (CREATE_TOOLS & IDEMPOTENT_CREATE_TOOLS), "a tool belongs to one class only"
 
     for name, tool in sorted(tools.items()):
-        annotations = tool.annotations
-        assert annotations is not None, f"{name} has no annotations"
-        assert annotations.open_world_hint is False, (
-            f"{name} talks to one known Nextcloud, never to the open web"
-        )
-        if name == "files_update":
-            assert annotations.read_only_hint is False
-            assert annotations.destructive_hint is True
-            assert annotations.idempotent_hint is False
-        elif name in CREATE_TOOLS:
-            assert annotations.read_only_hint is False, f"{name} writes and must say so"
-            assert annotations.destructive_hint is False, (
-                f"{name} can only create, never replace or delete"
-            )
-            assert annotations.idempotent_hint is False, (
-                f"a second {name} call is a second object, not a no-op"
-            )
-        else:
-            assert annotations.read_only_hint is True, f"{name} only reads"
+        _check_annotations(name, tool.annotations)
+
+
+def test_the_live_class_of_files_create_folder_passes_the_gate() -> None:
+    """Positive control of the counter proof below: the real class is accepted."""
+    for name in sorted(IDEMPOTENT_CREATE_TOOLS):
+        _check_annotations(name, CREATE_IDEMPOTENT)
+
+
+@pytest.mark.parametrize(
+    "planted",
+    [CREATE_ONLY, UPDATE_EXISTING, READ_ONLY],
+    ids=["create_only", "update_existing", "read_only"],
+)
+def test_the_gate_refuses_a_planted_class_for_files_create_folder(
+    planted: ToolAnnotations,
+) -> None:
+    """T-31-14: a folder tool that claims another class turns the gate red.
+
+    CREATE_ONLY would deny the no-op of a second call (E5), UPDATE_EXISTING would announce a
+    destruction that cannot happen, and READ_ONLY would hide the write altogether.
+    """
+    for name in sorted(IDEMPOTENT_CREATE_TOOLS):
+        with pytest.raises(AssertionError):
+            _check_annotations(name, planted)
 
 
 @pytest.mark.anyio
@@ -800,7 +854,7 @@ async def test_no_input_schema_accepts_a_user_parameter() -> None:
     async with Client(mcp, raise_exceptions=True) as client:
         tools = {tool.name: tool for tool in (await client.list_tools()).tools}
 
-    assert set(tools) == EXPECTED_TOOLS, "the confused deputy check must cover all 23 schemas"
+    assert set(tools) == EXPECTED_TOOLS, "the confused deputy check must cover all 24 schemas"
 
     findings: list[str] = []
     for name, tool in sorted(tools.items()):
@@ -839,7 +893,7 @@ async def test_the_readme_permission_table_matches_the_live_registry() -> None:
             "conditional-update"
             if name == "files_update"
             else "create-only"
-            if name in CREATE_TOOLS
+            if name in CREATE_TOOLS or name in IDEMPOTENT_CREATE_TOOLS
             else "read"
         )
         assert level == expected, f"README calls {name} {level}, the registry says {expected}"

@@ -34,6 +34,7 @@ BUNDLE_TOOLS: dict[str, frozenset[str]] = {
             "files_download",
             "files_read_as_markdown",
             "files_upload",
+            "files_create_folder",
         }
     ),
     "mail": frozenset({"mail_browse"}),

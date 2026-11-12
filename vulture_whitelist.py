@@ -20,6 +20,7 @@ files_search
 files_list
 files_read
 files_upload
+files_create_folder
 files_update
 files_download
 files_read_as_markdown
@@ -37,9 +38,10 @@ talk_send
 mail_browse
 contacts_search
 
-# --- Tool logic ahead of its registration ---------------------------------------------
-# Temporary: registered as files_create_folder in plan 31-03; remove there.
-create_folder
+# --- Tool logic ahead of its registration (plan 31-02, dissolved in plan 31-03) ---------
+# Empty on purpose: plan 31-02 parked create_folder here, because the tool logic was written
+# and tested one plan before its registration. Plan 31-03 registered files_create_folder,
+# which calls it, so the name left the list with the plan that calls it.
 
 # --- Framework entry points -----------------------------------------------------------
 # health: registered with @mcp.custom_route and checked by tests/unit/test_transport_

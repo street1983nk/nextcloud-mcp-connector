@@ -15,7 +15,7 @@ from pydantic import Field, WithJsonSchema
 from .. import config, deps
 from ..errors import ToolError
 from ..tools import files as files_tools
-from . import CREATE_ONLY, READ_ONLY, UPDATE_EXISTING, compact, graceful, mcp
+from . import CREATE_IDEMPOTENT, CREATE_ONLY, READ_ONLY, UPDATE_EXISTING, compact, graceful, mcp
 
 
 class _OpenAIFile(TypedDict):
@@ -244,6 +244,21 @@ async def files_upload(
             hint="For a PDF, encode one chunk of its bytes as base64.",
         )
     return compact(await files_tools.upload(clients, path=path, content=content))
+
+
+@mcp.tool(annotations=CREATE_IDEMPOTENT, structured_output=False)
+@graceful
+async def files_create_folder(
+    path: Annotated[str, Field(description="Folder path to create, e.g. /Projects/2026")],
+    parents: Annotated[
+        bool, Field(description="Also create missing parent folders, at most 10 new ones")
+    ] = False,
+    ctx: Context | None = None,
+) -> str:
+    """Create a folder; an existing folder answers created false. Never overwrites, moves
+    or deletes."""
+    clients = deps.resolve_clients(ctx)
+    return compact(await files_tools.create_folder(clients, path=path, parents=parents))
 
 
 if config.files_update_enabled():

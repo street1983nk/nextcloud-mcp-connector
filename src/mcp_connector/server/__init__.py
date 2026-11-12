@@ -40,6 +40,7 @@ from ..errors import (
 )
 
 __all__ = [
+    "CREATE_IDEMPOTENT",
     "CREATE_ONLY",
     "READ_ONLY",
     "UPDATE_EXISTING",
@@ -78,6 +79,17 @@ CREATE_ONLY = ToolAnnotations(
     read_only_hint=False,
     destructive_hint=False,
     idempotent_hint=False,
+    open_world_hint=False,
+)
+
+# A class of its own, because neither neighbour would be honest for files_create_folder: a
+# second call with the same path changes nothing and answers created false (E5, FOLD-03).
+# CREATE_ONLY would deny that, and UPDATE_EXISTING would claim a replacement that cannot
+# happen.
+CREATE_IDEMPOTENT = ToolAnnotations(
+    read_only_hint=False,
+    destructive_hint=False,
+    idempotent_hint=True,
     open_world_hint=False,
 )
 
