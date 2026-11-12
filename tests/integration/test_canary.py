@@ -2,7 +2,7 @@
 
 The canary world of plan 28-07 puts a marker into the name and the content of every tagged
 node. This test calls every tool of the live registry through the in-memory ``Client(mcp)``,
-the six write tools included, and scans every surface of every answer for the marker: the
+the seven write tools included, and scans every surface of every answer for the marker: the
 text parts, ``structuredContent``, the decoded blob and the unquoted URI of an embedded
 resource, and the decoded paging cursors. It does so in the normal state and in three forced
 outages of the tag REPORT (500, 412 always, timeout), so the fail closed path is scanned the
@@ -13,7 +13,7 @@ Four rules make a green run mean something:
 *   **The marker is never an argument (D-28-06).** Every argument set is asserted free of the
     marker before its call, so a marker in an answer can only come from the instance.
 *   **The registry is the plan.** ``set(PLAN) == registry`` against ``list_tools()``, and the
-    output says ``KANARIE <mode> geprüft <n> von <registry>`` with ``n == 23``.
+    output says ``KANARIE <mode> geprüft <n> von <registry>`` with ``n == 24``.
 *   **The control marker must show.** The untagged control file and note carry a second
     marker; in the normal state every reader answer that has to show them must show it, or an
     empty index or a wrong container would end in a green canary (T-28-101).
@@ -60,7 +60,7 @@ from mcp_connector.tools import withhold
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
 RAW = cw.RAW_DIR / "28-10-canary.txt"
-EXPECTED_TOOLS = 23
+EXPECTED_TOOLS = 24
 MAX_PAGES = 50
 COMMAND = (
     "PYTHONUTF8=1 .venv/Scripts/python.exe -m pytest tests/integration/test_canary.py "
@@ -86,7 +86,7 @@ WRITE_KINDS: dict[str, str] = {
 }
 
 #: The write tools that aim at a tagged target and therefore have to refuse.
-MUST_REFUSE = ("files_upload", "notes_create", "talk_send")
+MUST_REFUSE = ("files_upload", "files_create_folder", "notes_create", "talk_send")
 
 
 def log(line: str) -> None:
@@ -159,6 +159,13 @@ def plan(world: cw.World) -> dict[str, list[dict[str, Any]]]:
         "files_download": [{"path": world.locked_file}],
         "files_read_as_markdown": [{"path": world.locked_doc}, {"path": world.control_doc}],
         "files_upload": [{"path": f"{world.locked_dir}/neu-{world.h}.txt", "content": "x"}],
+        # Once without parents and once with: the chain must not probe or create a single
+        # segment below the locked folder either (FOLD-04). Both paths are the ones the
+        # world's cleanup removes and reads back, should a call create them after all.
+        "files_create_folder": [
+            {"path": world.refused_folder},
+            {"path": f"{world.refused_chain}/b", "parents": True},
+        ],
         "notes_search": [{"query": world.stamm}],
         "notes_read": [
             {"note_id": f"note:{world.note_id}"},
@@ -425,6 +432,10 @@ def assert_cleanup(world: cw.World) -> None:
     assert len(tool_lines) == len(world.writes_ledger), (tool_lines, world.writes_ledger)
     bad = [line for line in lines if not cw.cleanup_ok(line)]
     assert not bad, bad
+    # The two folders files_create_folder had to refuse are read back by name, so a
+    # cleanup that lost their step cannot pass as a clean one.
+    for folder in world.refused_folders:
+        assert f"CLEANUP ordner {folder}: 404" in lines, (folder, lines)
 
 
 async def test_no_tool_answer_carries_the_marker_normal(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -171,6 +171,9 @@ CASES: dict[tuple[str, str], Callable[[cw.World], Pair]] = {
         "files_upload", f"{w.locked_dir}/neu.txt", f"{_missing(w)}/neu.txt", content="x"
     ),
     ("files_upload", "binary_chunk1"): _binary_chunk1,
+    ("files_create_folder", "path"): lambda w: _path_pair(
+        "files_create_folder", f"{w.locked_dir}/neu-ordner", f"{_missing(w)}/neu-ordner"
+    ),
     ("fetch", "file"): lambda w: _id_pair(
         "fetch", "id", f"file:{w.fileids['tagged_file']}", f"file:{UNKNOWN_FILEID}"
     ),
@@ -290,6 +293,24 @@ def cleanup_uploads(world: cw.World) -> list[str]:
             world.harness.request("DELETE", url)
         after, _ = world.harness.stat_url(url)
         lines.append(f"CLEANUP uploads/{label} (vorher {before}): {after}")
+    return lines
+
+
+def cleanup_folders(world: cw.World) -> list[str]:
+    """The two targets of the folder pair, read back while the world still stands.
+
+    Neither call may create anything: the tagged side is refused before any request,
+    and the invented parent does not exist. Both targets lie below the world's root,
+    whose removal takes a folder with it and purges it from the trash bin by the stem;
+    removing one here would leave a trash bin entry without the stem behind. So a
+    folder found here is not removed a second time, it is a line that fails the
+    cleanup check: the instance holds something the gate says cannot exist.
+    """
+    pair = CASES[("files_create_folder", "path")](world)
+    lines: list[str] = []
+    for label, args in (("getaggt", pair.tagged), ("erfunden", pair.unknown)):
+        status, _ = world.harness.stat(args["path"])
+        lines.append(f"CLEANUP ordner/{label} {args['path']}: {status}")
     return lines
 
 
@@ -433,7 +454,7 @@ async def test_tagged_answers_like_missing_live(monkeypatch: pytest.MonkeyPatch,
             print(line)
             assert compared + skipped == len(PAIR_CASES)
         finally:
-            extra = cleanup_uploads(world) + cleanup_category(world)
+            extra = cleanup_uploads(world) + cleanup_folders(world) + cleanup_category(world)
             for entry in extra:
                 log(entry)
     assert_cleanup(world, extra)

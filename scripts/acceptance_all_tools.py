@@ -151,6 +151,17 @@ async def run(client: Client, report: Report) -> set[str]:
         "files_upload",
         {"path": path, "content": f"# {marker}\nAbnahmelauf Phase 1, Straßenbau.\n"},
     )
+    # Twice on purpose: the first call creates the chain, the second finds it and has to
+    # say so. A second created true would mean the tool does not see its own folder.
+    folder = {"path": f"/{marker}-{stamp}-ordner/a/b", "parents": True}
+    await call(client, report, "files_create_folder", folder)
+    again = await call(client, report, "files_create_folder", folder)
+    if again and loads(again).get("created") is not False:
+        report.add(
+            "files_create_folder",
+            "FAIL",
+            f"the second call did not answer created false: {again.splitlines()[0]}",
+        )
     found = loads(await call(client, report, "files_search", {"query": marker}))
     items = found.get("items") or []
     if not items:

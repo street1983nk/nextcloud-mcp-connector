@@ -218,7 +218,7 @@ def refusal_problem(tool: str, args: dict[str, Any], mode: str, text: str) -> st
     """Why ``text`` is not the refusal ``tool`` owes in ``mode``, or ``None`` when it is."""
     if tool == "talk_send":
         normal: tuple[str, ...] = (talk_tools._unknown_token(str(args.get("token") or "")).message,)
-    elif tool in ("files_upload", "notes_create"):
+    elif tool in ("files_upload", "notes_create", "files_create_folder"):
         normal = PARENT_MISSING_FRAGMENTS
     else:
         return f"no refusal is defined for {tool}"
@@ -648,6 +648,29 @@ class Cleanup:
 
         self.add(f"uploads/{label}", undo, lambda: str(harness.stat_url(url)[0]))
 
+    def add_folder(self, harness: Harness, path: str) -> None:
+        """A folder ``files_create_folder`` has to refuse, removed if it was created anyway.
+
+        The connector cannot delete, so the harness does, with the account's own WebDAV
+        access. The folder goes before the world's root does and would therefore be a trash
+        bin entry of its own, under a name without the stem; its name carries the run stamp,
+        so the bin is purged by that name and the read back covers both places.
+        """
+        name = path.rsplit("/", 1)[-1]
+
+        def undo() -> object:
+            status, _ = harness.stat(path)
+            if status == 207:
+                harness.delete(path)
+                harness.purge_trash(name)
+            return status
+
+        def read() -> str:
+            status = str(harness.stat(path)[0])
+            return f"{status} und noch im Papierkorb" if harness.trash_entries(name) else status
+
+        self.add(f"ordner {path}", undo, read)
+
     def add_table(self, harness: Harness, table_id: str) -> None:
         self.add(
             f"table {table_id}",
@@ -826,6 +849,21 @@ class World:
     @property
     def locked_file(self) -> str:
         return f"{self.locked_dir}/inhalt-{self.h}.txt"
+
+    @property
+    def refused_folder(self) -> str:
+        """The folder ``files_create_folder`` is asked for below the locked folder."""
+        return f"{self.locked_dir}/ordner-{self.h}"
+
+    @property
+    def refused_chain(self) -> str:
+        """The top of the chain ``files_create_folder`` is asked for with ``parents``."""
+        return f"{self.locked_dir}/a-{self.h}"
+
+    @property
+    def refused_folders(self) -> tuple[str, str]:
+        """Both of them: what the cleanup removes if a call created it after all."""
+        return (self.refused_folder, self.refused_chain)
 
     @property
     def control_file(self) -> str:
@@ -1015,6 +1053,10 @@ def _build_files(world: World, cleanup: Cleanup) -> None:
     cleanup.add_path(harness, world.root)
     harness.put(world.tagged_file, f"getaggt {world.stamm} {marker}\n".encode())
     harness.mkcol(world.locked_dir)
+    # Registered after the root, so they run before it: a folder a refused call created
+    # anyway is removed and read back on its own (pitfall 11 of phase 31).
+    for folder in world.refused_folders:
+        cleanup.add_folder(harness, folder)
     harness.put(world.locked_file, f"gesperrt {world.stamm} {marker}\n".encode())
     harness.put(world.control_file, f"kontrolle {world.stamm} {world.control_marker}\n".encode())
     # The same pair for files_read_as_markdown: a Word file below the locked folder and an
