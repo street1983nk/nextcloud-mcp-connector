@@ -890,9 +890,9 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 ## Session Continuity
 
 Last session: 2026-11-12
-Stopped at: Completed 30-05-PLAN.md (Messbericht abgeschlossen, Owner-Entscheid E15 festgehalten, Übergabe an die Phasen 31 bis 33), lokal committet auf plan/v1.8-tasks-080, nicht gepusht; in diesem Plan lief kein Docker
+Stopped at: Phase 31 context gathered (31-CONTEXT.md, sieben Entscheidungen D-31-01 bis D-31-07, Owner 12.11.2026); Phase 30 ist abgeschlossen und der Branch plan/v1.8-tasks-080 gepusht; nächster Schritt ist die Planung von Phase 31
 Nächster Schritt: Phase 30 verifizieren und abschließen, danach Planung von Phase 31 (Ordner anlegen)
-Resume file: None
+Resume file: .planning/phases/31-ordner-anlegen/31-CONTEXT.md
 
 ## Operator Next Steps
 
