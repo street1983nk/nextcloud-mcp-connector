@@ -246,3 +246,19 @@ LAEUFT nc35=nein nc-mcp-exapp=nein fremd=gameworld-dev-gameworld-docker-proxy-1
 == (5) Abschluss Task 1 ==
 
 ENTSCHEID NOETIG volume_abbau=ja
+
+== Task 2: Owner-Entscheid ==
+
+ENTSCHEID owner=option-a datum=2026-11-12
+    Der Owner hat am 2026-11-12 die Empfehlung wörtlich bestätigt ("wie empfohlen"):
+    Die Topologie nc-mcp-exapp darf mit `docker compose -f compose.exapp.yml down -v`
+    abgebaut und frisch auf nextcloud:32.0.15-apache aufgebaut werden. Die Freigabe gilt
+    nur für dieses Compose-Projekt und seine beiden Volumes.
+
+ZUSATZENTSCHEID park34 owner=entfernen-freigegeben datum=2026-11-12
+    Der Container nc_app_mcp_connector_park34 (Image 0.1.11, Exited, am Netz
+    nc-mcp-exapp-net, nicht Teil des Compose-Projekts) darf mit `docker rm` entfernt
+    werden, gestoppt und ohne -v. Vorher kommen seine Mounts per `docker inspect` ins
+    Protokoll; benannte Volumes von ihm werden nicht gelöscht, nur gemeldet.
+    Alles andere bleibt unberührt (nc35-*, nc_app_mcp_connector, nc_app_mcp_connector_data,
+    nc-mcp-nc35_*, fremde Container, Volumes, Netze und Images).
