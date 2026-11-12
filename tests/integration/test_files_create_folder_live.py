@@ -685,6 +685,25 @@ async def test_a_tagged_folder_answers_like_an_invented_parent(run: Run) -> None
                 positive.get("created") is True and on_disk(run.alice, f"{free}/neu"),
                 f"positive control offen/neu: {answered(positive)}",
             )
+            # D-31-08 (plan 31-05b): a name with whitespace at its edge is refused on the
+            # argument alone, before the guard is asked, so the tagged and the invented
+            # parent answer the same and neither call sends a single request.
+            sent = len(case.seen)
+            padded_tagged = await refusal(create(case, f"{locked}/leer ", parents=True))
+            padded_real = await refusal(create(case, f"{invented}/leer ", parents=True))
+            case.expect(
+                renamed(padded_tagged, locked, invented) == exact(padded_real)
+                and PADDED in padded_tagged.message
+                and len(case.seen) == sent,
+                f"padded name, tagged: {told(padded_tagged)}; invented: {told(padded_real)}; "
+                "equal once the folder is renamed, no request on either side",
+            )
+            case.expect(
+                not on_disk(run.alice, f"{locked}/leer ", "-e")
+                and not on_disk(run.alice, f"{locked}/leer", "-e")
+                and not on_disk(run.alice, invented, "-e"),
+                "file system without gesperrt/leer, with and without the space, and erfunden",
+            )
         finally:
             cw.untag(locked_id)
 
@@ -757,11 +776,31 @@ async def test_a_refused_name_inside_a_chain_is_a_named_refusal(run: Run) -> Non
         case.expect(not on_disk(run.alice, f"{kept}/.htaccess", "-e"), "no .htaccess on disk")
 
 
+#: Fragments of the two sentences of plan 31-05b (owner decision of 2026-11-12).
+PADDED = "starts or ends with whitespace"
+NO_FOLDER = "cannot be created as a folder: Nextcloud reports an entry there that is not a folder"
+
+
 async def test_refused_names_end_in_a_named_refusal_or_a_real_folder(run: Run) -> None:
-    """One call per name; the line ``NAME`` carries the calls and the outcome of each."""
+    """One call per name; the line ``NAME`` carries the calls and the outcome of each.
+
+    Three expectations changed with plan 31-05b. A name with whitespace at its edge
+    (``ende-leer `` and, new in the list, `` anfang-leer``) used to be created trimmed and
+    is now refused before any request (D-31-08): the tool no longer creates a folder
+    under another name than the one asked for. ``x.part`` used to be called a file and now
+    gets the sentence that claims none (D-31-09), because the storage holds nothing there.
+    """
     base = f"{P}/namen"
     run.harness.mkcol(base)
-    names = [".htaccess", "x.part", "x.filepart", "con", "ende-leer ", "ende-punkt."]
+    names = [
+        ".htaccess",
+        "x.part",
+        "x.filepart",
+        "con",
+        "ende-leer ",
+        " anfang-leer",
+        "ende-punkt.",
+    ]
     with Case(run, "namen") as case:
         for name in names:
             part = Case(run, "namen")
@@ -771,8 +810,19 @@ async def test_refused_names_end_in_a_named_refusal_or_a_real_folder(run: Run) -
             except ToolError as error:
                 ok = named(error) and not on_disk(run.alice, wanted, "-e")
                 outcome = f"{told(error)}; file system has it=no" if ok else told(error)
+                if name != name.strip():
+                    trimmed = on_disk(run.alice, f"{base}/{name.strip()}", "-e")
+                    ok = ok and PADDED in error.message and not part.seen and not trimmed
+                    outcome += (
+                        f"; refused before any request={'yes' if not part.seen else 'no'}; "
+                        f"file system has the trimmed name={'yes' if trimmed else 'no'}"
+                    )
+                if name == "x.part":
+                    ok = ok and NO_FOLDER in error.message and "file" not in error.message
+                    outcome += "; the sentence claims no file"
             else:
                 ok = answer.get("created") is True and on_disk(run.alice, str(answer["path"]))
+                ok = ok and name == name.strip() and name != "x.part"
                 outcome = f"{answered(answer)}; file system test -d of the answered path"
             record(
                 f"NAME {name!r} nc={run.version} nutzer={run.alice} status={calls(part.seen)} "
@@ -784,32 +834,47 @@ async def test_refused_names_end_in_a_named_refusal_or_a_real_folder(run: Run) -
         case.note(f"file system ls -1A {base}: {sorted(listing.stdout.splitlines())!r}")
 
 
-async def test_a_trailing_space_inside_a_chain_is_recorded(run: Run) -> None:
-    """Not a case of the plan: a folder name that ends in a space as a link of a chain.
+async def test_a_trailing_space_inside_a_chain_is_refused_before_any_write(run: Run) -> None:
+    """A folder name that ends in a space as a link of a chain: refused, nothing created.
 
     The first live run on 35.0.0 showed the tool creating the folder without the space and
-    then failing below the name with it. That is an open finding of plan 31-05 for the
-    owner, so this records what happens (``ZUSATZ ... befund=<ja|nein>``) and asserts
-    nothing: a green run must not hide it and a red run must not block the measured cases.
+    then failing below the name with it, and naming a folder as created that the file
+    system did not hold under that name (line ``ZUSATZ ... befund=ja`` of plan 31-05).
+    The owner decided on 2026-11-12 to refuse such a name before any write (D-31-08), so
+    this is a measured and asserted case since plan 31-05b: the very call of the finding,
+    and the same path without ``parents``. ``befund=nein`` means no request went out, the
+    sentence names nothing as created and the folder is as empty as before.
     """
     base = f"{P}/zusatz"
     run.harness.mkcol(base)
     part = Case(run, "zusatz")
     wanted = f"{base}/mitte-leer /kind"
-    try:
-        answer = await create(part, wanted, parents=True)
-        outcome, claimed = answered(answer), list(answer.get("created_folders") or [])
-    except ToolError as error:
-        outcome = told(error)
-        claimed = [f"{base}/mitte-leer "] if "Already created" in error.message else []
-    listing = in_container("ls", "-1A", f"{DATA}/{run.alice}/files{base}")
-    truthful = all(on_disk(run.alice, path) for path in claimed) and "ToolError" not in outcome
+    before = sorted(
+        in_container("ls", "-1A", f"{DATA}/{run.alice}/files{base}").stdout.splitlines()
+    )
+    told_chain = told_single = ""
+    refused = True
+    for parents in (True, False):
+        try:
+            answer = await create(part, wanted, parents=parents)
+        except ToolError as error:
+            outcome = told(error)
+            refused = refused and PADDED in error.message and "Already created" not in outcome
+        else:
+            outcome, refused = answered(answer), False
+        if parents:
+            told_chain = outcome
+        else:
+            told_single = outcome
+    after = sorted(in_container("ls", "-1A", f"{DATA}/{run.alice}/files{base}").stdout.splitlines())
+    kept = refused and not part.seen and before == after == []
     record(
         f"ZUSATZ name-mit-leerzeichen-in-kette nc={run.version} nutzer={run.alice} "
-        f"status={calls(part.seen)} befund={'nein' if truthful else 'ja'} | {outcome}; "
-        f"named as created: {claimed!r}; file system ls -1A {base}: "
-        f"{sorted(listing.stdout.splitlines())!r}"
+        f"status={calls(part.seen)} befund={'nein' if kept else 'ja'} | parents=true: "
+        f"{told_chain}; parents=false: {told_single}; requests sent: {len(part.seen)}; "
+        f"file system ls -1A {base} before: {before!r} after: {after!r}"
     )
+    assert kept, "a padded folder name must be refused before any request (D-31-08)"
 
 
 def lock(harness: cw.Harness, path: str, user_lock: bool = False) -> tuple[int, str, str]:

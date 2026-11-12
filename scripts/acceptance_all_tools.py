@@ -52,11 +52,14 @@ different next steps and only one of them is a defect.
 """
 
 import asyncio
+import base64
+import io
 import json
 import os
 import sys
 import time
 import uuid
+import zipfile
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -70,6 +73,9 @@ REQUIRED_ENV = ("NC_MCP_URL", "NC_MCP_USER", "NC_MCP_APP_PASSWORD")
 #: constant because the chain below would otherwise carry the same string five times, and five
 #: copies of a tool name are five places to miss when that tool is renamed.
 MAIL_BROWSE = "mail_browse"
+
+#: The type of the one document this run converts with ``files_read_as_markdown``.
+DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 #: The conversation Talk creates for every account to announce its own new features. It is
 #: read only by design, so a send into it is a refusal of the connector working correctly.
@@ -115,6 +121,32 @@ async def call(client: Client, report: Report, tool: str, arguments: dict[str, A
         return ""
     report.add(tool, "OK", payload)
     return payload
+
+
+def _minimal_docx(text: str) -> bytes:
+    """The smallest Word file the converter opens: one paragraph, no styles part."""
+    rel = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+    body = (
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+        f"<w:body><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:body></w:document>"
+    )
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "[Content_Types].xml",
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.'
+            'relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'
+            f'<Override PartName="/word/document.xml" ContentType="{DOCX_TYPE}.main+xml"/>'
+            "</Types>",
+        )
+        archive.writestr(
+            "_rels/.rels",
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            f'<Relationship Id="rId1" Type="{rel}" Target="word/document.xml"/></Relationships>',
+        )
+        archive.writestr("word/document.xml", body)
+    return buffer.getvalue()
 
 
 def loads(payload: str) -> dict[str, Any]:
@@ -163,13 +195,53 @@ async def run(client: Client, report: Report) -> set[str]:
             f"the second call did not answer created false: {again.splitlines()[0]}",
         )
     found = loads(await call(client, report, "files_search", {"query": marker}))
-    items = found.get("items") or []
-    if not items:
+    # The hit of the uploaded file, by its path and never by its position: the folder
+    # created above carries the marker as well and may be listed first, and a fetch of a
+    # folder is refused by design.
+    uploaded = [
+        item
+        for item in (found.get("items") or [])
+        if isinstance(item, dict) and item.get("path") == path
+    ]
+    if not uploaded:
         report.add("files_search", "FAIL", "the file uploaded one second ago was not found")
-    file_id = str(items[0].get("id", "")) if items else ""
+    file_id = str(uploaded[0].get("id", "")) if uploaded else ""
 
     await call(client, report, "files_list", {"path": "/"})
     await call(client, report, "files_read", {"path": path})
+    await call(client, report, "files_download", {"path": path})
+
+    # files_read_as_markdown refuses text by design, so it needs a document of its own. The
+    # smallest Word file goes up through the binary path of files_upload and is read back
+    # as Markdown; a conversion that loses the marker is a failure, not an empty document.
+    document = _minimal_docx(f"Abnahmelauf {marker}")
+    document_path = f"/{marker}-{stamp}.docx"
+    sent = await call(
+        client,
+        report,
+        "files_upload",
+        {
+            "path": document_path,
+            "content_base64": base64.b64encode(document).decode("ascii"),
+            "total_bytes": len(document),
+            "final": True,
+            "content_type": DOCX_TYPE,
+        },
+    )
+    if sent:
+        converted = await call(client, report, "files_read_as_markdown", {"path": document_path})
+        if converted and marker not in str(loads(converted).get("content") or ""):
+            report.add(
+                "files_read_as_markdown",
+                "FAIL",
+                f"the Markdown does not carry the marker: {converted.splitlines()[0]}",
+            )
+    else:
+        report.add(
+            "files_read_as_markdown",
+            "FAIL",
+            "the upload of the document failed, so there is nothing to convert",
+        )
 
     # --- calendar ---------------------------------------------------------------------
     start = datetime.now(UTC).replace(microsecond=0) + timedelta(days=1)
