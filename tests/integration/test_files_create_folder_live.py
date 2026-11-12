@@ -43,6 +43,7 @@ Without that environment it skips.
 import dataclasses
 import json
 import os
+import re
 import subprocess
 import sys
 import uuid
@@ -706,3 +707,216 @@ async def test_the_sandbox_root_is_never_created(run: Run, monkeypatch: pytest.M
         case.expect(not methods(case.seen[before:], "MKCOL"), "no MKCOL with a missing root")
         case.expect(not on_disk(run.alice, absent, "-e"), f"file system without {absent}")
         case.expect(not on_disk(run.alice, "/a", "-e"), "file system without /a above the root")
+
+
+# --- the five edge cases --------------------------------------------------------------
+
+_LOCK_BODY = (
+    b'<?xml version="1.0"?><d:lockinfo xmlns:d="DAV:"><d:lockscope><d:exclusive/>'
+    b"</d:lockscope><d:locktype><d:write/></d:locktype><d:owner>ordner31</d:owner></d:lockinfo>"
+)
+_LOCK_TOKEN = re.compile(r"opaquelocktoken:[0-9A-Za-z-]+")
+#: The sentence of the one branch that names no status of its own (``dav._check_mkcol``).
+_UNNAMED = ("unexpected status", "with status ")
+
+
+def named(error: ToolError) -> bool:
+    """Whether a refusal is one of the named sentences and not the rest for an odd status."""
+    return not any(fragment in error.message for fragment in _UNNAMED)
+
+
+def one_line(text: str, limit: int = 200) -> str:
+    """A response body as one short line, with every lock token replaced by a placeholder."""
+    flat = " ".join(_LOCK_TOKEN.sub("opaquelocktoken:<token>", text).split())
+    return flat if len(flat) <= limit else flat[: limit - 3] + "..."
+
+
+async def test_a_refused_name_inside_a_chain_is_a_named_refusal(run: Run) -> None:
+    kept, target = f"{P}/n/ok", f"{P}/n/ok/.htaccess/x"
+    with Case(run, "teilabbruch-name") as case:
+        error = await refusal(create(case, target, parents=True))
+        case.expect(named(error), told(error))
+        case.expect(
+            error.message.startswith(dav.name_rejected(target).message),
+            "the sentence of a refused folder name, for the target",
+        )
+        left = [path for path in (f"{P}/n", kept) if on_disk(run.alice, path)]
+        case.expect(
+            all(path in error.message for path in left)
+            and ("Already created" in error.message) == bool(left),
+            f"file system holds {left or 'nothing of the chain'}, and the sentence says so",
+        )
+        case.expect(not on_disk(run.alice, f"{kept}/.htaccess", "-e"), "no .htaccess on disk")
+
+
+async def test_refused_names_end_in_a_named_refusal_or_a_real_folder(run: Run) -> None:
+    """One call per name; the line ``NAME`` carries the calls and the outcome of each."""
+    base = f"{P}/namen"
+    run.harness.mkcol(base)
+    names = [".htaccess", "x.part", "x.filepart", "con", "ende-leer ", "ende-punkt."]
+    with Case(run, "namen") as case:
+        for name, parents in [(name, False) for name in names] + [("mitte-leer /kind", True)]:
+            part = Case(run, "namen")
+            wanted = f"{base}/{name}"
+            try:
+                answer = await create(part, wanted, parents=parents)
+            except ToolError as error:
+                ok = named(error) and not on_disk(run.alice, wanted, "-e")
+                outcome = f"{told(error)}; file system has it=no" if ok else told(error)
+            else:
+                ok = answer.get("created") is True and on_disk(run.alice, str(answer["path"]))
+                outcome = f"{answered(answer)}; file system test -d of the answered path"
+            record(
+                f"NAME {name!r} nc={run.version} nutzer={run.alice} status={calls(part.seen)} "
+                f"ergebnis={'ok' if ok else 'befund'} | {outcome}"
+            )
+            case.seen += [entry for entry in part.seen if entry[0] == "MKCOL"]
+            case.expect(ok, f"{name!r}: {'named refusal or real folder' if ok else outcome}")
+
+
+def lock(harness: cw.Harness, path: str, user_lock: bool = False) -> tuple[int, str, str]:
+    """``(status, token, body)`` of one LOCK, exclusive and of depth infinity.
+
+    ``user_lock`` sends the form of the ``files_lock`` app instead: no body, one extra field.
+    """
+    fields = {"Depth": "infinity", "Timeout": "Second-600"}
+    fields |= {"X-User-Lock": "1"} if user_lock else {"Content-Type": "application/xml"}
+    response = harness.request(
+        "LOCK", harness.dav_url(path), headers=fields, content=b"" if user_lock else _LOCK_BODY
+    )
+    token = response.headers.get("Lock-Token", "")
+    return response.status_code, token, one_line(response.text)
+
+
+def unlock(harness: cw.Harness, path: str, token: str, user_lock: bool = False) -> int:
+    fields = {"X-User-Lock": "1"} if user_lock else {}
+    if token:
+        fields["Lock-Token"] = token
+    return harness.request("UNLOCK", harness.dav_url(path), headers=fields).status_code
+
+
+async def test_a_locked_folder_is_refused_or_not_reproducible(run: Run) -> None:
+    """423: three ways to lock a folder; without a 423 the case says ``UNGEMESSEN``."""
+    shared, own, by_app = (f"{P}/lock-{STAMP}-{letter}" for letter in "abc")
+    for folder in (shared, own, by_app):
+        run.harness.mkcol(folder)
+    answer = run.harness.ocs_post(
+        cw.SHARES_API,
+        {"path": shared, "shareType": cw.SHARE_USER, "shareWith": run.bob, "permissions": 31},
+    )
+    try:
+        run.shares.append(str(answer.json()["ocs"]["data"]["id"]))
+    except (ValueError, KeyError, TypeError):
+        record(f"SPERRE freigabe an {run.bob} status={answer.status_code} (keine Freigabe)")
+    mount = f"/{shared.rsplit('/', 1)[-1]}"
+    attempts = [
+        ("bob-ueber-freigabe", run.harness_bob, mount, shared, False),
+        ("alice-eigenes-token", run.harness, own, own, False),
+        ("alice-x-user-lock", run.harness, by_app, by_app, True),
+    ]
+    with Case(run, "sperre-423") as case:
+        locked_out = False
+        for label, harness, lock_path, folder, user_lock in attempts:
+            status, token, body = lock(harness, lock_path, user_lock)
+            before = len(case.seen)
+            try:
+                made = await create(case, f"{folder}/kind")
+                outcome = answered(made)
+            except ToolError as error:
+                outcome = told(error)
+                case.expect(named(error), f"{label}: {outcome}")
+                if 423 in methods(case.seen[before:], "MKCOL"):
+                    locked_out = True
+                    case.expect(
+                        "is locked in Nextcloud" in error.message
+                        and not on_disk(run.alice, f"{folder}/kind", "-e"),
+                        f"{label}: MKCOL 423, sentence of the lock, nothing on disk",
+                    )
+            finally:
+                released = unlock(harness, lock_path, token, user_lock)
+            record(
+                f"SPERRE versuch={label} nc={run.version} LOCK status={status} "
+                f"token={'ja' if token else 'nein'} UNLOCK status={released} "
+                f"werkzeug status={calls(case.seen[before:])} | LOCK antwort: {body or 'leer'}; "
+                f"werkzeug: {outcome}"
+            )
+            case.note(f"{label}: LOCK {status}, MKCOL {methods(case.seen[before:], 'MKCOL')}")
+        if not locked_out:
+            record(
+                "UNGEMESSEN sperre-423 grund=kein LOCK dieser Instanz fuehrte zu MKCOL 423 "
+                "(drei Versuche, Rohausgabe in den Zeilen SPERRE); der Zweig 423 ist nur per "
+                "Unit-Test belegt"
+            )
+            case.note("423 not reproducible on this instance")
+
+
+async def test_a_parent_deleted_after_the_count_is_parent_missing(run: Run) -> None:
+    """404: the parent vanishes between the count and the write; plus the source of sabre."""
+    parent = f"{P}/geloescht-{STAMP}"
+    target = f"{parent}/kind"
+    run.harness.mkcol(parent)
+
+    def remover(method: str, path: str, status: int) -> None:
+        if (method, path, status) == ("PROPFIND", parent, 207):
+            run.harness.delete(parent)
+
+    with Case(run, "mkcol-404") as case:
+        error = await refusal(create(case, target, parents=True, watcher=remover))
+        written = methods(case.seen, "MKCOL")
+        case.expect(exact(error) == exact(dav.parent_missing(target)), told(error))
+        case.expect(written in ([404], [409]), f"MKCOL after the parent was deleted: {written}")
+        case.expect(not on_disk(run.alice, parent, "-e"), f"file system without {parent}")
+        source = in_container(
+            "awk",
+            "/function httpMkcol/{on=1} on&&/NotFound|Conflict|createCollection/"
+            '{print NR": "$0} on&&/^    }/{exit}',
+            "/var/www/html/3rdparty/sabre/dav/lib/DAV/CorePlugin.php",
+        )
+        lines = " / ".join(" ".join(line.split()) for line in source.stdout.splitlines())
+        record(
+            f"QUELLE mkcol-404 nc={run.version} CorePlugin.php httpMkcol exit={source.returncode} "
+            f"zeilen mit NotFound, Conflict oder createCollection: {lines or 'keine'}"
+        )
+        if 404 not in written:
+            record(
+                f"UNGEMESSEN mkcol-404 grund=der MKCOL unter einem geloeschten Elternordner "
+                f"antwortet {written}, nicht 404; httpMkcol in CorePlugin.php: "
+                f"{lines or 'keine Zeile mit NotFound'}; der Zweig 404 ist nur per Unit-Test belegt"
+            )
+            case.note("404 not reproducible on this instance")
+
+
+async def test_a_tight_quota_creates_and_an_exhausted_one_is_named(run: Run) -> None:
+    base = f"{P}/q-{STAMP}"
+    run.harness.mkcol(base)
+    used = int(props(run.harness, "/")[1][0]["used"] or 0)
+    with Case(run, "kontingent-knapp") as case:
+        run.quota_before = quota_setting(run.alice)
+        was = run.quota_before
+        try:
+            tight = f"{used + 1024} B"
+            cw.occ("user:setting", run.alice, "files", "quota", tight)
+            made = await create(case, f"{base}/knapp")
+            case.expect(
+                made.get("created") is True and on_disk(run.alice, f"{base}/knapp"),
+                f"quota {tight} (used {used} B plus 1 KB): {answered(made)}",
+            )
+            cw.occ("user:setting", run.alice, "files", "quota", "1 B")
+            before = len(case.seen)
+            try:
+                full = await create(case, f"{base}/voll")
+            except ToolError as error:
+                case.expect(
+                    error.message.startswith("Not enough space in Nextcloud")
+                    and methods(case.seen[before:], "MKCOL") == [507]
+                    and not on_disk(run.alice, f"{base}/voll", "-e"),
+                    f"quota 1 B: {told(error)}; nothing on disk",
+                )
+            else:
+                case.expect(
+                    full.get("created") is True and on_disk(run.alice, f"{base}/voll"),
+                    f"quota 1 B: {answered(full)}",
+                )
+        finally:
+            restore_quota(run)
+            case.expect(quota_setting(run.alice) == was, f"quota back to: {was}")
