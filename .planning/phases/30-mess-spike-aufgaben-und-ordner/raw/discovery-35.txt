@@ -1,0 +1,167 @@
+
+# Lauf blocks=discovery-matrix start=2026-11-12T01:17:12Z (neue Datei)
+
+== discovery-matrix nc-tag=35.0.2-apache parts=discovery,query,provider, start 2026-11-12T01:17:12Z ==
+
+== vorbedingungen ==
+RAM frei_host_gb=5.39 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+VORBEDINGUNG Container nc-spike-tags* vorhanden: nein
+VORBEDINGUNG Volume nc-spike-tags* vorhanden: nein
+
+== aufbau ==
+docker compose -f compose.spike-tags.yml up -d --wait: 22.1 s
+Container nc-spike-tags Starting / Container nc-spike-tags Started / Container nc-spike-tags Waiting / Container nc-spike-tags Healthy
+nc-spike-tags: installed (attempt 1)
+Installation abgewartet: 0.3 s
+bruteforce protection aus (Wegwerf-Instanz) -> System config value auth.bruteforce.protection.enabled set to boolean false
+- installed: true
+  - version: 35.0.2.2
+  - versionstring: 35.0.2
+  - edition: 
+  - maintenance: false
+  - needsDbUpgrade: false
+  - productname: Nextcloud
+  - extendedSupport: false
+VERSION OF RECORD 35.0.2
+dbtype: sqlite3
+memcache.local: \OC\Memcache\APCu
+nc-spike-tags  mem 282.3MiB / 5.786GiB  cpu 0.01%
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+occ user:add --password-from-env alice (password via stdin)
+occ user:auth-tokens:add alice --password-from-env --name spike30 (token kept)
+occ user:add --password-from-env bob (password via stdin)
+occ user:auth-tokens:add bob --password-from-env --name spike30 (token kept)
+
+== liste ==
+2026-11-12T01:17:46Z | SETUP MKCALENDAR liste=spike30-aufgaben nutzer=alice auth=basic status=201 komponenten=VTODO
+
+== frisches-konto ==
+occ user:add --password-from-env fresh30 (password via stdin)
+FRISCHES KONTO vor_anmeldung status=404 sammlungen=0 kalender_db=0  (PROPFIND Depth 1 als admin auf calendars/fresh30/: das Konto selbst hat sich noch nie angemeldet, eine Anfrage in seinem Namen waere schon die Anmeldung) | Sabre\DAV\Exception\NotFound Node with name 'fresh30' could not be found
+2026-11-12T01:17:51Z | ERSTANMELDUNG versuch=basic GET /ocs/v2.php/cloud/user nutzer=fresh30 status=200 kalender_db_danach=2 personal:VEVENT:leer contact_birthdays:VEVENT:leer
+ERSTANMELDUNG weg=basic
+2026-11-12T01:17:51Z | PROPFIND Depth 1 calendars/fresh30/ nutzer=fresh30 auth=basic status=207 bytes=5619
+ROHANTWORT-ANFANG discovery-frisch status=207 bytes=5619 sha256=93fbe221c1b539686fe6c8f1c656c3b6081ded51ab9eae3c01ecaf7aa1a71f8c
+    <?xml version="1.0"?>
+    <d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:cal="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"><d:response><d:href>/remote.php/dav/calendars/fresh30/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype><d:current-user-privilege-set><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-acl/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><cal:supported-calendar-component-set/><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/fresh30/personal/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:displayname>Personal</d:displayname><cal:supported-calendar-component-set><cal:comp name="VEVENT"/></cal:supported-calendar-component-set><d:current-user-privilege-set><d:privilege><d:write-acl/></d:privilege><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/fresh30/contact_birthdays/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:displayname>Contact birthdays</d:displayname><cal:supported-calendar-component-set><cal:comp name="VEVENT"/></cal:supported-calendar-component-set><d:current-user-privilege-set><d:privilege><d:write-properties/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/fresh30/inbox/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:schedule-inbox/></d:resourcetype><d:current-user-privilege-set><d:privilege><cal:schedule-deliver/></d:privilege><d:privilege><cal:schedule-deliver-invite/></d:privilege><d:privilege><cal:schedule-deliver-reply/></d:privilege><d:privilege><cal:schedule-query-freebusy/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><cal:supported-calendar-component-set/><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/fresh30/outbox/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:schedule-outbox/></d:resourcetype><d:current-user-privilege-set><d:privilege><cal:schedule-send/></d:privilege><d:privilege><cal:schedule-send-invite/></d:privilege><d:privilege><cal:schedule-send-reply/></d:privilege><d:privilege><cal:schedule-send-freebusy/></d:privilege><d:privilege><cal:schedule-post-vevent/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><cal:supported-calendar-component-set/><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/fresh30/trashbin/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><x1:trash-bin xmlns:x1="http://nextcloud.com/ns"/></d:resourcetype><d:current-user-privilege-set><d:privilege><d:all/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-acl/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><cal:supported-calendar-component-set/><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response></d:multistatus>
+    
+ROHANTWORT-ENDE discovery-frisch
+FRISCHES KONTO aufgabenlisten=0 kalender=personal(VEVENT),contact_birthdays(VEVENT)
+SAMMLUNG uri=personal art=terminkalender komponenten=VEVENT read_only=fehlt schreibrecht=ja typen=collection,calendar name=Personal
+SAMMLUNG uri=contact_birthdays art=terminkalender komponenten=VEVENT read_only=fehlt schreibrecht=nein typen=collection,calendar name=Contact birthdays
+SAMMLUNG uri=inbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-inbox name=-
+SAMMLUNG uri=outbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-outbox name=-
+SAMMLUNG uri=trashbin art=papierkorb komponenten=keine read_only=fehlt schreibrecht=ja typen=collection,trash-bin name=-
+  occ dav:list-calendars fresh30: +----------+-------------+--------------------------+-------------------+----------+
+  occ dav:list-calendars fresh30: | URI      | Displayname | Owner principal          | Owner displayname | Writable |
+  occ dav:list-calendars fresh30: +----------+-------------+--------------------------+-------------------+----------+
+  occ dav:list-calendars fresh30: | personal | Personal    | principals/users/fresh30 | fresh30           |  ✓       |
+  occ dav:list-calendars fresh30: +----------+-------------+--------------------------+-------------------+----------+
+GEGENPROBE frisches konto kalender_db=2 personal:VEVENT:leer contact_birthdays:VEVENT:leer aufgabenlisten_db=0 (Tabelle calendars, Spalte components, per PHP und nicht ueber DAV)
+
+== sammlungsarten ==
+2026-11-12T01:17:54Z | SETUP MKCALENDAR liste=spike30-gemischt nutzer=alice auth=basic status=201 komponenten=VEVENT,VTODO
+2026-11-12T01:17:54Z | SETUP MKCOL abo=spike30-abo quelle=http://127.0.0.1:9/keine.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:17:54Z | SETUP MKCALENDAR liste=spike30-geloescht nutzer=alice auth=basic status=201 komponenten=VTODO
+2026-11-12T01:17:55Z | SETUP DELETE kalender=spike30-geloescht nutzer=alice auth=basic status=204 kalender_db=3 spike30-aufgaben:VTODO:leer spike30-gemischt:VEVENT,VTODO:leer spike30-geloescht:VTODO:gesetzt
+2026-11-12T01:17:55Z | SETUP MKCALENDAR liste=spike30-b-rw nutzer=bob auth=basic status=201 komponenten=VTODO
+2026-11-12T01:17:55Z | FREIGABE liste=spike30-b-rw an=alice schreibrecht=ja nutzer=bob auth=basic status=200
+2026-11-12T01:17:55Z | SETUP MKCALENDAR liste=spike30-b-ro nutzer=bob auth=basic status=201 komponenten=VTODO
+2026-11-12T01:17:55Z | FREIGABE liste=spike30-b-ro an=alice schreibrecht=nein nutzer=bob auth=basic status=200
+occ app:install deck -> deck 1.19.2 installed deck enabled
+docker restart nc-spike-tags -> nc-spike-tags
+nc-spike-tags: installed (attempt 1)
+DECK-APP version=1.19.2 (gelesen mit occ app:list --output=json)
+2026-11-12T01:18:06Z | SETUP DECK POST /index.php/apps/deck/api/v1.0/boards titel=spike30-board nutzer=alice auth=basic status=200 board_id=2
+2026-11-12T01:18:06Z | PROPFIND Depth 1 calendars/alice/ nutzer=alice auth=basic status=207 bytes=11470
+ROHANTWORT-ANFANG discovery-vorbereitet status=207 bytes=11470 sha256=9ae4460702ca914b61e01c74fad53834ebc1ab0a1ce38c013c20bebfdb99c653
+    <?xml version="1.0"?>
+    <d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:cal="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"><d:response><d:href>/remote.php/dav/calendars/alice/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype><d:current-user-privilege-set><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-acl/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><cal:supported-calendar-component-set/><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/alice/spike30-aufgaben/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:displayname>spike30-aufgaben</d:displayname><cal:supported-calendar-component-set><cal:comp name="VTODO"/></cal:supported-calendar-component-set><d:current-user-privilege-set><d:privilege><d:write-acl/></d:privilege><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/alice/spike30-gemischt/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:displayname>spike30-gemischt</d:displayname><cal:supported-calendar-component-set><cal:comp name="VEVENT"/><cal:comp name="VTODO"/></cal:supported-calendar-component-set><d:current-user-privilege-set><d:privilege><d:write-acl/></d:privilege><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/alice/spike30-geloescht/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><x1:deleted-calendar xmlns:x1="http://nextcloud.com/ns"/></d:resourcetype><d:displayname>spike30-geloescht</d:displayname><cal:supported-calendar-component-set><cal:comp name="VTODO"/></cal:supported-calendar-component-set><d:current-user-privilege-set><d:privilege><d:write-acl/></d:privilege><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/alice/spike30-b-rw_shared_by_bob/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:displayname>spike30-b-rw (bob)</d:displayname><cal:supported-calendar-component-set><cal:comp name="VTODO"/></cal:supported-calendar-component-set><d:current-user-privilege-set><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set><oc:read-only></oc:read-only></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><cs:source/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/alice/spike30-b-ro_shared_by_bob/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:displayname>spike30-b-ro (bob)</d:displayname><cal:supported-calendar-component-set><cal:comp name="VTODO"/></cal:supported-calendar-component-set><d:current-user-privilege-set><d:privilege><d:write-properties/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set><oc:read-only>1</oc:read-only></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><cs:source/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/alice/inbox/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:schedule-inbox/></d:resourcetype><d:current-user-privilege-set><d:privilege><cal:schedule-deliver/></d:privilege><d:privilege><cal:schedule-deliver-invite/></d:privilege><d:privilege><cal:schedule-deliver-reply/></d:privilege><d:privilege><cal:schedule-query-freebusy/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><cal:supported-calendar-component-set/><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/alice/outbox/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:schedule-outbox/></d:resourcetype><d:current-user-privilege-set><d:privilege><cal:schedule-send/></d:privilege><d:privilege><cal:schedule-send-invite/></d:privilege><d:privilege><cal:schedule-send-reply/></d:privilege><d:privilege><cal:schedule-send-freebusy/></d:privilege><d:privilege><cal:schedule-post-vevent/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><cal:supported-calendar-component-set/><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/alice/trashbin/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><x1:trash-bin xmlns:x1="http://nextcloud.com/ns"/></d:resourcetype><d:current-user-privilege-set><d:privilege><d:all/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-acl/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><cal:supported-calendar-component-set/><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/alice/spike30-abo/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cs:subscribed/></d:resourcetype><d:displayname>spike30-abo</d:displayname><cal:supported-calendar-component-set><cal:comp name="VTODO"/><cal:comp name="VEVENT"/></cal:supported-calendar-component-set><cs:source><d:href>http://127.0.0.1:9/keine.ics</d:href></cs:source><d:current-user-privilege-set><d:privilege><d:all/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-acl/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/alice/app-generated--deck--board-1/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:displayname>Deck: Welcome to Nextcloud Deck!</d:displayname><cal:supported-calendar-component-set><cal:comp name="VTODO"/></cal:supported-calendar-component-set><d:current-user-privilege-set><d:privilege><d:write-properties/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/alice/app-generated--deck--board-2/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:displayname>Deck: spike30-board</d:displayname><cal:supported-calendar-component-set><cal:comp name="VTODO"/></cal:supported-calendar-component-set><d:current-user-privilege-set><d:privilege><d:write-properties/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response></d:multistatus>
+    
+ROHANTWORT-ENDE discovery-vorbereitet
+SAMMLUNG uri=spike30-aufgaben art=aufgabenliste komponenten=VTODO read_only=fehlt schreibrecht=ja typen=collection,calendar name=spike30-aufgaben
+SAMMLUNG uri=spike30-gemischt art=gemischt komponenten=VEVENT,VTODO read_only=fehlt schreibrecht=ja typen=collection,calendar name=spike30-gemischt
+SAMMLUNG uri=spike30-geloescht art=geloeschter-kalender komponenten=VTODO read_only=fehlt schreibrecht=ja typen=collection,deleted-calendar name=spike30-geloescht
+SAMMLUNG uri=spike30-b-rw_shared_by_bob art=geteilt-schreibbar komponenten=VTODO read_only=leer schreibrecht=ja typen=collection,calendar name=spike30-b-rw (bob)
+SAMMLUNG uri=spike30-b-ro_shared_by_bob art=geteilt-nur-lesen komponenten=VTODO read_only=1 schreibrecht=nein typen=collection,calendar name=spike30-b-ro (bob)
+SAMMLUNG uri=inbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-inbox name=-
+SAMMLUNG uri=outbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-outbox name=-
+SAMMLUNG uri=trashbin art=papierkorb komponenten=keine read_only=fehlt schreibrecht=ja typen=collection,trash-bin name=-
+SAMMLUNG uri=spike30-abo art=abo komponenten=VTODO,VEVENT read_only=fehlt schreibrecht=ja typen=collection,subscribed quelle=http://127.0.0.1:9/keine.ics name=spike30-abo
+SAMMLUNG uri=app-generated--deck--board-1 art=deck komponenten=VTODO read_only=fehlt schreibrecht=nein typen=collection,calendar name=Deck: Welcome to Nextcloud Deck!
+SAMMLUNG uri=app-generated--deck--board-2 art=deck komponenten=VTODO read_only=fehlt schreibrecht=nein typen=collection,calendar name=Deck: spike30-board
+ARTEN vorhanden=abo,aufgabenliste,deck,geloeschter-kalender,gemischt,geteilt-nur-lesen,geteilt-schreibbar,papierkorb,scheduling fehlen=keine
+POSITIVKONTROLLE aufgabenlisten_alice=4 (mindestens 1)
+READ-ONLY EIGENSCHAFT abrufbar=ja nur_lesen=1 schreibbar=leer schreibrecht_nur_lesen=nein schreibrecht_schreibbar=ja (A4)
+PAPIERKORB in_discovery=ja komponenten=keine typen=collection,trash-bin geloeschter_kalender_im_home=ja aufgabenliste_laut_auswertung=nein (A5)
+GEMISCHT in_beiden=ja terminfilter=ja aufgabenfilter=ja (A11; Terminfilter ist caldav.parse_calendar_home des Connectors, Aufgabenfilter ist task_lists)
+TERMINFILTER heute liefert=spike30-gemischt AUFGABENFILTER liefert=spike30-aufgaben,spike30-b-ro_shared_by_bob,spike30-b-rw_shared_by_bob,spike30-gemischt
+FOEDERIERT ungemessen grund=zweite Instanz noetig, in dieser Phase nicht vorgesehen
+2026-11-12T01:18:07Z | SCHREIBVERSUCH nur-lesen PUT create-only liste=spike30-b-ro_shared_by_bob nutzer=alice auth=basic status=404 angelegt_db=nein | Sabre\DAV\Exception\NotFound Calendar with name 'spike30-b-ro_shared_by_bob' could not be found
+2026-11-12T01:18:09Z | SCHREIBVERSUCH schreibbar PUT create-only liste=spike30-b-rw_shared_by_bob nutzer=alice auth=basic status=201 angelegt_db=ja | 
+  occ dav:list-calendars alice: +----------------------------+--------------------+------------------------+-------------------+----------+
+  occ dav:list-calendars alice: | URI                        | Displayname        | Owner principal        | Owner displayname | Writable |
+  occ dav:list-calendars alice: +----------------------------+--------------------+------------------------+-------------------+----------+
+  occ dav:list-calendars alice: | spike30-aufgaben           | spike30-aufgaben   | principals/users/alice | alice             |  ✓       |
+  occ dav:list-calendars alice: | spike30-gemischt           | spike30-gemischt   | principals/users/alice | alice             |  ✓       |
+  occ dav:list-calendars alice: | spike30-geloescht          | spike30-geloescht  | principals/users/alice | alice             |  ✓       |
+  occ dav:list-calendars alice: | spike30-b-rw_shared_by_bob | spike30-b-rw (bob) | principals/users/bob   | bob               |  ✓       |
+  occ dav:list-calendars alice: | spike30-b-ro_shared_by_bob | spike30-b-ro (bob) | principals/users/bob   | bob               |  x       |
+  occ dav:list-calendars alice: +----------------------------+--------------------+------------------------+-------------------+----------+
+GEGENPROBE vorbereitetes konto kalender_db=3 spike30-aufgaben:VTODO:leer spike30-gemischt:VEVENT,VTODO:leer spike30-geloescht:VTODO:gesetzt | Sammlungen mit resourcetype calendar in der Discovery=6 (eigene Kalender; Freigaben, Deck und Abos stehen nicht in der Tabelle calendars dieses Kontos)
+
+== abfragen-aufbau ==
+2026-11-12T01:18:10Z | SETUP PUT create-only spike30-aufgaben/s30-q-offen-undatiert-011745.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:18:10Z | SETUP PUT create-only spike30-aufgaben/s30-q-offen-im-fenster-011745.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:18:10Z | SETUP PUT create-only spike30-aufgaben/s30-q-offen-ausserhalb-011745.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:18:10Z | SETUP PUT create-only spike30-aufgaben/s30-q-erledigt-011745.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:18:10Z | SETUP PUT create-only spike30-aufgaben/s30-q-abgebrochen-011745.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:18:10Z | SETUP PUT create-only spike30-aufgaben/s30-q-in-arbeit-011745.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:18:10Z | SETUP PUT create-only spike30-aufgaben/s30-q-wiederkehrend-011745.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:18:10Z | SETUP PUT create-only spike30-aufgaben/s30-q-kind-011745.ics nutzer=alice auth=basic status=201 | 
+
+== abfragen ==
+ABFRAGEN liste=spike30-aufgaben nutzer=alice auth=basic REPORT calendar-query Depth 1; fenster=20261119T000000Z..20261122T000000Z text=q-offen eltern=UID von q-offen-im-fenster; client ist die Menge, die der Connector will (derselbe Filter im Skript ueber die ungefilterte Antwort), gleich=nein ist ein Befund ueber den Serverfilter
+ABFRAGE ohne-filter status=207 treffer=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+ABFRAGE ohne-filter client=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend gleich=ja
+ABFRAGE offen status=207 treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+ABFRAGE offen client=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend gleich=ja
+ABFRAGE fenster status=207 treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-im-fenster,q-offen-undatiert
+ABFRAGE fenster client=q-in-arbeit,q-offen-im-fenster gleich=nein nur_server=['q-abgebrochen', 'q-kind', 'q-offen-undatiert'] nur_client=[]
+ABFRAGE text status=207 treffer=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert
+ABFRAGE text client=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert gleich=ja
+ABFRAGE eltern status=207 treffer=q-kind
+ABFRAGE eltern client=q-kind gleich=ja
+ABFRAGE erledigt status=207 treffer=q-erledigt
+ABFRAGE erledigt client=q-erledigt gleich=ja
+
+== provider ==
+PROVIDER liste vor_installation status=200 tasks_dabei=nein ids=appstore,circles,comments,files,search-deck-card-board,search-deck-comment,settings,systemtags
+2026-11-12T01:18:11Z | GET /ocs/v2.php/search/providers/tasks/search?term=q-offen nutzer=alice auth=basic status=200 eintraege=0 | {"ocs":{"meta":{"status":"ok","statuscode":200,"message":"OK"},"data":{"name":"Tasks","isPaginated":false,"entries":[],"cursor":null}}}
+PROVIDER tasks app_nie_installiert status=200 eintraege=0
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+TASKS-APP version=0.18.1 (gelesen mit occ app:list --output=json)
+docker restart nc-spike-tags -> nc-spike-tags
+nc-spike-tags: installed (attempt 1)
+PROVIDER liste app_an status=200 tasks_dabei=ja ids=appstore,circles,comments,files,search-deck-card-board,search-deck-comment,settings,systemtags,tasks
+2026-11-12T01:18:16Z | GET /ocs/v2.php/search/providers/tasks/search?term=q-offen nutzer=alice auth=basic status=200 eintraege=3 | {"ocs":{"meta":{"status":"ok","statuscode":200,"message":"OK"},"data":{"name":"Tasks","isPaginated":true,"entries":[{"thumbnailUrl":"","title":"q-offen-undatiert","subline":"(spike30-aufgaben)","resourceUrl":"http:\/\/127.0.0.1:8083\/apps\/tasks\/calendars\/spike30-aufgaben\/tasks\/s30-q-offen-undat
+PROVIDER tasks treffer=3 link=http://127.0.0.1:8083/apps/tasks/calendars/spike30-aufgaben/tasks/s30-q-offen-undatiert-011745.ics
+  weiterer link=http://127.0.0.1:8083/apps/tasks/calendars/spike30-aufgaben/tasks/s30-q-offen-im-fenster-011745.ics
+  weiterer link=http://127.0.0.1:8083/apps/tasks/calendars/spike30-aufgaben/tasks/s30-q-offen-ausserhalb-011745.ics
+PROVIDER aufloesung status=200 uid_gleich=ja kalender=spike30-aufgaben objekt=s30-q-offen-undatiert-011745.ics (GET auf die aus dem Link gebaute DAV-URL; die UID der angelegten Aufgabe ist ihr Objektname ohne .ics)
+occ app:disable tasks -> tasks 0.18.1 disabled
+docker restart nc-spike-tags -> nc-spike-tags
+nc-spike-tags: installed (attempt 1)
+PROVIDER liste app_aus status=200 tasks_dabei=nein ids=appstore,circles,comments,files,search-deck-card-board,search-deck-comment,settings,systemtags
+2026-11-12T01:18:20Z | GET /ocs/v2.php/search/providers/tasks/search?term=q-offen nutzer=alice auth=basic status=200 eintraege=0 | {"ocs":{"meta":{"status":"ok","statuscode":200,"message":"OK"},"data":{"name":"Tasks","isPaginated":false,"entries":[],"cursor":null}}}
+PROVIDER tasks app_aus treffer=0 status=200
+nc-spike-tags  mem 83.29MiB / 5.786GiB  cpu 0.00%
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+
+== abbau ==
+Volume nc-mcp-spike-tags_nc-spike-tags-data Removing / Network nc-mcp-spike-tags_default Removing / Network nc-mcp-spike-tags_default Removed / Volume nc-mcp-spike-tags_nc-spike-tags-data Removed
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 70 s; ENDE 2026-11-12T01:18:26Z

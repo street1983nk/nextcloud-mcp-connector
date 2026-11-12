@@ -1,0 +1,131 @@
+
+# Lauf blocks=nc35-up,controls,vtodo-create,nc35-stop start=2026-11-12T01:28:46Z (neue Datei)
+
+== nc35-up ==
+RAM frei_host_gb=5.35 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+docker start nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+docker start nc35-harp -> nc35-harp
+docker start nc35-caddy -> nc35-caddy
+docker start nc_app_mcp_connector -> nc_app_mcp_connector
+GET http://127.0.0.1:8082/status.php -> HTTP 200
+- installed: true
+  - version: 35.0.0.10
+  - versionstring: 35.0.0
+  - edition: 
+  - maintenance: false
+  - needsDbUpgrade: false
+  - productname: Nextcloud
+  - extendedSupport: false
+VERSION OF RECORD 35.0.0
+dbtype: sqlite3
+APP app_api version=35.0.0 (occ app:list)
+occ app_api:app:list:
+  ExApps:
+  mcp_connector (MCP Connector): 0.3.2 [enabled]
+CONTAINER nc35-nc laeuft=true StartedAt=2026-11-12T01:28:50.262149624Z image=nextcloud:35.0.0-apache-local
+CONTAINER nc35-harp laeuft=true StartedAt=2026-11-12T01:28:52.016539908Z image=ghcr.io/nextcloud/nextcloud-appapi-harp:release
+CONTAINER nc35-caddy laeuft=true StartedAt=2026-11-12T01:28:52.347947311Z image=caddy:2
+CONTAINER nc_app_mcp_connector laeuft=true StartedAt=2026-11-12T01:28:52.779458036Z image=127.0.0.1:5000/mcp_connector:0.3.2
+EXAPP-CONTAINER laeuft=ja
+
+== controls ==
+RAM frei_host_gb=4.88 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 84.28MiB / 5.786GiB  cpu 3.89%
+nc35-caddy  mem 11.23MiB / 5.786GiB  cpu 0.02%
+nc35-harp  mem 69.64MiB / 5.786GiB  cpu 0.12%
+nc35-nc  mem 140.5MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+BASELINE-START apps_an={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"}
+BASELINE-START apps_aus={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"}
+BASELINE-START nutzer={"admin":"admin","alice":"alice","bob":"bob"}
+BASELINE-START gruppen={"admin":["admin"]}
+BASELINE-START dateien_alice=275
+BASELINE-START papierkorb_alice=0
+BASELINE-START kalender_alice=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+
+BASELINE-START kalender_bob=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+
+BASELINE-START geloeschte_kalenderobjekte=0
+BASELINE-START geloeschte_kalender=0
+BASELINE-START calendar_retention=
+BASELINE-START quota_alice=The setting does not exist for user "alice".
+occ user:add --password-from-env spike30a (password via stdin) -> The account "spike30a" was created successfully
+occ user:auth-tokens:add spike30a --password-from-env --name spike30 (token kept)
+2026-11-12T01:29:07Z | controls | PROPFIND Depth 0 home of spike30a (app password) | HTTP 207 | home
+occ user:add --password-from-env spike30b (password via stdin) -> The account "spike30b" was created successfully
+occ user:auth-tokens:add spike30b --password-from-env --name spike30 (token kept)
+2026-11-12T01:29:09Z | controls | PROPFIND Depth 0 home of spike30b (app password) | HTTP 207 | home
+2026-11-12T01:29:10Z | controls | a: GET /ocs/v2.php/cloud/user (AppAPI as spike30a) | HTTP 200 | id=spike30a erwartet=spike30a gleich=ja
+2026-11-12T01:29:10Z | controls | b: GET /ocs/v2.php/cloud/user (AppAPI as spike30a, wrong APP_SECRET) | HTTP 401 | abgelehnt=ja
+KONTROLLE c: exapp_impersonation.log, GET-Zeilen von spike30a seit 2026-11-12T01:29:09Z: 1
+  {"reqId":"Qh3WPCDvAD80hKLyVJhf","level":2,"time":"2026-11-12T01:29:10+00:00","remoteAddr":"172.30.42.128","user":"spike30a","app":"mcp_connector","method":"GET","url":"/ocs/v2.php/cloud/user","scriptName":"/ocs/v2.php","message":"impersonation request","userAgent":"python-httpx/0.28.1","version":"35
+
+== vtodo-create ==
+RAM frei_host_gb=4.74 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 91.54MiB / 5.786GiB  cpu 0.12%
+nc35-caddy  mem 11.27MiB / 5.786GiB  cpu 0.02%
+nc35-harp  mem 75.82MiB / 5.786GiB  cpu 5.76%
+nc35-nc  mem 225.4MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+2026-11-12T01:29:15Z | SETUP MKCALENDAR liste=spike30-anlegen nutzer=spike30a auth=appapi status=201 komponenten=VTODO
+VTODO anlegen auth=appapi status=201 nutzer=spike30a If-None-Match=* objekt=spike30-anlegen/s30-anlegen-appapi-012915.ics etag=stark | 
+  GEGENPROBE datenbank zeilen=1 spike30a/spike30-anlegen/s30-anlegen-appapi-012915.ics:deleted_at_leer:9d38af15ef17 gesendet=9d38af15ef174a35880c19be7bb7ac7edc95dfc659d12f3c959b3e607f9bab2e:255 gleich=ja
+  KONTROLLE exapp_impersonation.log PUT-Zeilen von spike30a: 1
+    {"reqId":"9VuKdqmWe20nNhoCf9Dv","level":2,"time":"2026-11-12T01:29:16+00:00","remoteAddr":"172.30.42.128","user":"spike30a","app":"mcp_connector","method":"PUT","url":"/remote.php/dav/calendars/spike30a/spike30-anlegen/s30-anlegen-appapi-012915.ics","scriptName":"/remote.php","message":"impersonatio
+  GEGENPROBE REPORT calendar-multiget auth=basic status=207 objekte=1 text_gleich=ja
+VTODO anlegen zweiter status=412 objekt_unveraendert=ja auth=appapi | Sabre\DAV\Exception\PreconditionFailed An If-None-Match header was specified, but the ETag matched (or * was specified).
+VTODO anlegen falsches_secret status=401 angelegt_db=nein
+VTODO anlegen auth=basic status=201 nutzer=spike30a If-None-Match=* objekt=spike30-anlegen/s30-anlegen-basic-012915.ics etag=stark | 
+  GEGENPROBE datenbank zeilen=1 spike30a/spike30-anlegen/s30-anlegen-basic-012915.ics:deleted_at_leer:042ebe4f73ac gesendet=042ebe4f73ac25f39b3d46f35c7a00342dab22afde79bb1d2d0c289833b0bfa7:253 gleich=ja
+VTODO anlegen zweiter status=412 objekt_unveraendert=ja auth=basic | Sabre\DAV\Exception\PreconditionFailed An If-None-Match header was specified, but the ETag matched (or * was specified).
+VTODO GLEICH appapi_basic=ja appapi=201/412/ja basic=201/412/ja
+
+== deck-discovery ==
+DECK-APP version=1.19.0 (occ app:list --output=json)
+2026-11-12T01:29:20Z | SETUP DECK POST /index.php/apps/deck/api/v1.0/boards titel=spike30-board nutzer=spike30a auth=basic status=200 board_id=67
+2026-11-12T01:29:20Z | PROPFIND Depth 1 calendars/spike30a/ nutzer=spike30a auth=appapi status=207 bytes=6471
+SAMMLUNG uri=spike30-anlegen art=aufgabenliste komponenten=VTODO read_only=fehlt schreibrecht=ja typen=collection,calendar name=spike30-anlegen
+SAMMLUNG uri=inbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-inbox name=-
+SAMMLUNG uri=outbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-outbox name=-
+SAMMLUNG uri=trashbin art=papierkorb komponenten=keine read_only=fehlt schreibrecht=ja typen=collection,trash-bin name=-
+SAMMLUNG uri=app-generated--deck--board-66 art=deck komponenten=VTODO read_only=fehlt schreibrecht=nein typen=collection,calendar name=Deck: Welcome to Nextcloud Deck!
+SAMMLUNG uri=app-generated--deck--board-67 art=deck komponenten=VTODO read_only=fehlt schreibrecht=nein typen=collection,calendar name=Deck: spike30-board
+RUECKBAU DECK DELETE boards/67 status=200
+
+== rueckbau ==
+rm -rf /var/www/html/data/spike30ext -> entfernt
+rm -rf /var/www/html/data/__groupfolders (Dateien darin vorher: fehlt) -> entfernt
+occ user:delete spike30a -> The specified user was deleted
+occ user:delete spike30b -> The specified user was deleted
+RUECKBAU reste_mit_praefix_spike30=keine
+RUECKBAU occ user:list -> - admin: admin - alice: alice - bob: bob
+RUECKBAU occ app:list groupfolders_vorhanden=nein files_external_an=nein
+RUECKBAU deck_boards_mit_praefix_spike30=0 (Tabelle deck_boards, per PHP)
+BASELINE apps_an vorher={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"} nachher={"activity": "8.0.0", "app_api": "35.0.0", "appstore": "2.0.0-dev.0", "bruteforcesettings": "8.0.0", "circles": "35.0.0", "cloud_federation_api": "2.0.0-dev.0", "comments": "2.0.0-dev.0", "contactsinteraction": "2.0.0-dev.0", "dashboard": "8.0.0-dev.0", "dav": "2.0.0-dev.1", "deck": "1.19.0", "federatedfilesharing": "2.0.0-dev.1", "federation": "2.0.0-dev.0", "files": "3.0.0-dev.0", "files_downloadlimit": "5.3.0", "files_lock": "35.0.0", "files_pdfviewer": "8.0.0", "files_reminders": "2.0.0-dev.0", "files_sharing": "2.0.0-dev.1", "files_trashbin": "2.0.0-dev.0", "files_versions": "2.0.0-dev.0", "firstrunwizard": "8.0.0", "logreader": "8.0.0", "lookup_server_connector": "2.0.0-dev.0", "mail": "5.12.0", "nextcloud_announcements": "7.0.0", "notes": "6.1.0", "notifications": "8.0.0", "oauth2": "2.0.0-dev.0", "office": "1.1.0", "password_policy": "7.0.0", "photos": "8.0.0", "privacy": "7.0.0", "profile": "2.0.0-dev.0", "provisioning_api": "2.0.0-dev.0", "recommendations": "8.0.0", "related_resources": "6.0.0", "serverinfo": "7.0.0", "settings": "2.0.0-dev.0", "sharebymail": "2.0.0-dev.0", "sharing": "1.0.4", "spreed": "25.0.0", "support": "7.0.0", "survey_client": "7.0.0", "systemtags": "2.0.0-dev.0", "tables": "2.3.1", "text": "9.0.0", "theming": "3.0.0-dev.0", "twofactor_backupcodes": "2.0.0-dev.0", "twofactor_totp": "17.1.0", "updatenotification": "2.0.0-dev.0", "user_status": "2.0.0-dev.0", "viewer": "8.0.0", "weather_status": "2.0.0-dev.0", "webhook_listeners": "2.0.0-dev.0", "workflowengine": "3.0.0-dev.0"} gleich=ja
+BASELINE apps_aus vorher={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"} nachher={"admin_audit": "2.0.0-dev.0", "encryption": "3.0.0-dev.0", "files_external": "2.0.0-dev.0", "suspicious_login": "13.0.0", "twofactor_nextcloud_notification": "9.0.0", "user_ldap": "2.0.0-dev.0"} gleich=ja
+BASELINE nutzer vorher={"admin":"admin","alice":"alice","bob":"bob"} nachher={"admin":"admin","alice":"alice","bob":"bob"} gleich=ja
+BASELINE gruppen vorher={"admin":["admin"]} nachher={"admin":["admin"]} gleich=ja
+BASELINE dateien_alice vorher=275 nachher=275 gleich=ja
+BASELINE papierkorb_alice vorher=0 nachher=0 gleich=ja
+BASELINE kalender_alice vorher=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+ nachher=+----------+-------------+------------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+------------------------+-------------------+----------+ | personal | personal | principals/users/alice | alice | ✓ | +----------+-------------+------------------------+-------------------+----------+ gleich=ja
+BASELINE kalender_bob vorher=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+ nachher=+----------+-------------+----------------------+-------------------+----------+ | URI | Displayname | Owner principal | Owner displayname | Writable | +----------+-------------+----------------------+-------------------+----------+ | personal | personal | principals/users/bob | bob | ✓ | +----------+-------------+----------------------+-------------------+----------+ gleich=ja
+BASELINE geloeschte_kalenderobjekte vorher=0 nachher=0 gleich=ja
+BASELINE geloeschte_kalender vorher=0 nachher=0 gleich=ja
+BASELINE calendar_retention vorher= nachher= gleich=ja
+BASELINE quota_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
+
+== nc35-stop ==
+RAM frei_host_gb=4.71 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+nc_app_mcp_connector  mem 92.2MiB / 5.786GiB  cpu 0.12%
+nc35-caddy  mem 11.36MiB / 5.786GiB  cpu 0.00%
+nc35-harp  mem 75.72MiB / 5.786GiB  cpu 0.10%
+nc35-nc  mem 241.3MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
+docker stop nc_app_mcp_connector -> nc_app_mcp_connector | laeuft=false

@@ -1,0 +1,71 @@
+
+# Lauf blocks=cost start=2026-11-12T01:24:24Z (neue Datei)
+
+== cost db=pg nc-tag=35.0.2-apache, start 2026-11-12T01:24:24Z ==
+
+== vorbedingungen ==
+RAM frei_host_gb=5.35 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+VORBEDINGUNG Container nc-spike-tags* vorhanden: nein
+VORBEDINGUNG Volume nc-spike-tags* vorhanden: nein
+
+== aufbau ==
+docker compose -f compose.spike-tags-pg.yml up -d --wait: 43.9 s
+Container nc-spike-tags-pg Waiting / Container nc-spike-tags-pgdb Waiting / Container nc-spike-tags-pgdb Healthy / Container nc-spike-tags-pg Healthy
+nc-spike-tags-pg: installed (attempt 1)
+Installation abgewartet: 0.4 s
+bruteforce protection aus (Wegwerf-Instanz) -> System config value auth.bruteforce.protection.enabled set to boolean false
+- installed: true
+  - version: 35.0.2.2
+  - versionstring: 35.0.2
+  - edition: 
+  - maintenance: false
+  - needsDbUpgrade: false
+  - productname: Nextcloud
+  - extendedSupport: false
+VERSION OF RECORD 35.0.2
+dbtype: pgsql
+select version(): PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+show shared_buffers: 128MB
+postgres-Image: postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+memcache.local: \OC\Memcache\APCu
+nc-spike-tags-pg  mem 288.1MiB / 2GiB  cpu 0.01%
+nc-spike-tags-pgdb  mem 69.09MiB / 1GiB  cpu 0.04%
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+occ user:add --password-from-env alice (password via stdin)
+occ user:auth-tokens:add alice --password-from-env --name spike30 (token kept)
+
+== datenaufbau ==
+2026-11-12T01:25:22Z | SETUP MKCALENDAR liste=spike30-kosten nutzer=alice auth=basic status=201 komponenten=VTODO
+AUFBAU aufgaben=2000 erledigt=1900 dauer_s=74 offen=100 mit_suchbegriff=10 gleichzeitig=4 wiederholte_put=0 objekt_bytes=490 (PUT create-only ueber DAV als alice, Liste spike30-kosten)
+GEGENPROBE datenbank zeilen=2000 erwartet=2000 gleich=ja (Tabelle calendarobjects, per PHP)
+
+== kosten ==
+nc-spike-tags-pg  mem 385.8MiB / 2GiB  cpu 0.01%
+nc-spike-tags-pgdb  mem 74.88MiB / 1GiB  cpu 0.02%
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+  KOSTEN offen: Instanz ruht nach 4 s (docker stats CPU unter 10 %)
+KOSTEN offen status=207 treffer=100 bytes=70274 min=129 median=150 p95_zweitgroesster=168 max=185 (n=15)
+  KOSTEN alle: Instanz ruht nach 3 s (docker stats CPU unter 10 %)
+KOSTEN alle status=207 treffer=2000 bytes=1521874 min=172 median=186 p95_zweitgroesster=205 max=225 (n=15)
+GEGENPROBE offen treffer_server=100 erwartet=100 alle_treffer=2000 erwartet_alle=2000 alle_ohne_completed=100 (Objekte ohne COMPLETED, clientseitig in der Antwort alle gezaehlt)
+KOSTEN calendar-search status=207 treffer=10 bytes=7364 ms=110 (ein Aufruf, REPORT auf dem Kalender-Home, Depth 2, Suchbegriff kostenprobe, comp-filter VTODO, prop-filter SUMMARY, limit 50, offset 0)
+GEGENPROBE calendar-search namen_gleich=ja erwartet=10 server=10 (dieselben Namen clientseitig aus der Antwort alle gefiltert; Positivkontrolle: der Suchbegriff steht in 10 vorbereiteten Aufgaben)
+  BEZUG discovery: Instanz ruht nach 4 s (docker stats CPU unter 10 %)
+BEZUG discovery median=80 status=[207] max=110 (ms, n=15, PROPFIND Depth 1)
+  BEZUG status.php: Instanz ruht nach 3 s (docker stats CPU unter 10 %)
+BEZUG status.php median=20 status=[200] max=21 (ms, n=15)
+nc-spike-tags-pg  mem 405.3MiB / 2GiB  cpu 6.57%
+nc-spike-tags-pgdb  mem 75.18MiB / 1GiB  cpu 0.85%
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+VORSCHLAG Bezugswert 0.186 s (höchstens 1,0 s): eine Abfrage je Liste ohne zusätzlichen Deckel unterhalb von 2000 Objekten, Zeitbudget je Liste 1 s (das Doppelte des größten gemessenen Maximalwerts 0.225 s, aufgerundet auf volle Sekunden); zweite Größe ist die Antwortgröße in Bytes je Modus (nur mit den Zahlen dieser Datenbank pgsql; die Ableitungsregel nimmt als Bezugswert den größeren Median beider Datenbanken, der Bericht wendet sie auf beide Dateien an)
+nc-spike-tags-pg  mem 405.2MiB / 2GiB  cpu 0.01%
+nc-spike-tags-pgdb  mem 75.13MiB / 1GiB  cpu 0.02%
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+
+== abbau ==
+Volume nc-mcp-spike-tags-pg_nc-spike-tags-pg-data Removing / Volume nc-mcp-spike-tags-pg_nc-spike-tags-pgdb-data Removed / Network nc-mcp-spike-tags-pg_default Removed / Volume nc-mcp-spike-tags-pg_nc-spike-tags-pg-data Removed
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 164 s; ENDE 2026-11-12T01:27:11Z

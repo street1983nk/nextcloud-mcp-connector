@@ -1,0 +1,73 @@
+
+# Lauf blocks=discovery-matrix start=2026-11-12T01:12:32Z (neue Datei)
+
+== discovery-matrix nc-tag=33.0.9-apache parts=query, start 2026-11-12T01:12:32Z ==
+
+== vorbedingungen ==
+RAM frei_host_gb=5.32 schwelle=4.0 ergebnis=ok
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+FREMDER CONTAINER gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 0.00% gemeldet=nein
+VORBEDINGUNG Container nc-spike-tags* vorhanden: nein
+VORBEDINGUNG Volume nc-spike-tags* vorhanden: nein
+
+== aufbau ==
+docker compose -f compose.spike-tags.yml up -d --wait: 22.1 s
+Container nc-spike-tags Starting / Container nc-spike-tags Started / Container nc-spike-tags Waiting / Container nc-spike-tags Healthy
+nc-spike-tags: installed (attempt 1)
+Installation abgewartet: 0.4 s
+bruteforce protection aus (Wegwerf-Instanz) -> System config value auth.bruteforce.protection.enabled set to boolean false
+- installed: true
+  - version: 33.0.9.1
+  - versionstring: 33.0.9
+  - edition: 
+  - maintenance: false
+  - needsDbUpgrade: false
+  - productname: Nextcloud
+  - extendedSupport: false
+VERSION OF RECORD 33.0.9
+dbtype: sqlite3
+memcache.local: \OC\Memcache\APCu
+nc-spike-tags  mem 256.8MiB / 5.786GiB  cpu 0.00%
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+occ user:add --password-from-env alice (password via stdin)
+BEFUND occ user:auth-tokens:add --name scheitert auf dieser Version (docker exec -i -u www-data nc-spike-tags exited 1: The "login-name" option does not exist. user:auth-tokens:add [--password-from-env] [--name NAME] [--] <user>); Rueckfall getapppassword
+GET /ocs/v2.php/core/getapppassword als alice -> HTTP 200 (kept)
+occ user:add --password-from-env bob (password via stdin)
+BEFUND occ user:auth-tokens:add --name scheitert auf dieser Version (docker exec -i -u www-data nc-spike-tags exited 1: The "login-name" option does not exist. user:auth-tokens:add [--password-from-env] [--name NAME] [--] <user>); Rueckfall getapppassword
+GET /ocs/v2.php/core/getapppassword als bob -> HTTP 200 (kept)
+
+== liste ==
+2026-11-12T01:13:13Z | SETUP MKCALENDAR liste=spike30-aufgaben nutzer=alice auth=basic status=201 komponenten=VTODO
+
+== abfragen-aufbau ==
+2026-11-12T01:13:13Z | SETUP PUT create-only spike30-aufgaben/s30-q-offen-undatiert-011313.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:13:13Z | SETUP PUT create-only spike30-aufgaben/s30-q-offen-im-fenster-011313.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:13:13Z | SETUP PUT create-only spike30-aufgaben/s30-q-offen-ausserhalb-011313.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:13:13Z | SETUP PUT create-only spike30-aufgaben/s30-q-erledigt-011313.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:13:13Z | SETUP PUT create-only spike30-aufgaben/s30-q-abgebrochen-011313.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:13:13Z | SETUP PUT create-only spike30-aufgaben/s30-q-in-arbeit-011313.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:13:13Z | SETUP PUT create-only spike30-aufgaben/s30-q-wiederkehrend-011313.ics nutzer=alice auth=basic status=201 | 
+2026-11-12T01:13:13Z | SETUP PUT create-only spike30-aufgaben/s30-q-kind-011313.ics nutzer=alice auth=basic status=201 | 
+
+== abfragen ==
+ABFRAGEN liste=spike30-aufgaben nutzer=alice auth=basic REPORT calendar-query Depth 1; fenster=20261119T000000Z..20261122T000000Z text=q-offen eltern=UID von q-offen-im-fenster; client ist die Menge, die der Connector will (derselbe Filter im Skript ueber die ungefilterte Antwort), gleich=nein ist ein Befund ueber den Serverfilter
+ABFRAGE ohne-filter status=207 treffer=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+ABFRAGE ohne-filter client=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend gleich=ja
+ABFRAGE offen status=207 treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+ABFRAGE offen client=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend gleich=ja
+ABFRAGE fenster status=207 treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-im-fenster,q-offen-undatiert
+ABFRAGE fenster client=q-in-arbeit,q-offen-im-fenster gleich=nein nur_server=['q-abgebrochen', 'q-kind', 'q-offen-undatiert'] nur_client=[]
+ABFRAGE text status=207 treffer=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert
+ABFRAGE text client=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert gleich=ja
+ABFRAGE eltern status=207 treffer=q-kind
+ABFRAGE eltern client=q-kind gleich=ja
+ABFRAGE erledigt status=207 treffer=q-erledigt
+ABFRAGE erledigt client=q-erledigt gleich=ja
+nc-spike-tags  mem 397.9MiB / 5.786GiB  cpu 0.00%
+gameworld-dev-gameworld-docker-proxy-1  mem 24.02MiB / 5.786GiB  cpu 0.00%
+
+== abbau ==
+Volume nc-mcp-spike-tags_nc-spike-tags-data Removing / Network nc-mcp-spike-tags_default Removing / Network nc-mcp-spike-tags_default Removed / Volume nc-mcp-spike-tags_nc-spike-tags-data Removed
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 45 s; ENDE 2026-11-12T01:13:21Z
