@@ -741,9 +741,12 @@ async def test_a_refused_name_inside_a_chain_is_a_named_refusal(run: Run) -> Non
     with Case(run, "teilabbruch-name") as case:
         error = await refusal(create(case, target, parents=True))
         case.expect(named(error), told(error))
+        # 35.0.0 refuses the name while the chain is counted (for the target, nothing is
+        # created), 32.0.15 only at the MKCOL of that link (for the link, after its parents).
+        sentences = [dav.name_rejected(path).message for path in (target, f"{kept}/.htaccess")]
         case.expect(
-            error.message.startswith(dav.name_rejected(target).message),
-            "the sentence of a refused folder name, for the target",
+            any(error.message.startswith(sentence) for sentence in sentences),
+            "the sentence of a refused folder name, for the target or for the refused link",
         )
         left = [path for path in (f"{P}/n", kept) if on_disk(run.alice, path)]
         case.expect(
@@ -922,18 +925,21 @@ async def test_a_parent_deleted_after_the_count_is_parent_missing(run: Run) -> N
 
 
 async def test_a_tight_quota_creates_and_an_exhausted_one_is_named(run: Run) -> None:
-    """Three quotas: used plus 4096 bytes, used plus 1024 bytes and one byte.
+    """Three quotas: used plus 8192 bytes, used plus 1024 bytes and one byte.
 
     Nextcloud asks for 4096 free bytes before it creates a folder (``QuotaPlugin`` of the
-    dav app, measured on 35.0.0), so the first quota has to create and the other two may
-    answer 507. Whatever the instance answers, the tool either created the folder or says
-    the named sentence of a full quota, and the line carries which.
+    dav app, measured on 35.0.0 and 32.0.15), so the first quota has to create and the
+    other two may answer 507. The first margin is twice that size on purpose: 32.0.15
+    reports the used bytes of a moment ago, without the few bytes this run wrote, and
+    with a margin of exactly 4096 the folder was refused there. Whatever the instance
+    answers, the tool either created the folder or says the named sentence of a full
+    quota, and the line carries which.
     """
     base = f"{P}/q-{STAMP}"
     run.harness.mkcol(base)
     used = int(props(run.harness, "/")[1][0]["used"] or 0)
     steps = [
-        ("knapp", f"{used + 4096} B", "used plus 4096 B", True),
+        ("knapp", f"{used + 8192} B", "used plus 8192 B", True),
         ("eng", f"{used + 1024} B", "used plus 1024 B", False),
         ("voll", "1 B", "1 B", False),
     ]
