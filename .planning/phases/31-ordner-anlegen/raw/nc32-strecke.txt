@@ -703,3 +703,366 @@ GESTOPPT nc-mcp-exapp volume_bleibt=ja
     registriert und nicht aktiv; das zugehörige APP_SECRET steht in .env.exapp im Worktree.
 
 STRECKE NC32 ergebnis=abgebrochen grund=manual-registrierung scheitert am heartbeat, AppAPI 32.0.0 baut host.docker.internal:23001:23001 (Invalid host), zwei Versuche
+
+== NACHMESSUNG 2026-11-12 (Owner-Entscheid Weg 1: Daemon manual_install ohne Port) ==
+
+ENTSCHEID owner=weg-1 datum=2026-11-12 inhalt=Daemon manual_install in dieser Instanz von Hand ohne Port registrieren, Strecke neu messen, Skript des Repos unverändert
+    Beginn 2026-11-12T15:04:39Z, HEAD 1bdac8e, Arbeitsbaum sauber. Kein Produktcode, kein
+    Skript und keine Compose-Datei des Repos wurde geändert. Höchstens zwei Versuche der
+    Registrierung waren erlaubt, gebraucht wurde einer.
+
+== (N1) RAM-Gate und Start ==
+
+RAM frei_host_gb=4.04 schwelle=4.0 ergebnis=ok (vor dem Start, drei Messungen 4233228, 4211732, 4220344 KiB)
+    $ docker ps        (vor dem Start)
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up About a minute
+    Die fünf Container von nc-mcp-exapp waren Exited, beide Volumes vorhanden, nc35 und
+    nc_app_mcp_connector Exited (nicht berührt). HP_SHARED_KEY für die Compose-Aufrufe
+    wurde aus dem gestoppten Container nc-mcp-exapp-harp zurückgelesen (docker inspect,
+    64 Zeichen, Wert nie ausgegeben), so wie es harp_shared_key im Skript tut.
+    $ docker compose -f compose.exapp.yml start        (erster Start)
+     Container nc-mcp-exapp-greenmail Starting
+     Container nc-mcp-exapp-registry Starting
+     Container nc-mcp-exapp-nc Starting
+     Container nc-mcp-exapp-greenmail Started
+     Container nc-mcp-exapp-registry Started
+     Container nc-mcp-exapp-nc Started
+     Container nc-mcp-exapp-nc Waiting
+     Container nc-mcp-exapp-nc Waiting
+     Container nc-mcp-exapp-nc Healthy
+     Container nc-mcp-exapp-caddy Starting
+     Container nc-mcp-exapp-caddy Started
+     Container nc-mcp-exapp-nc Healthy
+     Container nc-mcp-exapp-harp Starting
+     Container nc-mcp-exapp-harp Started
+    exit=0
+RAM frei_host_gb=3.56 schwelle=4.0 ergebnis=zu wenig (nach dem ersten Start, eigene Instanz läuft)
+    Messungen 3627224, 3705048, 3732688, 3734588, 3735080, 3731872, 3734468 KiB.
+    vmmemWSL 3837 MB; Container: nc 108.4 MiB, greenmail 120.5 MiB, harp 76.39 MiB,
+    caddy 10.4 MiB, registry 4.41 MiB, fremder Proxy 25.38 MiB.
+    Der Rahmen erlaubt drop_caches nur bei leerem Docker. Deshalb wurde die eigene
+    Instanz erst wieder gestoppt (compose stop, exit=0, kein Container von nc-mcp-exapp
+    lief mehr, nur der fremde Proxy-Container, der nie gestoppt werden darf), dann die
+    Abhilfe des Rahmens einmal ausgeführt und 75 s gewartet. Dazwischen lief kein
+    weiterer Docker-Schritt gegen die Instanz.
+    $ docker compose -f compose.exapp.yml stop
+     Container nc-mcp-exapp-caddy Stopping
+     Container nc-mcp-exapp-harp Stopping
+     Container nc-mcp-exapp-greenmail Stopping
+     Container nc-mcp-exapp-registry Stopping
+     Container nc-mcp-exapp-caddy Stopped
+     Container nc-mcp-exapp-harp Stopped
+     Container nc-mcp-exapp-nc Stopping
+     Container nc-mcp-exapp-registry Stopped
+     Container nc-mcp-exapp-greenmail Stopped
+     Container nc-mcp-exapp-nc Stopped
+    exit=0
+    $ wsl -d docker-desktop sh -c "sync; echo 3 > /proc/sys/vm/drop_caches; echo 1 > /proc/sys/vm/compact_memory"
+    exit=0
+    (75 s gewartet, fünf Messungen im Abstand von 15 s: 6334372, 6342956, 6408380, 6415788, 6431348 KiB)
+RAM frei_host_gb=6.13 schwelle=4.0 ergebnis=ok (nach der Abhilfe, kein eigener Container läuft)
+    $ docker compose -f compose.exapp.yml start        (zweiter Start)
+     Container nc-mcp-exapp-nc Starting
+     Container nc-mcp-exapp-registry Starting
+     Container nc-mcp-exapp-greenmail Starting
+     Container nc-mcp-exapp-greenmail Started
+     Container nc-mcp-exapp-nc Started
+     Container nc-mcp-exapp-nc Waiting
+     Container nc-mcp-exapp-nc Waiting
+     Container nc-mcp-exapp-registry Started
+     Container nc-mcp-exapp-nc Healthy
+     Container nc-mcp-exapp-harp Starting
+     Container nc-mcp-exapp-nc Healthy
+     Container nc-mcp-exapp-caddy Starting
+     Container nc-mcp-exapp-caddy Started
+     Container nc-mcp-exapp-harp Started
+    exit=0
+    $ docker ps
+    nc-mcp-exapp-caddy caddy:2 Up 13 seconds
+    nc-mcp-exapp-harp ghcr.io/nextcloud/nextcloud-appapi-harp:release Up 13 seconds (healthy)
+    nc-mcp-exapp-nc nextcloud:32.0.15-apache Up 19 seconds (healthy)
+    nc-mcp-exapp-registry registry:2 Up 19 seconds
+    nc-mcp-exapp-greenmail greenmail/standalone:2.1.12 Up 19 seconds
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 5 minutes
+RAM frei_host_gb=5.79 schwelle=4.0 ergebnis=ok (nach dem zweiten Start, 6070316, 6049516, 6060448 KiB)
+    Weitere Messungen: 5675200 KiB vor dem Bootstrap, 5410320 KiB nach den Kontrollen.
+
+== (N2) Ist-Zustand vor dem Eingriff ==
+
+VERSION OF RECORD 32.0.15 version=32.0.15.1
+    $ occ status
+      - installed: true
+      - version: 32.0.15.1
+      - versionstring: 32.0.15
+      - edition:
+      - maintenance: false
+      - needsDbUpgrade: false
+      - productname: Nextcloud
+      - extendedSupport: false
+APPAPI fassung=32.0.0
+DAEMON manual_install vorher host=host.docker.internal:23001 protokoll=http deploy=manual-install (Port im Host enthalten)
+    $ occ app_api:daemon:list
+    Registered ExApp daemon configs:
+    +-----+-------------------+---------------------+----------------+----------+----------------------------+--------------+---------+------------------+-------------------------+
+    | Def | Name              | Display name        | Deploy ID      | Protocol | Host                       | NC Url       | Is HaRP | HaRP FRP Address | HaRP Docker Socket Port |
+    +-----+-------------------+---------------------+----------------+----------+----------------------------+--------------+---------+------------------+-------------------------+
+    | *   | harp_proxy_docker | Harp Proxy (Docker) | docker-install | http     | appapi-harp:8780           | http://caddy | yes     | appapi-harp:8782 | 24000                   |
+    |     | manual_install    | Manual Install      | manual-install | http     | host.docker.internal:23001 | http://caddy | no      | (none)           | (none)                  |
+    +-----+-------------------+---------------------+----------------+----------+----------------------------+--------------+---------+------------------+-------------------------+
+    $ occ app_api:app:list
+    ExApps:
+    mcp_connector (MCP Connector): 0.7.2 [disabled]
+
+== (N3) Daemon manual_install neu ohne Port ==
+
+    Argumente abgelesen an scripts/bootstrap_exapp.sh Zeile 1288 bis 1290 und an
+    occ app_api:daemon:register --help der laufenden Instanz:
+    app_api:daemon:register [options] [--] <name> <display-name> <accepts-deploy-id> <protocol> <host> <nextcloud_url>
+    Die Hilfe von AppAPI 32.0.0 nennt für manual-install selbst ein Beispiel ohne Port:
+    app_api:daemon:register manual_install "Manual Install" "manual-install" "http" null "http://nextcloud.local"
+    Reihenfolge wie FALLBACK 2 des Skripts: erst die App abmelden, dann den alten
+    Daemon-Eintrag entfernen, dann neu registrieren. harp_proxy_docker blieb unberührt.
+    $ occ app_api:app:unregister mcp_connector
+    ExApp mcp_connector successfully unregistered.
+    exit=0
+    $ occ app_api:daemon:unregister manual_install
+    Daemon config unregistered.
+    exit=0
+    $ occ app_api:daemon:register manual_install "Manual Install" manual-install http host.docker.internal http://caddy
+    Daemon successfully registered.
+    exit=0
+    $ occ app_api:daemon:list
+    Registered ExApp daemon configs:
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    | Def | Name              | Display name        | Deploy ID      | Protocol | Host                 | NC Url       | Is HaRP | HaRP FRP Address | HaRP Docker Socket Port |
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    | *   | harp_proxy_docker | Harp Proxy (Docker) | docker-install | http     | appapi-harp:8780     | http://caddy | yes     | appapi-harp:8782 | 24000                   |
+    |     | manual_install    | Manual Install      | manual-install | http     | host.docker.internal | http://caddy | no      | (none)           | (none)                  |
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    $ occ app_api:app:list
+    ExApps:
+DAEMON manual_install nachher host=host.docker.internal protokoll=http deploy=manual-install nc_url=http://caddy port=keiner
+
+== (N4) Lokaler Prozess und Registrierung über das unveränderte Skript ==
+
+    Weg: scripts/bootstrap_exapp.sh --manual. register_manual_install (Zeile 1287)
+    registriert den Daemon nur, wenn occ app_api:daemon:list den Namen manual_install
+    nicht zeigt. Der von Hand angelegte Eintrag ohne Port bleibt also stehen, das Skript
+    läuft unverändert und registriert nur die App.
+    Vor dem Lauf in .env.exapp (ignoriert) die Zeile NC_MCP_TEST_SHARED_DIR mit dem Namen
+    des ersten Freigabeordners mcp-share-13f988b027 ergänzt, damit share_suffix des
+    Skripts den vorhandenen Ordner wiederverwendet und kein dritter entsteht. APP_SECRET
+    blieb der Wert aus 31-01 (das Skript übernimmt einen vorhandenen Wert).
+    Lokaler Prozess: nc-mcp-exapp über uv run --no-sync, 127.0.0.1:23001 (APP_HOST nicht
+    gesetzt), APP_ID mcp_connector, APP_VERSION 0.7.2, APP_SECRET aus .env.exapp,
+    NC_MCP_URL und NEXTCLOUD_URL http://127.0.0.1:8081, NC_MCP_PUBLIC_URL
+    http://127.0.0.1:8081/exapps/mcp_connector, APP_PERSISTENT_STORAGE im Scratchpad
+    außerhalb des Repos, ohne NC_MCP_APP_PASSWORD und NC_MCP_STATIC_BEARER.
+    $ curl http://127.0.0.1:23001/heartbeat        (vom Host)
+    200
+    $ docker exec nc-mcp-exapp-nc php -r 'echo file_get_contents("http://host.docker.internal:23001/heartbeat");'
+    {"status":"ok"}
+
+BOOTSTRAP nachmessung versuch=1 modus=--manual exit=1 registrierung=ok fehler=app-passwort (occ user:auth-tokens:add kennt --name auf 32.0.15 nicht)
+    $ NC_EXAPP_NEXTCLOUD_IMAGE=nextcloud:32.0.15-apache bash scripts/bootstrap_exapp.sh --manual
+    Ausgabe gefiltert: Zeilen mit secret, password, passwort, token, key oder schlüssel
+    sind entfernt (41 Zeilen roh, 38 nach dem Filter).
+    == ExApp topology bootstrap ==
+    nextcloud: installed
+    app notes: enabled
+    app deck: enabled
+    app tables: enabled
+    app mail: enabled
+    app spreed: enabled
+    user alice: exists
+    user bob: exists
+    mail account alice: exists on greenmail:3143 (id 1)
+    test mails alice: delivered 6 over greenmail:3025
+    mail sync alice: account 1 synchronised
+    calendar alice/personal: present (attempt 1)
+    addressbook alice/contacts: already there
+    calendar bob/personal: present (attempt 1)
+    files home alice: initialised
+    files home bob: initialised
+    share folder /mcp-share-13f988b027: already there
+    file alice/mcp-share-13f988b027/mcp-shared-file-13f988b027.md: already there
+    file alice/mcp-private-13f988b027.md: already there
+    share auto accept: on (test instance)
+    read-only share /mcp-share-13f988b027 to bob: present (attempt 1)
+    talk conversation MCP-Talk-offen-Grüße-aus-Hamburg: exists (f7rgfwke)
+    talk conversation MCP-Talk-offen-Grüße-aus-Hamburg: readonly=0
+    talk conversation MCP-Talk-nurlesen-Straße-ohne-Ausgang: exists (fj9zjzp7)
+    talk conversation MCP-Talk-nurlesen-Straße-ohne-Ausgang: readonly=1
+    bruteforce protection: disabled (test instance)
+    rate limit protection: disabled (test instance)
+    app app_api: enabled
+    daemon harp_proxy_docker: exists
+    exapp mcp_connector: registered against the local process on port 23001
+
+
+      The "--name" option does not exist.
+
+
+
+
+    Die drei gefilterten Zeilen tragen keinen Geheimwert und lauten:
+    test mails alice: keyword $label1 on message 4: OK
+    user:auth-tokens:add [--password-from-env] [--] <user>
+    ERROR: no app password could be parsed for alice. Raw output:
+    Die Registrierung der App ist damit durchgelaufen (ein Versuch). Das Skript brach erst
+    danach ab, in app_password (Zeile 991): der Aufruf
+    occ user:auth-tokens:add "$uid" --password-from-env --name "$TOKEN_NAME"
+    wird von Nextcloud 32.0.15 mit der Meldung The "--name" option does not exist.
+    abgelehnt. Folge: das Skript hat keine App-Passwörter erzeugt und .env.exapp nicht
+    geschrieben.
+    $ occ user:auth-tokens:add --help        (Auszug, laufende Instanz)
+    Usage:
+      user:auth-tokens:add [options] [--] <user>
+      user:add-app-password
+    Options:
+          --password-from-env  Read password from environment variable NC_PASS/OC_PASS. [...]
+    (keine Option --name; danach nur die allgemeinen Optionen -h, -q, -V, --ansi, -n, --no-warnings, -v)
+    $ Zugriffslog des lokalen Prozesses        (bis nach dem Bootstrap)
+    INFO:     127.0.0.1:64581 - "GET /heartbeat HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:64582 - "GET /heartbeat HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:64756 - "GET /heartbeat HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:64758 - "GET /heartbeat HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:64758 - "PUT /enabled?enabled=1 HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:64756 - "POST /init HTTP/1.1" 200 OK
+    INFO:     127.0.0.1:64954 - "GET /heartbeat HTTP/1.1" 200 OK
+    Die ersten zwei Zeilen sind die Kontrollabrufe vom Host und aus dem Container, danach
+    kommen Heartbeat, PUT /enabled und POST /init von AppAPI. In 31-01 hatte der Prozess
+    von Nextcloud keine einzige Anfrage gesehen.
+
+ENVDATEI ergänzt von_hand=ja vorbild=Heredoc des Skripts ab Zeile 1433
+    App-Passwörter für alice und bob mit demselben Aufruf wie app_password des Skripts,
+    aber ohne --name erzeugt (Kontopasswort über stdin als OC_PASS, nie im argv), Werte nie
+    ausgegeben. .env.exapp mit umask 077 neu geschrieben, dieselben Namen wie im Skript:
+    app password alice: created (length 72, output lines 2)
+    app password bob: created (length 72, output lines 2)
+    wrote .env.exapp
+    NC_MCP_URL
+    NC_MCP_EXAPP_BASE
+    NC_MCP_PUBLIC_URL
+    NC_MCP_TEST_USER
+    NC_MCP_TEST_APP_PASSWORD
+    NC_MCP_TEST_USER2
+    NC_MCP_TEST_APP_PASSWORD2
+    NC_MCP_TEST_SHARED_DIR
+    NC_MCP_TEST_SHARED_FILE
+    NC_MCP_TEST_PRIVATE_FILE
+    NC_MCP_TEST_SHARED_MARKER
+    NC_MCP_TEST_TALK_ROOM
+    NC_MCP_TEST_TALK_READONLY_ROOM
+    NC_MCP_TEST_PASSWORD
+    NC_MCP_TEST_PASSWORD2
+    APP_ID
+    APP_SECRET
+    APP_VERSION
+    HP_SHARED_KEY
+    Feste Werte nach dem Skript: Basis http://127.0.0.1:8081, Freigabe
+    mcp-share-13f988b027, die zwei Talk-Räume, die dokumentierten Wegwerf-Passwörter der
+    Konten, APP_SECRET unverändert, HP_SHARED_KEY aus dem HaRP-Container zurückgelesen.
+
+== (N5) Belege ==
+
+VERSION OF RECORD 32.0.15 version=32.0.15.1
+DAEMON manual_install host=host.docker.internal
+EXAPP mcp_connector registriert=ja aktiv=ja
+ENVDATEI ignoriert=ja
+    $ occ app_api:daemon:list
+    Registered ExApp daemon configs:
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    | Def | Name              | Display name        | Deploy ID      | Protocol | Host                 | NC Url       | Is HaRP | HaRP FRP Address | HaRP Docker Socket Port |
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    | *   | harp_proxy_docker | Harp Proxy (Docker) | docker-install | http     | appapi-harp:8780     | http://caddy | yes     | appapi-harp:8782 | 24000                   |
+    |     | manual_install    | Manual Install      | manual-install | http     | host.docker.internal | http://caddy | no      | (none)           | (none)                  |
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    $ occ app_api:app:list
+    ExApps:
+    mcp_connector (MCP Connector): 0.7.2 [enabled]
+    $ git check-ignore -v .env.exapp
+    .gitignore:6:.env.exapp	.env.exapp
+
+== (N6) Kontrollen ==
+
+KONTROLLE a status=200 id=alice
+KONTROLLE b status=401
+KONTROLLE c status=207
+    Einmalprogramm über uv run --no-sync python mit set -a && . ./.env.exapp && set +a,
+    Produktions-Credentials Credentials(mode=MODE_APPAPI, user, secret=APP_SECRET, app_id,
+    app_version, aa_version) und deren auth(); NC_MCP_APP_PASSWORD und
+    NC_MCP_STATIC_BEARER im Prozess nicht gesetzt (per assert geprüft). a: GET
+    /ocs/v2.php/cloud/user?format=json als alice. b: derselbe Aufruf mit 64 Nullen als
+    Secret. c: PROPFIND Depth 0 auf /remote.php/dav/files/alice/. Das Programm druckt nur
+    Status und Nutzerkennung. Die Zeilen ZUSATZ gehören nicht zum Plan: bob unter
+    Impersonation, die zwei neuen App-Passwörter per Basic gegen cloud/user (belegt, dass
+    die erzeugten Werte gültig sind) und der Freigabeordner aus Sicht von bob.
+    modus=appapi prozess_ohne_app_passwort=ja
+    KONTROLLE a status=200 id=alice
+    KONTROLLE b status=401
+    KONTROLLE c status=207
+    ZUSATZ bob_unter_impersonation status=200 id=bob
+    ZUSATZ app_passwort_alice basic status=200
+    ZUSATZ app_passwort_bob basic status=200
+    ZUSATZ freigabeordner_bob status=207
+
+UNTERSCHIED ZUM SKRIPT 1 (trägt die Registrierung): scripts/bootstrap_exapp.sh Zeile 1288 bis 1290, Aufruf occ app_api:daemon:register manual_install "Manual Install" manual-install http <host> http://caddy; das Skript übergibt als fünftes Argument <host> den Wert "host.docker.internal:${MANUAL_APP_PORT}" (host.docker.internal:23001), die Nachmessung "host.docker.internal" ohne Port; alle anderen Argumente gleich. AppAPI 32.0.0 hängt den Port der App (23001 aus dem json-info der Registrierung) selbst an.
+UNTERSCHIED ZUM SKRIPT 2 (trägt die App-Passwörter und damit .env.exapp): scripts/bootstrap_exapp.sh Zeile 991, Aufruf occ user:auth-tokens:add "$uid" --password-from-env --name "$TOKEN_NAME"; Nextcloud 32.0.15 kennt die Option --name nicht, die Nachmessung ruft occ user:auth-tokens:add <uid> --password-from-env ohne --name auf. Das Skript schreibt deshalb auf 32 auch mit dem Daemon ohne Port keine .env.exapp; die Datei wurde von Hand nach dem Heredoc des Skripts geschrieben.
+    Nicht gemessen: ob ein Daemon-Host ohne Port auf AppAPI 34 und 35 ebenfalls
+    funktioniert und ob --name dort gilt. Eine Anpassung des Skripts muss alle Fassungen
+    des Fensters bedienen.
+
+== (N7) Prozess beendet, Instanz gestoppt ==
+
+PROZESS lokal beendet=ja port=23001
+    heartbeat_vor=200
+    prozess_pid=18564
+    python
+    beendet
+    heartbeat_nach=000
+
+GESTOPPT nc-mcp-exapp volume_bleibt=ja
+    $ docker compose -f compose.exapp.yml stop
+     Container nc-mcp-exapp-caddy Stopping
+     Container nc-mcp-exapp-greenmail Stopping
+     Container nc-mcp-exapp-registry Stopping
+     Container nc-mcp-exapp-harp Stopping
+     Container nc-mcp-exapp-caddy Stopped
+     Container nc-mcp-exapp-harp Stopped
+     Container nc-mcp-exapp-nc Stopping
+     Container nc-mcp-exapp-registry Stopped
+     Container nc-mcp-exapp-greenmail Stopped
+     Container nc-mcp-exapp-nc Stopped
+    exit=0
+    $ docker ps
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 8 minutes
+    $ docker ps -a --filter name=nc-mcp-exapp
+    nc-mcp-exapp-caddy caddy:2 Exited (0) 1 second ago
+    nc-mcp-exapp-harp ghcr.io/nextcloud/nextcloud-appapi-harp:release Exited (0) 1 second ago
+    nc-mcp-exapp-nc nextcloud:32.0.15-apache Exited (137) Less than a second ago
+    nc-mcp-exapp-registry registry:2 Exited (2) 1 second ago
+    nc-mcp-exapp-greenmail greenmail/standalone:2.1.12 Exited (143) 1 second ago
+    $ docker volume ls --filter name=nc-mcp-exapp
+    DRIVER    VOLUME NAME
+    local     nc-mcp-exapp_nextcloud-exapp-data
+    local     nc-mcp-exapp_registry-exapp-data
+    $ docker ps -a --filter name=nc35-
+    nc35-test-issuer caddy:2 Exited (0) 6 weeks ago
+    nc35-greenmail greenmail/standalone:2.1.12 Exited (143) 6 weeks ago
+    nc35-caddy caddy:2 Exited (0) 14 hours ago
+    nc35-harp ghcr.io/nextcloud/nextcloud-appapi-harp:release Exited (0) 14 hours ago
+    nc35-nc nextcloud:35.0.0-apache-local Exited (0) 14 hours ago
+    nc_app_mcp_connector 127.0.0.1:5000/mcp_connector:0.3.2 Exited (0) 14 hours ago
+    Es läuft nur der fremde Container gameworld-dev-gameworld-docker-proxy-1, wie vor der
+    Nachmessung. nc35 und nc_app_mcp_connector blieben gestoppt und unberührt. Docker
+    Desktop läuft weiter.
+    Zustand im Volume: Nextcloud 32.0.15.1, alice und bob mit Testdaten, Daemon
+    harp_proxy_docker unverändert, Daemon manual_install mit Host host.docker.internal
+    ohne Port, mcp_connector 0.7.2 registriert und aktiv, je ein neues App-Passwort für
+    alice und bob. .env.exapp im Worktree ist vollständig und passt zu diesem Zustand.
+    Für einen Wiederanlauf (Plan 31-05): compose start, lokalen Prozess mit den Werten
+    aus .env.exapp auf 127.0.0.1:23001 starten. Der Bootstrap muss dafür nicht erneut
+    laufen; auf 32 bräche er wieder bei --name ab.
+
+STRECKE NC32 NACHMESSUNG ergebnis=bereit weg=daemon manual_install ohne port (host.docker.internal), registrierung im ersten versuch, kontrollen a=200/alice b=401 c=207; skript unverändert, bricht auf 32 zusätzlich bei --name von user:auth-tokens:add ab
