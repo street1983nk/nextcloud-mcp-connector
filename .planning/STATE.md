@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: executing
-last_updated: "2026-11-12T07:22:00.000Z"
+last_updated: "2026-11-12T12:00:00.000Z"
 last_activity: 2026-11-12
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 5
+  total_plans: 11
   completed_plans: 5
-  percent: 100
+  percent: 45
 ---
 
 # Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-12)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) ist mit 30-01 bis 30-05 ausgeführt, der Owner hat E15 am 12.11.2026 entschieden; als Nächstes folgt die Planung von Phase 31.
+**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) ist mit 30-01 bis 30-05 ausgeführt, der Owner hat E15 am 12.11.2026 entschieden und am selben Tag das Löschen einer Aufgabe (TMOD-07) aus 0.8.0 gestrichen; Phase 31 (Ordner anlegen) ist mit sechs Plänen geplant und geprüft, als Nächstes folgt ihre Ausführung nach Owner-Freigabe.
 
 ## Current Position
 
-Phase: 30 von 30 bis 34 (Mess-Spike Aufgaben und Ordner), alle fünf Pläne ausgeführt
-Plan: 30-01 bis 30-05 sind abgeschlossen; in Phase 30 ist kein Plan mehr offen
-Status: 30-05 ausgeführt (Messbericht abgeschlossen, kein Abbruchkriterium ausgelöst, Owner-Entscheid E15 vom 12.11.2026: eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge, ab Werk aus), nächster Schritt Planung von Phase 31
-Last activity: 2026-11-12, Plan 30-05 ausgeführt (Bericht Abschnitte 8 bis 11, Block report-check, Owner-Entscheid E15 samt A15, A16, A21 in Bericht 10.4, PROJECT.md, REQUIREMENTS.md und ROADMAP.md), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
+Phase: 31 von 30 bis 34 (Ordner anlegen), geplant, noch nicht ausgeführt
+Plan: 31-01 bis 31-06 liegen vor (sechs Wellen, streng nacheinander); kein Plan ausgeführt
+Status: Phase 31 geplant (Research, Pattern-Map, sechs Pläne; Plan-Checker im zweiten Lauf bestanden, 0 Blocker); die Ausführung beginnt erst nach Owner-Freigabe; 31-01 hält für den Entscheid zum Volume `nc-mcp-exapp` an, 31-06 für den Push-Entscheid
+Last activity: 2026-11-12, Phase 31 geplant (31-RESEARCH.md, 31-PATTERNS.md, 31-01 bis 31-06), D-31-03 präzisiert (Id als `file:<n>`, Owner "Ok"), Löschen einer Aufgabe aus 0.8.0 gestrichen (Owner, Auswahl "Löschen raus", Commit c251647); lokal committet auf plan/v1.8-tasks-080, nicht gepusht
 
 ## Performance Metrics
 
@@ -891,9 +891,9 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 ## Session Continuity
 
 Last session: 2026-11-12
-Stopped at: Phase 31 context gathered (31-CONTEXT.md, sieben Entscheidungen D-31-01 bis D-31-07, Owner 12.11.2026); Phase 30 ist abgeschlossen und der Branch plan/v1.8-tasks-080 gepusht; nächster Schritt ist die Planung von Phase 31
-Nächster Schritt: Phase 30 verifizieren und abschließen, danach Planung von Phase 31 (Ordner anlegen)
-Resume file: .planning/phases/31-ordner-anlegen/31-CONTEXT.md
+Stopped at: Phase 31 geplant und geprüft (sechs Pläne, FOLD-01 bis FOLD-06 und D-31-01 bis D-31-07 abgedeckt); lokale Commits liegen vor origin/plan/v1.8-tasks-080 (c2e8fe9), nicht gepusht
+Nächster Schritt: nach Owner-Freigabe `/gsd:execute-phase 31`, beginnend mit 31-01 (Strecke Nextcloud 32 unter Impersonation, Abbruchkriterium)
+Resume file: .planning/phases/31-ordner-anlegen/31-01-PLAN.md
 
 ## Operator Next Steps
 

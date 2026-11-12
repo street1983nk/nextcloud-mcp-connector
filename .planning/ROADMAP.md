@@ -168,7 +168,16 @@ Messbericht: `docs/spike-tasks.md`; Rohprotokolle unter `.planning/phases/30-mes
   4. Die Kanarie ruft `files_create_folder` wirklich auf und es steht in `MUST_REFUSE`; der Klassifikations-Freeze führt es unter `FILE_WRITERS` mit Paarfall; jeder Aufruf erzeugt einen Audit-Eintrag; `EXPECTED_PUT_CALLS` ist unverändert, eine Nadel hält `MKCOL` auf `dav.py` und ohne Body; das Budget der Werkzeugliste ist grün, ohne dass ein Werkzeug über 1400 Bytes liegt
   5. Auf dem Stand ohne Phase 32 sind alle Gates grün, und Werkzeugliste, Rechtetabelle und Werkzeugzahl der drei READMEs, je ein Satz in `docs/exclusion.md`, `.de.md` und `.fr.md` sowie der Eintrag in `CHANGELOG.md`, `CHANGELOG.de.md` und `CHANGELOG.fr.md` nennen das Werkzeug
 
-**Plans**: TBD
+**Plans**: 6 plans (sechs Wellen, streng nacheinander: ein Docker-Host, immer nur eine Instanz)
+
+Plans:
+- [ ] 31-01-PLAN.md: Machbarkeitsbeweis der Strecke Nextcloud 32 unter AppAPI-Impersonation mit Abbruchkriterium, Basis-Commit in 31-BASE.txt (FOLD-01; D-31-06)
+- [ ] 31-02-PLAN.md: `dav.make_folder`, `probe_folder`, Statusprüfer und `files.create_folder` mit Vorab-Zählung, Deckel 10, Sandbox und `kein-ki`, Unit-Tests (FOLD-01 bis FOLD-05; D-31-01 bis D-31-05)
+- [ ] 31-03-PLAN.md: Registrierung mit `CREATE_IDEMPOTENT`, Audit, Werkzeugmenge 24, Annotations-Gate, Freeze mit Paarfall, Budget-Messzeile, drei READMEs (FOLD-03, FOLD-05, FOLD-06)
+- [ ] 31-04-PLAN.md: MKCOL-Nadel mit gepflanzten Umgehungen, Kanarie mit `MUST_REFUSE`, Live-Paarfall und Abnahmeskript als Code (FOLD-05)
+- [ ] 31-05-PLAN.md: Live-Test unter Impersonation auf Nextcloud 35 und 32 mit 15 Fällen und 2 Kontrollen, Beleg in `docs/folder-evidence.md` (FOLD-01 bis FOLD-05; D-31-05 bis D-31-07)
+- [ ] 31-06-PLAN.md: `docs/exclusion*.md` mit stabilem Beleganker, drei CHANGELOGs, Umlaut-Audit, voller Lauf ohne Phase 32, Owner-Checkpoint zum Push (FOLD-06)
+
 **Rückfallschnitt**: klemmt Phase 32, ist diese Phase allein als Release lieferbar (Owner-Entscheid)
 
 ### Phase 32: Tasks-Bundle suchen, lesen, anlegen
@@ -259,7 +268,7 @@ Messbericht: `docs/spike-tasks.md`; Rohprotokolle unter `.planning/phases/30-mes
 | 28. Gates und Beweise | v1.7 | 12/12 | Complete    | 2026-10-01 |
 | 29. Prüfkommando und Doku | v1.7 | 9/9 | Complete    | 2026-10-01 |
 | 30. Mess-Spike Aufgaben und Ordner | v1.8 | 5/5 | Complete    | 2026-11-12 |
-| 31. Ordner anlegen | v1.8 | 0/TBD | Not started | - |
+| 31. Ordner anlegen | v1.8 | 0/6 | Planned | - |
 | 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 0/TBD | Not started | - |
 | 33. Aufgaben ändern | v1.8 | 0/TBD | Not started | - |
 | 34. Doku, Store, Release 0.8.0 | v1.8 | 0/TBD | Not started | - |

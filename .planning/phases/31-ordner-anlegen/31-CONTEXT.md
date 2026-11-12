@@ -22,7 +22,7 @@ Die Anforderungen FOLD-01 bis FOLD-06 und die fünf Erfolgskriterien in ROADMAP.
 - **D-31-02:** Der Satz aus FOLD-02 "scheitert ein Segment mittendrin, nennt die Antwort die bereits angelegten Ordner" gilt unverändert für alle anderen Abbrüche (Rechte, Sperre, Serverfehler, Kontingent, Wettlauf mit einem anderen Schreiber).
 
 ### Antwortinhalt
-- **D-31-03:** Die Erfolgsantwort trägt Pfad, `created` und die Datei-Id des Zielordners, in derselben Form wie `files_upload` sie liefert. Bei `parents=true` kommt die Liste der wirklich neu angelegten Pfade dazu. (Owner, 12.11.2026, Auswahl "Pfad, created, Datei-Id")
+- **D-31-03:** Die Erfolgsantwort trägt Pfad, `created` und die Datei-Id des Zielordners, in derselben Form wie `files_upload` sie liefert. Bei `parents=true` kommt die Liste der wirklich neu angelegten Pfade dazu. (Owner, 12.11.2026, Auswahl "Pfad, created, Datei-Id") Präzisierung nach der Recherche: `files_upload` liefert keine Id (nur `path`, `etag`, `created`); die Id kommt als `id: "file:<n>"` in der Form von `files_list` und `files_search` (`ids.encode_file`), `files_upload` bleibt unverändert. (Owner, 12.11.2026, wörtlich "Ok" auf diese Empfehlung)
 - **D-31-04:** Bei einem schon vorhandenen Ordner (`created: false`, E5) kommt die Datei-Id aus derselben Abfrage, die prüft, dass am Pfad ein Ordner und keine Datei liegt. Kein zusätzlicher Aufruf nur für die Id.
 
 ### Schreibrecht
