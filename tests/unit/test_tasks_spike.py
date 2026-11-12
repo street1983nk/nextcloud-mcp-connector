@@ -995,3 +995,314 @@ def test_pretest_distinguishing_keeps_only_candidates_right_in_both_states() -> 
     assert spike.pretest_distinguishing(on, off) == ["frist-eigenschaft"]
     assert spike.pretest_distinguishing(on, on) == []
     assert spike.pretest_distinguishing(off, on) == []
+
+
+# --- plan 30-04: discovery, queries, provider link, cost rule, fixtures ---------------------
+
+_HOME = """<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav"
+    xmlns:cs="http://calendarserver.org/ns/" xmlns:oc="http://owncloud.org/ns">
+  <d:response><d:href>/remote.php/dav/calendars/alice/</d:href>
+    <d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype></d:prop>
+      <d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>
+  {entries}
+</d:multistatus>
+"""
+
+
+def _entry(uri: str, comps: str = "", types: str = "<cal:calendar/>", extra: str = "") -> str:
+    comp = "".join(f'<cal:comp name="{name}"/>' for name in comps.split(",") if name)
+    comp_set = (
+        f"<cal:supported-calendar-component-set>{comp}</cal:supported-calendar-component-set>"
+        if comp
+        else ""
+    )
+    missing = (
+        ""
+        if comp
+        else "<d:propstat><d:prop><cal:supported-calendar-component-set/></d:prop>"
+        "<d:status>HTTP/1.1 404 Not Found</d:status></d:propstat>"
+    )
+    return (
+        f"<d:response><d:href>/remote.php/dav/calendars/alice/{uri}/</d:href>"
+        f"<d:propstat><d:prop><d:resourcetype><d:collection/>{types}</d:resourcetype>"
+        f"{comp_set}{extra}</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>"
+        f"{missing}</d:response>"
+    )
+
+
+def _kinds(*entries: str) -> dict[str, str]:
+    body = _HOME.format(entries="\n".join(entries))
+    return {entry.uri: spike.classify_collection(entry) for entry in spike.parse_home(body)}
+
+
+def test_parse_home_drops_the_home_itself_and_reads_only_found_properties() -> None:
+    body = _HOME.format(entries=_entry("personal", "VEVENT"))
+    entries = spike.parse_home(body)
+    assert [entry.uri for entry in entries] == ["personal"]
+    assert entries[0].components == ("VEVENT",)
+    assert entries[0].read_only is None
+
+
+def test_classify_collection_names_every_kind_of_the_discovery() -> None:
+    assert _kinds(
+        _entry("app-generated--deck--board-7", "VEVENT,VTODO"),
+        _entry("trashbin", types=""),
+        _entry("inbox", types="<cal:schedule-inbox/>"),
+        _entry("outbox", types="<cal:schedule-outbox/>"),
+        _entry("spike30-abo", types="<cs:subscribed/>"),
+        _entry("x_shared_by_bob", "VTODO", extra="<oc:read-only>1</oc:read-only>"),
+        _entry("y_shared_by_bob", "VTODO", extra="<oc:read-only></oc:read-only>"),
+        _entry("z_shared_by_bob", "VTODO"),
+        _entry("gemischt", "VEVENT,VTODO"),
+        _entry("liste", "VTODO"),
+        _entry("termine", "VEVENT"),
+        _entry("leer"),
+    ) == {
+        "app-generated--deck--board-7": "deck",
+        "trashbin": "papierkorb",
+        "inbox": "scheduling",
+        "outbox": "scheduling",
+        "spike30-abo": "abo",
+        "x_shared_by_bob": "geteilt-nur-lesen",
+        "y_shared_by_bob": "geteilt-schreibbar",
+        "z_shared_by_bob": "geteilt-schreibbar",
+        "gemischt": "gemischt",
+        "liste": "aufgabenliste",
+        "termine": "terminkalender",
+        "leer": "ohne-komponenten",
+    }
+
+
+def test_task_lists_counts_only_lists_a_task_tool_may_use() -> None:
+    fresh = spike.parse_home(_HOME.format(entries=_entry("personal", "VEVENT")))
+    assert spike.task_lists(fresh) == []
+    body = _HOME.format(
+        entries="\n".join(
+            [
+                _entry("app-generated--deck--board-7", "VEVENT,VTODO"),
+                _entry("trashbin", types=""),
+                _entry("spike30-abo", "VTODO", types="<cs:subscribed/>"),
+                _entry("x_shared_by_bob", "VTODO", extra="<oc:read-only>1</oc:read-only>"),
+                _entry("e_shared_by_bob", "VEVENT"),
+                _entry("z_shared_by_bob", "VTODO"),
+                _entry("gemischt", "VEVENT,VTODO"),
+                _entry("liste", "VTODO"),
+                _entry("termine", "VEVENT"),
+            ]
+        )
+    )
+    assert [entry.uri for entry in spike.task_lists(spike.parse_home(body))] == [
+        "x_shared_by_bob",
+        "z_shared_by_bob",
+        "gemischt",
+        "liste",
+    ]
+
+
+def _filter_xml(*args: str, **kwargs: str) -> str:
+    return spike.build_todo_filter(*args, **kwargs).decode()
+
+
+def test_build_todo_filter_offen_has_exactly_one_completed_is_not_defined() -> None:
+    body = _filter_xml("offen")
+    assert body.count("<c:prop-filter") == 1
+    assert 'prop-filter name="COMPLETED"' in body
+    assert "is-not-defined" in body
+    assert 'comp-filter name="VTODO"' in body
+
+
+def test_build_todo_filter_alle_has_no_prop_filter() -> None:
+    body = _filter_xml("alle")
+    assert "prop-filter" not in body
+    assert 'comp-filter name="VTODO"' in body
+    assert "calendar-data" in body
+
+
+def test_build_todo_filter_fenster_text_eltern_erledigt() -> None:
+    window = _filter_xml("fenster", "20261119T000000Z", "20261122T000000Z")
+    assert 'time-range start="20261119T000000Z" end="20261122T000000Z"' in window
+    text = _filter_xml("text", term="s30")
+    assert 'prop-filter name="SUMMARY"' in text
+    assert "text-match" in text
+    assert 'match-type="contains"' in text
+    assert ">s30<" in text
+    parent = _filter_xml("eltern", parent_uid="abc-1")
+    assert 'prop-filter name="RELATED-TO"' in parent
+    assert ">abc-1<" in parent
+    done = _filter_xml("erledigt")
+    assert 'prop-filter name="COMPLETED"' in done
+    assert "is-not-defined" not in done
+
+
+def test_build_todo_filter_refuses_an_unknown_mode_and_never_makes_the_term_a_tag() -> None:
+    with pytest.raises(ValueError, match="quer"):
+        spike.build_todo_filter("quer")
+    with pytest.raises(ValueError, match="fenster"):
+        spike.build_todo_filter("fenster")
+    body = _filter_xml("text", term="<c:evil/>")
+    assert "<c:evil" not in body
+    assert "&lt;c:evil/&gt;" in body
+
+
+def _todo(summary: str, *extra: str) -> str:
+    return spike.simple_todo(summary, summary, extra)
+
+
+_OBJECTS = (
+    _todo("q-offen-undatiert"),
+    _todo("q-offen-im-fenster", "DUE:20261120T100000Z"),
+    _todo("q-offen-ausserhalb", "DUE:20270301T100000Z"),
+    _todo("q-erledigt", "STATUS:COMPLETED", "COMPLETED:20261110T090000Z"),
+    _todo("q-ganztag", "DUE;VALUE=DATE:20261121"),
+    _todo("q-kind", "RELATED-TO:q-offen-im-fenster"),
+)
+
+
+def test_names_in_reads_the_summaries_of_a_report_answer() -> None:
+    responses = "".join(
+        f"<d:response><d:href>/x/{number}.ics</d:href><d:propstat><d:prop>"
+        f"<cal:calendar-data>{text}</cal:calendar-data></d:prop>"
+        "<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"
+        for number, text in enumerate(_OBJECTS[:2])
+    )
+    body = (
+        '<d:multistatus xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">'
+        f"{responses}</d:multistatus>"
+    )
+    assert spike.names_in(body) == {"q-offen-undatiert", "q-offen-im-fenster"}
+    assert spike.names_in('<d:multistatus xmlns:d="DAV:"/>') == set()
+
+
+def test_client_filter_is_the_set_the_connector_wants_from_each_query() -> None:
+    assert spike.client_filter(_OBJECTS, "alle") == {
+        "q-offen-undatiert",
+        "q-offen-im-fenster",
+        "q-offen-ausserhalb",
+        "q-erledigt",
+        "q-ganztag",
+        "q-kind",
+    }
+    assert spike.client_filter(_OBJECTS, "offen") == {
+        "q-offen-undatiert",
+        "q-offen-im-fenster",
+        "q-offen-ausserhalb",
+        "q-ganztag",
+        "q-kind",
+    }
+    assert spike.client_filter(_OBJECTS, "erledigt") == {"q-erledigt"}
+    # an undated task is never part of a due window
+    assert spike.client_filter(_OBJECTS, "fenster", "20261119T000000Z", "20261122T000000Z") == {
+        "q-offen-im-fenster",
+        "q-ganztag",
+    }
+    assert spike.client_filter(_OBJECTS, "text", term="Q-OFFEN") == {
+        "q-offen-undatiert",
+        "q-offen-im-fenster",
+        "q-offen-ausserhalb",
+    }
+    assert spike.client_filter(_OBJECTS, "eltern", parent_uid="q-offen-im-fenster") == {"q-kind"}
+    with pytest.raises(ValueError, match="quer"):
+        spike.client_filter(_OBJECTS, "quer")
+
+
+def test_same_sets_names_the_versions_that_differ_per_query() -> None:
+    same = {"offen": {"a", "b"}, "alle": {"a", "b", "c"}}
+    assert spike.same_sets({"32": same, "33": same, "34": same, "35": same}) == {
+        "offen": [],
+        "alle": [],
+    }
+    other = {"offen": {"a"}, "alle": {"a", "b", "c"}}
+    assert spike.same_sets({"32": same, "33": other, "34": same, "35": same}) == {
+        "offen": ["33"],
+        "alle": [],
+    }
+    # a version that did not answer a query differs, it is never silently equal
+    assert spike.same_sets({"32": same, "33": {"offen": {"a", "b"}}}) == {
+        "offen": [],
+        "alle": ["33"],
+    }
+
+
+def test_provider_link_parts_resolves_only_the_known_form() -> None:
+    link = "/index.php/apps/tasks/calendars/spike30-x/tasks/abc.ics"
+    assert spike.provider_link_parts(link) == ("spike30-x", "abc.ics")
+    assert spike.provider_link_parts(
+        "http://127.0.0.1:8083/index.php/apps/tasks/#/calendars/spike30%20x/tasks/a%20b.ics"
+    ) == ("spike30 x", "a b.ics")
+    assert spike.provider_link_parts("/index.php/apps/tasks/calendars/spike30-x") is None
+    assert spike.provider_link_parts("/index.php/apps/calendar/edit/abc") is None
+    assert spike.provider_link_parts("/apps/tasks/calendars/a/tasks/b.ics/extra") is None
+    assert spike.provider_link_parts("") is None
+
+
+def test_proposal_applies_the_derivation_rule_fixed_before_the_measurement() -> None:
+    first = spike.proposal(median_all_seconds=0.4, max_seconds=0.9)
+    assert "eine Abfrage je Liste ohne zusätzlichen Deckel unterhalb von 2000" in first
+    assert "Zeitbudget je Liste 2 s" in first
+    second = spike.proposal(1.6, 2.2)
+    assert "Standardmodus offen als einziger Weg ohne Hinweis" in second
+    assert "Zeitbudget je Liste 5 s" in second
+    assert "Antwortgröße" in second
+    # exactly 1.0 s still is the first proposal
+    assert "ohne zusätzlichen Deckel" in spike.proposal(1.0, 1.0)
+    assert "Zeitbudget je Liste 2 s" in spike.proposal(1.0, 1.0)
+
+
+def test_summarize_and_series_line_name_the_second_largest_value_as_what_it_is() -> None:
+    stats = spike.summarize([0.3, 0.1, 0.2, 0.5, 0.4])
+    assert stats == {"min": 0.1, "median": 0.3, "p95_second_largest": 0.4, "max": 0.5}
+    with pytest.raises(ValueError, match="two"):
+        spike.summarize([0.1])
+    line = spike.series_line("KOSTEN alle", [207] * 5, [2000] * 5, [10, 10, 10, 10, 12], stats)
+    assert line == (
+        "KOSTEN alle status=207 treffer=2000 bytes=10..12 min=100 median=300 "
+        "p95_zweitgroesster=400 max=500 (n=5)"
+    )
+
+
+def test_pick_fixtures_maps_the_seven_kinds_and_names_what_is_missing() -> None:
+    state_a = {
+        "s30 ganztag": "a1",
+        "s30 uhrzeit": "a2",
+        "s30 kind-abhaken": "a3",
+        "s30 eltern-abhaken": "a4",
+        "s30 wiederkehrend": "a5",
+        "s30 tags": "a6",
+        "s30 abhaken": "a7",
+        "s30 wieder-oeffnen": "a8",
+    }
+    state_b = {"s30 abhaken": "b7", "s30 wieder-oeffnen": "b8", "s30 ganztag": "b1"}
+    picked, missing = spike.pick_fixtures(state_a, state_b)
+    assert missing == []
+    assert picked == {
+        "all_day.ics": ("ganztag", "a", "a1"),
+        "with_time.ics": ("uhrzeit", "a", "a2"),
+        "subtask.ics": ("unteraufgabe", "a", "a3"),
+        "subtask_parent.ics": ("unteraufgabe", "a", "a4"),
+        "recurring.ics": ("wiederkehrend", "a", "a5"),
+        "tags.ics": ("tags", "a", "a6"),
+        "completed.ics": ("abgehakt", "b", "b7"),
+        "reopened.ics": ("wieder-geoeffnet", "b", "b8"),
+    }
+    del state_a["s30 wiederkehrend"]
+    del state_a["s30 eltern-abhaken"]
+    picked, missing = spike.pick_fixtures(state_a, {})
+    assert missing == ["unteraufgabe", "wiederkehrend", "abgehakt", "wieder-geoeffnet"]
+    # nothing stands in for a missing kind, and half a sub task pair is no pair
+    assert set(picked) == {"all_day.ics", "with_time.ics", "tags.ics"}
+
+
+def test_probe_values_only_names_everything_that_is_no_probe_value() -> None:
+    clean = (
+        '<d:multistatus xmlns:d="DAV:" xmlns:cs="http://calendarserver.org/ns/">'
+        "<d:href>/remote.php/dav/calendars/alice/spike30-abo/</d:href>"
+        "<cs:source><d:href>http://127.0.0.1:9/keine.ics</d:href></cs:source>"
+        "<d:href>/remote.php/dav/principals/users/bob/</d:href></d:multistatus>"
+    )
+    assert spike.probe_values_only(clean, ("alice", "bob")) == []
+    dirty = clean.replace("users/bob", "users/khaled").replace("127.0.0.1:9", "example.org")
+    offences = spike.probe_values_only(dirty + " mail someone@example.org", ("alice", "bob"))
+    assert "konto khaled" in offences
+    assert "host example.org" in offences
+    assert any(offence.startswith("adresse ") for offence in offences)
