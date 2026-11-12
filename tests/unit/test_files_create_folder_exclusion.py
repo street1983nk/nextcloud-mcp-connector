@@ -17,7 +17,7 @@ import httpx
 import pytest
 import respx
 
-from mcp_connector.errors import ToolError
+from mcp_connector.errors import REASON_UNREACHABLE, ToolError
 from mcp_connector.nextcloud import NcClients
 from mcp_connector.nextcloud.clients import dav
 from mcp_connector.nextcloud.credentials import Credentials
@@ -274,3 +274,72 @@ async def test_a_chain_checks_before_every_mkcol_and_asks_one_report(
     assert report.call_count == 1, "the checks of one call share a single REPORT"
     assert len(checked) == files.mkcol_count + 1, "once at the entry, once before every MKCOL"
     assert set(checked) == {path}, "the target is checked, never the segment"
+
+
+# --- A network failure on the write route changes nothing (plan 31-04b) ---------------------
+
+
+def _cut_write(mock: respx.MockRouter, failure: type[Exception]) -> respx.Route:
+    """Let every MKCOL fail on the wire. Call it after ``_Files.seal``.
+
+    respx keeps one route per pattern, so this replaces the answer of the sealed MKCOL
+    route: its counter and the one of ``_Files`` are the same.
+    """
+    return mock.route(method="MKCOL", url__startswith=f"{HOME}/").mock(side_effect=failure)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("failure", [httpx.ConnectError, httpx.ReadTimeout])
+@pytest.mark.parametrize("parents", [False, True])
+async def test_a_tagged_target_never_reaches_a_broken_write_route(
+    failure: type[Exception], parents: bool
+) -> None:
+    """The network branch is no oracle: a withheld path is refused before any request."""
+    with _mock() as mock:
+        guard_routes.active(mock, TAGGED_FOLDER)
+        files = _Files(mock).seal()
+        cut = _cut_write(mock, failure)
+        tagged = await _refused(TARGET, parents=parents)
+
+    assert cut.call_count == 0, "no write before the refusal"
+    assert files.mkcol_count == 0
+    assert files.propfind_count == 0
+    assert _tuple(tagged) == _tuple(dav.parent_missing(TARGET))
+    assert "unknown" not in tagged.message
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("state", ["unverifiable", "stale", "timeout"])
+@pytest.mark.parametrize("parents", [False, True])
+async def test_an_unanswered_tag_check_never_reaches_a_broken_write_route(
+    state: str, parents: bool
+) -> None:
+    with _mock() as mock:
+        getattr(guard_routes, state)(mock)
+        files = _Files(mock).seal()
+        cut = _cut_write(mock, httpx.ConnectError)
+        refused = await _refused("/Frei/neu", parents=parents)
+
+    assert cut.call_count == 0, "fail-closed: nothing is written unchecked"
+    assert files.propfind_count == 0
+    assert _tuple(refused) == _tuple(withhold.unavailable_error())
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("parents", [False, True])
+async def test_without_the_tag_the_broken_write_route_is_reached(parents: bool) -> None:
+    """Positive control: the route above does cut a call the guard lets through."""
+    with _mock() as mock:
+        _untagged(mock)
+        files = _Files(mock)
+        files.folder("/Projekt", "950")
+        files.seal()
+        cut = _cut_write(mock, httpx.ConnectError)
+        failed = await _refused(TARGET, parents=parents)
+
+    assert cut.call_count == 1
+    assert failed.message == (
+        f"Could not reach Nextcloud while creating {TARGET}; whether that folder exists "
+        "now is unknown. No other folder was created in this call."
+    )
+    assert failed.reason == REASON_UNREACHABLE

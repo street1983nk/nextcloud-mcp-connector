@@ -6,6 +6,8 @@ decision of phase 31 is nailed down by name here:
 *   D-31-01: with ``parents`` the missing folders are counted before the first MKCOL, and
     more than ten are refused with nothing created.
 *   D-31-02: a failure inside the chain keeps its sentence and names what was created.
+    Since plan 31-04b that holds for a network failure too, which also names the one
+    folder whose state is unknown: the MKCOL that was under way.
 *   D-31-03: the answer is ``path``, ``created``, ``id`` and, with ``parents``, the list
     ``created_folders``.
 *   D-31-04: the id of an existing folder comes out of the read that tells folder from file.
@@ -15,13 +17,21 @@ The ``kein-ki`` guard is switched to ``untagged`` here; its states are tested in
 ``test_files_create_folder_exclusion.py``.
 """
 
+import inspect
+
 import guard_routes
 import httpx
 import pytest
 import respx
 
-from mcp_connector import config
-from mcp_connector.errors import REASON_PERMISSION_DENIED, ConflictError, ToolError
+from mcp_connector import config, server
+from mcp_connector.errors import (
+    REASON_PERMISSION_DENIED,
+    REASON_TIMEOUT,
+    REASON_UNREACHABLE,
+    ConflictError,
+    ToolError,
+)
 from mcp_connector.nextcloud import NcClients
 from mcp_connector.nextcloud.clients import dav
 from mcp_connector.nextcloud.clients import xml as davxml
@@ -41,6 +51,13 @@ OC_FILEID = "00023274oclxpo7v8s2m"
 CHAIN = ["/A/b", "/A/b/c", "/A/b/c/d"]
 CHAIN_TARGET = CHAIN[-1]
 SUFFIX_AFTER_ONE = " Already created in this call and left in place: /A/b."
+
+#: The retry is safe either way: a second call keeps what exists (E5, idempotent).
+CHAIN_RETRY_HINT = (
+    "Call again with the same path and parents=true; that is safe: folders that exist "
+    "are kept and only the missing ones are created."
+)
+SINGLE_RETRY_HINT = "Call again with the same path; that is safe: a folder that exists is kept."
 
 
 @pytest.fixture(autouse=True)
@@ -556,6 +573,251 @@ async def test_a_file_that_appeared_meanwhile_is_a_conflict_with_the_list(
         f"A file, not a folder, already exists at /A/b/c.{SUFFIX_AFTER_ONE}"
     )
     assert third.call_count == 0
+
+
+# --- Network failure inside the chain (D-31-02, owner decision of 2026-11-12) ---------------
+
+
+def raising(
+    mock: respx.MockRouter, method: str, path: str, failure: type[Exception]
+) -> respx.Route:
+    return mock.route(method=method, url=url(path)).mock(side_effect=failure)
+
+
+@pytest.mark.anyio
+async def test_a_timeout_at_the_second_mkcol_parts_created_from_unknown(
+    clients: NcClients,
+) -> None:
+    with _mock() as mock:
+        chain_reads(mock)
+        mkcol(mock, "/A/b", made(201))
+        raising(mock, "MKCOL", "/A/b/c", httpx.ReadTimeout)
+        third = mkcol(mock, "/A/b/c/d", made(203))
+        with pytest.raises(ToolError) as caught:
+            await files_tools.create_folder(clients, path=CHAIN_TARGET, parents=True)
+
+    assert caught.value.message == (
+        "Nextcloud did not respond in time while creating /A/b/c; whether that folder "
+        f"exists now is unknown.{SUFFIX_AFTER_ONE}"
+    )
+    assert caught.value.hint == CHAIN_RETRY_HINT
+    assert caught.value.reason == REASON_TIMEOUT
+    assert type(caught.value) is ToolError
+    assert third.call_count == 0, "no write after the failure"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("failure", [httpx.ReadError, httpx.RemoteProtocolError])
+async def test_a_broken_connection_at_the_third_mkcol_lists_both_created_folders(
+    clients: NcClients, failure: type[Exception]
+) -> None:
+    with _mock() as mock:
+        chain_reads(mock)
+        mkcol(mock, "/A/b", made(201))
+        mkcol(mock, "/A/b/c", made(202))
+        raising(mock, "MKCOL", "/A/b/c/d", failure)
+        with pytest.raises(ToolError) as caught:
+            await files_tools.create_folder(clients, path=CHAIN_TARGET, parents=True)
+
+    assert caught.value.message == (
+        "Could not reach Nextcloud while creating /A/b/c/d; whether that folder exists "
+        "now is unknown. Already created in this call and left in place: /A/b, /A/b/c."
+    )
+    assert caught.value.hint == CHAIN_RETRY_HINT
+    assert caught.value.reason == REASON_UNREACHABLE
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("failure", "opening", "reason"),
+    [
+        (httpx.ReadTimeout, "Nextcloud did not respond in time", REASON_TIMEOUT),
+        (httpx.ConnectTimeout, "Nextcloud did not respond in time", REASON_TIMEOUT),
+        (httpx.ConnectError, "Could not reach Nextcloud", REASON_UNREACHABLE),
+    ],
+)
+async def test_a_cut_at_the_first_mkcol_names_it_unknown_and_nothing_created(
+    clients: NcClients, failure: type[Exception], opening: str, reason: str
+) -> None:
+    with _mock() as mock:
+        chain_reads(mock)
+        raising(mock, "MKCOL", "/A/b", failure)
+        second = mkcol(mock, "/A/b/c", made(202))
+        with pytest.raises(ToolError) as caught:
+            await files_tools.create_folder(clients, path=CHAIN_TARGET, parents=True)
+
+    assert caught.value.message == (
+        f"{opening} while creating /A/b; whether that folder exists now is unknown. "
+        "No other folder was created in this call."
+    )
+    assert "Already created" not in caught.value.message
+    assert caught.value.hint == CHAIN_RETRY_HINT
+    assert caught.value.reason == reason
+    assert second.call_count == 0
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("failure", "opening", "reason"),
+    [
+        (httpx.ReadTimeout, "Nextcloud did not respond in time", REASON_TIMEOUT),
+        (httpx.ReadError, "Could not reach Nextcloud", REASON_UNREACHABLE),
+    ],
+)
+async def test_a_cut_at_the_only_mkcol_without_parents_names_the_target_unknown(
+    clients: NcClients, failure: type[Exception], opening: str, reason: str
+) -> None:
+    with _mock() as mock:
+        raising(mock, "MKCOL", TARGET, failure)
+        with pytest.raises(ToolError) as caught:
+            await files_tools.create_folder(clients, path=TARGET)
+        requests = requests_of(mock)
+
+    assert caught.value.message == (
+        f"{opening} while creating {TARGET}; whether that folder exists now is unknown. "
+        "No other folder was created in this call."
+    )
+    assert caught.value.hint == SINGLE_RETRY_HINT
+    assert "parents" not in caught.value.hint
+    assert caught.value.reason == reason
+    assert requests == [("MKCOL", TARGET)], "no read follows the cut"
+
+
+@pytest.mark.anyio
+async def test_a_cut_read_between_two_segments_names_the_list_and_nothing_unknown(
+    clients: NcClients,
+) -> None:
+    """No MKCOL was under way: /A/b/c answered 405, the read behind it never came back."""
+    with _mock() as mock:
+        mock.route(method="PROPFIND", url=url("/A/b/c")).mock(
+            side_effect=[httpx.Response(404), httpx.ConnectError("down")]
+        )
+        propfind(mock, "/A/b/c/d", httpx.Response(404))
+        propfind(mock, "/A/b", httpx.Response(404))
+        propfind(mock, "/A", node("100"))
+        mkcol(mock, "/A/b", made(201))
+        mkcol(mock, "/A/b/c", httpx.Response(405))
+        third = mkcol(mock, "/A/b/c/d", made(203))
+        with pytest.raises(ToolError) as caught:
+            await files_tools.create_folder(clients, path=CHAIN_TARGET, parents=True)
+
+    assert caught.value.message == f"Could not reach Nextcloud.{SUFFIX_AFTER_ONE}"
+    assert "unknown" not in caught.value.message
+    assert caught.value.hint == CHAIN_RETRY_HINT
+    assert caught.value.reason == REASON_UNREACHABLE
+    assert third.call_count == 0
+
+
+@pytest.mark.anyio
+async def test_a_timed_out_read_between_two_segments_keeps_the_timeout_class(
+    clients: NcClients,
+) -> None:
+    with _mock() as mock:
+        mock.route(method="PROPFIND", url=url("/A/b/c")).mock(
+            side_effect=[httpx.Response(404), httpx.ReadTimeout("slow")]
+        )
+        propfind(mock, "/A/b/c/d", httpx.Response(404))
+        propfind(mock, "/A/b", httpx.Response(404))
+        propfind(mock, "/A", node("100"))
+        mkcol(mock, "/A/b", made(201))
+        mkcol(mock, "/A/b/c", httpx.Response(405))
+        with pytest.raises(ToolError) as caught:
+            await files_tools.create_folder(clients, path=CHAIN_TARGET, parents=True)
+
+    assert caught.value.message == f"Nextcloud did not respond in time.{SUFFIX_AFTER_ONE}"
+    assert caught.value.reason == REASON_TIMEOUT
+
+
+@pytest.mark.anyio
+async def test_a_cut_read_behind_the_first_segment_stays_the_plain_network_error(
+    clients: NcClients,
+) -> None:
+    """Nothing created and no MKCOL under way: as before, the caller sees the httpx error."""
+    with _mock() as mock:
+        mock.route(method="PROPFIND", url=url("/A/b")).mock(
+            side_effect=[httpx.Response(404), httpx.ConnectError("down")]
+        )
+        propfind(mock, "/A/b/c/d", httpx.Response(404))
+        propfind(mock, "/A/b/c", httpx.Response(404))
+        propfind(mock, "/A", node("100"))
+        mkcol(mock, "/A/b", httpx.Response(405))
+        second = mkcol(mock, "/A/b/c", made(202))
+        with pytest.raises(httpx.ConnectError):
+            await files_tools.create_folder(clients, path=CHAIN_TARGET, parents=True)
+
+    assert second.call_count == 0
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("failure", [httpx.ReadTimeout, httpx.ConnectError])
+@pytest.mark.parametrize("broken", [*CHAIN, "/A"])
+async def test_a_network_failure_during_the_count_is_unchanged_and_writes_nothing(
+    clients: NcClients, failure: type[Exception], broken: str
+) -> None:
+    with _mock() as mock:
+        for path in CHAIN:
+            if path != broken:
+                propfind(mock, path, httpx.Response(404))
+        if broken != "/A":
+            propfind(mock, "/A", node("100"))
+        raising(mock, "PROPFIND", broken, failure)
+        write = mock.route(method="MKCOL").mock(return_value=made(201))
+        with pytest.raises(failure):
+            await files_tools.create_folder(clients, path=CHAIN_TARGET, parents=True)
+
+    assert write.call_count == 0
+
+
+@pytest.mark.anyio
+async def test_a_network_failure_reading_the_sandbox_root_is_unchanged(
+    clients: NcClients, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(config.ENV_FILES_ROOT, "/Sandbox")
+    with _mock() as mock:
+        propfind(mock, "/Sandbox/x", httpx.Response(404))
+        raising(mock, "PROPFIND", "/Sandbox", httpx.ReadTimeout)
+        write = mock.route(method="MKCOL").mock(return_value=made(201))
+        with pytest.raises(httpx.ReadTimeout):
+            await files_tools.create_folder(clients, path="/x", parents=True)
+
+    assert write.call_count == 0
+
+
+@pytest.mark.anyio
+async def test_a_cut_read_behind_a_405_without_parents_is_unchanged(clients: NcClients) -> None:
+    with _mock() as mock:
+        mkcol(mock, TARGET, httpx.Response(405))
+        raising(mock, "PROPFIND", TARGET, httpx.ReadTimeout)
+        with pytest.raises(httpx.ReadTimeout):
+            await files_tools.create_folder(clients, path=TARGET)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("failure", [httpx.ReadTimeout, httpx.ConnectError])
+async def test_a_cut_id_read_after_the_last_mkcol_of_a_chain_stays_a_success(
+    clients: NcClients, failure: type[Exception]
+) -> None:
+    """31-02: once the write was accepted, no follow-up read turns the answer into an error."""
+    with _mock() as mock:
+        mock.route(method="PROPFIND", url=url("/A/b/c/d")).mock(
+            side_effect=[httpx.Response(404), failure("gone")]
+        )
+        propfind(mock, "/A/b/c", httpx.Response(404))
+        propfind(mock, "/A/b", httpx.Response(404))
+        propfind(mock, "/A", node("100"))
+        mkcol(mock, "/A/b", made(201))
+        mkcol(mock, "/A/b/c", made(202))
+        mkcol(mock, "/A/b/c/d", httpx.Response(201))
+        result = await files_tools.create_folder(clients, path=CHAIN_TARGET, parents=True)
+
+    assert result == {"path": CHAIN_TARGET, "created": True, "created_folders": CHAIN}
+
+
+def test_the_network_sentences_open_like_the_ones_of_the_server_wrapper() -> None:
+    """The two openings are the sentences ``graceful`` gives a bare httpx error."""
+    wrapper = inspect.getsource(server.graceful)
+    assert "Nextcloud did not respond in time." in wrapper
+    assert "Could not reach Nextcloud." in wrapper
 
 
 # --- Path guard and sandbox (FOLD-04) -------------------------------------------------------

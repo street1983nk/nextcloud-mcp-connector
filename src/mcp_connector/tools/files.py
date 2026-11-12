@@ -32,7 +32,14 @@ import httpx
 
 from .. import config, documents, ids, paging
 from ..documents import detect as document_detect
-from ..errors import REASON_GUARD_TRIPPED, REASON_UNKNOWN_ID, ConflictError, ToolError
+from ..errors import (
+    REASON_GUARD_TRIPPED,
+    REASON_TIMEOUT,
+    REASON_UNKNOWN_ID,
+    REASON_UNREACHABLE,
+    ConflictError,
+    ToolError,
+)
 from ..nextcloud import NcClients
 from ..nextcloud.clients import dav
 from ..nextcloud.exclusion import TagScope
@@ -685,7 +692,11 @@ async def create_folder(
     the counted number, and nothing is created.
 
     D-31-02: when a folder of the chain fails after others were created, the sentence of
-    that failure stays as it is and names what this call left in place.
+    that failure stays as it is and names what this call left in place. A network failure
+    counts as well (owner decision of 2026-11-12): its sentence names what was created
+    and, apart from that, the one folder whose write was on the wire and whose state is
+    therefore unknown, also when that was the very first write. A network failure before
+    any write stays the plain httpx error.
 
     D-31-05: no rights pre-check, the 403 is the answer. Without ``parents`` no read goes
     out before the write at all.
@@ -712,6 +723,8 @@ async def create_folder(
             made = await dav.make_folder(clients.client, clients.creds, target)
         except ToolError as err:
             raise _parent_missing_of(err, target) from None
+        except httpx.RequestError as exc:
+            raise _cut_off(exc, target, [], chain=False) from None
         if not made["created"]:
             existing = await _existing_folder(clients, target)
             return _folder_answer(target, False, existing["fileid"])
@@ -742,11 +755,16 @@ async def create_folder(
     created: list[str] = []
     fileid = ""
     for segment in reversed(missing):
+        # The folder whose write is on the wire right now. Only that one can be in an
+        # unknown state when the network fails.
+        under_way: str | None = None
         try:
             # The target is what is checked, never the segment: every segment is an
             # ancestor of the target, so the one cached answer of this call covers it.
             await _writable(clients, target)
+            under_way = segment
             made = await dav.make_folder(clients.client, clients.creds, segment)
+            under_way = None
             if made["created"]:
                 created.append(segment)
                 fileid = made["fileid"]
@@ -755,6 +773,12 @@ async def create_folder(
                 fileid = (await _existing_folder(clients, segment))["fileid"]
         except ToolError as err:
             raise _with_created(_parent_missing_of(err, target), created) from None
+        except httpx.RequestError as exc:
+            if under_way is None and not created:
+                # Nothing written and nothing on the wire: there is nothing to report
+                # beyond the network failure itself.
+                raise
+            raise _with_created(_cut_off(exc, under_way, created, chain=True), created) from None
 
     made_target = bool(created) and created[-1] == target
     if made_target and not fileid:
@@ -854,6 +878,46 @@ def _with_created(err: ToolError, created: list[str]) -> ToolError:
         message=f"{err.message} Already created in this call and left in place: {kept}.",
         hint=err.hint,
         reason=err.reason,
+    )
+
+
+def _cut_off(
+    exc: httpx.RequestError,
+    unknown: str | None,
+    created: list[str],
+    *,
+    chain: bool,
+) -> ToolError:
+    """The sentence of a network failure once a folder write went out (D-31-02).
+
+    It keeps two things apart. ``unknown`` is the folder whose write was on the wire: the
+    request may have reached Nextcloud, so nobody knows whether it exists. What this call
+    created for certain is added by :func:`_with_created`; with nothing created the
+    sentence says so itself. The openings and the reasons are those of the server wrapper
+    for a bare httpx error, so the audit class of the call stays what it was.
+    """
+    if unknown is None:
+        rest = "."
+    else:
+        rest = f" while creating {unknown}; whether that folder exists now is unknown."
+        if not created:
+            rest += " No other folder was created in this call."
+    hint = (
+        "Call again with the same path and parents=true; that is safe: folders that exist "
+        "are kept and only the missing ones are created."
+        if chain
+        else "Call again with the same path; that is safe: a folder that exists is kept."
+    )
+    if isinstance(exc, httpx.TimeoutException):
+        return ToolError(
+            message=f"Nextcloud did not respond in time{rest}",
+            hint=hint,
+            reason=REASON_TIMEOUT,
+        )
+    return ToolError(
+        message=f"Could not reach Nextcloud{rest}",
+        hint=hint,
+        reason=REASON_UNREACHABLE,
     )
 
 
