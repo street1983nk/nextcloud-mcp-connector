@@ -40,7 +40,9 @@ collection, ``query``: six ``calendar-query`` filters against the same filter ap
 create-only ``PUT`` of a VTODO under impersonation on nc35), ``fixtures`` (no Docker: the
 objects the Tasks app wrote in plan 30-02 and the discovery answers as test fixtures),
 ``nc35-stop`` (``docker stop`` of the
-same four containers) and ``secret-scan`` (the gate over every raw protocol of the phase
+same four containers), ``report-check`` (no Docker: the finished report against itself and
+against the raw files, eight checks, and the recommendation the rule for the owner decision
+E15 yields) and ``secret-scan`` (the gate over every raw protocol of the phase
 folder and the report before a commit). Whatever the measuring blocks created is taken back
 in a ``finally`` and compared against the baseline, before ``nc35-stop`` runs.
 
@@ -128,7 +130,6 @@ SABRE = "http://sabredav.org/ns"
 DAV_FILES = "/remote.php/dav/files/"
 TIMEOUT = httpx.Timeout(60.0)
 
-#: Further blocks follow in plans 30-03 to 30-05.
 BLOCKS = (
     "nc35-up",
     "controls",
@@ -151,6 +152,7 @@ BLOCKS = (
     "vtodo-create",
     "fixtures",
     "nc35-stop",
+    "report-check",
     "secret-scan",
 )
 
@@ -8145,6 +8147,485 @@ async def run_blocks(env: Mapping[str, str], blocks: Sequence[str], ui: UiOption
                     block_nc35_stop()
 
 
+# --- plan 30-05: the report checks itself, and the basis for the owner decision E15 ----------
+
+#: The fixed headings of the report, set by plan 30-01. No later plan renames or moves one:
+#: the plans of phases 31 to 33 point at these sections by number.
+REPORT_HEADINGS = (
+    "## Entscheidungskriterien, vorab festgelegt",
+    "## 1. MKCOL unter AppAPI-Impersonation (MESS-01)",
+    "## 2. Gruppenordner mit ACL und externer Speicher (MESS-02)",
+    "## 3. Ändernde Zugriffe (MESS-05)",
+    "## 4. Verschieben und Löschen (MESS-06)",
+    "## 5. Discovery und Objekte (MESS-03)",
+    "## 6. Kosten der Aufgabensuche (MESS-04)",
+    "## 7. Inventar der Gates und Zusagen (A17)",
+    "## 8. Annahmen A1 bis A19 und A21",
+    "## 9. Abbruchkriterien und Übergabe an die Phasen 31 bis 33",
+    "## 10. Owner-Entscheid E15",
+    "## 11. Was ungemessen blieb",
+    RAW_HEADING,
+)
+ASSUMPTION_HEADING = REPORT_HEADINGS[8]
+ABORT_HEADING = REPORT_HEADINGS[9]
+E15_HEADING = REPORT_HEADINGS[10]
+
+#: The nineteen assumptions this phase answers. A10 and A20 belong to no measurement of it.
+ASSUMPTIONS = (*(f"A{n}" for n in range(1, 10)), *(f"A{n}" for n in range(11, 20)), "A21")
+STATUS_WORDS = ("belegt", "widerlegt", "ungemessen")
+
+ABORT_KEYS = ("MESS-01", "MESS-05", "MESS-06-MOVE", "MESS-06-LOESCHEN")
+
+E15_SWITCH = "eigener Schalter"
+E15_BUNDLE = "nur Bundle-Abschaltung"
+E15_TRIGGERS = ("S1", "S2", "S3", "S4")
+
+#: The lines of the head block that name a version; each has to say how it was read.
+HEAD_VERSION_LABELS = (
+    "Nextcloud",
+    "AppAPI",
+    "Diese ExApp",
+    "groupfolders",
+    "Tasks",
+    "Deck",
+    "Datenbank",
+)
+OPEN_MARKER = "offen, füllt plan"
+
+#: En dash and em dash, by code point: the report and this file carry neither.
+DASHES = (chr(0x2013), chr(0x2014))
+
+
+def report_headings(report_text: str) -> list[str]:
+    """Every second level heading of the report in its order, fenced blocks left out."""
+    found: list[str] = []
+    fenced = False
+    for line in report_text.splitlines():
+        if line.strip().startswith("```"):
+            fenced = not fenced
+        elif not fenced and line.startswith("## "):
+            found.append(line.strip())
+    return found
+
+
+def headings_intact(report_text: str) -> bool:
+    """Whether the thirteen fixed headings stand word for word, once each, in their order."""
+    fixed = set(REPORT_HEADINGS)
+    return [line for line in report_headings(report_text) if line in fixed] == list(REPORT_HEADINGS)
+
+
+def report_section(report_text: str, heading: str) -> list[str]:
+    """The lines between ``heading`` and the next second level heading, fences respected."""
+    lines: list[str] = []
+    inside = False
+    fenced = False
+    for line in report_text.splitlines():
+        if line.strip().startswith("```"):
+            fenced = not fenced
+        elif not fenced and line.startswith("## "):
+            inside = line.strip() == heading
+            continue
+        if inside:
+            lines.append(line)
+    return lines
+
+
+def table_cells(line: str) -> list[str]:
+    """The cells of one Markdown table row; an escaped pipe stays inside its cell."""
+    cells = [cell.strip() for cell in re.split(r"(?<!\\)\|", line.strip())]
+    return cells[1:-1] if len(cells) >= 2 else []
+
+
+def assumption_rows(report_text: str) -> dict[str, str]:
+    """The status word of every assumption in the table of section 8.
+
+    A row is refused, never read charitably: a status other than one of the three words, a
+    second row for the same assumption, or a row without evidence raises ``ValueError``.
+    """
+    rows: dict[str, str] = {}
+    for line in report_section(report_text, ASSUMPTION_HEADING):
+        if not re.match(r"\|\s*A\d+\s*\|", line):
+            continue
+        cells = table_cells(line)
+        name = cells[0]
+        if len(cells) < 5:
+            raise ValueError(f"{name}: the row has {len(cells)} cells, five are needed")
+        if cells[2] not in STATUS_WORDS:
+            raise ValueError(f"{name}: status {cells[2]!r} is none of {STATUS_WORDS}")
+        if not cells[3]:
+            raise ValueError(f"{name}: the row names no evidence")
+        if name in rows:
+            raise ValueError(f"{name}: the table carries the assumption twice")
+        rows[name] = cells[2]
+    return rows
+
+
+def missing_assumptions(rows: Mapping[str, str]) -> list[str]:
+    """The assumptions of this phase the table does not carry, in their order."""
+    return [name for name in ASSUMPTIONS if name not in rows]
+
+
+def _abort_key(cell: str) -> str:
+    if cell.startswith("MESS-01"):
+        return "MESS-01"
+    if cell.startswith("MESS-05"):
+        return "MESS-05"
+    if cell.startswith("MESS-06") and "MOVE" in cell:
+        return "MESS-06-MOVE"
+    if cell.startswith("MESS-06") and "Löschen" in cell:
+        return "MESS-06-LOESCHEN"
+    raise ValueError(f"{cell[:60]!r} is none of the four abort criteria {ABORT_KEYS}")
+
+
+def abort_rows(report_text: str) -> dict[str, str]:
+    """The four abort criteria of section 9 with what the report says about each.
+
+    Read is the table before the first sub heading. The first three answer ``ja`` or
+    ``nein``, deleting answers with its verdict word. A missing row, a double row and any
+    other answer raise ``ValueError``.
+    """
+    rows: dict[str, str] = {}
+    for line in report_section(report_text, ABORT_HEADING):
+        if line.startswith("### "):
+            break
+        if not re.match(r"\|\s*MESS-\d+", line):
+            continue
+        cells = table_cells(line)
+        key = _abort_key(cells[0])
+        value = cells[1] if len(cells) > 1 else ""
+        allowed = (
+            (VERDICT_RESTORABLE, VERDICT_LOST, VERDICT_UNCLEAR)
+            if key == "MESS-06-LOESCHEN"
+            else ("ja", "nein")
+        )
+        if value not in allowed:
+            raise ValueError(f"{key}: {value!r} is none of {allowed}")
+        if key in rows:
+            raise ValueError(f"{key}: the table carries the criterion twice")
+        rows[key] = value
+    absent = [key for key in ABORT_KEYS if key not in rows]
+    if absent:
+        raise ValueError(f"the table lacks {', '.join(absent)}")
+    return {key: rows[key] for key in ABORT_KEYS}
+
+
+def has_dash(text: str) -> bool:
+    """Whether ``text`` carries an en dash or an em dash."""
+    return any(dash in text for dash in DASHES)
+
+
+def protocol_field(text: str, marker: str, key: str) -> str | None:
+    """The value ``key=`` carries on the protocol lines that contain ``marker``.
+
+    ``None`` without such a line or such a field: not measured is never read as a no. Two
+    lines that carry different values raise ``ValueError``, a contradiction is not settled
+    by taking the first.
+    """
+    values: set[str] = set()
+    for line in text.splitlines():
+        if marker not in line:
+            continue
+        match = re.search(rf"(?<![\w-]){re.escape(key)}=(\S+)", line)
+        if match is not None:
+            values.add(match[1])
+    if len(values) > 1:
+        raise ValueError(f"{marker}: {key} carries {sorted(values)} in the same raw file")
+    return next(iter(values), None)
+
+
+def _e15_states(
+    delete_word: str | None,
+    move_overwrites: bool | None,
+    properties_lost: bool | None,
+    readonly_put_accepted: bool | None,
+) -> dict[str, bool | None]:
+    """Per trigger: fired, not fired, or ``None`` for a value nobody measured."""
+    words = (VERDICT_RESTORABLE, VERDICT_LOST, VERDICT_UNCLEAR)
+    if delete_word is not None and delete_word not in words:
+        raise ValueError(f"{delete_word!r} is none of the three verdict words")
+    return {
+        "S1": None if delete_word is None else delete_word == VERDICT_RESTORABLE,
+        "S2": move_overwrites,
+        "S3": properties_lost,
+        "S4": readonly_put_accepted,
+    }
+
+
+def e15_recommendation(
+    *,
+    delete_word: str | None,
+    move_overwrites: bool | None,
+    properties_lost: bool | None,
+    readonly_put_accepted: bool | None,
+) -> tuple[str, list[str]]:
+    """The recommendation for E15 by the rule plan 30-05 fixed in advance, and its triggers.
+
+    An own switch is recommended as soon as one trigger is measured: S1 deleting ends as
+    ``wiederherstellbar`` (0.8.0 then ships a destructive tool for the first time), S2
+    ``MOVE`` overwrites a taken target and cannot be kept from it, S3 the abort criterion
+    for foreign properties fired, S4 the server accepted a ``PUT`` into a list shared read
+    only. Without a measured trigger the bundle switch is the recommendation. An unmeasured
+    value fires nothing; ``e15_unmeasured`` names it. The owner decides, not this function.
+    """
+    states = _e15_states(delete_word, move_overwrites, properties_lost, readonly_put_accepted)
+    fired = [name for name in E15_TRIGGERS if states[name] is True]
+    return (E15_SWITCH if fired else E15_BUNDLE, fired)
+
+
+def e15_unmeasured(
+    *,
+    delete_word: str | None,
+    move_overwrites: bool | None,
+    properties_lost: bool | None,
+    readonly_put_accepted: bool | None,
+) -> list[str]:
+    """The triggers of the rule whose value is not measured, for which nothing is advised."""
+    states = _e15_states(delete_word, move_overwrites, properties_lost, readonly_put_accepted)
+    return [name for name in E15_TRIGGERS if states[name] is None]
+
+
+def head_problems(report_text: str) -> list[str]:
+    """What keeps the head block from being complete, one finding per line.
+
+    Every version line has to carry a value with the command it was read with, or the word
+    ``ungemessen`` with its reason. No line of the whole report may still say that a later
+    plan fills it.
+    """
+    lines = report_text.splitlines()
+    head: list[str] = []
+    for line in lines:
+        if line.startswith("## "):
+            break
+        head.append(line)
+    problems: list[str] = []
+    for label in HEAD_VERSION_LABELS:
+        found = [line for line in head if line.startswith(f"**{label}:**")]
+        if len(found) != 1:
+            problems.append(f"{label}: {len(found)} Zeilen im Kopfblock, genau eine erwartet")
+            continue
+        read = "gelesen mit" in found[0]
+        unmeasured = "ungemessen" in found[0] and "Grund" in found[0]
+        if not read and not unmeasured:
+            problems.append(f"{label}: weder Lesebefehl noch ungemessen mit Grund")
+    problems.extend(
+        f"Zeile {number}: {line.strip()[:60]}"
+        for number, line in enumerate(lines, start=1)
+        if OPEN_MARKER in line.casefold()
+    )
+    return problems
+
+
+def phase_raw_texts() -> dict[str, str]:
+    """Every file below the raw folder of the phase, by its path relative to the repository."""
+    raw_files = (
+        sorted(path for path in RAW_DIR.rglob("*") if path.is_file()) if RAW_DIR.is_dir() else []
+    )
+    return {
+        str(path.relative_to(REPO_ROOT)): path.read_text(encoding="utf-8", errors="replace")
+        for path in raw_files
+    }
+
+
+def _raw(name: str) -> str:
+    path = RAW_DIR / name
+    return path.read_text(encoding="utf-8", errors="replace") if path.is_file() else ""
+
+
+def collected_delete_rows() -> list[VersionRow]:
+    """The collected lines of the four delete raw files, each only for its own version."""
+    return [
+        row
+        for major in DELETE_MAJORS
+        for row in version_rows(_raw(f"loeschen-{major}.txt"))
+        if row.major == major
+    ]
+
+
+def _yes_no_none(value: str | None) -> bool | None:
+    return None if value not in ("ja", "nein") else value == "ja"
+
+
+def e15_inputs() -> dict[str, Any]:
+    """The four values of the E15 rule, read from the raw files, ``None`` where one lacks."""
+    move = _raw("nc35-verschieben.txt")
+    modify = _raw("nc35-aendern.txt")
+    rows = collected_delete_rows()
+    overwritten = protocol_field(move, "MOVE belegt-ohne-kopf auth=appapi", "ueberschrieben")
+    guarded = protocol_field(move, "MOVE belegt-overwrite-f auth=appapi", "status")
+    refused_put = _yes_no_none(protocol_field(modify, "NUR-LESEN ERGEBNIS", "abgelehnt"))
+    return {
+        "delete_word": delete_verdict(rows) if rows else None,
+        "move_overwrites": (
+            None
+            if overwritten not in ("ja", "nein") or guarded is None
+            else overwritten == "ja" and guarded != "412"
+        ),
+        "properties_lost": _yes_no_none(
+            protocol_field(modify, "ABBRUCHKRITERIUM MESS-05 EIGENSCHAFTEN", "ausgeloest")
+        ),
+        "readonly_put_accepted": None if refused_put is None else not refused_put,
+    }
+
+
+def e15_line(inputs: Mapping[str, Any]) -> str:
+    """The one line section 10.3 of the report quotes: option, fired and unmeasured triggers."""
+    option, fired = e15_recommendation(**inputs)
+    unmeasured = e15_unmeasured(**inputs)
+    return (
+        f"E15 EMPFEHLUNG option={option} ausgeloest={','.join(fired) or 'keine'} "
+        f"ungemessen={','.join(unmeasured) or 'keine'}"
+    )
+
+
+def _measured_abort_states() -> dict[str, str | None]:
+    """What the raw files say about the four abort criteria; ``None`` for a missing line."""
+    modify = _raw("nc35-aendern.txt")
+    parts = [
+        protocol_field(modify, "ABBRUCHKRITERIUM MESS-05 IF-MATCH", "ausgeloest"),
+        protocol_field(modify, "ABBRUCHKRITERIUM MESS-05 EIGENSCHAFTEN", "ausgeloest"),
+    ]
+    both: str | None = None
+    if all(part in ("ja", "nein") for part in parts):
+        both = "ja" if "ja" in parts else "nein"
+    rows = collected_delete_rows()
+    return {
+        "MESS-01": protocol_field(_raw("nc35-mkcol.txt"), "ABBRUCHKRITERIUM MESS-01", "ausgeloest"),
+        "MESS-05": both,
+        "MESS-06-MOVE": protocol_field(
+            _raw("nc35-verschieben.txt"), "ABBRUCHKRITERIUM MESS-06 MOVE", "ausgeloest"
+        ),
+        "MESS-06-LOESCHEN": delete_verdict(rows) if rows else None,
+    }
+
+
+def _check_assumptions(report: str) -> tuple[bool, str]:
+    rows = assumption_rows(report)
+    missing = missing_assumptions(rows)
+    extra = [name for name in rows if name not in ASSUMPTIONS]
+    counts = " ".join(f"{word}={list(rows.values()).count(word)}" for word in STATUS_WORDS)
+    return (
+        not missing and not extra,
+        (
+            f"annahmen={len(rows)} {counts} fehlend={','.join(missing) or 'keine'} "
+            f"unerwartet={','.join(extra) or 'keine'}"
+        ),
+    )
+
+
+def _check_abort(report: str) -> tuple[bool, str]:
+    told = abort_rows(report)
+    measured = _measured_abort_states()
+    differing = [key for key in ABORT_KEYS if told[key] != measured[key]]
+    pairs = " ".join(f"{key}={told[key].replace(' ', '-')}" for key in ABORT_KEYS)
+    detail = ",".join(f"{key}(roh={measured[key]})" for key in differing) or "keine"
+    return (not differing, f"zeilen={len(told)} {pairs} abweichend_von_rohdatei={detail}")
+
+
+def _check_result_lines(report: str) -> tuple[bool, str]:
+    lines = report.splitlines()
+    words = [
+        line.removeprefix("ERGEBNIS LOESCHEN (E13):").strip()
+        for line in lines
+        if line.startswith("ERGEBNIS LOESCHEN (E13):")
+    ]
+    consequences = [
+        line.removeprefix("KONSEQUENZ:").strip() for line in lines if line.startswith("KONSEQUENZ:")
+    ]
+    rows = collected_delete_rows()
+    word = delete_verdict(rows) if rows else ""
+    same_word = words == [word]
+    same_consequence = bool(word) and consequences == [consequence(word)]
+    return (
+        same_word and same_consequence,
+        (
+            f"ergebniszeilen={len(words)} konsequenzzeilen={len(consequences)} "
+            f"wort_gleich_regel={yes_no(same_word)} "
+            f"konsequenz_gleich_regel={yes_no(same_consequence)}"
+        ),
+    )
+
+
+def block_report_check(env_file: Path) -> int:
+    """The report checked against itself and against the raw files, eight lines ``PRUEFUNG``.
+
+    Needs no Docker. Before the checks it prints the four values of the E15 rule as the raw
+    files carry them and the line section 10.3 has to quote; a report that recommends
+    something else than the rule fails like a failed check. A check that cannot read its
+    part of the report counts as failed and names why.
+    """
+    remember_env_secrets(read_env_file(env_file))
+    raw_texts = phase_raw_texts()
+    report = REPORT_FILE.read_text(encoding="utf-8") if REPORT_FILE.is_file() else ""
+    report_label = str(REPORT_FILE.relative_to(REPO_ROOT))
+
+    inputs = e15_inputs()
+    for name, value in inputs.items():
+        shown = (
+            "ungemessen" if value is None else value if isinstance(value, str) else yes_no(value)
+        )
+        print(f"E15 EINGANG {name}={shown}")
+    line = e15_line(inputs)
+    quoted = line in "\n".join(report_section(report, E15_HEADING))
+    print(f"{line} im_bericht={yes_no(quoted)}")
+
+    def headings() -> tuple[bool, str]:
+        found = [text for text in report_headings(report) if text in set(REPORT_HEADINGS)]
+        return (headings_intact(report), f"feste_ueberschriften={len(found)}/13")
+
+    def quotes() -> tuple[bool, str]:
+        missing = missing_quotes(report, raw_texts)
+        for quote_ in missing:
+            print(f"QUOTE NOT IN A RAW FILE | {quote_[:160]}")
+        return (
+            not missing,
+            (
+                f"zitate={len(quoted_lines(report))} fehlend={len(missing)} "
+                f"rohdateien={len(raw_texts)}"
+            ),
+        )
+
+    def dashes() -> tuple[bool, str]:
+        hits = [
+            str(number)
+            for number, text in enumerate(report.splitlines(), start=1)
+            if has_dash(text)
+        ]
+        return (not hits, f"zeilen_mit_strich={','.join(hits[:10]) or 'keine'}")
+
+    def secrets_() -> tuple[bool, str]:
+        hits = scan_for_secrets({**raw_texts, report_label: report}, _secrets)
+        for hit in hits:
+            print(f"SECRET FOUND | {hit}")
+        return (not hits, f"dateien={len(raw_texts) + 1} funde={len(hits)}")
+
+    def head() -> tuple[bool, str]:
+        problems = head_problems(report)
+        return (
+            not problems,
+            f"fassungszeilen={len(HEAD_VERSION_LABELS)} offen={'; '.join(problems[:5]) or 'keine'}",
+        )
+
+    checks: tuple[tuple[str, Any], ...] = (
+        ("ueberschriften", headings),
+        ("zitate", quotes),
+        ("annahmen", lambda: _check_assumptions(report)),
+        ("abbruchkriterien", lambda: _check_abort(report)),
+        ("ergebniszeilen", lambda: _check_result_lines(report)),
+        ("striche", dashes),
+        ("geheimnisse", secrets_),
+        ("kopfblock", head),
+    )
+    failed = 0 if quoted else 1
+    for name, check in checks:
+        try:
+            ok, details = check()
+        except ValueError as failure:
+            ok, details = False, f"nicht lesbar: {failure}"
+        failed += 0 if ok else 1
+        print(f"PRUEFUNG {name} ergebnis={'ok' if ok else 'fehler'} {details}")
+    return 1 if failed else 0
+
+
 def secret_scan(env_file: Path) -> int:
     """The gate before a commit: no secret in a raw file or the report, every quote real.
 
@@ -8153,13 +8634,7 @@ def secret_scan(env_file: Path) -> int:
     """
     env = read_env_file(env_file)
     remember_env_secrets(env)
-    raw_files = (
-        sorted(path for path in RAW_DIR.rglob("*") if path.is_file()) if RAW_DIR.is_dir() else []
-    )
-    raw_texts = {
-        str(path.relative_to(REPO_ROOT)): path.read_text(encoding="utf-8", errors="replace")
-        for path in raw_files
-    }
+    raw_texts = phase_raw_texts()
     texts = dict(raw_texts)
     report = REPORT_FILE.read_text(encoding="utf-8") if REPORT_FILE.is_file() else ""
     if report:
@@ -8232,6 +8707,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if len(blocks) > 1:
             parser.error("delete-verdict runs on its own")
         return block_delete_verdict()
+    if "report-check" in blocks:
+        if len(blocks) > 1:
+            parser.error("report-check runs on its own")
+        return block_report_check(Path(options.env_file))
     if not options.out:
         parser.error("--out is required for a measuring block")
     matrix_tag = ""

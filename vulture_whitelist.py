@@ -350,3 +350,6 @@ background
 # and GF_KEYS left it with the groupfolder block of task 3.
 # value_form sat here between task 1 and task 3 of plan 30-02 and left with the block
 # ui-evaluate, its caller.
+# Plan 30-05 parked nothing: every helper it added (assumption_rows, abort_rows,
+# e15_recommendation, headings_intact, has_dash and their neighbours) is called by the
+# block report-check of the same commit. No name of phase 30 is left in this list.
