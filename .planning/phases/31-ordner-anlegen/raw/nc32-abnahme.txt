@@ -1,0 +1,277 @@
+# Plan 31-05b, Nachtrag: Rohprotokoll Abnahmeskript auf Nextcloud 32 (Topologie nc-mcp-exapp), Beginn 2026-11-12T19:31:55Z, HEAD 418bfa8
+# Schließt den offenen Punkt 'Exit 0 des Abnahmeskripts nicht belegt'. Entscheid der Hauptsitzung: die Testpost darf in der
+# Wegwerf-Instanz von Hand neu zugestellt werden, mit genau den Schritten von scripts/bootstrap_exapp.sh (deliver_test_mail,
+# danach occ mail:account:sync <id> -f); das Skript selbst lief nicht und wurde nicht geändert. Keine Secret-Werte.
+
+== (1) RAM-Gate und Start ==
+
+RAM frei_host_gb=5.47 schwelle=4.0 ergebnis=ok (vor dem Start, kein eigener Container läuft; Messungen 5757568, 5733636, 5732668 KiB)
+    HP_SHARED_KEY für Compose aus .env.exapp gelesen (Wert nie ausgegeben)
+    $ docker compose -f compose.exapp.yml start        (kein bootstrap_exapp.sh)
+     Container nc-mcp-exapp-registry Starting 
+     Container nc-mcp-exapp-greenmail Starting 
+     Container nc-mcp-exapp-nc Starting 
+     Container nc-mcp-exapp-greenmail Started 
+     Container nc-mcp-exapp-registry Started 
+     Container nc-mcp-exapp-nc Started 
+     Container nc-mcp-exapp-nc Waiting 
+     Container nc-mcp-exapp-nc Waiting 
+     Container nc-mcp-exapp-nc Healthy 
+     Container nc-mcp-exapp-harp Starting 
+     Container nc-mcp-exapp-nc Healthy 
+     Container nc-mcp-exapp-caddy Starting 
+     Container nc-mcp-exapp-harp Started 
+     Container nc-mcp-exapp-caddy Started 
+    exit=0
+    GET http://127.0.0.1:8081/status.php -> HTTP 200
+RAM frei_host_gb=5.13 schwelle=4.0 ergebnis=ok (nach dem Start, nc-mcp-exapp läuft; Messungen 5393600, 5389420, 5378800 KiB)
+
+== (2) Instanz, lokaler Prozess, Code des Worktrees ==
+
+VERSION OF RECORD 32.0.15 version=32.0.15.1
+    $ occ status
+      - installed: true
+      - version: 32.0.15.1
+      - versionstring: 32.0.15
+      - edition: 
+      - maintenance: false
+      - needsDbUpgrade: false
+      - productname: Nextcloud
+      - extendedSupport: false
+    $ occ app_api:app:list
+    ExApps:
+    mcp_connector (MCP Connector): 9.9.9 [enabled]
+PROZESS lokal gestartet port=23001 heartbeat_vom_host=200 (Versuch 1) kommando=uv run --no-sync nc-mcp-exapp (im Worktree, PYTHONPATH=src)
+    Umgebung des Prozesses: nur APP_ID, APP_SECRET, APP_VERSION, NC_MCP_URL und NC_MCP_PUBLIC_URL aus .env.exapp,
+    NEXTCLOUD_URL gleich NC_MCP_URL, APP_PORT=23001, APP_PERSISTENT_STORAGE außerhalb des Repos.
+TOOLS-LIST weg=lokaler-prozess-direkt initialize=200 status=200 werkzeuge=24 files_create_folder=ja
+TOOLS-LIST weg=nextcloud-proxy-mit-app-passwort initialize=200 status=200 werkzeuge=24 files_create_folder=ja
+
+== (3) Zustand vorher ==
+
+POSTFACH vorher greenmail_laeuft=ja imap_inbox_nachrichten=0 uidnext=1 mail_app_abruf_nachricht_1_bis_6=HTTP 500
+    $ docker inspect nc-mcp-exapp-greenmail (State)
+    status=running started=2026-11-12T19:31:57.344451496Z
+    $ docker exec nc-mcp-exapp-nc curl imap://greenmail:3143 -X 'STATUS INBOX (MESSAGES UIDNEXT UIDVALIDITY)'   (Konto alice)
+    * STATUS "INBOX" (MESSAGES 0 UIDNEXT 1 UIDVALIDITY 1794511918)
+    curl_exit=0
+    $ occ mail:account:export alice (ohne Passwortzeilen)
+    Account 1:
+    - E-Mail: alice@example.test
+    - Name: Alice Spike
+    - Provision: none ID: N/A
+    - Protocol: IMAP
+    - IMAP user: alice
+    - IMAP host: greenmail:3143, security: none
+    - SMTP user: alice
+    - SMTP host: greenmail:3025, security: none
+    MAIL-APP nachricht=1 abruf=HTTP 500
+    MAIL-APP nachricht=2 abruf=HTTP 500
+    MAIL-APP nachricht=3 abruf=HTTP 500
+    MAIL-APP nachricht=4 abruf=HTTP 500
+    MAIL-APP nachricht=5 abruf=HTTP 500
+    MAIL-APP nachricht=6 abruf=HTTP 500
+    MAIL-APP liste mailbox=1 anzahl=1 ids=[6]
+       id=6 uid=None subject='Nur ein Anhang'
+    Die Zeile 'MAIL-APP liste' stammt aus dem Listenweg der Mail-App ohne limit-Parameter (ein Eintrag); mit
+    limit=20 listet sie sechs, siehe Abschnitt 4. Die Abrufe laufen am Connector vorbei mit dem App-Passwort von alice.
+
+== (4) Zustellung der Testpost und Sync, von Hand wie im Bootstrap-Skript ==
+
+RAM frei_host_gb=4.86 schwelle=4.0 ergebnis=ok (vor der Zustellung; Messungen 5099704, 5117292, 5111136 KiB)
+    Am Skript abgelesen: deliver_test_mail (Zeile 458 bis 664) startet einen Wegwerf-Container python:3.13-alpine im
+    Netz der Topologie (docker run --rm -i --network nc-mcp-exapp-net, Image lag lokal vor) und reicht ihm ein
+    Python-Programm über stdin; sync_mail_account (Zeile 670 bis 686) ruft occ mail:account:sync <id> -f.
+    Das Programm wurde unverändert aus dem Skript herausgelesen (185 Zeilen zwischen <<'PY' und PY, in eine Datei
+    außerhalb des Repos), mit denselben Variablen wie im Skript: MAIL_HOST=greenmail, MAIL_SMTP_PORT=3025,
+    MAIL_IMAP_PORT=3143, MAIL_USER=alice, MAIL_ADDRESS=alice@example.test, MAIL_EXPECTED=6, MAIL_PW wie im Skript
+    aus NC_EXAPP_ALICE_IMAP_PASSWORD bzw. dessen Vorgabe. Konto-Id 1 aus occ mail:account:export (Abschnitt 3).
+    $ docker run --rm -i --network nc-mcp-exapp-net -e MAIL_PW -e MAIL_HOST -e MAIL_SMTP_PORT -e MAIL_IMAP_PORT -e MAIL_USER -e MAIL_ADDRESS -e MAIL_EXPECTED python:3.13-alpine python - < <Programm aus dem Skript>
+    test mails alice: delivered 6 over greenmail:3025
+    test mails alice: keyword $label1 on message 4: OK
+    exit=0
+    Danach kein Container aus python:3.13-alpine mehr vorhanden (docker ps -a: 0).
+    $ occ mail:account:sync 1 -f
+    51MB of memory used
+    exit=0
+POSTFACH nachher imap_inbox_nachrichten=6 uidnext=7 mail_app_listet=6 (ids 1 bis 6) mail_app_abruf_nachricht_1_bis_6=HTTP 200
+    $ docker exec nc-mcp-exapp-nc curl imap://greenmail:3143 -X 'STATUS INBOX (MESSAGES UIDNEXT UIDVALIDITY)'   (Konto alice)
+    * STATUS "INBOX" (MESSAGES 6 UIDNEXT 7 UIDVALIDITY 1794511918)
+    curl_exit=0
+    MAIL-APP liste mailbox=1 limit=20 anzahl=6 ids=[1, 2, 3, 4, 5, 6]
+    MAIL-APP nachricht=1 abruf=HTTP 200
+    MAIL-APP nachricht=2 abruf=HTTP 200
+    MAIL-APP nachricht=3 abruf=HTTP 200
+    MAIL-APP nachricht=4 abruf=HTTP 200
+    MAIL-APP nachricht=5 abruf=HTTP 200
+    MAIL-APP nachricht=6 abruf=HTTP 200
+    MAIL-APP nachricht=7 abruf=HTTP 404
+    MAIL-APP nachricht=8 abruf=HTTP 404
+    MAIL-APP nachricht=9 abruf=HTTP 404
+    MAIL-APP nachricht=10 abruf=HTTP 404
+    MAIL-APP nachricht=11 abruf=HTTP 404
+    MAIL-APP nachricht=12 abruf=HTTP 404
+    Die Mail-App führt nach dem Sync dieselben sechs Ids wie vorher; GreenMail vergibt nach dem Neustart wieder
+    die UIDs 1 bis 6, und der Abruf jeder der sechs Nachrichten antwortet 200. Kein Datenbankeingriff.
+
+== (5) Abnahmeskript ==
+
+RAM frei_host_gb=4.73 schwelle=4.0 ergebnis=ok (vor dem Abnahmeskript, nc-mcp-exapp und lokaler Prozess laufen; Messungen 4960320, 4959736, 4960020 KiB)
+    $ NC_MCP_USER=$NC_MCP_TEST_USER NC_MCP_APP_PASSWORD=$NC_MCP_TEST_APP_PASSWORD uv run --no-sync python scripts/acceptance_all_tools.py        (Stand des Skripts: Commit 95ff4da, unverändert)
+    INFO mcp_connector.entry_stdio: MCP Connector is serving over stdio
+    starting nc-mcp.exe over stdio against http://127.0.0.1:8081
+
+    tools/list: 24 tools: calendar_create_event, calendar_list_events, contacts_search, deck_browse, deck_create_card, fetch, files_create_folder, files_download, files_list, files_read, files_read_as_markdown, files_search, files_upload, mail_browse, notes_create, notes_read, notes_search, prepare_context, search, tables_browse, tables_create_row, talk_browse, talk_send, unified_search
+
+      OK      files_upload           {"path":"/abnahme318c6d6eb4-20261112-203317.md","etag":"\"b42e42fb0d02434d3a5158e7087b650e
+      OK      files_create_folder    {"path":"/abnahme318c6d6eb4-20261112-203317-ordner/a/b","created":true,"id":"file:581","cr
+      OK      files_create_folder    {"path":"/abnahme318c6d6eb4-20261112-203317-ordner/a/b","created":false,"id":"file:581","c
+      OK      files_search           {"query":"abnahme318c6d6eb4","folder":"/","count":2,"items":[{"path":"/abnahme318c6d6eb4-2
+      OK      files_list             {"path":"/","count":22,"items":[{"path":"/abnahme0a4f51708b-20261112-191615-ordner","name"
+      OK      files_read             {"path":"/abnahme318c6d6eb4-20261112-203317.md","content":"# abnahme318c6d6eb4\nAbnahmelau
+      OK      files_download         {"path":"/abnahme318c6d6eb4-20261112-203317.md","size":54,"content_type":"text/markdown","
+      OK      files_upload           {"path":"/abnahme318c6d6eb4-20261112-203317.docx","etag":"\"4afe2f0c70cf4bb9017fd4649d2fab
+      OK      files_read_as_markdown {"path":"/abnahme318c6d6eb4-20261112-203317.docx","content":"Abnahmelauf abnahme318c6d6eb4
+      OK      calendar_create_event  {"id":"event:personal:b83105b4-eebc-4c83-b1da-814a789b12cd.ics","uid":"b83105b4-eebc-4c83-
+      OK      calendar_list_events   {"range":{"start":"2026-11-13T18:33:18+00:00","end":"2026-11-13T21:33:18+00:00","timezone"
+      OK      notes_create           {"id":"note:585","title":"Abnahme abnahme318c6d6eb4","category":"","modified":1794511999,"
+      OK      notes_search           {"count":1,"results":[{"id":"note:585","title":"Abnahme abnahme318c6d6eb4","excerpt":"Abna
+      OK      notes_read             {"id":"note:585","title":"Abnahme abnahme318c6d6eb4","content":"Abnahmelauf abnahme318c6d6
+      OK      deck_browse            {"level":"boards","count":1,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_e
+      OK      deck_browse            {"level":"stacks","count":4,"results":[{"id":1,"title":"Custom lists - click to rename!","
+      OK      deck_create_card       {"id":"card:1:1:34","title":"Abnahme abnahme318c6d6eb4","url":"http://127.0.0.1:8081/index
+      OK      tables_browse          {"level":"tables","count":1,"results":[{"id":10,"title":"Welcome to Nextcloud Tables!","ro
+      OK      tables_browse          {"level":"columns","count":4,"results":[{"id":10,"title":"What","type":"text","mandatory":
+      OK      tables_create_row      {"id":54,"table_id":"10","url":"http://127.0.0.1:8081/index.php/apps/tables/#/table/10","v
+      OK      talk_browse            {"level":"conversations","count":5,"results":[{"token":"f7rgfwke","name":"MCP-Talk-offen-G
+      OK      talk_browse            {"level":"messages","token":"f7rgfwke","conversation":"MCP-Talk-offen-Grüße-aus-Hamburg","
+      OK      talk_send              {"sent":true,"id":203,"token":"f7rgfwke","conversation":"MCP-Talk-offen-Grüße-aus-Hamburg"
+      OK      mail_browse            {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]}
+      OK      mail_browse            {"level":"mailboxes","count":1,"results":[{"id":1,"name":"INBOX","unread":6,"delimiter":".
+      OK      mail_browse            {"level":"messages","mailbox_id":"1","count":6,"results":[{"id":"mail:1","subject":"Gruess
+      OK      contacts_search        {"query":"a","count":0,"contacts":[]}
+      OK      unified_search         {"query":"abnahme318c6d6eb4","count":7,"results":[{"id":"note:585","title":"Abnahme abnahm
+      OK      prepare_context        {"query":"abnahme318c6d6eb4","window":{"start":"2026-11-12T19:33:23+00:00","end":"2026-11-
+      OK      search                 { "results": [ { "id": "note:585", "title": "Abnahme abnahme318c6d6eb4", "url": "http://12
+      OK      fetch                  { "id": "file:578", "title": "abnahme318c6d6eb4-20261112-203317.md", "text": "# abnahme318
+      OK      fetch                  { "id": "mail:1", "title": "Gruesse aus Hamburg, die Masse stehen unten", "text": "Moin,\n
+      OK      fetch                  { "id": "message:f7rgfwke:202", "title": "MCP-Talk-offen-Grüße-aus-Hamburg", "text": "From
+      OK      fetch                  { "id": "table:10", "title": "Welcome to Nextcloud Tables!", "text": "Welcome to Nextcloud
+
+    === acceptance matrix ===
+    OK      files_upload           {"path":"/abnahme318c6d6eb4-20261112-203317.md","etag":"\"b42e42fb0d02434d3a5158e7087b650e\"","created":true}
+    OK      files_create_folder    {"path":"/abnahme318c6d6eb4-20261112-203317-ordner/a/b","created":true,"id":"file:581","created_folders":["/ab
+    OK      files_create_folder    {"path":"/abnahme318c6d6eb4-20261112-203317-ordner/a/b","created":false,"id":"file:581","created_folders":[]}
+    OK      files_search           {"query":"abnahme318c6d6eb4","folder":"/","count":2,"items":[{"path":"/abnahme318c6d6eb4-20261112-203317-ordne
+    OK      files_list             {"path":"/","count":22,"items":[{"path":"/abnahme0a4f51708b-20261112-191615-ordner","name":"abnahme0a4f51708b-
+    OK      files_read             {"path":"/abnahme318c6d6eb4-20261112-203317.md","content":"# abnahme318c6d6eb4\nAbnahmelauf Phase 1, Straßenba
+    OK      files_download         {"path":"/abnahme318c6d6eb4-20261112-203317.md","size":54,"content_type":"text/markdown","offset":0,"bytes":54
+    OK      files_upload           {"path":"/abnahme318c6d6eb4-20261112-203317.docx","etag":"\"4afe2f0c70cf4bb9017fd4649d2fabe2\"","created":true
+    OK      files_read_as_markdown {"path":"/abnahme318c6d6eb4-20261112-203317.docx","content":"Abnahmelauf abnahme318c6d6eb4\n","content_type":"
+    OK      calendar_create_event  {"id":"event:personal:b83105b4-eebc-4c83-b1da-814a789b12cd.ics","uid":"b83105b4-eebc-4c83-b1da-814a789b12cd","
+    OK      calendar_list_events   {"range":{"start":"2026-11-13T18:33:18+00:00","end":"2026-11-13T21:33:18+00:00","timezone":"UTC"},"count":3,"e
+    OK      notes_create           {"id":"note:585","title":"Abnahme abnahme318c6d6eb4","category":"","modified":1794511999,"url":"http://127.0.0
+    OK      notes_search           {"count":1,"results":[{"id":"note:585","title":"Abnahme abnahme318c6d6eb4","excerpt":"Abnahmelauf abnahme318c6
+    OK      notes_read             {"id":"note:585","title":"Abnahme abnahme318c6d6eb4","content":"Abnahmelauf abnahme318c6d6eb4","category":"","
+    OK      deck_browse            {"level":"boards","count":1,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_edit":true}]}
+    OK      deck_browse            {"level":"stacks","count":4,"results":[{"id":1,"title":"Custom lists - click to rename!","cards":3},{"id":2,"t
+    OK      deck_create_card       {"id":"card:1:1:34","title":"Abnahme abnahme318c6d6eb4","url":"http://127.0.0.1:8081/index.php/apps/deck/card/
+    OK      tables_browse          {"level":"tables","count":1,"results":[{"id":10,"title":"Welcome to Nextcloud Tables!","rowsCount":9,"columnsC
+    OK      tables_browse          {"level":"columns","count":4,"results":[{"id":10,"title":"What","type":"text","mandatory":false,"subtype":"lin
+    OK      tables_create_row      {"id":54,"table_id":"10","url":"http://127.0.0.1:8081/index.php/apps/tables/#/table/10","values_written":{"Wha
+    OK      talk_browse            {"level":"conversations","count":5,"results":[{"token":"f7rgfwke","name":"MCP-Talk-offen-Grüße-aus-Hamburg","t
+    OK      talk_browse            {"level":"messages","token":"f7rgfwke","conversation":"MCP-Talk-offen-Grüße-aus-Hamburg","count":2,"results":[
+    OK      talk_send              {"sent":true,"id":203,"token":"f7rgfwke","conversation":"MCP-Talk-offen-Grüße-aus-Hamburg","timestamp":1794512
+    OK      mail_browse            {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]}
+    OK      mail_browse            {"level":"mailboxes","count":1,"results":[{"id":1,"name":"INBOX","unread":6,"delimiter":".","special_role":"in
+    OK      mail_browse            {"level":"messages","mailbox_id":"1","count":6,"results":[{"id":"mail:1","subject":"Gruesse aus Hamburg, die M
+    OK      contacts_search        {"query":"a","count":0,"contacts":[]}
+    OK      unified_search         {"query":"abnahme318c6d6eb4","count":7,"results":[{"id":"note:585","title":"Abnahme abnahme318c6d6eb4","sublin
+    OK      prepare_context        {"query":"abnahme318c6d6eb4","window":{"start":"2026-11-12T19:33:23+00:00","end":"2026-11-19T19:33:23+00:00"},
+    OK      search                 { "results": [ { "id": "note:585", "title": "Abnahme abnahme318c6d6eb4", "url": "http://127.0.0.1:8081/apps/no
+    OK      fetch                  { "id": "file:578", "title": "abnahme318c6d6eb4-20261112-203317.md", "text": "# abnahme318c6d6eb4\nAbnahmelauf
+    OK      fetch                  { "id": "mail:1", "title": "Gruesse aus Hamburg, die Masse stehen unten", "text": "Moin,\n\nGrüße aus Hamburg.
+    OK      fetch                  { "id": "message:f7rgfwke:202", "title": "MCP-Talk-offen-Grüße-aus-Hamburg", "text": "From: alice\nAbnahmelauf
+    OK      fetch                  { "id": "table:10", "title": "Welcome to Nextcloud Tables!", "text": "Welcome to Nextcloud Tables!\nRows: 10\n
+
+    OK: all 24 tools of the registry answered over stdio.
+    exit=0
+ABNAHME nc-mcp-exapp exit=0 werkzeuge=24 gerufen=24 zeilen_ok=34 fail=0 prereq=0 skip=0 nie_aufgerufen=keins
+    Gezählt in der Matrix: 34 Zeilen OK über 24 verschiedene Werkzeuge, keine Zeile FAIL, PREREQ oder SKIP.
+    fetch der Mail (mail:1) ist jetzt OK. Das Skript hinterlässt seine Objekte in der Wegwerf-Instanz.
+
+== (6) Registrierte Version 9.9.9 (nur gelesen) ==
+
+VERSION-9.9.9 ursache=AppAPI übernimmt eine höhere Version aus dem Kopf EX-APP-VERSION eines Aufrufs und senkt sie nie
+    handleExAppVersionChange in apps/app_api/lib/Service/AppAPIService.php (AppAPI 32.0.0) läuft bei jedem
+    Aufruf einer ExApp an Nextcloud: ist die Version im Kopf nach version_compare größer als die gespeicherte,
+    wird sie gespeichert. Der Aufruf mit der erfundenen Nummer 9.9.9 aus 31-05 (Zeile VERSIONSKOPF in
+    raw/nc32-ordner.txt) hat den Eintrag also von 0.7.2 auf 9.9.9 gehoben; die späteren Aufrufe mit 0.7.2
+    senken ihn nicht. Nichts daran geändert.
+    $ docker exec nc-mcp-exapp-nc grep -nE 'EX-APP-VERSION|handleExAppVersionChange|updateExAppVersion' apps/app_api/lib/Service/AppAPIService.php
+    314:			if (!$this->handleExAppVersionChange($request, $exApp)) {
+    383:	public function handleExAppVersionChange(IRequest $request, ExApp $exApp): bool {
+    384:		$requestExAppVersion = $request->getHeader('EX-APP-VERSION');
+    $ Funktion handleExAppVersionChange
+    	public function handleExAppVersionChange(IRequest $request, ExApp $exApp): bool {
+    		$requestExAppVersion = $request->getHeader('EX-APP-VERSION');
+    		if ($requestExAppVersion === '') {
+    			return false;
+    		}
+    		if (version_compare($requestExAppVersion, $exApp->getVersion(), '>')) {
+    			$exApp->setVersion($requestExAppVersion);
+    			if (!$this->exAppService->updateExApp($exApp, ['version'])) {
+    				return false;
+    			}
+    		}
+    		return true;
+    	}
+
+    	public function dispatchExAppInitInternal(ExApp $exApp): void {
+    		$auth = [];
+    		$initUrl = $this->getExAppUrl($exApp, $exApp->getPort(), $auth) . '/init';
+    		$options = [
+    			'headers' => $this->commonService->buildAppAPIAuthHeaders(null, null, $exApp),
+    			'nextcloud' => [
+    				'allow_local_address' => true,
+    			],
+    		];
+    $ Aufrufstelle
+    			} catch (\Exception $e) {
+    				$this->logger->error(sprintf('Error getting path info. Error: %s', $e->getMessage()), ['exception' => $e]);
+    				return false;
+    			}
+    			if (($this->sanitizeOcsRoute($path) !== '/apps/app_api/ex-app/state') && !$exApp->getEnabled()) {
+    				$this->logger->error(sprintf('ExApp with appId %s is disabled (%s)', $request->getHeader('EX-APP-ID'), $request->getRequestUri()));
+    				return false;
+    			}
+    			if (!$this->handleExAppVersionChange($request, $exApp)) {
+    				return false;
+    			}
+    			return $this->finalizeRequestToNC($exApp, $userId, $request, $delay);
+    		} else {
+    $ occ app_api:app:list
+    ExApps:
+    mcp_connector (MCP Connector): 9.9.9 [enabled]
+
+== (7) Stopp ==
+
+PROZESS lokal beendet pid=24008 port_23001_frei=ja (kein Lauscher mehr, Prozess beendet; drei Sekunden nach dem Beenden standen noch Client-Sockets im Zustand WARTEND in netstat)
+    $ docker compose -f compose.exapp.yml stop
+     Container nc-mcp-exapp-caddy Stopping 
+     Container nc-mcp-exapp-registry Stopping 
+     Container nc-mcp-exapp-harp Stopping 
+     Container nc-mcp-exapp-greenmail Stopping 
+     Container nc-mcp-exapp-registry Stopped 
+     Container nc-mcp-exapp-caddy Stopped 
+     Container nc-mcp-exapp-harp Stopped 
+     Container nc-mcp-exapp-nc Stopping 
+     Container nc-mcp-exapp-greenmail Stopped 
+     Container nc-mcp-exapp-nc Stopped 
+    exit=0
+    $ docker ps
+gameworld-dev-gameworld-docker-proxy-1 Up 5 hours
+    $ docker volume ls --filter name=nc-mcp-exapp
+nc-mcp-exapp_nextcloud-exapp-data
+nc-mcp-exapp_registry-exapp-data
+GESTOPPT nc-mcp-exapp volume_bleibt=ja

@@ -194,6 +194,17 @@ Dazu ein Zusatz im Fall kein-ki (Paar mit Leerzeichen am Namensende).
 - Das Abnahmeskript lässt jetzt zusätzlich eine DOCX-Datei in der Wegwerf-Instanz stehen.
 - STATE.md, ROADMAP.md, REQUIREMENTS.md und 31-06-PLAN.md wurden nicht angefasst; FOLD-01 und FOLD-05 sind nicht als erledigt markiert.
 
+## Nachtrag vom 2026-11-12: Exit 0 des Abnahmeskripts belegt
+
+Der erste offene Punkt oben ist geschlossen, der zweite geklärt. Entscheid der Hauptsitzung: Die Testpost darf in der Wegwerf-Instanz 32 von Hand neu zugestellt werden, mit genau den Schritten des Bootstrap-Skripts. Rohprotokoll: `raw/nc32-abnahme.txt`.
+
+- **Vorher:** GreenMail läuft, INBOX von alice `MESSAGES 0, UIDNEXT 1`; die Mail-App antwortet beim Abruf der Nachrichten 1 bis 6 je HTTP 500.
+- **Zustellung:** das Python-Programm aus `deliver_test_mail` unverändert aus dem Skript herausgelesen (185 Zeilen) und wie dort in einem Wegwerf-Container `python:3.13-alpine` im Netz `nc-mcp-exapp-net` gefahren (`docker run --rm`, Image lag lokal vor): "delivered 6", Schlagwort `$label1` gesetzt, Exit 0. Danach `occ mail:account:sync 1 -f`, Exit 0. `scripts/bootstrap_exapp.sh` lief nicht und ist unverändert; kein Datenbankeingriff.
+- **Nachher:** INBOX `MESSAGES 6, UIDNEXT 7`; die Mail-App listet sechs Nachrichten mit denselben Ids 1 bis 6 und liefert jede mit HTTP 200.
+- **Abnahmeskript (Commit 95ff4da, unverändert): Exit 0.** 24 von 24 Werkzeugen gerufen, 34 Zeilen OK, 0 FAIL, 0 PREREQ, 0 SKIP; `fetch` der Mail ist OK.
+- **Version 9.9.9:** nur gelesen. `handleExAppVersionChange` in `apps/app_api/lib/Service/AppAPIService.php` (AppAPI 32.0.0) speichert bei jedem Aufruf einer ExApp die Version aus dem Kopf `EX-APP-VERSION`, wenn sie nach `version_compare` größer ist als die gespeicherte, und senkt sie nie. Der Aufruf mit der erfundenen Nummer aus 31-05 hat den Eintrag also auf 9.9.9 gehoben; Aufrufe mit 0.7.2 ändern ihn nicht zurück. Nichts daran geändert. Folge für später: Eine echte höhere Version als 9.9.9 gibt es nicht, der Eintrag dieser Wegwerf-Instanz bleibt also so, bis sie neu aufgebaut wird.
+- Am Ende: lokaler Prozess beendet, Topologie gestoppt (stop), Volumes vorhanden, es läuft nur gameworld-dev-gameworld-docker-proxy-1. GreenMail ist nach dem Stopp wieder leer; vor dem nächsten Lauf des Skripts braucht es dieselbe Zustellung.
+
 ## Known Stubs
 
 Keine.

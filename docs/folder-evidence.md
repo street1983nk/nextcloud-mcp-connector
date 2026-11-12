@@ -458,3 +458,18 @@ was not run here, so exit code 0 was not measured.
 MAIL ursache=testinstanz greenmail_laeuft=ja imap_inbox_nachrichten=0 uidnext=1 mail_app_listet=6 mail_app_abruf_nachricht_1=HTTP 500
 ABNAHME nc-mcp-exapp exit=3 werkzeuge=24 nie_aufgerufen=keins fehlgeschlagen=keins voraussetzung=fetch (Mail): die Mail-App der Instanz antwortet selbst HTTP 500
 ```
+
+Exit code 0 was measured afterwards, on the same instance and with the script unchanged
+(raw protocol:
+[raw/nc32-abnahme.txt](../.planning/phases/31-ordner-anlegen/raw/nc32-abnahme.txt)). The test
+mail was delivered again by hand with exactly the steps the bootstrap script of the topology
+takes: its delivery program, read out of the script unchanged, and the forced sync of the mail
+account. The mail server then held six messages, the Mail app read each of them, and the
+script ended with exit code 0: all 24 tools called, 34 lines OK, no failure, no missing
+prerequisite and no skipped step.
+
+```text
+POSTFACH vorher greenmail_laeuft=ja imap_inbox_nachrichten=0 uidnext=1 mail_app_abruf_nachricht_1_bis_6=HTTP 500
+POSTFACH nachher imap_inbox_nachrichten=6 uidnext=7 mail_app_listet=6 (ids 1 bis 6) mail_app_abruf_nachricht_1_bis_6=HTTP 200
+ABNAHME nc-mcp-exapp exit=0 werkzeuge=24 gerufen=24 zeilen_ok=34 fail=0 prereq=0 skip=0 nie_aufgerufen=keins
+```
