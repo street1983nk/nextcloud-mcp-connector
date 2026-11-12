@@ -1048,6 +1048,7 @@ def test_classify_collection_names_every_kind_of_the_discovery() -> None:
     assert _kinds(
         _entry("app-generated--deck--board-7", "VEVENT,VTODO"),
         _entry("trashbin", types=""),
+        _entry("weg", "VTODO", types='<x:deleted-calendar xmlns:x="http://nextcloud.com/ns"/>'),
         _entry("inbox", types="<cal:schedule-inbox/>"),
         _entry("outbox", types="<cal:schedule-outbox/>"),
         _entry("spike30-abo", types="<cs:subscribed/>"),
@@ -1061,6 +1062,7 @@ def test_classify_collection_names_every_kind_of_the_discovery() -> None:
     ) == {
         "app-generated--deck--board-7": "deck",
         "trashbin": "papierkorb",
+        "weg": "geloeschter-kalender",
         "inbox": "scheduling",
         "outbox": "scheduling",
         "spike30-abo": "abo",
@@ -1083,6 +1085,7 @@ def test_task_lists_counts_only_lists_a_task_tool_may_use() -> None:
                 _entry("app-generated--deck--board-7", "VEVENT,VTODO"),
                 _entry("trashbin", types=""),
                 _entry("spike30-abo", "VTODO", types="<cs:subscribed/>"),
+                _entry("weg", "VTODO", types='<x:deleted-calendar xmlns:x="urn:x"/>'),
                 _entry("x_shared_by_bob", "VTODO", extra="<oc:read-only>1</oc:read-only>"),
                 _entry("e_shared_by_bob", "VEVENT"),
                 _entry("z_shared_by_bob", "VTODO"),

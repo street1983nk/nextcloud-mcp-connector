@@ -6250,6 +6250,11 @@ def classify_collection(entry: Collection) -> str:
         return "deck"
     if entry.uri == TRASH or "trash-bin" in entry.types:
         return "papierkorb"
+    if "deleted-calendar" in entry.types:
+        # Measured in the first run of plan 30-04 on 32.0.15: a deleted calendar stays in the
+        # home with this resourcetype and its component set, so the set alone would make it
+        # a task list.
+        return "geloeschter-kalender"
     if entry.uri in ("inbox", "outbox") or {"schedule-inbox", "schedule-outbox"} & set(entry.types):
         return "scheduling"
     if "subscribed" in entry.types:
@@ -6785,6 +6790,17 @@ def app_version(container: str, app: str) -> str:
     return str(enabled.get(app, "")) if isinstance(enabled, dict) else ""
 
 
+def restart_instance(container: str) -> None:
+    """Restart the web server after ``occ`` changed the app set.
+
+    The web process keeps routes and the app list in APCu; an app installed on the command
+    line answered 404 on its REST route right after the install (first run of plan 30-04).
+    """
+    note(f"docker restart {container} -> {docker('restart', container).strip()}")
+    wait_for_http(SPIKE_BASE_URL)
+    wait_for_install(container)
+
+
 async def propfind_home(session: Session, creds: Credentials, user: str = "") -> DavResult:
     """The discovery of plan 30-04: PROPFIND Depth 1 on a calendar home."""
     url = f"{creds.base_url}{DAV_CALENDARS}{quote(user or creds.user, safe='')}/"
@@ -6998,6 +7014,7 @@ async def prepare_account(inst: Instance) -> None:
     installed = _one_line(occ(container, "app:install", "deck", check=False))
     version = app_version(container, "deck")
     note(f"occ app:install deck -> {installed[:200]}")
+    restart_instance(container)
     if not version:
         note(f"DECK ungemessen grund=occ app:install deck: {installed[:200] or 'keine Ausgabe'}")
         return
@@ -7213,6 +7230,7 @@ async def provider_part(inst: Instance, state: QueryState) -> None:
     note(f"TASKS-APP version={version or 'nicht aktiv'} (gelesen mit occ app:list --output=json)")
     if not version:
         raise RunFailed(f"the Tasks app is not enabled: {installed[:200]}")
+    restart_instance(container)
     note(f"PROVIDER liste app_an {await provider_ids(session, alice)}")
     _, links = await provider_search(session, alice, QUERY_TERM)
     note(f"PROVIDER tasks treffer={len(links)} link={links[0] if links else '-'}")
@@ -7238,9 +7256,7 @@ async def provider_part(inst: Instance, state: QueryState) -> None:
         )
     disabled = _one_line(occ(container, "app:disable", "tasks", check=False))
     note(f"occ app:disable tasks -> {disabled[:160]}")
-    note(f"docker restart {container} -> {docker('restart', container).strip()}")
-    wait_for_http(SPIKE_BASE_URL)
-    wait_for_install(container)
+    restart_instance(container)
     note(f"PROVIDER liste app_aus {await provider_ids(session, alice)}")
     status, links_off = await provider_search(session, alice, QUERY_TERM)
     note(f"PROVIDER tasks app_aus treffer={len(links_off)} status={status}")
