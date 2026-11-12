@@ -311,7 +311,7 @@ def run() -> Iterator[Run]:
         _teardown(state)
         after = baseline(state)
         left = harness.stat(P)[0]
-        record(f"RUECKBAU PROPFIND {P}: {left}")
+        record(f"CLEANUP PROPFIND {P}: {left}")
         for key, value in before.items():
             same = "ja" if after[key] == value else "nein"
             record(f"BASELINE {key} vorher={value} nachher={after[key]} gleich={same}")
@@ -837,11 +837,11 @@ async def test_a_locked_folder_is_refused_or_not_reproducible(run: Run) -> None:
     try:
         run.shares.append(str(answer.json()["ocs"]["data"]["id"]))
     except (ValueError, KeyError, TypeError):
-        record(f"SPERRE freigabe an {run.bob} status={answer.status_code} (keine Freigabe)")
+        record(f"SPERRE share with {run.bob} status={answer.status_code} (no share)")
     mount = f"/{shared.rsplit('/', 1)[-1]}"
     attempts = [
-        ("bob-ueber-freigabe", run.harness_bob, mount, shared, False),
-        ("alice-eigenes-token", run.harness, own, own, False),
+        ("bob-via-share", run.harness_bob, mount, shared, False),
+        ("alice-own-token", run.harness, own, own, False),
         ("alice-x-user-lock", run.harness, by_app, by_app, True),
     ]
     with Case(run, "sperre-423") as case:
@@ -866,16 +866,16 @@ async def test_a_locked_folder_is_refused_or_not_reproducible(run: Run) -> None:
                 released = unlock(harness, lock_path, token, user_lock)
             record(
                 f"SPERRE versuch={label} nc={run.version} LOCK status={status} "
-                f"token={'ja' if token else 'nein'} UNLOCK status={released} "
-                f"werkzeug status={calls(case.seen[before:])} | LOCK antwort: {body or 'leer'}; "
-                f"werkzeug: {outcome}"
+                f"token={'yes' if token else 'no'} UNLOCK status={released} "
+                f"tool status={calls(case.seen[before:])} | LOCK answer: {body or 'empty'}; "
+                f"tool: {outcome}"
             )
             case.note(f"{label}: LOCK {status}, MKCOL {methods(case.seen[before:], 'MKCOL')}")
         if not locked_out:
             record(
-                "UNGEMESSEN sperre-423 grund=kein LOCK dieser Instanz fuehrte zu MKCOL 423 "
-                "(drei Versuche, Rohausgabe in den Zeilen SPERRE); der Zweig 423 ist nur per "
-                "Unit-Test belegt"
+                "UNGEMESSEN sperre-423 grund=no LOCK on this instance made the MKCOL answer 423 "
+                "(three attempts, raw output in the SPERRE lines); the 423 branch is covered "
+                "by unit tests only"
             )
             case.note("423 not reproducible on this instance")
 
@@ -905,13 +905,13 @@ async def test_a_parent_deleted_after_the_count_is_parent_missing(run: Run) -> N
         lines = " / ".join(" ".join(line.split()) for line in source.stdout.splitlines())
         record(
             f"QUELLE mkcol-404 nc={run.version} CorePlugin.php httpMkcol exit={source.returncode} "
-            f"zeilen mit NotFound, Conflict oder createCollection: {lines or 'keine'}"
+            f"lines with NotFound, Conflict or createCollection: {lines or 'none'}"
         )
         if 404 not in written:
             record(
-                f"UNGEMESSEN mkcol-404 grund=der MKCOL unter einem geloeschten Elternordner "
-                f"antwortet {written}, nicht 404; httpMkcol in CorePlugin.php: "
-                f"{lines or 'keine Zeile mit NotFound'}; der Zweig 404 ist nur per Unit-Test belegt"
+                f"UNGEMESSEN mkcol-404 grund=the MKCOL below a parent that was just deleted "
+                f"answers {written}, not 404; httpMkcol in CorePlugin.php: "
+                f"{lines or 'no line with NotFound'}; the 404 branch is covered by unit tests only"
             )
             case.note("404 not reproducible on this instance")
 
