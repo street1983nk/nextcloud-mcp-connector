@@ -120,6 +120,8 @@ DEFAULT_CONTENT_TYPE = "text/markdown"
 # above all no control characters that could split the request header.
 _CONTENT_TYPE_RE = re.compile(r"^[A-Za-z0-9!#$%&'*+.^_`|~-]+/[A-Za-z0-9!#$%&'*+.^_`|~-]+$")
 _UPLOAD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+#: A file id as Nextcloud hands it out: ASCII digits only (``str.isdigit`` takes more).
+_FILE_ID = re.compile(r"[0-9]+")
 
 # Restrict multi-tenant Azure to the verified OpenAI account from a live upload.
 _OPENAI_FILE_HOST_SUFFIXES = ("oaiusercontent.com",)
@@ -743,7 +745,7 @@ async def create_folder(
 
     missing, found = await _missing_folders(clients, target, root)
     if found is not None and not found["is_collection"]:
-        raise _file_in_the_way(found["path"])
+        raise _in_the_way(found)
     if found is not None and found["path"] == target:
         return _folder_answer(target, False, found["fileid"], [])
     if found is None and root != "/":
@@ -752,7 +754,7 @@ async def create_folder(
         if base is None:
             raise dav.parent_missing(target)
         if not base["is_collection"]:
-            raise _file_in_the_way(root)
+            raise _in_the_way(base)
     if len(missing) > MAX_NEW_FOLDERS:
         raise ToolError(
             message=(
@@ -868,7 +870,7 @@ async def _existing_folder(clients: NcClients, path: str) -> dict[str, Any]:
             hint="List the parent folder and try again.",
         )
     if not node["is_collection"]:
-        raise _file_in_the_way(path)
+        raise _in_the_way(node)
     return node
 
 
@@ -889,6 +891,33 @@ def _file_in_the_way(path: str) -> ConflictError:
     return ConflictError(
         message=f"A file, not a folder, already exists at {path}.",
         hint="Choose another name; this tool never replaces a file.",
+    )
+
+
+def _in_the_way(node: Mapping[str, Any]) -> ConflictError:
+    """The conflict of a node that is no folder, without claiming more than was read.
+
+    D-31-09: a file Nextcloud stores has a file id, a positive number, and only then the
+    sentence says "a file". Nextcloud also answers for names it keeps for itself as if
+    something were there: for ``x.part`` the MKCOL answers 405 and the read a node without
+    a folder type, with the id -1 on 35.0.0 and with none on 32.0.15, while the storage
+    holds nothing (live finding of plan 31-05). Calling that a file would name a file
+    that does not exist, so that node gets a sentence that says only what both answers
+    show. A real file whose id could not be read gets it too, and it is still true.
+    """
+    path = str(node["path"])
+    fileid = str(node.get("fileid") or "")
+    if _FILE_ID.fullmatch(fileid) and int(fileid) > 0:
+        return _file_in_the_way(path)
+    return ConflictError(
+        message=(
+            f"{path} cannot be created as a folder: Nextcloud reports an entry there that "
+            "is not a folder."
+        ),
+        hint=(
+            "Choose another name, for example one that does not end in .part; this tool "
+            "never replaces anything."
+        ),
     )
 
 

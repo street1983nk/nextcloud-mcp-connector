@@ -1103,3 +1103,145 @@ def test_the_path_guard_of_the_other_tools_still_trims() -> None:
     assert dav.safe_path("/A/b ") == "/A/b"
     assert dav.safe_path(" /A/b\t") == "/A/b"
     assert dav.safe_path("/A/mitte-leer /kind") == "/A/mitte-leer /kind"
+
+
+# --- A node that is no folder and has no file id (D-31-09, owner decision of 2026-11-12) ----
+
+NO_FOLDER_HINT = (
+    "Choose another name, for example one that does not end in .part; this tool never "
+    "replaces anything."
+)
+
+
+def no_folder(path: str) -> tuple[str, str]:
+    message = (
+        f"{path} cannot be created as a folder: Nextcloud reports an entry there that is "
+        "not a folder."
+    )
+    return (message, NO_FOLDER_HINT)
+
+
+def ghost(fileid: str | None) -> httpx.Response:
+    """The 207 Nextcloud gives for ``x.part``: no folder type, and no file id worth the name.
+
+    Measured in plan 31-05: Nextcloud 35.0.0 sends the id -1, Nextcloud 32.0.15 sends none
+    (raw/nc35-ordner.txt line 72, raw/nc32-ordner.txt line 128). ``None`` leaves the
+    element out.
+    """
+    fileid_prop = "" if fileid is None else f"<oc:fileid>{fileid}</oc:fileid>"
+    body = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        f'<d:multistatus xmlns:d="DAV:" xmlns:oc="{davxml.OC}"><d:response>'
+        f"<d:href>{DAV_HOME}/x</d:href><d:propstat><d:prop>"
+        f"{fileid_prop}<d:resourcetype/>"
+        "</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>"
+        "</d:response></d:multistatus>"
+    )
+    return httpx.Response(207, content=body.encode(), headers={"Content-Type": "application/xml"})
+
+
+GHOST_IDS = ["-1", "", None, "0", "abc"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("fileid", GHOST_IDS)
+async def test_a_node_without_a_file_id_is_not_called_a_file(
+    clients: NcClients, fileid: str | None
+) -> None:
+    """Live finding 5 of plan 31-05: ``x.part`` answers 405, then a node that is no file."""
+    path = "/A/x.part"
+    with _mock() as mock:
+        mkcol(mock, path, httpx.Response(405))
+        propfind(mock, path, ghost(fileid))
+        with pytest.raises(ConflictError) as caught:
+            await files_tools.create_folder(clients, path=path)
+        requests = requests_of(mock)
+
+    assert (caught.value.message, caught.value.hint) == no_folder(path)
+    assert "file" not in caught.value.message.lower()
+    assert requests == [("MKCOL", path), ("PROPFIND", path)], "no request after the conflict"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("fileid", ["-1", None])
+async def test_a_node_without_a_file_id_as_target_of_a_chain(
+    clients: NcClients, fileid: str | None
+) -> None:
+    path = "/A/b/x.part"
+    with _mock() as mock:
+        propfind(mock, path, ghost(fileid))
+        write = mock.route(method="MKCOL").mock(return_value=httpx.Response(201))
+        with pytest.raises(ConflictError) as caught:
+            await files_tools.create_folder(clients, path=path, parents=True)
+
+    assert (caught.value.message, caught.value.hint) == no_folder(path)
+    assert write.call_count == 0
+
+
+@pytest.mark.anyio
+async def test_a_node_without_a_file_id_as_ancestor_of_a_chain(clients: NcClients) -> None:
+    with _mock() as mock:
+        propfind(mock, "/A/x.part/c/d", httpx.Response(404))
+        propfind(mock, "/A/x.part/c", httpx.Response(404))
+        propfind(mock, "/A/x.part", ghost("-1"))
+        write = mock.route(method="MKCOL").mock(return_value=httpx.Response(201))
+        with pytest.raises(ConflictError) as caught:
+            await files_tools.create_folder(clients, path="/A/x.part/c/d", parents=True)
+
+    assert (caught.value.message, caught.value.hint) == no_folder("/A/x.part")
+    assert write.call_count == 0
+
+
+@pytest.mark.anyio
+async def test_a_node_without_a_file_id_met_inside_a_chain_keeps_the_list(
+    clients: NcClients,
+) -> None:
+    """The count saw nothing there, the MKCOL answers 405 and the read shows the odd node."""
+    with _mock() as mock:
+        mock.route(method="PROPFIND", url=url("/A/b/c")).mock(
+            side_effect=[httpx.Response(404), ghost(None)]
+        )
+        propfind(mock, "/A/b/c/d", httpx.Response(404))
+        propfind(mock, "/A/b", httpx.Response(404))
+        propfind(mock, "/A", node("100"))
+        mkcol(mock, "/A/b", made(201))
+        mkcol(mock, "/A/b/c", httpx.Response(405))
+        third = mkcol(mock, "/A/b/c/d", made(203))
+        with pytest.raises(ConflictError) as caught:
+            await files_tools.create_folder(clients, path=CHAIN_TARGET, parents=True)
+
+    assert caught.value.message == f"{no_folder('/A/b/c')[0]}{SUFFIX_AFTER_ONE}"
+    assert caught.value.hint == NO_FOLDER_HINT
+    assert third.call_count == 0
+
+
+@pytest.mark.anyio
+async def test_a_sandbox_root_without_a_file_id_is_not_called_a_file(
+    clients: NcClients, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(config.ENV_FILES_ROOT, "/Sandbox")
+    with _mock() as mock:
+        propfind(mock, "/Sandbox/x", httpx.Response(404))
+        propfind(mock, "/Sandbox", ghost("-1"))
+        write = mock.route(method="MKCOL").mock(return_value=httpx.Response(201))
+        with pytest.raises(ConflictError) as caught:
+            await files_tools.create_folder(clients, path="/x", parents=True)
+
+    assert (caught.value.message, caught.value.hint) == no_folder("/Sandbox")
+    assert write.call_count == 0
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("fileid", ["1", "121", "00023274"])
+async def test_a_node_with_a_file_id_is_still_called_a_file(
+    clients: NcClients, fileid: str
+) -> None:
+    """Positive control: with an id Nextcloud handed out, the sentence stays what it was."""
+    with _mock() as mock:
+        mkcol(mock, TARGET, httpx.Response(405))
+        propfind(mock, TARGET, node(fileid, folder=False))
+        with pytest.raises(ConflictError) as caught:
+            await files_tools.create_folder(clients, path=TARGET)
+
+    assert caught.value.message == f"A file, not a folder, already exists at {TARGET}."
+    assert caught.value.hint == "Choose another name; this tool never replaces a file."
