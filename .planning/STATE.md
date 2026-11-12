@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 
 ## Current Position
 
-Phase: 31 von 30 bis 34 (Ordner anlegen), geplant, noch nicht ausgeführt
-Plan: 31-01 bis 31-06 liegen vor (sechs Wellen, streng nacheinander); kein Plan ausgeführt
-Status: Phase 31 geplant (Research, Pattern-Map, sechs Pläne; Plan-Checker im zweiten Lauf bestanden, 0 Blocker); die Ausführung beginnt erst nach Owner-Freigabe; 31-01 hält für den Entscheid zum Volume `nc-mcp-exapp` an, 31-06 für den Push-Entscheid
-Last activity: 2026-11-12, Phase 31 geplant (31-RESEARCH.md, 31-PATTERNS.md, 31-01 bis 31-06), D-31-03 präzisiert (Id als `file:<n>`, Owner "Ok"), Löschen einer Aufgabe aus 0.8.0 gestrichen (Owner, Auswahl "Löschen raus", Commit c251647); lokal committet auf plan/v1.8-tasks-080, nicht gepusht
+Phase: 31 von 30 bis 34 (Ordner anlegen), in Ausführung
+Plan: 31-01 abgearbeitet (Strecke Nextcloud 32 abgebrochen, siehe 31-01-SUMMARY.md); 31-02 bis 31-06 offen, streng nacheinander; 31-05 ist blockiert, bis der Owner über D-31-06 auf Nextcloud 32 entschieden hat
+Status: Phase 31 in Ausführung (Owner-Freigabe 2026-11-12); 31-01 endet mit `STRECKE NC32 ergebnis=abgebrochen`: Nextcloud 32.0.15.1 läuft, die Registrierung über `bootstrap_exapp.sh --manual` scheitert am Heartbeat (AppAPI 32.0.0 baut `host.docker.internal:23001:23001`, Invalid host); offen ist der Owner-Entscheid zu D-31-06; 31-06 hält für den Push-Entscheid
+Last activity: 2026-11-12, 31-01 ausgeführt (Commits 7f067f7, ba5b4c0, 8c4f541, b2ebdf8): Owner-Entscheid option-a, Topologie nc-mcp-exapp abgebaut und frisch auf 32.0.15 aufgebaut, Container nc_app_mcp_connector_park34 entfernt, Instanz gestoppt, Volume bleibt; lokal committet auf plan/v1.8-tasks-080, nicht gepusht
 
 ## Performance Metrics
 
