@@ -1349,3 +1349,322 @@ def test_time_form_reads_what_icalendar_decoded() -> None:
     )
     assert spike.time_form(date(2026, 11, 20)) == "date"
     assert spike.time_form("20261120") == "other"
+
+
+# --- plan 30-05: the report checks itself, and the rule behind the E15 recommendation ---------
+
+
+def _assumption_table(rows: dict[str, str]) -> str:
+    lines = [
+        "# Bericht",
+        "",
+        "## 8. Annahmen A1 bis A19 und A21",
+        "",
+        "| Annahme | Wortlaut | Status | Beleg | Folge |",
+        "|---------|----------|--------|-------|-------|",
+    ]
+    lines += [
+        f"| {name} | Wortlaut von {name} | {status} | Abschnitt 1, `raw/x.txt` | keine |"
+        for name, status in rows.items()
+    ]
+    lines += ["", "## 9. Abbruchkriterien und Übergabe an die Phasen 31 bis 33", ""]
+    return "\n".join(lines)
+
+
+def test_assumption_rows_reads_the_status_word_of_every_row_of_section_8() -> None:
+    rows = dict.fromkeys(spike.ASSUMPTIONS, "belegt") | {"A9": "widerlegt", "A5": "ungemessen"}
+    found = spike.assumption_rows(_assumption_table(rows))
+    assert found == rows
+    assert len(found) == 19
+    assert spike.missing_assumptions(found) == []
+
+
+def test_assumptions_are_the_nineteen_of_this_phase_without_a10_and_a20() -> None:
+    assert len(spike.ASSUMPTIONS) == 19
+    assert "A10" not in spike.ASSUMPTIONS
+    assert "A20" not in spike.ASSUMPTIONS
+    assert spike.ASSUMPTIONS[0] == "A1"
+    assert spike.ASSUMPTIONS[-1] == "A21"
+
+
+def test_missing_assumptions_names_every_row_the_table_lacks() -> None:
+    rows = dict.fromkeys(spike.ASSUMPTIONS, "belegt")
+    del rows["A7"]
+    del rows["A21"]
+    found = spike.assumption_rows(_assumption_table(rows))
+    assert spike.missing_assumptions(found) == ["A7", "A21"]
+    assert spike.missing_assumptions({}) == list(spike.ASSUMPTIONS)
+
+
+def test_assumption_rows_refuses_any_other_status_word() -> None:
+    for word in ("teils belegt", "offen", "Belegt", "belegt, mit Einschränkung", ""):
+        with pytest.raises(ValueError, match="A3"):
+            spike.assumption_rows(_assumption_table({"A1": "belegt", "A3": word}))
+
+
+def test_assumption_rows_refuses_a_double_row_and_a_row_without_evidence() -> None:
+    table = _assumption_table({"A1": "belegt"})
+    doubled = table.replace(
+        "\n\n## 9.", "\n| A1 | noch einmal | widerlegt | Abschnitt 2 | keine |\n\n## 9."
+    )
+    with pytest.raises(ValueError, match="A1"):
+        spike.assumption_rows(doubled)
+    with pytest.raises(ValueError, match="A1"):
+        spike.assumption_rows(table.replace("Abschnitt 1, `raw/x.txt`", " "))
+
+
+def test_assumption_rows_reads_only_section_8_and_keeps_an_escaped_pipe_in_its_cell() -> None:
+    table = _assumption_table({"A1": "belegt"}).replace("Wortlaut von A1", r"a \| b")
+    elsewhere = table + "\n| A2 | steht in Abschnitt 9 | widerlegt | x | y |\n"
+    assert spike.assumption_rows(elsewhere) == {"A1": "belegt"}
+
+
+def _abort_table(rows: list[tuple[str, str]]) -> str:
+    lines = [
+        "## 9. Abbruchkriterien und Übergabe an die Phasen 31 bis 33",
+        "",
+        "| Kriterium | ausgelöst | Rohbeleg | Folge |",
+        "|-----------|-----------|----------|-------|",
+    ]
+    lines += [f"| {name} | {value} | `zeile` in `raw/x.txt` | Folge |" for name, value in rows]
+    lines += [
+        "",
+        "### 9.1 Was Phase 31 übernimmt",
+        "",
+        "| MESS-01 steht hier nur im Text | ja | x | y |",
+        "",
+        "## 10. Owner-Entscheid E15",
+    ]
+    return "\n".join(lines)
+
+
+_ABORT_ROWS = [
+    ("MESS-01 MKCOL unter Impersonation", "nein"),
+    ("MESS-05 If-Match und fremde Eigenschaften", "nein"),
+    ("MESS-06 MOVE unter Impersonation", "nein"),
+    ("MESS-06 Löschen nach E13", "wiederherstellbar"),
+]
+
+
+def test_abort_rows_reads_exactly_the_four_criteria_by_their_keys() -> None:
+    assert spike.abort_rows(_abort_table(_ABORT_ROWS)) == {
+        "MESS-01": "nein",
+        "MESS-05": "nein",
+        "MESS-06-MOVE": "nein",
+        "MESS-06-LOESCHEN": "wiederherstellbar",
+    }
+    assert tuple(spike.abort_rows(_abort_table(_ABORT_ROWS))) == spike.ABORT_KEYS
+
+
+def test_abort_rows_refuses_a_missing_and_a_double_row() -> None:
+    with pytest.raises(ValueError, match="MESS-06-MOVE"):
+        spike.abort_rows(_abort_table([row for row in _ABORT_ROWS if "MOVE" not in row[0]]))
+    with pytest.raises(ValueError, match="MESS-01"):
+        spike.abort_rows(_abort_table([*_ABORT_ROWS, ("MESS-01 noch einmal", "ja")]))
+    with pytest.raises(ValueError, match="MESS-01"):
+        spike.abort_rows("## 9. Abbruchkriterien und Übergabe an die Phasen 31 bis 33\n")
+
+
+def test_abort_rows_refuses_a_value_that_is_no_answer() -> None:
+    wrong_flag = [("MESS-01 MKCOL unter Impersonation", "teilweise"), *_ABORT_ROWS[1:]]
+    with pytest.raises(ValueError, match="MESS-01"):
+        spike.abort_rows(_abort_table(wrong_flag))
+    # deleting answers with the verdict word, never with ja or nein
+    wrong_word = [*_ABORT_ROWS[:3], ("MESS-06 Löschen nach E13", "nein")]
+    with pytest.raises(ValueError, match="MESS-06-LOESCHEN"):
+        spike.abort_rows(_abort_table(wrong_word))
+    unknown = [*_ABORT_ROWS, ("MESS-06 etwas anderes", "nein")]
+    with pytest.raises(ValueError, match="MESS-06"):
+        spike.abort_rows(_abort_table(unknown))
+
+
+def test_e15_recommendation_names_the_switch_when_deleting_is_restorable() -> None:
+    assert spike.e15_recommendation(
+        delete_word="wiederherstellbar",
+        move_overwrites=False,
+        properties_lost=False,
+        readonly_put_accepted=False,
+    ) == ("eigener Schalter", ["S1"])
+
+
+def test_e15_recommendation_stays_with_the_bundle_when_nothing_is_triggered() -> None:
+    for word in ("nicht eindeutig", "nicht wiederherstellbar"):
+        assert spike.e15_recommendation(
+            delete_word=word,
+            move_overwrites=False,
+            properties_lost=False,
+            readonly_put_accepted=False,
+        ) == ("nur Bundle-Abschaltung", [])
+
+
+def test_e15_recommendation_does_not_guess_an_unmeasured_trigger() -> None:
+    values = {
+        "delete_word": "nicht eindeutig",
+        "move_overwrites": None,
+        "properties_lost": False,
+        "readonly_put_accepted": False,
+    }
+    assert spike.e15_recommendation(**values) == ("nur Bundle-Abschaltung", [])
+    assert spike.e15_unmeasured(**values) == ["S2"]
+    nothing = dict.fromkeys(values)
+    assert spike.e15_recommendation(**nothing) == ("nur Bundle-Abschaltung", [])
+    assert spike.e15_unmeasured(**nothing) == ["S1", "S2", "S3", "S4"]
+
+
+def test_e15_recommendation_counts_each_trigger_on_its_own_and_in_order() -> None:
+    quiet = {
+        "delete_word": "nicht eindeutig",
+        "move_overwrites": False,
+        "properties_lost": False,
+        "readonly_put_accepted": False,
+    }
+    assert spike.e15_recommendation(**quiet | {"move_overwrites": True}) == (
+        "eigener Schalter",
+        ["S2"],
+    )
+    assert spike.e15_recommendation(**quiet | {"properties_lost": True}) == (
+        "eigener Schalter",
+        ["S3"],
+    )
+    assert spike.e15_recommendation(**quiet | {"readonly_put_accepted": True}) == (
+        "eigener Schalter",
+        ["S4"],
+    )
+    everything = {
+        "delete_word": "wiederherstellbar",
+        "move_overwrites": True,
+        "properties_lost": True,
+        "readonly_put_accepted": True,
+    }
+    assert spike.e15_recommendation(**everything) == (
+        "eigener Schalter",
+        ["S1", "S2", "S3", "S4"],
+    )
+    assert spike.e15_unmeasured(**everything) == []
+    # one measured trigger is enough, an unmeasured one next to it is still named
+    assert spike.e15_recommendation(**everything | {"move_overwrites": None}) == (
+        "eigener Schalter",
+        ["S1", "S3", "S4"],
+    )
+    assert spike.e15_unmeasured(**everything | {"move_overwrites": None}) == ["S2"]
+
+
+def test_e15_recommendation_refuses_a_word_that_is_no_verdict() -> None:
+    with pytest.raises(ValueError, match="vielleicht"):
+        spike.e15_recommendation(
+            delete_word="vielleicht",
+            move_overwrites=False,
+            properties_lost=False,
+            readonly_put_accepted=False,
+        )
+
+
+def _report_with(headings: list[str]) -> str:
+    return "# Titel\n\nKopf\n\n" + "\n\n".join(f"{heading}\n\nText" for heading in headings) + "\n"
+
+
+def test_headings_intact_wants_the_thirteen_headings_word_for_word_and_in_order() -> None:
+    fixed = list(spike.REPORT_HEADINGS)
+    assert len(fixed) == 13
+    assert fixed[0] == "## Entscheidungskriterien, vorab festgelegt"
+    assert fixed[1] == "## 1. MKCOL unter AppAPI-Impersonation (MESS-01)"
+    assert fixed[8] == "## 8. Annahmen A1 bis A19 und A21"
+    assert fixed[12] == "## 12. Rohausgaben"
+    assert spike.headings_intact(_report_with(fixed)) is True
+    # a sub heading in between is none of the fixed ones and does not disturb them
+    with_sub = _report_with(fixed).replace(
+        "## 12. Rohausgaben", "### 11.1 Mehr\n\n## 12. Rohausgaben"
+    )
+    assert spike.headings_intact(with_sub) is True
+
+
+def test_headings_intact_notices_a_renamed_a_missing_a_moved_and_a_double_heading() -> None:
+    fixed = list(spike.REPORT_HEADINGS)
+    renamed = [*fixed[:10], "## 10. Owner-Entscheid", *fixed[11:]]
+    assert spike.headings_intact(_report_with(renamed)) is False
+    assert spike.headings_intact(_report_with(fixed[:-1])) is False
+    moved = [*fixed[:8], fixed[9], fixed[8], *fixed[10:]]
+    assert spike.headings_intact(_report_with(moved)) is False
+    assert spike.headings_intact(_report_with([*fixed, fixed[3]])) is False
+    # a heading that only stands inside a fenced block is a quote, not a heading
+    fenced = _report_with(fixed[:-1]) + "\n```\n## 12. Rohausgaben\n```\n"
+    assert spike.headings_intact(fenced) is False
+
+
+def test_has_dash_finds_the_en_dash_and_the_em_dash_and_nothing_else() -> None:
+    assert spike.has_dash(f"a {chr(0x2013)} b") is True
+    assert spike.has_dash(f"a {chr(0x2014)} b") is True
+    assert spike.has_dash("a - b") is False
+    assert spike.has_dash("") is False
+
+
+def test_protocol_field_reads_one_value_and_refuses_two_runs_that_differ() -> None:
+    text = "\n".join(
+        [
+            "2026-11-11T16:40:29Z | MOVE belegt-ohne-kopf auth=appapi status=204 ueberschrieben=ja",
+            "ABBRUCHKRITERIUM MESS-01 ausgeloest=nein status=201",
+            "ABBRUCHKRITERIUM MESS-05 IF-MATCH ausgeloest=nein grund=keiner",
+        ]
+    )
+    assert spike.protocol_field(text, "ABBRUCHKRITERIUM MESS-01", "ausgeloest") == "nein"
+    assert spike.protocol_field(text, "ABBRUCHKRITERIUM MESS-01", "status") == "201"
+    assert spike.protocol_field(text, "MOVE belegt-ohne-kopf auth=appapi", "ueberschrieben") == "ja"
+    # no such line and no such field are both "not measured", never a no
+    assert spike.protocol_field(text, "ABBRUCHKRITERIUM MESS-06 MOVE", "ausgeloest") is None
+    assert spike.protocol_field(text, "ABBRUCHKRITERIUM MESS-01", "grund") is None
+    same = text + "\nABBRUCHKRITERIUM MESS-01 ausgeloest=nein status=201\n"
+    assert spike.protocol_field(same, "ABBRUCHKRITERIUM MESS-01", "ausgeloest") == "nein"
+    differs = text + "\nABBRUCHKRITERIUM MESS-01 ausgeloest=ja status=403\n"
+    with pytest.raises(ValueError, match="MESS-01"):
+        spike.protocol_field(differs, "ABBRUCHKRITERIUM MESS-01", "ausgeloest")
+
+
+def _head(lines: list[str]) -> str:
+    return "\n".join(["# Titel", "", *lines, "", "## Entscheidungskriterien, vorab festgelegt", ""])
+
+
+def _version_lines() -> list[str]:
+    return [
+        f"**{label}:** 1.2.3, gelesen mit `occ status` am 2026-11-11"
+        for label in spike.HEAD_VERSION_LABELS
+    ]
+
+
+def test_head_problems_is_empty_when_every_version_line_names_how_it_was_read() -> None:
+    assert spike.HEAD_VERSION_LABELS == (
+        "Nextcloud",
+        "AppAPI",
+        "Diese ExApp",
+        "groupfolders",
+        "Tasks",
+        "Deck",
+        "Datenbank",
+    )
+    assert spike.head_problems(_head(_version_lines())) == []
+    unmeasured = _version_lines()
+    unmeasured[5] = "**Deck:** ungemessen, Grund: die App war nicht installiert (2026-11-12)"
+    assert spike.head_problems(_head(unmeasured)) == []
+
+
+def test_head_problems_names_a_missing_an_open_and_an_unexplained_version_line() -> None:
+    lines = _version_lines()
+    missing = spike.head_problems(_head(lines[:-1]))
+    assert len(missing) == 1
+    assert "Datenbank" in missing[0]
+    lines[4] = "**Tasks:** offen, füllt Plan 30-02"
+    still_open = spike.head_problems(_head(lines))
+    assert any("Tasks" in problem for problem in still_open)
+    lines[4] = "**Tasks:** 0.18.1"
+    assert any("Tasks" in problem for problem in spike.head_problems(_head(lines)))
+    lines[4] = "**Tasks:** ungemessen"
+    assert any("Tasks" in problem for problem in spike.head_problems(_head(lines)))
+
+
+def test_head_problems_finds_the_open_marker_anywhere_in_the_report() -> None:
+    text = (
+        _head(_version_lines())
+        + "\n## 8. Annahmen A1 bis A19 und A21\n\nOffen, füllt Plan 30-05.\n"
+    )
+    problems = spike.head_problems(text)
+    assert len(problems) == 1
+    assert "füllt Plan" in problems[0]
