@@ -22,7 +22,7 @@ You bring the model, and no content leaves your server.
 
 ## What it does
 
-- 23 tools across nine app families: files, calendar, notes, Deck, contacts, Tables, Talk,
+- 24 tools across nine app families: files, calendar, notes, Deck, contacts, Tables, Talk,
   Mail and cloud wide search
 - OAuth 2.1 to the MCP authorization specification: dynamic client registration, PKCE S256,
   audience bound tokens, refresh rotation with reuse detection and immediate revocation.
@@ -69,6 +69,7 @@ the live registry and fails if a name or a level disagrees with it.
 | `files_download` | read | Any-size file as bounded embedded-resource chunks |
 | `files_read_as_markdown` | read | A DOCX, XLSX, PPTX or PDF file converted to Markdown, in slices |
 | `files_upload` | create-only | A new text file or any-size binary upload in base64 chunks; an existing path is refused, never overwritten |
+| `files_create_folder` | create-only | A new folder, optionally with its missing parents (at most 10 per call); an existing folder answers created false, nothing is overwritten |
 | `files_update` | conditional-update | Replaces an existing UTF-8 text file only with its previously read ETag; available only when the admin enables `NC_MCP_FILES_UPDATE` |
 | `calendar_list_events` | read | Events in an explicit time range, with an explicit time zone |
 | `calendar_create_event` | create-only | A new event; existing events are never changed |
@@ -119,7 +120,7 @@ missing app is answered in one sentence, never with an empty result.
   - `context`: `prepare_context`
   - `deck`: `deck_browse`, `deck_create_card`
   - `files`: `files_search`, `files_list`, `files_read`, `files_download`,
-    `files_read_as_markdown`, `files_upload`
+    `files_read_as_markdown`, `files_upload`, `files_create_folder`
   - `mail`: `mail_browse`
   - `notes`: `notes_search`, `notes_read`, `notes_create`
   - `search`: `unified_search`

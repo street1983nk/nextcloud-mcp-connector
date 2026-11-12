@@ -25,7 +25,7 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
 
 ## Ce qu'il sait faire
 
-- 23 outils répartis sur neuf familles d'applications : fichiers, agenda, notes, Deck,
+- 24 outils répartis sur neuf familles d'applications : fichiers, agenda, notes, Deck,
   contacts, Tables, Talk, Mail et la recherche à l'échelle du cloud
 - OAuth 2.1 conforme à la spécification d'autorisation MCP : enregistrement dynamique des
   clients, PKCE S256, jetons liés à leur audience, rotation des jetons de rafraîchissement
@@ -80,6 +80,7 @@ qu'un nom ou un niveau diverge.
 | `files_read` | read | Le contenu d'un fichier |
 | `files_download` | read | Un fichier de toute taille en blocs de ressource intégrés et limités |
 | `files_upload` | create-only | Un fichier texte ou binaire en blocs Base64 ; un chemin existant est refusé, jamais écrasé |
+| `files_create_folder` | create-only | Un nouveau dossier, au besoin avec ses dossiers parents manquants (au plus 10 par appel) ; un dossier existant répond created false, rien n'est écrasé |
 | `calendar_list_events` | read | Les événements d'une plage de temps explicite, avec un fuseau horaire explicite |
 | `calendar_create_event` | create-only | Un nouvel événement ; les événements existants ne sont jamais modifiés |
 | `notes_search` | read | Des notes par titre et contenu, via le fournisseur de recherche de notes Nextcloud |

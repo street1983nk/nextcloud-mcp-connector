@@ -25,7 +25,7 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
 
 ## Was er kann
 
-- 23 Tools über neun App-Familien: Dateien, Kalender, Notizen, Deck, Kontakte, Tables, Talk,
+- 24 Tools über neun App-Familien: Dateien, Kalender, Notizen, Deck, Kontakte, Tables, Talk,
   Mail und die cloud-weite Suche
 - OAuth 2.1 nach der MCP-Autorisierungsspezifikation: dynamische Client-Registrierung,
   PKCE S256, zielgebundene Token, Refresh-Rotation mit Wiederverwendungserkennung und
@@ -77,6 +77,7 @@ abweicht.
 | `files_read` | read | Der Inhalt einer Datei |
 | `files_download` | read | Eine beliebig große Datei in begrenzten eingebetteten Ressourcenblöcken |
 | `files_upload` | create-only | Eine neue Text- oder Binärdatei in Base64-Blöcken; ein vorhandener Pfad wird abgelehnt, nie überschrieben |
+| `files_create_folder` | create-only | Ein neuer Ordner, auf Wunsch samt fehlender Elternordner (höchstens 10 je Aufruf); ein vorhandener Ordner antwortet mit created false, nichts wird überschrieben |
 | `calendar_list_events` | read | Termine in einem expliziten Zeitraum, mit expliziter Zeitzone |
 | `calendar_create_event` | create-only | Ein neuer Termin; bestehende Termine werden nie geändert |
 | `notes_search` | read | Notizen nach Titel und Inhalt, über den Notes-Suchprovider von Nextcloud |
