@@ -365,6 +365,30 @@ async def test_a_file_as_target_is_a_conflict_without_a_write(clients: NcClients
 
 
 @pytest.mark.anyio
+async def test_a_blocked_name_during_the_count_is_reported_for_the_target(
+    clients: NcClients,
+) -> None:
+    """Measured live on 35.0.0 (plan 31-05): the read of ``.htaccess`` answers 500."""
+    blocked = (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">\n'
+        "  <s:exception>OCP\\Files\\ForbiddenException</s:exception>\n"
+        "  <s:message>Invalid path: files/A/b/c</s:message>\n"
+        "</d:error>\n"
+    )
+    with _mock() as mock:
+        propfind(mock, "/A/b/c/d", httpx.Response(404))
+        propfind(mock, "/A/b/c", httpx.Response(500, content=blocked.encode()))
+        write = mock.route(method="MKCOL").mock(return_value=httpx.Response(201))
+        with pytest.raises(ToolError) as caught:
+            await files_tools.create_folder(clients, path=CHAIN_TARGET, parents=True)
+
+    assert triple(caught.value) == triple(dav.name_rejected(CHAIN_TARGET))
+    assert "server error" not in caught.value.message
+    assert write.call_count == 0
+
+
+@pytest.mark.anyio
 async def test_a_refused_name_during_the_count_is_reported_for_the_target(
     clients: NcClients,
 ) -> None:

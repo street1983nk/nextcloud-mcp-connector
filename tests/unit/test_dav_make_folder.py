@@ -312,6 +312,67 @@ async def test_probe_names_a_refused_name(client: httpx.AsyncClient, creds: Cred
     assert "unexpected status" not in error.message
 
 
+def sabre_error(status: int, exception: str, message: str) -> httpx.Response:
+    """An error body as sabre writes it; the 500 of a blocked name is quoted from 35.0.0."""
+    body = (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<d:error xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns">\n'
+        f"  <s:exception>{exception}</s:exception>\n"
+        f"  <s:message>{message}</s:message>\n"
+        "</d:error>\n"
+    )
+    return httpx.Response(
+        status, content=body.encode(), headers={"Content-Type": "application/xml; charset=utf-8"}
+    )
+
+
+#: What Nextcloud 35.0.0 answers a PROPFIND on a name of its block list (plan 31-05, live).
+BLOCKED_NAME = (r"OCP\Files\ForbiddenException", "Invalid path: files/Projekte/.htaccess")
+
+
+async def probe_answered(
+    client: httpx.AsyncClient, creds: Credentials, response: httpx.Response
+) -> ToolError:
+    with respx.mock(assert_all_called=True) as mock:
+        mock.route(method="PROPFIND", url=TARGET_URL).mock(return_value=response)
+        with pytest.raises(ToolError) as caught:
+            await dav.probe_folder(client, creds, TARGET)
+    return caught.value
+
+
+@pytest.mark.anyio
+async def test_probe_names_a_blocked_name_that_nextcloud_answers_with_a_500(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    """Measured live on 35.0.0: the read of ``.htaccess`` is a 500, not a 400."""
+    error = await probe_answered(client, creds, sabre_error(500, *BLOCKED_NAME))
+
+    assert triple(error) == triple(dav.name_rejected(TARGET))
+    assert "server error" not in error.message
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "response",
+    [
+        sabre_error(500, r"Sabre\DAV\Exception\ServiceUnavailable", "Invalid path: x"),
+        sabre_error(500, BLOCKED_NAME[0], "Access denied"),
+        sabre_error(503, *BLOCKED_NAME),
+        httpx.Response(500, content=b"<html>Internal Server Error</html"),
+        httpx.Response(500, content=b'<!DOCTYPE d [<!ENTITY x "y">]><d:error xmlns:d="DAV:"/>'),
+        httpx.Response(500),
+    ],
+    ids=["other-exception", "other-message", "503", "not-xml", "dtd", "empty"],
+)
+async def test_probe_keeps_every_other_server_error_a_server_error(
+    client: httpx.AsyncClient, creds: Credentials, response: httpx.Response
+) -> None:
+    """Only the one measured body is a refused name; nothing else may be read as one."""
+    error = await probe_answered(client, creds, response)
+
+    assert triple(error) == triple(shared_error(response.status_code))
+
+
 @pytest.mark.anyio
 @pytest.mark.parametrize("status", [403, 500])
 async def test_probe_hands_every_other_status_to_the_shared_sentences(

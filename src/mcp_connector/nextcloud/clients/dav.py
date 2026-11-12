@@ -251,6 +251,33 @@ def _probe_body() -> bytes:
     return etree.tostring(root, xml_declaration=True, encoding="utf-8")
 
 
+#: The body of the one 500 that is a refused name and no outage (see ``_is_blocked_name``).
+_SABRE = "http://sabredav.org/ns"
+_BLOCKED_EXCEPTION = r"OCP\Files\ForbiddenException"
+_BLOCKED_MESSAGE = "Invalid path"
+
+
+def _is_blocked_name(response: httpx.Response) -> bool:
+    """Whether a 500 is Nextcloud refusing to read a name of its block list.
+
+    Measured live on 35.0.0 (plan 31-05): a PROPFIND on ``.htaccess`` does not answer 400
+    like the MKCOL does, the storage throws and sabre passes it on as a 500 with exactly
+    this exception and the message ``Invalid path: <path>``. Read as a server error, the
+    caller would be told to retry a name that never works. Only that one body counts: any
+    other 500, and a body that cannot be parsed, stays the server error it is. Nothing of
+    the body reaches a message.
+    """
+    if response.status_code != 500 or not response.content:
+        return False
+    try:
+        root = xml.parse_root(response.content)
+    except ToolError:
+        return False
+    exception = (root.findtext(f"{{{_SABRE}}}exception") or "").strip()
+    message = (root.findtext(f"{{{_SABRE}}}message") or "").strip()
+    return exception == _BLOCKED_EXCEPTION and message.startswith(_BLOCKED_MESSAGE)
+
+
 async def probe_folder(
     client: httpx.AsyncClient,
     creds: Credentials,
@@ -260,9 +287,10 @@ async def probe_folder(
 
     The read of folder creation, kept apart from :func:`stat` for two reasons. It asks for
     the node type and the id only: no rights pre-check, the 403 is the answer (D-31-05).
-    And it names the two answers a chain of missing folders meets and ``_check`` has no
+    And it names the answers a chain of missing folders meets and ``_check`` has no
     sentence for: 409 is a node below a file and counts as missing like a 404, 400 is a
-    name Nextcloud refuses before anything exists.
+    name Nextcloud refuses before anything exists, and so is the 500 of a blocked name
+    (:func:`_is_blocked_name`).
     """
     target = safe_path(path)
     response = await client.request(
@@ -274,7 +302,7 @@ async def probe_folder(
     )
     if response.status_code in (404, 409):
         return None
-    if response.status_code == 400:
+    if response.status_code == 400 or _is_blocked_name(response):
         raise name_rejected(target)
     _check(response, target)
 
