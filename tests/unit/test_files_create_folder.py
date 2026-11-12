@@ -945,3 +945,161 @@ async def test_a_traversal_path_is_refused_without_a_request(
         assert mock.calls.call_count == 0
 
     assert "points outside the user's files" in caught.value.message
+
+
+# --- Whitespace at the edge of a folder name (D-31-08, owner decision of 2026-11-12) --------
+
+PADDED_HINT = (
+    "Remove the whitespace at the start and the end of every folder name and call again; "
+    "nothing was created."
+)
+
+
+def padded(path: str, segment: str) -> tuple[str, str, str]:
+    """The refusal of a padded folder name, spelled out here and not taken from the code."""
+    return (
+        f"The folder name {segment!r} in {path!r} starts or ends with whitespace.",
+        PADDED_HINT,
+        "unspecified",
+    )
+
+
+#: Everything ``str.strip`` removes at an edge, which is what ``dav.safe_path`` trims at the
+#: end of a path: the space, the tab, the line break, the no-break space, the wide space.
+EDGES = [" ", "\t", "\n", "\r\n", "\u00a0", "\u3000", "  "]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("parents", [False, True])
+@pytest.mark.parametrize("edge", EDGES)
+async def test_a_target_name_ending_in_whitespace_is_refused_without_a_request(
+    clients: NcClients, edge: str, parents: bool
+) -> None:
+    """Live finding 2 of plan 31-05: trimmed, the folder would get another name than asked."""
+    path = f"/A/ende-leer{edge}"
+    with _mock() as mock:
+        with pytest.raises(ToolError) as caught:
+            await files_tools.create_folder(clients, path=path, parents=parents)
+        assert mock.calls.call_count == 0
+
+    assert not isinstance(caught.value, ConflictError)
+    assert triple(caught.value) == padded(path, f"ende-leer{edge}")
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("parents", [False, True])
+@pytest.mark.parametrize(
+    ("path", "segment"),
+    [
+        ("/A/ anfang-leer", " anfang-leer"),
+        ("/A/mitte-leer /kind", "mitte-leer "),
+        ("/A/\u00a0mitte/kind", "\u00a0mitte"),
+        ("/ oben/b/c", " oben"),
+        ("/A/ /b", " "),
+        (" /A/b", " "),
+        ("A/b ", "b "),
+        ("/A/b /", "b "),
+        ("/A/b/ ", " "),
+        ("/A/. /b", ". "),
+    ],
+)
+async def test_every_padded_segment_is_refused_without_a_request(
+    clients: NcClients, path: str, segment: str, parents: bool
+) -> None:
+    """Each segment counts, with and without ``parents``; the first padded one is named."""
+    with _mock() as mock:
+        with pytest.raises(ToolError) as caught:
+            await files_tools.create_folder(clients, path=path, parents=parents)
+        assert mock.calls.call_count == 0
+
+    assert triple(caught.value) == padded(path, segment)
+
+
+@pytest.mark.anyio
+async def test_the_chain_of_the_live_finding_creates_nothing(clients: NcClients) -> None:
+    """The very call of the line ``ZUSATZ`` of plan 31-05: no MKCOL for ``mitte-leer``."""
+    path = "/zusatz/mitte-leer /kind"
+    with _mock() as mock:
+        write = mock.route(method="MKCOL").mock(return_value=made(1))
+        read = mock.route(method="PROPFIND").mock(return_value=httpx.Response(404))
+        with pytest.raises(ToolError) as caught:
+            await files_tools.create_folder(clients, path=path, parents=True)
+
+    assert write.call_count == 0
+    assert read.call_count == 0
+    assert "Already created" not in caught.value.message
+    assert triple(caught.value) == padded(path, "mitte-leer ")
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("parents", [False, True])
+async def test_a_padded_name_in_the_sandbox_is_refused_without_a_request(
+    clients: NcClients, monkeypatch: pytest.MonkeyPatch, parents: bool
+) -> None:
+    monkeypatch.setenv(config.ENV_FILES_ROOT, "/Sandbox")
+    with _mock() as mock:
+        with pytest.raises(ToolError) as caught:
+            await files_tools.create_folder(clients, path="/x /y", parents=parents)
+        assert mock.calls.call_count == 0
+
+    assert triple(caught.value) == padded("/x /y", "x ")
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("path", "fragment"),
+    [
+        ("   ", "No path was given."),
+        ("/ ", "The folder path is the root folder, which always exists."),
+        (" / ", "The folder path is the root folder, which always exists."),
+        ("/A /../../etc", "points outside the user's files"),
+        ("/A \\b", "contains a backslash"),
+        ("/A\t/b ", "contains a control character"),
+    ],
+)
+async def test_the_older_refusals_keep_their_sentence(
+    clients: NcClients, path: str, fragment: str
+) -> None:
+    """The name check comes after the path checks that were there before, not instead."""
+    with _mock() as mock:
+        with pytest.raises(ToolError) as caught:
+            await files_tools.create_folder(clients, path=path, parents=True)
+        assert mock.calls.call_count == 0
+
+    assert fragment in caught.value.message
+    assert "whitespace" not in caught.value.message
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("path", "sent"),
+    [
+        ("/A/mit leer", "/A/mit leer"),
+        ("/A/ende-punkt.", "/A/ende-punkt."),
+        ("/A/b/", "/A/b"),
+        ("//A//b", "/A/b"),
+        ("/A/./b", "/A/b"),
+    ],
+)
+async def test_names_the_path_guard_does_not_change_are_still_created(
+    clients: NcClients, path: str, sent: str
+) -> None:
+    """Positive control: only a name that would be trimmed is refused, nothing else.
+
+    A space inside a name and a dot at its end reach Nextcloud as they were asked for, so
+    there is nothing to refuse; no rule beyond the trimming was invented.
+    """
+    with _mock() as mock:
+        mkcol(mock, sent, made(190))
+        result = await files_tools.create_folder(clients, path=path)
+        requests = requests_of(mock)
+
+    assert requests == [("MKCOL", sent)]
+    assert result == {"path": sent, "created": True, "id": "file:190"}
+
+
+def test_the_path_guard_of_the_other_tools_still_trims() -> None:
+    """``safe_path`` serves every file tool and is not part of this decision."""
+    assert dav.safe_path("/A/b ") == "/A/b"
+    assert dav.safe_path(" /A/b\t") == "/A/b"
+    assert dav.safe_path("/A/mitte-leer /kind") == "/A/mitte-leer /kind"

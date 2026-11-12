@@ -343,3 +343,96 @@ async def test_without_the_tag_the_broken_write_route_is_reached(parents: bool) 
         "now is unknown. No other folder was created in this call."
     )
     assert failed.reason == REASON_UNREACHABLE
+
+
+# --- A padded folder name is no oracle (D-31-08, owner decision of 2026-11-12) --------------
+
+PADDED_TARGET = "/Projekt/neu "
+PADDED_SENTENCE = (
+    "The folder name 'neu ' in '/Projekt/neu ' starts or ends with whitespace.",
+    (
+        "Remove the whitespace at the start and the end of every folder name and call again; "
+        "nothing was created."
+    ),
+    "unspecified",
+)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("parents", [False, True])
+async def test_a_padded_name_reads_the_same_with_and_without_the_tag(parents: bool) -> None:
+    """The refusal depends on the argument alone, so it cannot tell tagged from free.
+
+    It is decided before the guard is asked: not one request goes out on either side, so
+    neither the answer nor the traffic differs between a tagged and a free parent.
+    """
+    with _mock() as mock:
+        guard_routes.active(mock, TAGGED_FOLDER)
+        files = _Files(mock).seal()
+        tagged = await _refused(PADDED_TARGET, parents=parents)
+        assert mock.calls.call_count == 0, "not even the tag check"
+
+    with _mock() as mock:
+        _untagged(mock)
+        free = _Files(mock)
+        free.folder("/Projekt", "950")
+        free.seal()
+        untagged = await _refused(PADDED_TARGET, parents=parents)
+        assert mock.calls.call_count == 0
+
+    assert files.mkcol_count == 0
+    assert free.mkcol_count == 0
+    assert _tuple(tagged) == _tuple(untagged) == PADDED_SENTENCE
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("parents", [False, True])
+async def test_a_padded_name_below_a_tagged_folder_answers_like_an_invented_one(
+    parents: bool,
+) -> None:
+    """The pair on two paths, as in the paired tests: only the path itself differs."""
+    invented = "/erfunden-1/neu "
+    with _mock() as mock:
+        guard_routes.active(mock, TAGGED_FOLDER)
+        files = _Files(mock).seal()
+        tagged = await _refused(PADDED_TARGET, parents=parents)
+        unknown = await _refused(invented, parents=parents)
+        assert mock.calls.call_count == 0
+
+    assert files.mkcol_count == 0
+    assert files.propfind_count == 0
+    assert invented in unknown.message, "the control side names its own path"
+    renamed = tuple(part.replace("/erfunden-1", "/Projekt") for part in _tuple(unknown))
+    assert _tuple(tagged) == renamed
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("state", ["unverifiable", "stale", "timeout"])
+@pytest.mark.parametrize("parents", [False, True])
+async def test_a_padded_name_writes_nothing_while_the_tag_check_is_unanswered(
+    state: str, parents: bool
+) -> None:
+    """Fail-closed stays: the name is refused before the guard, and nothing is written."""
+    with _mock() as mock:
+        getattr(guard_routes, state)(mock)
+        files = _Files(mock).seal()
+        refused = await _refused(PADDED_TARGET, parents=parents)
+        assert mock.calls.call_count == 0
+
+    assert files.mkcol_count == 0
+    assert files.propfind_count == 0
+    assert _tuple(refused) == PADDED_SENTENCE
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("parents", [False, True])
+async def test_the_same_name_without_the_padding_still_meets_the_guard(parents: bool) -> None:
+    """Positive control: the refusals above are the name check, the guard is still there."""
+    with _mock() as mock:
+        _, report = guard_routes.active(mock, TAGGED_FOLDER)
+        files = _Files(mock).seal()
+        tagged = await _refused(PADDED_TARGET.strip(), parents=parents)
+        assert report.call_count == 1
+
+    assert files.mkcol_count == 0
+    assert _tuple(tagged) == _tuple(dav.parent_missing(TARGET))

@@ -648,6 +648,40 @@ async def test_files_create_folder_in_a_tagged_folder_answers_like_an_invented_p
     assert [route.call_count for route in refused] == [1 if mode in ANSWERED else 0]
 
 
+@pytest.mark.anyio
+@pytest.mark.parametrize("mode", GUARD_MODES)
+async def test_files_create_folder_refuses_a_padded_name_the_same_on_both_sides(
+    mode: str, unexpected: list[str]
+) -> None:
+    """A folder name with whitespace at its edge, below a tagged and below an invented parent.
+
+    D-31-08 (owner decision of 2026-11-12): such a name is refused before anything is
+    written. The refusal is decided on the argument alone and before the guard is asked,
+    so it reads the same in every guard state and on both sides, and neither side sends
+    its MKCOL. This is no pair case of its own in ``PAIR_CASES``: it is the same tool and
+    the same argument as the case above, with a name the tool does not take.
+    """
+    path = "/Projekt/neu "
+    invented = f"{INVENTED_FOLDER}/neu "
+    left: list[respx.Route] = []
+    right: list[respx.Route] = []
+    tagged, unknown = await pair(
+        "files_create_folder",
+        {"path": path},
+        {"path": invented},
+        path,
+        invented,
+        _mkcol(path.strip(), 201, left),
+        _mkcol(invented.strip(), 201, right),
+        mode,
+        unexpected,
+    )
+    assert tagged == unknown, f"tagged:  {tagged}\nunknown: {unknown}"
+    assert "starts or ends with whitespace" in tagged
+    assert '"isError": true' in tagged
+    assert [route.call_count for route in left + right] == [0, 0], "nothing is written"
+
+
 # --- coverage and time ----------------------------------------------------------------------
 
 

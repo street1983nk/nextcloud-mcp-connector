@@ -705,6 +705,13 @@ async def create_folder(
     with the sentence of a missing parent folder, and nothing is written while the tag
     check cannot be answered: :func:`_writable` runs first and again before every single
     write of the chain. The sandbox root is never created and never the target.
+
+    D-31-08: a folder name with whitespace at its start or end is refused before any
+    request, in every segment and with or without ``parents``. ``dav.safe_path`` trims the
+    end of a path, and this tool builds a path per folder of a chain, so such a name would
+    be created under another name than the one asked for (live finding of plan 31-05).
+    The refusal reads the argument only and comes before the tag check, so it is the same
+    for a tagged and for a free place.
     """
     target = dav.safe_path(path)
     root = config.files_root()
@@ -713,6 +720,9 @@ async def create_folder(
             message="The folder path is the root folder, which always exists.",
             hint="Name a folder below the root, for example /Projects/2026.",
         )
+    padded = _padded_name(path)
+    if padded is not None:
+        raise _name_padded(path, padded)
 
     # Before any request: a PROPFIND ahead of the check would itself tell an existing
     # path from a missing one.
@@ -784,6 +794,36 @@ async def create_folder(
     if made_target and not fileid:
         fileid = await _late_fileid(clients, target)
     return _folder_answer(target, made_target, fileid, created)
+
+
+def _padded_name(path: str) -> str | None:
+    """The first folder name of ``path`` with whitespace at its start or end, or ``None``.
+
+    Whitespace is what ``str.strip`` removes, the very set ``dav.safe_path`` trims at the
+    end of a path, so exactly the names that would be created differently are found and
+    no other naming rule is made up here: a space inside a name and a dot at its end pass.
+    Empty segments and ``.`` are skipped as the path guard skips them.
+    """
+    for segment in path.split("/"):
+        if segment not in ("", ".") and segment != segment.strip():
+            return segment
+    return None
+
+
+def _name_padded(path: str, segment: str) -> ToolError:
+    """The refusal of a folder name with whitespace at its edge (D-31-08).
+
+    Its own sentence and not ``dav.name_rejected``: Nextcloud would take such a name
+    (measured on 32.0.15 and 35.0.0), it is this tool that does not. Both values are
+    shown quoted, so the whitespace can be seen.
+    """
+    return ToolError(
+        message=f"The folder name {segment!r} in {path!r} starts or ends with whitespace.",
+        hint=(
+            "Remove the whitespace at the start and the end of every folder name and call "
+            "again; nothing was created."
+        ),
+    )
 
 
 async def _missing_folders(
