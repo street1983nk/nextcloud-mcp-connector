@@ -1,4 +1,5 @@
-"""WebDAV client: SEARCH, PROPFIND, ranged GET, and create-only file uploads.
+"""WebDAV client: SEARCH, PROPFIND, ranged GET, create-only file uploads,
+and create-only folder creation (MKCOL without a body).
 
 The ordinary file write is a PUT that carries ``If-None-Match: *``. Large binary uploads use
 Nextcloud's private chunk directory and one final MOVE with ``Overwrite: F``; that MOVE only
@@ -52,7 +53,11 @@ DAV_ROOT_PATH = "/remote.php/dav/"
 FILEID_BLOCK = 50
 
 _NOT_FOUND_HINT = "List the parent folder first to get the exact spelling of the path."
-_PARENT_HINT = "Create the folder in Nextcloud first, or upload into a folder that exists."
+_PARENT_HINT = (
+    "Create the missing folder first, in Nextcloud or with files_create_folder where that "
+    "tool is offered (parents=true creates the whole chain), and check that no file stands "
+    "in the path."
+)
 
 
 def not_found(path: str) -> ToolError:
@@ -997,6 +1002,89 @@ async def start_chunked_upload(
         # upload id is random or caller-owned, and all actual writes remain create-only.
         return
     _check_chunk_response(response, target)
+
+
+#: The ``oc-fileid`` header of a created node: the file id padded to eight digits, followed
+#: by the instance id (measured in phase 30: ``00023274oclxpo7v8s2m``). It is never the bare
+#: ``oc:fileid`` property, so a value without the instance part is not a match.
+_OC_FILEID = re.compile(r"([0-9]+)(oc[0-9a-z]+)")
+
+
+def fileid_from_header(value: str) -> str:
+    """Return the file id inside an ``oc-fileid`` header, or an empty string."""
+    match = _OC_FILEID.fullmatch((value or "").strip())
+    return str(int(match.group(1))) if match else ""
+
+
+async def make_folder(
+    client: httpx.AsyncClient,
+    creds: Credentials,
+    path: str,
+) -> dict[str, Any]:
+    """Create one folder that must not exist yet and return ``created`` and ``fileid``.
+
+    The request carries no body and no headers of its own: a body without an XML type
+    would earn a 415, and the gate over this module counts exactly this call form. A 405
+    means that something already sits at the path; Nextcloud words it the same for a
+    folder and a file, so it is no error here and the caller reads the node to decide.
+    """
+    target = safe_path(path)
+    response = await client.request("MKCOL", files_url(creds, target), auth=creds.auth())
+    if response.status_code == 405:
+        return {"created": False, "fileid": ""}
+    _check_mkcol(response, target)
+    return {
+        "created": True,
+        "fileid": fileid_from_header(response.headers.get("oc-fileid", "")),
+    }
+
+
+def _check_mkcol(response: httpx.Response, path: str) -> None:
+    """Translate the answer to a folder creation; every measured status has its own branch.
+
+    405 is not in here on purpose, see :func:`make_folder`. No server text is copied into
+    a message: the 403 of a share, an ACL and a read-only storage carry an empty one.
+    """
+    status = response.status_code
+    if status == 201:
+        return
+    if status == 403:
+        raise ToolError(
+            message=f"No permission to create a folder at {path}.",
+            hint=(
+                "The share, group folder or storage does not allow creating folders there; "
+                "ask its owner for the create permission."
+            ),
+            reason=REASON_PERMISSION_DENIED,
+        )
+    if status == 400:
+        raise ToolError(
+            message=f"Nextcloud does not accept the folder name in {path}.",
+            hint=(
+                "Avoid reserved names such as .htaccess, a backslash, a trailing space or "
+                "dot, and very long names."
+            ),
+        )
+    if status in (404, 409):
+        raise parent_missing(path)
+    if status == 423:
+        raise ToolError(
+            message=f"{path} is locked in Nextcloud.",
+            hint="Wait until the other client releases the lock, then try again.",
+        )
+    if status == 507:
+        raise ToolError(
+            message=f"Not enough space in Nextcloud to create {path}.",
+            hint="Free up quota in Nextcloud and try again.",
+        )
+    if 300 <= status < 400 or status in (401, 429) or status >= 500:
+        # Redirect, rejected credentials, rate limit and server errors keep the one
+        # sentence each that every other DAV call of this module gives them.
+        _check(response, path)
+    raise ToolError(
+        message=f"Nextcloud answered creating the folder {path} with status {status}.",
+        hint="Check the Nextcloud log for that request; the folder was probably not created.",
+    )
 
 
 async def put_upload_chunk(

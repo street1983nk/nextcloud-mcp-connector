@@ -24,7 +24,11 @@ SEARCH_URL = f"{BASE}/remote.php/dav/"
 XML_HEADERS = {"Content-Type": "application/xml; charset=utf-8"}
 
 NOT_FOUND_HINT = "List the parent folder first to get the exact spelling of the path."
-PARENT_HINT = "Create the folder in Nextcloud first, or upload into a folder that exists."
+PARENT_HINT = (
+    "Create the missing folder first, in Nextcloud or with files_create_folder where that "
+    "tool is offered (parents=true creates the whole chain), and check that no file stands "
+    "in the path."
+)
 
 
 @pytest.fixture
