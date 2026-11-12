@@ -103,9 +103,14 @@ _first_line_of_test = True
 
 
 @pytest.fixture(autouse=True)
-def _own_line() -> None:
-    """The first line of a test starts on a line of its own, after the dot of the last one."""
+def _own_line() -> Iterator[None]:
+    """The first line of a test starts on a line of its own, after the dot of the last one.
+
+    Set again once the test is over, so the lines of the module teardown do as well.
+    """
     global _first_line_of_test
+    _first_line_of_test = True
+    yield
     _first_line_of_test = True
 
 
