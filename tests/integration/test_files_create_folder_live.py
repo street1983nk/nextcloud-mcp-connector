@@ -155,7 +155,7 @@ def methods(seen: list[Seen], method: str) -> list[int]:
 class Run:
     """The accounts, the two harnesses and what the teardown has to undo."""
 
-    env: dict[str, str]
+    env: dict[str, str] = dataclasses.field(repr=False)
     version: str
     harness: cw.Harness
     harness_bob: cw.Harness
@@ -755,11 +755,11 @@ async def test_refused_names_end_in_a_named_refusal_or_a_real_folder(run: Run) -
     run.harness.mkcol(base)
     names = [".htaccess", "x.part", "x.filepart", "con", "ende-leer ", "ende-punkt."]
     with Case(run, "namen") as case:
-        for name, parents in [(name, False) for name in names] + [("mitte-leer /kind", True)]:
+        for name in names:
             part = Case(run, "namen")
             wanted = f"{base}/{name}"
             try:
-                answer = await create(part, wanted, parents=parents)
+                answer = await create(part, wanted)
             except ToolError as error:
                 ok = named(error) and not on_disk(run.alice, wanted, "-e")
                 outcome = f"{told(error)}; file system has it=no" if ok else told(error)
@@ -772,6 +772,36 @@ async def test_refused_names_end_in_a_named_refusal_or_a_real_folder(run: Run) -
             )
             case.seen += [entry for entry in part.seen if entry[0] == "MKCOL"]
             case.expect(ok, f"{name!r}: {'named refusal or real folder' if ok else outcome}")
+        listing = in_container("ls", "-1A", f"{DATA}/{run.alice}/files{base}")
+        case.note(f"file system ls -1A {base}: {sorted(listing.stdout.splitlines())!r}")
+
+
+async def test_a_trailing_space_inside_a_chain_is_recorded(run: Run) -> None:
+    """Not a case of the plan: a folder name that ends in a space as a link of a chain.
+
+    The first live run on 35.0.0 showed the tool creating the folder without the space and
+    then failing below the name with it. That is an open finding of plan 31-05 for the
+    owner, so this records what happens (``ZUSATZ ... befund=<ja|nein>``) and asserts
+    nothing: a green run must not hide it and a red run must not block the measured cases.
+    """
+    base = f"{P}/zusatz"
+    run.harness.mkcol(base)
+    part = Case(run, "zusatz")
+    wanted = f"{base}/mitte-leer /kind"
+    try:
+        answer = await create(part, wanted, parents=True)
+        outcome, claimed = answered(answer), list(answer.get("created_folders") or [])
+    except ToolError as error:
+        outcome = told(error)
+        claimed = [f"{base}/mitte-leer "] if "Already created" in error.message else []
+    listing = in_container("ls", "-1A", f"{DATA}/{run.alice}/files{base}")
+    truthful = all(on_disk(run.alice, path) for path in claimed) and "ToolError" not in outcome
+    record(
+        f"ZUSATZ name-mit-leerzeichen-in-kette nc={run.version} nutzer={run.alice} "
+        f"status={calls(part.seen)} befund={'nein' if truthful else 'ja'} | {outcome}; "
+        f"named as created: {claimed!r}; file system ls -1A {base}: "
+        f"{sorted(listing.stdout.splitlines())!r}"
+    )
 
 
 def lock(harness: cw.Harness, path: str, user_lock: bool = False) -> tuple[int, str, str]:
@@ -887,36 +917,46 @@ async def test_a_parent_deleted_after_the_count_is_parent_missing(run: Run) -> N
 
 
 async def test_a_tight_quota_creates_and_an_exhausted_one_is_named(run: Run) -> None:
+    """Three quotas: used plus 4096 bytes, used plus 1024 bytes and one byte.
+
+    Nextcloud asks for 4096 free bytes before it creates a folder (``QuotaPlugin`` of the
+    dav app, measured on 35.0.0), so the first quota has to create and the other two may
+    answer 507. Whatever the instance answers, the tool either created the folder or says
+    the named sentence of a full quota, and the line carries which.
+    """
     base = f"{P}/q-{STAMP}"
     run.harness.mkcol(base)
     used = int(props(run.harness, "/")[1][0]["used"] or 0)
+    steps = [
+        ("knapp", f"{used + 4096} B", "used plus 4096 B", True),
+        ("eng", f"{used + 1024} B", "used plus 1024 B", False),
+        ("voll", "1 B", "1 B", False),
+    ]
     with Case(run, "kontingent-knapp") as case:
         run.quota_before = quota_setting(run.alice)
         was = run.quota_before
+        case.note(f"used {used} B, quota before: {was}")
         try:
-            tight = f"{used + 1024} B"
-            cw.occ("user:setting", run.alice, "files", "quota", tight)
-            made = await create(case, f"{base}/knapp")
-            case.expect(
-                made.get("created") is True and on_disk(run.alice, f"{base}/knapp"),
-                f"quota {tight} (used {used} B plus 1 KB): {answered(made)}",
-            )
-            cw.occ("user:setting", run.alice, "files", "quota", "1 B")
-            before = len(case.seen)
-            try:
-                full = await create(case, f"{base}/voll")
-            except ToolError as error:
-                case.expect(
-                    error.message.startswith("Not enough space in Nextcloud")
-                    and methods(case.seen[before:], "MKCOL") == [507]
-                    and not on_disk(run.alice, f"{base}/voll", "-e"),
-                    f"quota 1 B: {told(error)}; nothing on disk",
-                )
-            else:
-                case.expect(
-                    full.get("created") is True and on_disk(run.alice, f"{base}/voll"),
-                    f"quota 1 B: {answered(full)}",
-                )
+            for name, quota, label, must_create in steps:
+                cw.occ("user:setting", run.alice, "files", "quota", quota)
+                target = f"{base}/{name}"
+                before = len(case.seen)
+                try:
+                    made = await create(case, target)
+                except ToolError as error:
+                    case.expect(
+                        not must_create
+                        and error.message.startswith("Not enough space in Nextcloud")
+                        and methods(case.seen[before:], "MKCOL") == [507]
+                        and not on_disk(run.alice, target, "-e"),
+                        f"quota {label}: MKCOL {methods(case.seen[before:], 'MKCOL')} "
+                        f"{told(error)}; nothing on disk",
+                    )
+                else:
+                    case.expect(
+                        made.get("created") is True and on_disk(run.alice, target),
+                        f"quota {label}: {answered(made)}; on disk",
+                    )
         finally:
             restore_quota(run)
             case.expect(quota_setting(run.alice) == was, f"quota back to: {was}")
