@@ -1,14 +1,14 @@
 # Mess-Spike Aufgaben und Ordner (MESS-01 bis MESS-06)
 
-**Status:** läuft. Die Abschnitte 1 (MESS-01) und 2 (MESS-02) sind gemessen, das Abbruchkriterium zu MESS-01 ist nicht ausgelöst. Abschnitt 3 (MESS-05) ist gemessen, beide Abbruchkriterien zu MESS-05 sind nicht ausgelöst, und Abschnitt 7 trägt das Inventar der Gates und Zusagen (A17). Aus Abschnitt 4 (MESS-06) sind 4.1 und 4.2 gemessen: `MOVE` unter Impersonation und das Verhalten der Unteraufgaben, das Abbruchkriterium zu MESS-06 für das Verschieben ist nicht ausgelöst; das Löschen ist auf Nextcloud 32 bis 35 gemessen (4.3 bis 4.5) und trägt das Ergebniswort "wiederherstellbar". Abschnitt 4 (MESS-06) ist damit gemessen. Die Abschnitte 5, 6 und 8 bis 10 sind offen
-**Messzeitraum:** ab 2026-11-11 (erster Messlauf 11:55 UTC), Ende offen
-**Nextcloud:** 35.0.0 (Build 35.0.0.10), gelesen mit `occ status` am 2026-11-11 aus dem laufenden Container `nc35-nc`. Das Image heißt `nextcloud:35.0.0-apache-local` und ist lokal aus dem veröffentlichten Quellpaket gebaut (`compose.nc35.yml`, Kopfkommentar). Für die Löschmatrix (Abschnitt 4.3) liefen am 2026-11-11 nacheinander vier Wegwerf-Instanzen aus `compose.spike-tags.yml` mit den offiziellen Images; ihre Fassungen of record, je gelesen mit `occ status` in der laufenden Instanz, sind 32.0.15, 33.0.9, 34.0.4, 35.0.2 (Zeile `VERSION OF RECORD` in `raw/loeschen-32.txt` bis `raw/loeschen-35.txt`)
+**Status:** läuft. Die Abschnitte 1 (MESS-01) und 2 (MESS-02) sind gemessen, das Abbruchkriterium zu MESS-01 ist nicht ausgelöst. Abschnitt 3 (MESS-05) ist gemessen, beide Abbruchkriterien zu MESS-05 sind nicht ausgelöst, und Abschnitt 7 trägt das Inventar der Gates und Zusagen (A17). Aus Abschnitt 4 (MESS-06) sind 4.1 und 4.2 gemessen: `MOVE` unter Impersonation und das Verhalten der Unteraufgaben, das Abbruchkriterium zu MESS-06 für das Verschieben ist nicht ausgelöst; das Löschen ist auf Nextcloud 32 bis 35 gemessen (4.3 bis 4.5) und trägt das Ergebniswort "wiederherstellbar". Abschnitt 4 (MESS-06) ist damit gemessen. Abschnitt 5 (MESS-03) und Abschnitt 6 (MESS-04) sind am 2026-11-12 gemessen: Discovery auf 32.0.15 und 35.0.2, Abfragen auf 32 bis 35, Kosten bei 2000 Aufgaben auf SQLite und PostgreSQL. Die Abschnitte 8 bis 10 sind offen
+**Messzeitraum:** ab 2026-11-11 (erster Messlauf 11:55 UTC), letzter Messlauf des Plans 30-04 am 2026-11-12 um 01:30 UTC; Ende offen bis Plan 30-05
+**Nextcloud:** 35.0.0 (Build 35.0.0.10), gelesen mit `occ status` am 2026-11-11 aus dem laufenden Container `nc35-nc`. Das Image heißt `nextcloud:35.0.0-apache-local` und ist lokal aus dem veröffentlichten Quellpaket gebaut (`compose.nc35.yml`, Kopfkommentar). Für die Löschmatrix (Abschnitt 4.3) liefen am 2026-11-11 nacheinander vier Wegwerf-Instanzen aus `compose.spike-tags.yml` mit den offiziellen Images; ihre Fassungen of record, je gelesen mit `occ status` in der laufenden Instanz, sind 32.0.15, 33.0.9, 34.0.4, 35.0.2 (Zeile `VERSION OF RECORD` in `raw/loeschen-32.txt` bis `raw/loeschen-35.txt`). Für Discovery, Abfragen und Kosten (Abschnitte 5 und 6) liefen am 2026-11-12 nacheinander sechs weitere Wegwerf-Instanzen mit denselben Images: 32.0.15, 33.0.9, 34.0.4 und 35.0.2 aus `compose.spike-tags.yml`, dazu 35.0.2 zweimal für die Kosten, einmal mit SQLite und einmal aus `compose.spike-tags-pg.yml` (Zeile `VERSION OF RECORD` in `raw/discovery-32.txt` bis `raw/discovery-35.txt`, `raw/kosten-sqlite.txt` und `raw/kosten-pg.txt`)
 **AppAPI:** `app_api` 35.0.0, gelesen mit `occ app:list --output=json` derselben Instanz am 2026-11-11
 **Diese ExApp:** 0.3.2, gelesen mit `occ app_api:app:list` am 2026-11-11. In der Topologie ist also ein älterer Stand registriert als der Arbeitsbaum. Für die Messung zählt das an zwei Stellen: die Impersonation läuft mit dem Secret dieser Registrierung, und der Produktionsweg (Abschnitt 1.2) läuft im Container dieses Images. Kein Werkzeug der App wird gemessen, nur ihr Zugang zu Nextcloud
 **groupfolders:** 23.0.1, gelesen mit `occ app:list --output=json` am 2026-11-11 nach `occ app:install groupfolders` in der laufenden Instanz (Protokollzeile `GRUPPENORDNER version=23.0.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)`). Die App wurde für die Messung aus dem App Store geladen und danach wieder entfernt. `files_external` 2.0.0-dev.0 gehört zum Server und war nur für die Messung eingeschaltet
 **Tasks:** 0.18.1, gelesen mit `occ app:list --output=json` am 2026-11-11 nach `occ app:install tasks` in der laufenden Instanz (Protokollzeile `TASKS-APP version=0.18.1 installiert_vorher=nein (gelesen mit occ app:list --output=json)`). Die App war für die Messung aus dem App Store geladen und ist im Rückbau wieder entfernt worden. Die Browser-Sitzung lief am 2026-11-11 in Chromium (Playwright), Zeitzone des Browsers Europe/Berlin, Sprache des Messkontos Deutsch
-**Deck:** offen, füllt Plan 30-04
-**Datenbank:** `sqlite3`, gelesen mit `occ config:system:get dbtype` am 2026-11-11
+**Deck:** 1.19.0 auf nc35 (35.0.0), 1.16.9 auf der Wegwerf-Instanz 32.0.15 und 1.19.2 auf 35.0.2, je gelesen mit `occ app:list --output=json` in der laufenden Instanz am 2026-11-12 (Protokollzeilen `DECK-APP version=`); auf den Wegwerf-Instanzen mit `occ app:install deck` aus dem App Store geladen. Tasks 0.18.1 ebenso auf der Wegwerf-Instanz 35.0.2 für den Suchprovider
+**Datenbank:** `sqlite3`, gelesen mit `occ config:system:get dbtype` am 2026-11-11; für die Kostenmessung zusätzlich `pgsql` mit PostgreSQL 17.11 (gelesen am 2026-11-12 mit `select version()` über den lokalen Socket des Datenbank-Containers, Image `postgres:17-alpine`, Digest in `raw/kosten-pg.txt`)
 **Topologie:** die vorhandene Strecke `compose.nc35.yml` (Container `nc35-nc`, `nc35-harp`, `nc35-caddy`, ExApp-Container `nc_app_mcp_connector`, Loopback `http://127.0.0.1:8082`). Sie wird nur mit `docker start` und `docker stop` bewegt, nie abgebaut. Weitere Instanzen für die Versionsbreite nennen die Pläne 30-03 und 30-04
 **Messskript:** `scripts/tasks_spike.py`; der Commit, der das Skript zusammen mit diesen Kriterien festschreibt, liegt vor jeder Rohdatei unter `.planning/phases/30-mess-spike-aufgaben-und-ordner/raw/`. Das ist Commit `63ad052`; die Blöcke `mkcol`, `groupfolder` und `nachlauf` kamen danach dazu, ohne dass sich Kriterien oder Erwartungen geändert haben
 **Scope:** gemessen wird gegen laufende Nextcloud-Instanzen in lokalem Docker, was die Phasen 31 bis 33 bisher nur annehmen: Ordner anlegen mit `MKCOL`, auch unter AppAPI-Impersonation und in einem Gruppenordner mit ACL, danach die Aufgaben-Zugriffe über CalDAV. Es entsteht kein Produktcode: unter `src/` ändert diese Phase nichts, und jeder schreibende Aufruf läuft aus dem Messskript.
@@ -521,11 +521,202 @@ Auflagen für TMOD-07 aus den Messwerten:
 
 ## 5. Discovery und Objekte (MESS-03)
 
-Offen, füllt Plan 30-04.
+Gemessen am 2026-11-12 auf vier Wegwerf-Instanzen aus `compose.spike-tags.yml` (offizielle Images, SQLite, Loopback `127.0.0.1:8083`, je eine Instanz, nacheinander): 32.0.15 und 35.0.2 mit Discovery und Abfragen, 33.0.9 und 34.0.4 mit den Abfragen, 35.0.2 zusätzlich mit dem Suchprovider. Rohprotokolle `raw/discovery-32.txt` bis `raw/discovery-35.txt` im Phasenordner, wörtliche Zeilen in Abschnitt 12.8. Alle Aufrufe liefen mit App-Passwort als Konto `alice` (Gegenseite der Freigaben: `bob`), das frische Konto `fresh30` mit seinem Anmeldepasswort. Der create-only `PUT` unter Impersonation (5.5) lief auf der Strecke nc35 (35.0.0), Rohprotokoll `raw/nc35-vtodo-anlegen.txt`. Die Fixtures (5.6) stammen aus den Rohobjekten des Plans 30-02, Protokoll `raw/fixtures.txt`.
+
+`raw/discovery-32.txt` trägt drei Läufe. Der erste endete am RAM-Tor und hat nichts gestartet. Der zweite hat gemessen, aber mit einem Werkzeugfehler: die Deck-REST-Schnittstelle antwortete direkt nach `occ app:install deck` mit 404, weil der Webserver die App-Liste noch aus dem Zwischenspeicher las; das Skript startet den Container seither nach einer Installation neu (Commit `57f60f6`). Der dritte Lauf lief auf frischem Volume und ist der gewertete; er trägt die Zeile `WIEDERHOLUNG Grund`. Alle Werte, die der zweite und der dritte Lauf gemeinsam haben, sind gleich; neu im dritten sind nur die Deck-Zeilen und die Benennung des gelöschten Kalenders (siehe 5.2).
+
+### 5.1 Frisches Konto ohne Aufgabenliste
+
+Das Konto `fresh30` wurde mit `occ user:add` angelegt und hat sich danach zum ersten Mal angemeldet. Vor der Anmeldung gab es weder ein Kalender-Home noch eine Zeile in der Tabelle `calendars`; die erste Anfrage mit Nutzername und Passwort (Basic) an `/ocs/v2.php/cloud/user` hat den Standardkalender erzeugt, das Web-Formular wurde nicht gebraucht.
+
+| | 32.0.15 | 35.0.2 |
+|---|---|---|
+| vor der Anmeldung | `status=404 sammlungen=0 kalender_db=0` | `status=404 sammlungen=0 kalender_db=0` |
+| Weg der Erstanmeldung | `ERSTANMELDUNG weg=basic` | `ERSTANMELDUNG weg=basic` |
+| Ergebnis | `FRISCHES KONTO aufgabenlisten=0 kalender=personal(VEVENT),contact_birthdays(VEVENT)` | `FRISCHES KONTO aufgabenlisten=0 kalender=personal(VEVENT),contact_birthdays(VEVENT)` |
+| Gegenprobe (Tabelle `calendars`, nicht über DAV) | `kalender_db=2 personal:VEVENT:leer contact_birthdays:VEVENT:leer aufgabenlisten_db=0` | `kalender_db=2 personal:VEVENT:leer contact_birthdays:VEVENT:leer aufgabenlisten_db=0` |
+
+Positivkontrolle: dieselbe Auswertung findet beim vorbereiteten Konto Aufgabenlisten (`POSITIVKONTROLLE aufgabenlisten_alice=4 (mindestens 1)` auf 32.0.15, `POSITIVKONTROLLE aufgabenlisten_alice=4 (mindestens 1)` auf 35.0.2), und der Standardkalender des frischen Kontos existiert. `occ dav:list-calendars fresh30` nennt auf beiden Versionen nur `personal`.
+
+Für TASK-03 heißt das: ein Konto, das sich angemeldet hat und sonst nichts getan hat, besitzt die Kalender `personal` und `contact_birthdays`, beide nur mit `VEVENT`, dazu Ein- und Ausgang des Schedulings und den Papierkorb, und keine Aufgabenliste. Der Fall "keine Aufgabenliste" ist auf 32.0.15 und 35.0.2 der Normalzustand eines neuen Kontos. Die Rohantwort von 35.0.2 liegt unverändert als `tests/fixtures/caldav_home_fresh_account.xml` vor (5.6) und steht wörtlich in 12.10.
+
+Ein Befund am Rand, der denselben Fall verschärft: ein Konto, das sich nie mit Passwort angemeldet hat, hat nicht einmal `personal`. Auf 35.0.2 bekam `alice` ihr App-Passwort aus `occ user:auth-tokens:add` und hat nur damit gearbeitet; ihre Tabelle zeigt nur die drei von der Messung angelegten Kalender (`GEGENPROBE vorbereitetes konto kalender_db=3 spike30-aufgaben:VTODO:leer spike30-gemischt:VEVENT,VTODO:leer spike30-geloescht:VTODO:gesetzt`). Auf 32.0.15 lief der Rückfall über `/ocs/v2.php/core/getapppassword` mit dem Anmeldepasswort, und dort hat `alice` `personal` und `contact_birthdays`. Auf nc35 (35.0.0) hat das Messkonto `spike30a`, das nur mit App-Passwort und unter Impersonation sprach, ebenfalls keinen Standardkalender (Zeilen `SAMMLUNG` in `raw/nc35-vtodo-anlegen.txt`). Ob ein Konto hinter einer ExApp je "zum ersten Mal angemeldet" ist, hängt also vom Anmeldeweg ab; gemessen ist das nur als Beobachtung an diesen drei Konten, nicht als eigene Reihe.
+
+### 5.2 Sammlungsarten in der Discovery
+
+`PROPFIND` Depth 1 auf das Kalender-Home von `alice` mit `resourcetype`, `displayname`, `supported-calendar-component-set`, `cs:source`, `current-user-privilege-set` und `{http://owncloud.org/ns}read-only`. Jede vorbereitete Art taucht in der Antwort auf (`ARTEN vorhanden=abo,aufgabenliste,deck,geloeschter-kalender,gemischt,geteilt-nur-lesen,geteilt-schreibbar,papierkorb,scheduling,terminkalender fehlen=keine` auf 32.0.15, `ARTEN vorhanden=abo,aufgabenliste,deck,geloeschter-kalender,gemischt,geteilt-nur-lesen,geteilt-schreibbar,papierkorb,scheduling fehlen=keine` auf 35.0.2; `terminkalender` fehlt auf 35.0.2 nur, weil `alice` dort keinen Standardkalender hat, siehe 5.1). Deck: 1.16.9 auf 32.0.15, 1.19.2 auf 35.0.2, je aus dem App Store in die Wegwerf-Instanz geladen; auf nc35 Deck 1.19.0.
+
+| Art | Woran der Connector sie erkennt | 32.0.15 | 35.0.2 | Folge für TASK-01 |
+|-----|--------------------------------|---------|--------|-------------------|
+| eigene Aufgabenliste | resourcetype `calendar`, Komponenten-Set mit `VTODO` | `art=aufgabenliste`, Typen `collection,calendar`, Komponenten `VTODO`, `read_only=fehlt`, `schreibrecht=ja` | wie 32.0.15 | ist eine Aufgabenliste |
+| Kalender mit `VEVENT` und `VTODO` | resourcetype `calendar`, beide Komponenten | `art=gemischt`, Typen `collection,calendar`, Komponenten `VEVENT,VTODO`, `read_only=fehlt`, `schreibrecht=ja` | wie 32.0.15 | ist eine Aufgabenliste und zugleich ein Terminkalender (A11) |
+| Deck-Kalender | URI-Präfix `app-generated--` | `art=deck`, Typen `collection,calendar`, Komponenten `VTODO`, `read_only=fehlt`, `schreibrecht=nein` | wie 32.0.15 | ausschließen, allein am Präfix: Typ und Komponenten-Set sind die einer Aufgabenliste (`calendar`, nur `VTODO`); das fehlende Schreibrecht ist ein zweites Merkmal, aber keines, auf das sich TASK-01 stützen sollte |
+| Papierkorb | URI `trashbin`, resourcetype `trash-bin` | `art=papierkorb`, Typen `collection,trash-bin`, Komponenten `keine`, `read_only=fehlt`, `schreibrecht=ja` | wie 32.0.15 | keine Aufgabenliste: kein resourcetype `calendar`, kein Komponenten-Set |
+| gelöschter Kalender | resourcetype `deleted-calendar` statt `calendar` | `art=geloeschter-kalender`, Typen `collection,deleted-calendar`, Komponenten `VTODO`, `read_only=fehlt`, `schreibrecht=ja` | wie 32.0.15 | ausschließen, und zwar über den resourcetype: Komponenten-Set `VTODO` und Schreibrecht stehen weiter da |
+| Abonnement | resourcetype `subscribed` statt `calendar`, `cs:source` | `art=abo`, Typen `collection,subscribed`, Komponenten `VTODO,VEVENT`, `read_only=fehlt`, `schreibrecht=ja` | wie 32.0.15 | ausschließen über den resourcetype: das Komponenten-Set nennt `VTODO`, und das Privilegien-Set nennt Schreibrecht |
+| Scheduling-Eingang | resourcetype `schedule-inbox` | `art=scheduling`, Typen `collection,schedule-inbox`, Komponenten `keine`, `read_only=fehlt`, `schreibrecht=nein` | wie 32.0.15 | keine Aufgabenliste |
+| Scheduling-Ausgang | resourcetype `schedule-outbox` | `art=scheduling`, Typen `collection,schedule-outbox`, Komponenten `keine`, `read_only=fehlt`, `schreibrecht=nein` | wie 32.0.15 | keine Aufgabenliste |
+| geteilte Liste mit Schreibrecht | URI-Muster `<uri>_shared_by_<konto>`, `read-only` vorhanden und leer | `art=geteilt-schreibbar`, Typen `collection,calendar`, Komponenten `VTODO`, `read_only=leer`, `schreibrecht=ja` | wie 32.0.15 | ist eine Aufgabenliste, beschreibbar |
+| geteilte Liste ohne Schreibrecht | dasselbe Muster, `read-only` mit Wert 1, kein Schreibprivileg | `art=geteilt-nur-lesen`, Typen `collection,calendar`, Komponenten `VTODO`, `read_only=1`, `schreibrecht=nein` | wie 32.0.15 | ist eine Aufgabenliste zum Lesen; Schreiben vorab ablehnen |
+| föderierter Kalender | ungemessen | ungemessen | ungemessen | offen; `FOEDERIERT ungemessen grund=zweite Instanz noetig, in dieser Phase nicht vorgesehen` |
+
+Daraus folgt eine Regel, die enger ist als der Wortlaut von TASK-01 ("Kalender, deren Komponenten-Set `VTODO` enthält"): eine Aufgabenliste ist eine Sammlung mit dem resourcetype `calendar` UND `VTODO` im Komponenten-Set UND ohne das Präfix `app-generated--`. Das Komponenten-Set allein reicht nicht: ein gelöschter Kalender und ein Abonnement tragen es ebenfalls. Der heutige Terminfilter des Connectors (`caldav.parse_calendar_home`) verlangt den resourcetype `calendar` nicht; er liefert auf 32.0.15 `contact_birthdays`, `personal` und `spike30-gemischt` (Zeile `TERMINFILTER heute liefert=`) und den gelöschten Kalender nur deshalb nicht, weil dessen Set kein `VEVENT` trägt. Ein gelöschter Kalender mit `VEVENT` wäre nach derselben Logik ein Terminkalender; das ist abgeleitet, nicht gemessen, und gehört in die Übergabe an Phase 32 (TASK-01 verlangt, dass das Kalender-Bundle byte-gleich bleibt).
+
+- **A4 belegt** (32.0.15 und 35.0.2): die Eigenschaft ist per `PROPFIND` abrufbar und unterscheidet. `READ-ONLY EIGENSCHAFT abrufbar=ja nur_lesen=1 schreibbar=leer schreibrecht_nur_lesen=nein schreibrecht_schreibbar=ja (A4)` (35.0.2 wortgleich). Bei einer eigenen Liste kommt sie unter 404 zurück (`read_only=fehlt`), bei einer Freigabe mit Schreibrecht ist sie vorhanden und leer, bei einer nur lesbaren trägt sie den Wert 1. Das Privilegien-Set sagt dasselbe und ist der standardkonforme zweite Weg. Gegenprobe mit einem Schreibversuch: nur lesbar `status=404 angelegt_db=nein` (`Calendar with name 'spike30-b-ro_shared_by_bob' could not be found`), mit Schreibrecht `status=201 angelegt_db=ja`. Der Statuscode 404 für das fehlende Schreibrecht bestätigt den Befund aus 3.3 auf zwei weiteren Versionen.
+- **A5 teils belegt, teils widerlegt.** Der Papierkorb fällt nicht aus der Discovery heraus, er steht als Sammlung `trashbin` darin, ist aber an URI und resourcetype erkennbar und trägt kein Komponenten-Set: `PAPIERKORB in_discovery=ja komponenten=keine typen=collection,trash-bin geloeschter_kalender_im_home=ja aufgabenliste_laut_auswertung=nein (A5)`. Widerlegt ist die Annahme für gelöschte Kalender: sie stehen mit dem resourcetype `deleted-calendar`, mit Komponenten-Set und mit Schreibprivileg weiter im Home, sind also weder herausgefallen noch nur lesbar. Die vorab festgelegte Auswertung kannte diesen Typ nicht und hat ihn im zweiten Lauf auf 32.0.15 als Aufgabenliste gezählt (`POSITIVKONTROLLE aufgabenlisten_alice=5`); die Funktion ist danach ergänzt worden, die Änderung steht bei den Kriterien. Föderierte Kalender: ungemessen, eine zweite Instanz war in dieser Phase nicht vorgesehen.
+- **A11 belegt** (32.0.15 und 35.0.2): `GEMISCHT in_beiden=ja terminfilter=ja aufgabenfilter=ja (A11; Terminfilter ist caldav.parse_calendar_home des Connectors, Aufgabenfilter ist task_lists)`.
+
+Gegenprobe über `occ dav:list-calendars alice`: sie nennt die eigenen Kalender samt dem gelöschten und die beiden Freigaben mit der Spalte Writable (Haken für die schreibbare, x für die nur lesbare), nicht aber Deck, Abonnement, Papierkorb und Scheduling. Die Zahl der Kalender laut occ ist also keine Gegenprobe für die Zahl der Sammlungen, wohl aber für Freigaben und Schreibrecht.
+
+### 5.3 Abfrageverhalten auf 32 bis 35
+
+Acht Aufgaben in einer Liste nur für `VTODO`, sechs `REPORT calendar-query` mit Depth 1 als `alice`. Fenster `20261119T000000Z` bis `20261122T000000Z`, Suchbegriff `q-offen`, alle Aufgaben mit `CREATED:20261111T100000Z`. Die Treffermengen des Servers sind auf 32.0.15, 33.0.9, 34.0.4 und 35.0.2 gleich (Zeilen aus `raw/fixtures.txt`, gebildet mit `same_sets()` über die vier Rohdateien):
+
+| Abfrage | Filter | Treffer des Servers (alle vier Versionen) | gleich über die Versionen | gleich der Menge, die der Connector will |
+|---------|--------|-------------------------------------------|---------------------------|------------------------------------------|
+| ohne-filter | nur `comp-filter VTODO` | alle acht | ja | ja |
+| offen | `COMPLETED` nicht definiert | alle außer `q-erledigt` | ja | ja |
+| fenster | `time-range` | `q-abgebrochen`, `q-in-arbeit`, `q-kind`, `q-offen-im-fenster`, `q-offen-undatiert` | ja | nein |
+| text | `text-match` an `SUMMARY` | `q-offen-ausserhalb`, `q-offen-im-fenster`, `q-offen-undatiert` | ja | ja |
+| eltern | `text-match` an `RELATED-TO` | `q-kind` | ja | ja |
+| erledigt | `COMPLETED` definiert | `q-erledigt` | ja | ja |
+
+```
+A1 abfrage=ohne-filter gleich=ja abweichend=keine treffer=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+A1 abfrage=offen gleich=ja abweichend=keine treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+A1 abfrage=fenster gleich=ja abweichend=keine treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-im-fenster,q-offen-undatiert
+A1 abfrage=text gleich=ja abweichend=keine treffer=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert
+A1 abfrage=eltern gleich=ja abweichend=keine treffer=q-kind
+A1 abfrage=erledigt gleich=ja abweichend=keine treffer=q-erledigt
+A1 alle_sechs_abfragen_auf_allen_versionen_gleich=ja versionen=32.0.15,33.0.9,34.0.4,35.0.2 vollstaendig=ja
+```
+
+**A1 belegt:** `A1 alle_sechs_abfragen_auf_allen_versionen_gleich=ja versionen=32.0.15,33.0.9,34.0.4,35.0.2 vollstaendig=ja`. Positivkontrolle: die Abfrage ohne Filter liefert auf jeder Version alle acht vorbereiteten Aufgaben.
+
+Undatierte Aufgaben fallen in das Zeitfenster des Servers. Wörtlich auf allen vier Versionen: `ABFRAGE fenster client=q-in-arbeit,q-offen-im-fenster gleich=nein nur_server=['q-abgebrochen', 'q-kind', 'q-offen-undatiert'] nur_client=[]`. Der Server liefert für das Fenster die drei Aufgaben ohne `DUE` und ohne `DTSTART` mit (`q-offen-undatiert`, `q-kind`, `q-abgebrochen`); ihr einziges Datum ist `CREATED`, und das liegt vor dem Ende des Fensters. `q-offen-ausserhalb` (`DUE` im März 2027) und `q-erledigt` liefert er nicht. Für TASK-02 heißt das: die Fälligkeitsgrenze darf nicht dem `time-range` des Servers überlassen werden, der Connector filtert sie selbst, wie von der Recherche empfohlen. Zwei weitere Beobachtungen aus denselben Zeilen: der Vorfilter "offen" liefert `q-abgebrochen` (`STATUS:CANCELLED`) mit, abgebrochene Aufgaben sortiert also der Connector aus; und die wiederkehrende Aufgabe (`DTSTART` und `DUE` am 1.11., `RRULE:FREQ=DAILY`) steht nicht in den Treffern des Fensters, der Server hat die Serie für diese Abfrage also nicht bis ins Fenster aufgelöst.
+
+### 5.4 Link des Suchproviders tasks
+
+Gemessen auf 35.0.2 mit der Tasks-App 0.18.1 (`occ app:install tasks` in der Wegwerf-Instanz), Aufruf `GET /ocs/v2.php/search/providers/tasks/search?term=q-offen` als `alice`.
+
+```
+PROVIDER liste vor_installation status=200 tasks_dabei=nein ids=appstore,circles,comments,files,search-deck-card-board,search-deck-comment,settings,systemtags
+PROVIDER tasks app_nie_installiert status=200 eintraege=0
+PROVIDER liste app_an status=200 tasks_dabei=ja ids=appstore,circles,comments,files,search-deck-card-board,search-deck-comment,settings,systemtags,tasks
+PROVIDER tasks treffer=3 link=http://127.0.0.1:8083/apps/tasks/calendars/spike30-aufgaben/tasks/s30-q-offen-undatiert-011745.ics
+PROVIDER aufloesung status=200 uid_gleich=ja kalender=spike30-aufgaben objekt=s30-q-offen-undatiert-011745.ics (GET auf die aus dem Link gebaute DAV-URL; die UID der angelegten Aufgabe ist ihr Objektname ohne .ics)
+PROVIDER liste app_aus status=200 tasks_dabei=nein ids=appstore,circles,comments,files,search-deck-card-board,search-deck-comment,settings,systemtags
+PROVIDER tasks app_aus treffer=0 status=200
+  weiterer link=http://127.0.0.1:8083/apps/tasks/calendars/spike30-aufgaben/tasks/s30-q-offen-im-fenster-011745.ics
+  weiterer link=http://127.0.0.1:8083/apps/tasks/calendars/spike30-aufgaben/tasks/s30-q-offen-ausserhalb-011745.ics
+```
+
+- Form des Links, wörtlich: `http://127.0.0.1:8083/apps/tasks/calendars/spike30-aufgaben/tasks/s30-q-offen-undatiert-011745.ics`, also absolute URL der Instanz, dann `/apps/tasks/calendars/<Kalender-URI>/tasks/<Objektname>`, ohne `index.php` und ohne `#`.
+- Auflösung ohne Raten: `provider_link_parts()` liest Kalender-URI und Objektname, der `GET` auf die daraus gebaute DAV-URL liefert das Objekt mit der erwarteten UID (`PROVIDER aufloesung status=200 uid_gleich=ja kalender=spike30-aufgaben objekt=s30-q-offen-undatiert-011745.ics (GET auf die aus dem Link gebaute DAV-URL; die UID der angelegten Aufgabe ist ihr Objektname ohne .ics)`).
+- Der Provider gehört zum Server (dav-App), nicht zur Tasks-App, und hängt an deren Zustand: ohne die App steht er nicht in der Liste der Provider (`tasks_dabei=nein`), und der direkte Aufruf antwortet mit 200 und leerer Trefferliste, vor der Installation wie nach `occ app:disable tasks` (`PROVIDER tasks app_aus treffer=0 status=200`).
+
+Folge für TASK-09: der Eintrag `tasks` in `PROVIDER_KINDS` kann den Link mit einem festen Muster auflösen; eine leere Antwort des Providers heißt nicht "keine Aufgaben", sondern kann "Tasks-App nicht aktiv" heißen. Ungemessen: der Link für eine Aufgabe in einer geteilten Liste, in einem Deck-Kalender und mit Sonderzeichen im Namen.
+
+### 5.5 Create-only PUT unter AppAPI-Impersonation
+
+Gemessen am 2026-11-12 auf nc35 (35.0.0, SQLite) als `spike30a`, Liste `spike30-anlegen` (per `MKCALENDAR` unter Impersonation angelegt, 201).
+
+```
+VTODO anlegen auth=appapi status=201 nutzer=spike30a If-None-Match=* objekt=spike30-anlegen/s30-anlegen-appapi-012915.ics etag=stark |
+  GEGENPROBE datenbank zeilen=1 spike30a/spike30-anlegen/s30-anlegen-appapi-012915.ics:deleted_at_leer:9d38af15ef17 gesendet=9d38af15ef174a35880c19be7bb7ac7edc95dfc659d12f3c959b3e607f9bab2e:255 gleich=ja
+  KONTROLLE exapp_impersonation.log PUT-Zeilen von spike30a: 1
+  GEGENPROBE REPORT calendar-multiget auth=basic status=207 objekte=1 text_gleich=ja
+VTODO anlegen zweiter status=412 objekt_unveraendert=ja auth=appapi | Sabre\DAV\Exception\PreconditionFailed An If-None-Match header was specified, but the ETag matched (or * was specified).
+VTODO anlegen falsches_secret status=401 angelegt_db=nein
+VTODO anlegen auth=basic status=201 nutzer=spike30a If-None-Match=* objekt=spike30-anlegen/s30-anlegen-basic-012915.ics etag=stark |
+  GEGENPROBE datenbank zeilen=1 spike30a/spike30-anlegen/s30-anlegen-basic-012915.ics:deleted_at_leer:042ebe4f73ac gesendet=042ebe4f73ac25f39b3d46f35c7a00342dab22afde79bb1d2d0c289833b0bfa7:253 gleich=ja
+VTODO anlegen zweiter status=412 objekt_unveraendert=ja auth=basic | Sabre\DAV\Exception\PreconditionFailed An If-None-Match header was specified, but the ETag matched (or * was specified).
+VTODO GLEICH appapi_basic=ja appapi=201/412/ja basic=201/412/ja
+```
+
+Der erste `PUT` mit `If-None-Match: *` antwortet unter Impersonation mit 201 und starker ETag, der zweite auf denselben Namen mit 412 (`PreconditionFailed`), das Objekt ist danach unverändert (Datenbank-Hash und `GET`). Positivkontrolle: eine `PUT`-Zeile des Messnutzers in `exapp_impersonation.log`. Gegenproben: die Datenbank hält genau das Gesendete, `REPORT calendar-multiget` mit App-Passwort liefert denselben Text, und derselbe `PUT` mit falschem Secret antwortet 401 und legt nichts an. Mit App-Passwort dieselben Werte. Damit ist die Schreibschiene für das Anlegen einer Aufgabe unter Impersonation belegt, auf einer Version.
+
+Die Discovery desselben Kontos unter Impersonation zeigt den Deck-Kalender mit denselben Merkmalen wie auf den Wegwerf-Instanzen: `SAMMLUNG uri=app-generated--deck--board-67 art=deck komponenten=VTODO read_only=fehlt schreibrecht=nein typen=collection,calendar name=Deck: spike30-board`. Rückbau: alle zwölf `BASELINE`-Zeilen `gleich=ja`, `RUECKBAU deck_boards_mit_praefix_spike30=0 (Tabelle deck_boards, per PHP)`, die vier Container wieder gestoppt.
+
+### 5.6 Von der Tasks-App geschriebene Objekte
+
+Acht Fixtures unter `tests/fixtures/tasks_app/`, je eine unveränderte Kopie eines Rohobjekts aus der Browser-Sitzung des Plans 30-02 (Nextcloud 35.0.0, Tasks 0.18.1, Konto `spike30ui`), Herkunft in `tests/fixtures/tasks_app/PROVENANCE.md`:
+
+| Datei | Art | Stand | Rohdatei | byte-gleich |
+|-------|-----|-------|----------|-------------|
+| `tests/fixtures/tasks_app/all_day.ics` | ganztag | a | `raw/ui-a/4EA29582-E2DB-4C8D-AAB9-7D57EABD83BA.ics` | ja |
+| `tests/fixtures/tasks_app/with_time.ics` | uhrzeit | a | `raw/ui-a/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics` | ja |
+| `tests/fixtures/tasks_app/subtask.ics` | unteraufgabe | a | `raw/ui-a/7CB0DDE8-C2D1-4640-B1D0-808CA11B3E2E.ics` | ja |
+| `tests/fixtures/tasks_app/subtask_parent.ics` | unteraufgabe | a | `raw/ui-a/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics` | ja |
+| `tests/fixtures/tasks_app/recurring.ics` | wiederkehrend | a | `raw/ui-a/7B483532-932E-4791-B363-DD0F4E3C8FEF.ics` | ja |
+| `tests/fixtures/tasks_app/tags.ics` | tags | a | `raw/ui-a/F2771C57-9EFA-4F40-9558-DA8132B79147.ics` | ja |
+| `tests/fixtures/tasks_app/completed.ics` | abgehakt | b | `raw/ui-b/4BFE626B-9A78-493B-9A99-78CC0FFC7D38.ics` | ja |
+| `tests/fixtures/tasks_app/reopened.ics` | wieder-geoeffnet | b | `raw/ui-b/2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics` | ja |
+
+Fehlende Arten: keine. Alle sieben Arten aus MESS-03 liegen vor (ganztägig, mit Uhrzeit, Unteraufgabe samt Elternaufgabe, wiederkehrend, mit Tags, abgehakt, wieder geöffnet); jedes Objekt nennt in seiner `PRODID` die Tasks-App und trägt das Merkmal seiner Art. Positivkontrolle: `KONTROLLE s30 unberuehrt in_beiden_staenden_gleich=ja (Positivkontrolle)`. Die Dateien behalten die Zeilenenden des Servers (CRLF); `.gitattributes` nimmt sie und die beiden Discovery-Antworten von der Zeilenenden-Umwandlung aus.
+
+- **A2 belegt** (Tasks 0.18.1): `A2 related_to_gleich_eltern_uid=ja gleiche_liste=ja reltype=fehlt related_to=dd207b48-0e3c-459d-a852-3868aefe8c36 eltern_uid=dd207b48-0e3c-459d-a852-3868aefe8c36 liste_kind=spike30-liste-1 liste_eltern=spike30-liste-1 (Listen aus den Zeilen UI-OBJEKT stand=a in raw/ui-sitzung.txt)`. `RELATED-TO` trägt die UID der Elternaufgabe, ohne den Parameter `RELTYPE`, und beide lagen in derselben Liste. Der Dateiname eines Objekts ist nicht seine UID (die App vergibt beide getrennt).
+- **A3 belegt** (Tasks 0.18.1): `A3 zeitform due=date+utc dtstart=utc completed=utc (value_form ueber die Zeile, alle Fixtures)`; Gegenprobe `A3 gegenprobe icalendar due=date+utc dtstart=utc completed=utc gleich=ja (dieselben Werte mit der Bibliothek icalendar gelesen)`; `A3 schwebend_vorhanden=nein tzid_vorhanden=nein`. Die App schreibt Zeiten in UTC mit `Z` und ganztägige Fälligkeiten als Datum, nie schwebend und nie mit `TZID`. Die Zeitmatrix von TASK-04 braucht für "mit Zone" und "schwebend" also weiter eigene, von Hand gebaute Testobjekte; von der App geschriebene gibt es dafür nicht.
+
+Dazu die beiden Discovery-Antworten von 35.0.2 als Fixtures, unverändert aus `raw/discovery-35.txt` zurückgelesen und nur angelegt, weil ihr sha256 der des Laufs ist und sie nur Probewerte enthalten:
+
+```
+FIXTURE discovery tests/fixtures/caldav_home_fresh_account.xml quelle=raw/discovery-35.txt (discovery-frisch) sha256_gleich=ja sha256=93fbe221c1b539686fe6c8f1c656c3b6081ded51ab9eae3c01ecaf7aa1a71f8c bytes=5619 sammlungen=5 aufgabenlisten=0 nur_probewerte=ja
+FIXTURE discovery tests/fixtures/caldav_home_task_lists.xml quelle=raw/discovery-35.txt (discovery-vorbereitet) sha256_gleich=ja sha256=9ae4460702ca914b61e01c74fad53834ebc1ab0a1ce38c013c20bebfdb99c653 bytes=11470 sammlungen=11 aufgabenlisten=4 nur_probewerte=ja
+```
+
+Kein Test dieser Phase liest die Fixtures; sie sind Vorarbeit für die Phasen 32 und 33. Die wiederkehrende Aufgabe ist eine tägliche Serie ohne Ende, die Elternaufgabe der Unteraufgabe stammt aus Stand a (vor dem Abhaken).
 
 ## 6. Kosten der Aufgabensuche (MESS-04)
 
-Offen, füllt Plan 30-04.
+Gemessen am 2026-11-12 auf zwei Wegwerf-Instanzen mit Nextcloud 35.0.2, nacheinander: SQLite (`compose.spike-tags.yml`) und PostgreSQL 17.11 (`compose.spike-tags-pg.yml`, Deckel 2 g und 1 g). Rohprotokolle `raw/kosten-sqlite.txt` und `raw/kosten-pg.txt`, wörtliche Zeilen in 12.9. Eine Liste `spike30-kosten` mit 2000 Aufgaben, davon 1900 erledigt, 100 offen, 10 der offenen mit dem Wort `kostenprobe` im Titel; jedes Objekt rund 490 Bytes. Je Reihe drei verworfene Aufwärmläufe und 15 Messläufe als `alice` mit App-Passwort, `REPORT calendar-query` Depth 1 mit `getetag` und `calendar-data`. Zeiten in Millisekunden, Wanduhr am Client auf demselben Host.
+
+| Messung | SQLite | PostgreSQL |
+|---------|--------|------------|
+| Aufbau | `AUFBAU aufgaben=2000 erledigt=1900 dauer_s=109 offen=100 mit_suchbegriff=10 gleichzeitig=1 wiederholte_put=0 objekt_bytes=490` | `AUFBAU aufgaben=2000 erledigt=1900 dauer_s=74 offen=100 mit_suchbegriff=10 gleichzeitig=4 wiederholte_put=0 objekt_bytes=490` |
+| Modus offen | `KOSTEN offen status=207 treffer=100 bytes=70274 min=106 median=108 p95_zweitgroesster=112 max=148 (n=15)` | `KOSTEN offen status=207 treffer=100 bytes=70274 min=129 median=150 p95_zweitgroesster=168 max=185 (n=15)` |
+| Modus alle | `KOSTEN alle status=207 treffer=2000 bytes=1521874 min=146 median=148 p95_zweitgroesster=257 max=337 (n=15)` | `KOSTEN alle status=207 treffer=2000 bytes=1521874 min=172 median=186 p95_zweitgroesster=205 max=225 (n=15)` |
+| calendar-search (ein Aufruf) | `KOSTEN calendar-search status=207 treffer=10 bytes=7364 ms=77` | `KOSTEN calendar-search status=207 treffer=10 bytes=7364 ms=110` |
+| Bezug: Discovery | `BEZUG discovery median=44 status=[207] max=65 (ms, n=15, PROPFIND Depth 1)` | `BEZUG discovery median=80 status=[207] max=110 (ms, n=15, PROPFIND Depth 1)` |
+| Bezug: status.php | `BEZUG status.php median=13 status=[200] max=21 (ms, n=15)` | `BEZUG status.php median=20 status=[200] max=21 (ms, n=15)` |
+
+Positivkontrollen und Gegenproben, je Datenbank gleich: `GEGENPROBE datenbank zeilen=2000 erwartet=2000 gleich=ja` (Tabelle `calendarobjects`, per PHP); `GEGENPROBE offen treffer_server=100 erwartet=100 alle_treffer=2000 erwartet_alle=2000 alle_ohne_completed=100`; `GEGENPROBE calendar-search namen_gleich=ja erwartet=10 server=10`. Kein Lauf erreichte das Zeitlimit, kein `PUT` des Aufbaus musste wiederholt werden.
+
+Was die Zahlen sagen:
+
+- Der Vorfilter "offen" spart vor allem Übertragung, kaum Zeit. Er liefert ein Zwanzigstel der Objekte und 70274 statt 1521874 Bytes, braucht aber im Median 108 statt 148 ms auf SQLite und 150 statt 186 ms auf PostgreSQL. Der größere Teil der Zeit fällt also unabhängig von der Treffermenge an.
+- PostgreSQL war auf diesem Host in jeder Reihe etwas langsamer als SQLite, auch bei den Bezugswerten; die Datenbank läuft dort in einem zweiten Container.
+- `calendar-search` antwortet mit 207 und genau den zehn erwarteten Aufgaben, in der Größenordnung des Modus offen. Gemessen ist ein einzelner Aufruf ohne Aufwärmen, also kein Median.
+
+**A6 belegt** als Größenordnung für diesen Aufbau: 2000 Aufgaben in einer Liste kosten im Modus alle im Median 148 ms (SQLite) und 186 ms (PostgreSQL), bei rund 1,5 MB Antwort. Die Schätzung der Recherche wird damit durch Zahlen ersetzt; sie gelten für eine frische Instanz auf einem Entwicklungsrechner.
+
+Anwendung der vorab festgelegten Ableitungsregel, als Vorschlag für Phase 32 und nicht als Produktwert:
+
+- Bezugswert ist der größere der beiden Mediane des Modus alle: `median=148` (SQLite) und `median=186` (PostgreSQL), also 186 ms.
+- 186 ms liegt bei höchstens 1,0 s, es gilt der erste Zweig der Regel: eine Abfrage je Liste ohne zusätzlichen Deckel unterhalb von 2000 Objekten.
+- Zeitbudget je Liste: das Doppelte des größten gemessenen Maximalwerts, aufgerundet auf volle Sekunden. Der größte Maximalwert über die Reihen offen und alle beider Datenbanken ist 337 ms (Modus alle, SQLite); das Doppelte sind 674 ms, aufgerundet 1 s.
+- Zweite Größe, die Antwortgröße je Modus: `bytes=70274` im Modus offen und `bytes=1521874` im Modus alle, auf beiden Datenbanken gleich. Das sind rund 760 Bytes je Aufgabe bei Objekten von 490 Bytes.
+
+Die Zeilen `VORSCHLAG` der beiden Dateien wenden die Regel je auf eine Datenbank an und kommen zum selben Zweig und zum selben Zeitbudget:
+
+```
+VORSCHLAG Bezugswert 0.148 s (höchstens 1,0 s): eine Abfrage je Liste ohne zusätzlichen Deckel unterhalb von 2000 Objekten, Zeitbudget je Liste 1 s (das Doppelte des größten gemessenen Maximalwerts 0.337 s, aufgerundet auf volle Sekunden); zweite Größe ist die Antwortgröße in Bytes je Modus (nur mit den Zahlen dieser Datenbank sqlite3; die Ableitungsregel nimmt als Bezugswert den größeren Median beider Datenbanken, der Bericht wendet sie auf beide Dateien an)
+VORSCHLAG Bezugswert 0.186 s (höchstens 1,0 s): eine Abfrage je Liste ohne zusätzlichen Deckel unterhalb von 2000 Objekten, Zeitbudget je Liste 1 s (das Doppelte des größten gemessenen Maximalwerts 0.225 s, aufgerundet auf volle Sekunden); zweite Größe ist die Antwortgröße in Bytes je Modus (nur mit den Zahlen dieser Datenbank pgsql; die Ableitungsregel nimmt als Bezugswert den größeren Median beider Datenbanken, der Bericht wendet sie auf beide Dateien an)
+```
+
+Der Vorschlag sagt nichts über den Deckel oberhalb von 2000 Objekten und nichts über mehrere Listen; das Zeitbudget von 1 s ist das Ergebnis der Regel auf einem lokalen Host ohne Netzwerkstrecke und für Phase 32 eine Untergrenze, kein Zielwert.
+
+### Grenzen der Messung
+
+- Einzelhost: Client, Webserver und Datenbank laufen auf demselben Rechner, es gibt keine Netzwerkstrecke, keinen Reverse Proxy und kein TLS. Die Zeiten sind eine untere Schranke.
+- Frische Instanz: ein Konto, keine weiteren Daten, keine Hintergrundlast, `memcache.local` APCu wie im offiziellen Image; keine Aussage über eine gewachsene Instanz.
+- Eine Liste mit 2000 kleinen Aufgaben (490 Bytes, eine kurze Beschreibung, keine Alarme, keine Anhänge). Größere Objekte vergrößern die Antwort linear; mehrere Listen und geteilte Listen sind ungemessen.
+- MySQL und MariaDB sind nicht gemessen, PostgreSQL nur in der Fassung 17.11 mit den Vorgaben des Images (`shared_buffers` 128MB).
+- Nur Nextcloud 35.0.2; die Kosten auf 32 bis 34 sind ungemessen.
+- Kein Lauf unter Impersonation: die Reihen liefen mit App-Passwort, die Wegwerf-Instanzen haben keine ExApp.
+- 15 Läufe je Reihe: der Wert `p95_zweitgroesster` ist der zweitgrößte der 15 Werte, kein Perzentil.
+- Mitläufer laut `docker stats` vor und nach den Reihen: nur der fremde Container `gameworld-dev-gameworld-docker-proxy-1` mit 0,00 % CPU und rund 24 MiB.
+- `calendar-search` ist einmal gemessen, mit einem Suchbegriff und einer Liste; sein Verhalten über geteilte Listen und mit Blättern (`offset` größer 0) ist ungemessen.
 
 ## 7. Inventar der Gates und Zusagen (A17)
 
@@ -778,6 +969,27 @@ Ergänzt durch Plan 30-03 (2026-11-11):
 | Belegtes Ziel ohne `Overwrite` bei abgeschaltetem Papierkorb | ungemessen | auf nc35 wird der Schalter nie verändert; dort lag das verdrängte Objekt im Papierkorb. Im Aus-Zustand wäre es nach 4.4 endgültig weg (abgeleitet, nicht gemessen) |
 | Unteraufgaben über mehrere Ebenen, Unteraufgabe in einer anderen Liste als die Elternaufgabe | ungemessen | gemessen ist eine Unteraufgabe in derselben Liste |
 | Mitnehmen der Unteraufgaben durch den Connector (Reihenfolge, Teilfehler) | ungemessen | gemessen ist, was Server und Tasks-App tun; der Connector hat noch kein Werkzeug dafür |
+
+Ergänzt durch Plan 30-04 (2026-11-12):
+
+| Punkt | Stand | Grund |
+|-------|-------|-------|
+| Föderierte Kalender in der Discovery (Teil von A5) | ungemessen | eine zweite Instanz wäre nötig und war in dieser Phase nicht vorgesehen; Protokollzeile `FOEDERIERT ungemessen grund=zweite Instanz noetig, in dieser Phase nicht vorgesehen` |
+| Discovery der Sammlungsarten auf Nextcloud 33 und 34 | ungemessen | der Plan misst die Discovery auf 32.0.15 und 35.0.2 und auf 33.0.9 und 34.0.4 nur die Abfragen |
+| Discovery und Abfragen unter Impersonation auf 32 bis 34 | ungemessen | Impersonation gibt es nur auf nc35 (35.0.0); dort ist die Discovery mit Deck-Kalender und der create-only `PUT` gemessen, die Abfragen nicht |
+| Wann ein Konto hinter einer ExApp seinen Standardkalender bekommt | ungemessen als eigene Reihe | beobachtet an drei Konten: mit Passwort-Anmeldung entsteht `personal`, nur mit App-Passwort aus occ oder unter Impersonation nicht (5.1); welche Anmeldewege das Ereignis auslösen, ist nicht systematisch gemessen |
+| Erstanmeldung über das Web-Formular | ungemessen | die Anfrage mit Basic hat den Kalender auf beiden Versionen schon erzeugt, der zweite Weg wurde nicht gebraucht |
+| Gelöschter Kalender mit `VEVENT` im heutigen Terminfilter des Connectors | ungemessen | der gelöschte Probekalender trug nur `VTODO`; dass `caldav.parse_calendar_home` einen gelöschten Terminkalender durchließe, ist abgeleitet (5.2) |
+| Abonnement mit abrufbarer Quelle, Kalender anderer Apps mit dem Präfix `app-generated--` | ungemessen | die Quelle des Probe-Abos ist absichtlich nicht erreichbar; gemessen ist nur Deck |
+| Geteilte Liste aus einer Freigabe an eine Gruppe oder ein Team, öffentlicher Link | ungemessen | hergestellt wurde eine Freigabe an ein einzelnes Konto |
+| `text-match` mit anderer Schreibweise (Groß- und Kleinschreibung, Umlaute), Textsuche über `DESCRIPTION` und `CATEGORIES` im Server | ungemessen | gemessen ist ein Begriff in Kleinbuchstaben an `SUMMARY`; TASK-02 filtert Text ohnehin im Connector |
+| Zeitfenster-Abfrage für eine wiederkehrende Aufgabe, deren Serie im Fenster beginnt | ungemessen | gemessen ist eine tägliche Serie, die vor dem Fenster beginnt; sie stand nicht in den Treffern |
+| Undatierte Aufgabe ohne `CREATED` im Zeitfenster | ungemessen | alle Probeaufgaben tragen `CREATED` vor dem Fensterende |
+| Link des Suchproviders für Aufgaben in geteilten Listen, in Deck-Kalendern und mit Sonderzeichen im Namen; Provider auf 32 bis 34 | ungemessen | gemessen ist eine eigene Liste auf 35.0.2 mit Tasks 0.18.1 |
+| Create-only `PUT` unter Impersonation auf 32 bis 34 und in einer geteilten Liste | ungemessen | nur nc35; in eine geteilte Liste ist das Anlegen mit App-Passwort gemessen (201 mit, 404 ohne Schreibrecht) |
+| Von der App geschriebene Objekte mit Zone (`TZID`) oder schwebender Zeit, mit Alarm, mit Priorität, mit `PERCENT-COMPLETE` zwischen 0 und 100 | nicht vorhanden | die Tasks-App 0.18.1 hat in der Sitzung nur UTC und Datum geschrieben (A3); die übrigen Felder wurden in der Sitzung nicht gesetzt |
+| Kosten der Suche auf MySQL und MariaDB, auf 32 bis 34, über mehrere Listen, über geteilte Listen, mit mehr als 2000 Aufgaben, mit großen Objekten, über eine Netzwerkstrecke, unter Impersonation | ungemessen | siehe "Grenzen der Messung" in Abschnitt 6 |
+| `calendar-search` als Reihe, mit `offset` größer 0, über geteilte Listen | ungemessen | ein Aufruf je Datenbank, wie in MESS-04 verlangt |
 
 Zum Rückbau gehört eine Grenze, die keine Messlücke ist, aber benannt sein muss: `occ app:remove groupfolders` nimmt den Code der App weg, nicht ihre Tabellen in der Datenbank, und auch `files_external` behält seine Tabellen nach dem Ausschalten. Die Baseline (Apps, Konten, Gruppen, Dateien, Kalender) ist nach dem Lauf in allen zwölf Feldern gleich; die leeren Tabellen beider Apps bleiben in der Instanz nc35 zurück.
 
@@ -1945,4 +2157,308 @@ LOESCHEN VERSION 35.0.2 g=ja w1=ja w2=ja w3=nein w4=ja wer=loeschender
 ABBAU Container vorhanden: nein
 ABBAU Volume vorhanden: nein
 DAUER 69 s; ENDE 2026-11-11T17:27:52Z
+```
+
+### 12.8 raw/discovery-32.txt bis raw/discovery-35.txt
+
+Vier Läufe des Blocks discovery-matrix vom 2026-11-12, je Version die Messzeilen des gewerteten Laufs in der Reihenfolge des Protokolls, ohne die Aufbauzeilen und ohne die Rohantworten. Die Datei für 32.0.15 trägt davor einen Abbruch am RAM-Tor und einen Lauf mit Werkzeugfehler (Abschnitt 5).
+
+Nextcloud 32.0.15 (Rohdatei discovery-32.txt, dritter Lauf):
+
+```
+WIEDERHOLUNG Grund: Werkzeugfehler im Lauf davor: die Deck-REST-Schnittstelle antwortete direkt nach occ app:install mit 404, der Neustart des Webservers fehlte im Skript (Fix 57f60f6); die Auswertung fuehrt deleted-calendar seither als eigene Art
+RAM frei_host_gb=5.37 schwelle=4.0 ergebnis=ok
+VERSION OF RECORD 32.0.15
+dbtype: sqlite3
+FRISCHES KONTO vor_anmeldung status=404 sammlungen=0 kalender_db=0  (PROPFIND Depth 1 als admin auf calendars/fresh30/: das Konto selbst hat sich noch nie angemeldet, eine Anfrage in seinem Namen waere schon die Anmeldung) | Sabre\DAV\Exception\NotFound Node with name 'fresh30' could not be found
+2026-11-12T01:10:36Z | ERSTANMELDUNG versuch=basic GET /ocs/v2.php/cloud/user nutzer=fresh30 status=200 kalender_db_danach=2 personal:VEVENT:leer contact_birthdays:VEVENT:leer
+ERSTANMELDUNG weg=basic
+FRISCHES KONTO aufgabenlisten=0 kalender=personal(VEVENT),contact_birthdays(VEVENT)
+SAMMLUNG uri=personal art=terminkalender komponenten=VEVENT read_only=fehlt schreibrecht=ja typen=collection,calendar name=Personal
+SAMMLUNG uri=contact_birthdays art=terminkalender komponenten=VEVENT read_only=fehlt schreibrecht=nein typen=collection,calendar name=Contact birthdays
+SAMMLUNG uri=inbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-inbox name=-
+SAMMLUNG uri=outbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-outbox name=-
+SAMMLUNG uri=trashbin art=papierkorb komponenten=keine read_only=fehlt schreibrecht=ja typen=collection,trash-bin name=-
+GEGENPROBE frisches konto kalender_db=2 personal:VEVENT:leer contact_birthdays:VEVENT:leer aufgabenlisten_db=0 (Tabelle calendars, Spalte components, per PHP und nicht ueber DAV)
+DECK-APP version=1.16.9 (gelesen mit occ app:list --output=json)
+SAMMLUNG uri=personal art=terminkalender komponenten=VEVENT read_only=fehlt schreibrecht=ja typen=collection,calendar name=Personal
+SAMMLUNG uri=contact_birthdays art=terminkalender komponenten=VEVENT read_only=fehlt schreibrecht=nein typen=collection,calendar name=Contact birthdays
+SAMMLUNG uri=spike30-aufgaben art=aufgabenliste komponenten=VTODO read_only=fehlt schreibrecht=ja typen=collection,calendar name=spike30-aufgaben
+SAMMLUNG uri=spike30-gemischt art=gemischt komponenten=VEVENT,VTODO read_only=fehlt schreibrecht=ja typen=collection,calendar name=spike30-gemischt
+SAMMLUNG uri=spike30-geloescht art=geloeschter-kalender komponenten=VTODO read_only=fehlt schreibrecht=ja typen=collection,deleted-calendar name=spike30-geloescht
+SAMMLUNG uri=spike30-b-rw_shared_by_bob art=geteilt-schreibbar komponenten=VTODO read_only=leer schreibrecht=ja typen=collection,calendar name=spike30-b-rw (bob)
+SAMMLUNG uri=spike30-b-ro_shared_by_bob art=geteilt-nur-lesen komponenten=VTODO read_only=1 schreibrecht=nein typen=collection,calendar name=spike30-b-ro (bob)
+SAMMLUNG uri=inbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-inbox name=-
+SAMMLUNG uri=outbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-outbox name=-
+SAMMLUNG uri=trashbin art=papierkorb komponenten=keine read_only=fehlt schreibrecht=ja typen=collection,trash-bin name=-
+SAMMLUNG uri=spike30-abo art=abo komponenten=VTODO,VEVENT read_only=fehlt schreibrecht=ja typen=collection,subscribed quelle=http://127.0.0.1:9/keine.ics name=spike30-abo
+SAMMLUNG uri=app-generated--deck--board-1 art=deck komponenten=VTODO read_only=fehlt schreibrecht=nein typen=collection,calendar name=Deck: Welcome to Nextcloud Deck!
+SAMMLUNG uri=app-generated--deck--board-2 art=deck komponenten=VTODO read_only=fehlt schreibrecht=nein typen=collection,calendar name=Deck: spike30-board
+ARTEN vorhanden=abo,aufgabenliste,deck,geloeschter-kalender,gemischt,geteilt-nur-lesen,geteilt-schreibbar,papierkorb,scheduling,terminkalender fehlen=keine
+POSITIVKONTROLLE aufgabenlisten_alice=4 (mindestens 1)
+READ-ONLY EIGENSCHAFT abrufbar=ja nur_lesen=1 schreibbar=leer schreibrecht_nur_lesen=nein schreibrecht_schreibbar=ja (A4)
+PAPIERKORB in_discovery=ja komponenten=keine typen=collection,trash-bin geloeschter_kalender_im_home=ja aufgabenliste_laut_auswertung=nein (A5)
+GEMISCHT in_beiden=ja terminfilter=ja aufgabenfilter=ja (A11; Terminfilter ist caldav.parse_calendar_home des Connectors, Aufgabenfilter ist task_lists)
+TERMINFILTER heute liefert=contact_birthdays,personal,spike30-gemischt AUFGABENFILTER liefert=spike30-aufgaben,spike30-b-ro_shared_by_bob,spike30-b-rw_shared_by_bob,spike30-gemischt
+FOEDERIERT ungemessen grund=zweite Instanz noetig, in dieser Phase nicht vorgesehen
+2026-11-12T01:10:52Z | SCHREIBVERSUCH nur-lesen PUT create-only liste=spike30-b-ro_shared_by_bob nutzer=alice auth=basic status=404 angelegt_db=nein | Sabre\DAV\Exception\NotFound Calendar with name 'spike30-b-ro_shared_by_bob' could not be found
+2026-11-12T01:10:53Z | SCHREIBVERSUCH schreibbar PUT create-only liste=spike30-b-rw_shared_by_bob nutzer=alice auth=basic status=201 angelegt_db=ja |
+GEGENPROBE vorbereitetes konto kalender_db=5 personal:VEVENT:leer contact_birthdays:VEVENT:leer spike30-aufgaben:VTODO:leer spike30-gemischt:VEVENT,VTODO:leer spike30-geloescht:VTODO:gesetzt | Sammlungen mit resourcetype calendar in der Discovery=8 (eigene Kalender; Freigaben, Deck und Abos stehen nicht in der Tabelle calendars dieses Kontos)
+ABFRAGE ohne-filter status=207 treffer=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+ABFRAGE ohne-filter client=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend gleich=ja
+ABFRAGE offen status=207 treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+ABFRAGE offen client=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend gleich=ja
+ABFRAGE fenster status=207 treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-im-fenster,q-offen-undatiert
+ABFRAGE fenster client=q-in-arbeit,q-offen-im-fenster gleich=nein nur_server=['q-abgebrochen', 'q-kind', 'q-offen-undatiert'] nur_client=[]
+ABFRAGE text status=207 treffer=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert
+ABFRAGE text client=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert gleich=ja
+ABFRAGE eltern status=207 treffer=q-kind
+ABFRAGE eltern client=q-kind gleich=ja
+ABFRAGE erledigt status=207 treffer=q-erledigt
+ABFRAGE erledigt client=q-erledigt gleich=ja
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 66 s; ENDE 2026-11-12T01:10:59Z
+```
+
+Nextcloud 33.0.9 (Rohdatei discovery-33.txt):
+
+```
+RAM frei_host_gb=5.32 schwelle=4.0 ergebnis=ok
+VERSION OF RECORD 33.0.9
+dbtype: sqlite3
+ABFRAGE ohne-filter status=207 treffer=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+ABFRAGE ohne-filter client=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend gleich=ja
+ABFRAGE offen status=207 treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+ABFRAGE offen client=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend gleich=ja
+ABFRAGE fenster status=207 treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-im-fenster,q-offen-undatiert
+ABFRAGE fenster client=q-in-arbeit,q-offen-im-fenster gleich=nein nur_server=['q-abgebrochen', 'q-kind', 'q-offen-undatiert'] nur_client=[]
+ABFRAGE text status=207 treffer=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert
+ABFRAGE text client=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert gleich=ja
+ABFRAGE eltern status=207 treffer=q-kind
+ABFRAGE eltern client=q-kind gleich=ja
+ABFRAGE erledigt status=207 treffer=q-erledigt
+ABFRAGE erledigt client=q-erledigt gleich=ja
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 45 s; ENDE 2026-11-12T01:13:21Z
+```
+
+Nextcloud 34.0.4 (Rohdatei discovery-34.txt):
+
+```
+RAM frei_host_gb=5.32 schwelle=4.0 ergebnis=ok
+VERSION OF RECORD 34.0.4
+dbtype: sqlite3
+ABFRAGE ohne-filter status=207 treffer=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+ABFRAGE ohne-filter client=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend gleich=ja
+ABFRAGE offen status=207 treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+ABFRAGE offen client=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend gleich=ja
+ABFRAGE fenster status=207 treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-im-fenster,q-offen-undatiert
+ABFRAGE fenster client=q-in-arbeit,q-offen-im-fenster gleich=nein nur_server=['q-abgebrochen', 'q-kind', 'q-offen-undatiert'] nur_client=[]
+ABFRAGE text status=207 treffer=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert
+ABFRAGE text client=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert gleich=ja
+ABFRAGE eltern status=207 treffer=q-kind
+ABFRAGE eltern client=q-kind gleich=ja
+ABFRAGE erledigt status=207 treffer=q-erledigt
+ABFRAGE erledigt client=q-erledigt gleich=ja
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 40 s; ENDE 2026-11-12T01:15:38Z
+```
+
+Nextcloud 35.0.2 (Rohdatei discovery-35.txt):
+
+```
+RAM frei_host_gb=5.39 schwelle=4.0 ergebnis=ok
+VERSION OF RECORD 35.0.2
+dbtype: sqlite3
+FRISCHES KONTO vor_anmeldung status=404 sammlungen=0 kalender_db=0  (PROPFIND Depth 1 als admin auf calendars/fresh30/: das Konto selbst hat sich noch nie angemeldet, eine Anfrage in seinem Namen waere schon die Anmeldung) | Sabre\DAV\Exception\NotFound Node with name 'fresh30' could not be found
+2026-11-12T01:17:51Z | ERSTANMELDUNG versuch=basic GET /ocs/v2.php/cloud/user nutzer=fresh30 status=200 kalender_db_danach=2 personal:VEVENT:leer contact_birthdays:VEVENT:leer
+ERSTANMELDUNG weg=basic
+FRISCHES KONTO aufgabenlisten=0 kalender=personal(VEVENT),contact_birthdays(VEVENT)
+SAMMLUNG uri=personal art=terminkalender komponenten=VEVENT read_only=fehlt schreibrecht=ja typen=collection,calendar name=Personal
+SAMMLUNG uri=contact_birthdays art=terminkalender komponenten=VEVENT read_only=fehlt schreibrecht=nein typen=collection,calendar name=Contact birthdays
+SAMMLUNG uri=inbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-inbox name=-
+SAMMLUNG uri=outbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-outbox name=-
+SAMMLUNG uri=trashbin art=papierkorb komponenten=keine read_only=fehlt schreibrecht=ja typen=collection,trash-bin name=-
+GEGENPROBE frisches konto kalender_db=2 personal:VEVENT:leer contact_birthdays:VEVENT:leer aufgabenlisten_db=0 (Tabelle calendars, Spalte components, per PHP und nicht ueber DAV)
+DECK-APP version=1.19.2 (gelesen mit occ app:list --output=json)
+SAMMLUNG uri=spike30-aufgaben art=aufgabenliste komponenten=VTODO read_only=fehlt schreibrecht=ja typen=collection,calendar name=spike30-aufgaben
+SAMMLUNG uri=spike30-gemischt art=gemischt komponenten=VEVENT,VTODO read_only=fehlt schreibrecht=ja typen=collection,calendar name=spike30-gemischt
+SAMMLUNG uri=spike30-geloescht art=geloeschter-kalender komponenten=VTODO read_only=fehlt schreibrecht=ja typen=collection,deleted-calendar name=spike30-geloescht
+SAMMLUNG uri=spike30-b-rw_shared_by_bob art=geteilt-schreibbar komponenten=VTODO read_only=leer schreibrecht=ja typen=collection,calendar name=spike30-b-rw (bob)
+SAMMLUNG uri=spike30-b-ro_shared_by_bob art=geteilt-nur-lesen komponenten=VTODO read_only=1 schreibrecht=nein typen=collection,calendar name=spike30-b-ro (bob)
+SAMMLUNG uri=inbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-inbox name=-
+SAMMLUNG uri=outbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-outbox name=-
+SAMMLUNG uri=trashbin art=papierkorb komponenten=keine read_only=fehlt schreibrecht=ja typen=collection,trash-bin name=-
+SAMMLUNG uri=spike30-abo art=abo komponenten=VTODO,VEVENT read_only=fehlt schreibrecht=ja typen=collection,subscribed quelle=http://127.0.0.1:9/keine.ics name=spike30-abo
+SAMMLUNG uri=app-generated--deck--board-1 art=deck komponenten=VTODO read_only=fehlt schreibrecht=nein typen=collection,calendar name=Deck: Welcome to Nextcloud Deck!
+SAMMLUNG uri=app-generated--deck--board-2 art=deck komponenten=VTODO read_only=fehlt schreibrecht=nein typen=collection,calendar name=Deck: spike30-board
+ARTEN vorhanden=abo,aufgabenliste,deck,geloeschter-kalender,gemischt,geteilt-nur-lesen,geteilt-schreibbar,papierkorb,scheduling fehlen=keine
+POSITIVKONTROLLE aufgabenlisten_alice=4 (mindestens 1)
+READ-ONLY EIGENSCHAFT abrufbar=ja nur_lesen=1 schreibbar=leer schreibrecht_nur_lesen=nein schreibrecht_schreibbar=ja (A4)
+PAPIERKORB in_discovery=ja komponenten=keine typen=collection,trash-bin geloeschter_kalender_im_home=ja aufgabenliste_laut_auswertung=nein (A5)
+GEMISCHT in_beiden=ja terminfilter=ja aufgabenfilter=ja (A11; Terminfilter ist caldav.parse_calendar_home des Connectors, Aufgabenfilter ist task_lists)
+TERMINFILTER heute liefert=spike30-gemischt AUFGABENFILTER liefert=spike30-aufgaben,spike30-b-ro_shared_by_bob,spike30-b-rw_shared_by_bob,spike30-gemischt
+FOEDERIERT ungemessen grund=zweite Instanz noetig, in dieser Phase nicht vorgesehen
+2026-11-12T01:18:07Z | SCHREIBVERSUCH nur-lesen PUT create-only liste=spike30-b-ro_shared_by_bob nutzer=alice auth=basic status=404 angelegt_db=nein | Sabre\DAV\Exception\NotFound Calendar with name 'spike30-b-ro_shared_by_bob' could not be found
+2026-11-12T01:18:09Z | SCHREIBVERSUCH schreibbar PUT create-only liste=spike30-b-rw_shared_by_bob nutzer=alice auth=basic status=201 angelegt_db=ja |
+GEGENPROBE vorbereitetes konto kalender_db=3 spike30-aufgaben:VTODO:leer spike30-gemischt:VEVENT,VTODO:leer spike30-geloescht:VTODO:gesetzt | Sammlungen mit resourcetype calendar in der Discovery=6 (eigene Kalender; Freigaben, Deck und Abos stehen nicht in der Tabelle calendars dieses Kontos)
+ABFRAGE ohne-filter status=207 treffer=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+ABFRAGE ohne-filter client=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend gleich=ja
+ABFRAGE offen status=207 treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+ABFRAGE offen client=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend gleich=ja
+ABFRAGE fenster status=207 treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-im-fenster,q-offen-undatiert
+ABFRAGE fenster client=q-in-arbeit,q-offen-im-fenster gleich=nein nur_server=['q-abgebrochen', 'q-kind', 'q-offen-undatiert'] nur_client=[]
+ABFRAGE text status=207 treffer=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert
+ABFRAGE text client=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert gleich=ja
+ABFRAGE eltern status=207 treffer=q-kind
+ABFRAGE eltern client=q-kind gleich=ja
+ABFRAGE erledigt status=207 treffer=q-erledigt
+ABFRAGE erledigt client=q-erledigt gleich=ja
+PROVIDER liste vor_installation status=200 tasks_dabei=nein ids=appstore,circles,comments,files,search-deck-card-board,search-deck-comment,settings,systemtags
+PROVIDER tasks app_nie_installiert status=200 eintraege=0
+TASKS-APP version=0.18.1 (gelesen mit occ app:list --output=json)
+PROVIDER liste app_an status=200 tasks_dabei=ja ids=appstore,circles,comments,files,search-deck-card-board,search-deck-comment,settings,systemtags,tasks
+PROVIDER tasks treffer=3 link=http://127.0.0.1:8083/apps/tasks/calendars/spike30-aufgaben/tasks/s30-q-offen-undatiert-011745.ics
+PROVIDER aufloesung status=200 uid_gleich=ja kalender=spike30-aufgaben objekt=s30-q-offen-undatiert-011745.ics (GET auf die aus dem Link gebaute DAV-URL; die UID der angelegten Aufgabe ist ihr Objektname ohne .ics)
+PROVIDER liste app_aus status=200 tasks_dabei=nein ids=appstore,circles,comments,files,search-deck-card-board,search-deck-comment,settings,systemtags
+PROVIDER tasks app_aus treffer=0 status=200
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 70 s; ENDE 2026-11-12T01:18:26Z
+```
+
+### 12.9 raw/kosten-sqlite.txt und raw/kosten-pg.txt
+
+Zwei Läufe des Blocks cost vom 2026-11-12 auf Nextcloud 35.0.2.
+
+SQLite (Rohdatei kosten-sqlite.txt):
+
+```
+RAM frei_host_gb=5.29 schwelle=4.0 ergebnis=ok
+VERSION OF RECORD 35.0.2
+dbtype: sqlite3
+memcache.local: \OC\Memcache\APCu
+AUFBAU aufgaben=2000 erledigt=1900 dauer_s=109 offen=100 mit_suchbegriff=10 gleichzeitig=1 wiederholte_put=0 objekt_bytes=490 (PUT create-only ueber DAV als alice, Liste spike30-kosten)
+GEGENPROBE datenbank zeilen=2000 erwartet=2000 gleich=ja (Tabelle calendarobjects, per PHP)
+KOSTEN offen status=207 treffer=100 bytes=70274 min=106 median=108 p95_zweitgroesster=112 max=148 (n=15)
+KOSTEN alle status=207 treffer=2000 bytes=1521874 min=146 median=148 p95_zweitgroesster=257 max=337 (n=15)
+GEGENPROBE offen treffer_server=100 erwartet=100 alle_treffer=2000 erwartet_alle=2000 alle_ohne_completed=100 (Objekte ohne COMPLETED, clientseitig in der Antwort alle gezaehlt)
+KOSTEN calendar-search status=207 treffer=10 bytes=7364 ms=77 (ein Aufruf, REPORT auf dem Kalender-Home, Depth 2, Suchbegriff kostenprobe, comp-filter VTODO, prop-filter SUMMARY, limit 50, offset 0)
+GEGENPROBE calendar-search namen_gleich=ja erwartet=10 server=10 (dieselben Namen clientseitig aus der Antwort alle gefiltert; Positivkontrolle: der Suchbegriff steht in 10 vorbereiteten Aufgaben)
+BEZUG discovery median=44 status=[207] max=65 (ms, n=15, PROPFIND Depth 1)
+BEZUG status.php median=13 status=[200] max=21 (ms, n=15)
+VORSCHLAG Bezugswert 0.148 s (höchstens 1,0 s): eine Abfrage je Liste ohne zusätzlichen Deckel unterhalb von 2000 Objekten, Zeitbudget je Liste 1 s (das Doppelte des größten gemessenen Maximalwerts 0.337 s, aufgerundet auf volle Sekunden); zweite Größe ist die Antwortgröße in Bytes je Modus (nur mit den Zahlen dieser Datenbank sqlite3; die Ableitungsregel nimmt als Bezugswert den größeren Median beider Datenbanken, der Bericht wendet sie auf beide Dateien an)
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 167 s; ENDE 2026-11-12T01:22:51Z
+```
+
+PostgreSQL (Rohdatei kosten-pg.txt):
+
+```
+RAM frei_host_gb=5.35 schwelle=4.0 ergebnis=ok
+VERSION OF RECORD 35.0.2
+dbtype: pgsql
+select version(): PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+show shared_buffers: 128MB
+postgres-Image: postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+memcache.local: \OC\Memcache\APCu
+AUFBAU aufgaben=2000 erledigt=1900 dauer_s=74 offen=100 mit_suchbegriff=10 gleichzeitig=4 wiederholte_put=0 objekt_bytes=490 (PUT create-only ueber DAV als alice, Liste spike30-kosten)
+GEGENPROBE datenbank zeilen=2000 erwartet=2000 gleich=ja (Tabelle calendarobjects, per PHP)
+KOSTEN offen status=207 treffer=100 bytes=70274 min=129 median=150 p95_zweitgroesster=168 max=185 (n=15)
+KOSTEN alle status=207 treffer=2000 bytes=1521874 min=172 median=186 p95_zweitgroesster=205 max=225 (n=15)
+GEGENPROBE offen treffer_server=100 erwartet=100 alle_treffer=2000 erwartet_alle=2000 alle_ohne_completed=100 (Objekte ohne COMPLETED, clientseitig in der Antwort alle gezaehlt)
+KOSTEN calendar-search status=207 treffer=10 bytes=7364 ms=110 (ein Aufruf, REPORT auf dem Kalender-Home, Depth 2, Suchbegriff kostenprobe, comp-filter VTODO, prop-filter SUMMARY, limit 50, offset 0)
+GEGENPROBE calendar-search namen_gleich=ja erwartet=10 server=10 (dieselben Namen clientseitig aus der Antwort alle gefiltert; Positivkontrolle: der Suchbegriff steht in 10 vorbereiteten Aufgaben)
+BEZUG discovery median=80 status=[207] max=110 (ms, n=15, PROPFIND Depth 1)
+BEZUG status.php median=20 status=[200] max=21 (ms, n=15)
+VORSCHLAG Bezugswert 0.186 s (höchstens 1,0 s): eine Abfrage je Liste ohne zusätzlichen Deckel unterhalb von 2000 Objekten, Zeitbudget je Liste 1 s (das Doppelte des größten gemessenen Maximalwerts 0.225 s, aufgerundet auf volle Sekunden); zweite Größe ist die Antwortgröße in Bytes je Modus (nur mit den Zahlen dieser Datenbank pgsql; die Ableitungsregel nimmt als Bezugswert den größeren Median beider Datenbanken, der Bericht wendet sie auf beide Dateien an)
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 164 s; ENDE 2026-11-12T01:27:11Z
+```
+
+### 12.10 raw/nc35-vtodo-anlegen.txt, raw/fixtures.txt und die Rohantwort des frischen Kontos
+
+Create-only PUT unter Impersonation auf nc35 (Rohdatei nc35-vtodo-anlegen.txt), ohne die Zeilen des Hochfahrens:
+
+```
+VERSION OF RECORD 35.0.0
+2026-11-12T01:29:15Z | SETUP MKCALENDAR liste=spike30-anlegen nutzer=spike30a auth=appapi status=201 komponenten=VTODO
+VTODO anlegen auth=appapi status=201 nutzer=spike30a If-None-Match=* objekt=spike30-anlegen/s30-anlegen-appapi-012915.ics etag=stark |
+  GEGENPROBE datenbank zeilen=1 spike30a/spike30-anlegen/s30-anlegen-appapi-012915.ics:deleted_at_leer:9d38af15ef17 gesendet=9d38af15ef174a35880c19be7bb7ac7edc95dfc659d12f3c959b3e607f9bab2e:255 gleich=ja
+  KONTROLLE exapp_impersonation.log PUT-Zeilen von spike30a: 1
+  GEGENPROBE REPORT calendar-multiget auth=basic status=207 objekte=1 text_gleich=ja
+VTODO anlegen zweiter status=412 objekt_unveraendert=ja auth=appapi | Sabre\DAV\Exception\PreconditionFailed An If-None-Match header was specified, but the ETag matched (or * was specified).
+VTODO anlegen falsches_secret status=401 angelegt_db=nein
+VTODO anlegen auth=basic status=201 nutzer=spike30a If-None-Match=* objekt=spike30-anlegen/s30-anlegen-basic-012915.ics etag=stark |
+  GEGENPROBE datenbank zeilen=1 spike30a/spike30-anlegen/s30-anlegen-basic-012915.ics:deleted_at_leer:042ebe4f73ac gesendet=042ebe4f73ac25f39b3d46f35c7a00342dab22afde79bb1d2d0c289833b0bfa7:253 gleich=ja
+VTODO anlegen zweiter status=412 objekt_unveraendert=ja auth=basic | Sabre\DAV\Exception\PreconditionFailed An If-None-Match header was specified, but the ETag matched (or * was specified).
+VTODO GLEICH appapi_basic=ja appapi=201/412/ja basic=201/412/ja
+DECK-APP version=1.19.0 (occ app:list --output=json)
+2026-11-12T01:29:20Z | SETUP DECK POST /index.php/apps/deck/api/v1.0/boards titel=spike30-board nutzer=spike30a auth=basic status=200 board_id=67
+SAMMLUNG uri=spike30-anlegen art=aufgabenliste komponenten=VTODO read_only=fehlt schreibrecht=ja typen=collection,calendar name=spike30-anlegen
+SAMMLUNG uri=inbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-inbox name=-
+SAMMLUNG uri=outbox art=scheduling komponenten=keine read_only=fehlt schreibrecht=nein typen=collection,schedule-outbox name=-
+SAMMLUNG uri=trashbin art=papierkorb komponenten=keine read_only=fehlt schreibrecht=ja typen=collection,trash-bin name=-
+SAMMLUNG uri=app-generated--deck--board-66 art=deck komponenten=VTODO read_only=fehlt schreibrecht=nein typen=collection,calendar name=Deck: Welcome to Nextcloud Deck!
+SAMMLUNG uri=app-generated--deck--board-67 art=deck komponenten=VTODO read_only=fehlt schreibrecht=nein typen=collection,calendar name=Deck: spike30-board
+RUECKBAU DECK DELETE boards/67 status=200
+RUECKBAU reste_mit_praefix_spike30=keine
+RUECKBAU occ user:list -> - admin: admin - alice: alice - bob: bob
+RUECKBAU occ app:list groupfolders_vorhanden=nein files_external_an=nein
+RUECKBAU deck_boards_mit_praefix_spike30=0 (Tabelle deck_boards, per PHP)
+BASELINE nutzer vorher={"admin":"admin","alice":"alice","bob":"bob"} nachher={"admin":"admin","alice":"alice","bob":"bob"} gleich=ja
+BASELINE geloeschte_kalenderobjekte vorher=0 nachher=0 gleich=ja
+BASELINE geloeschte_kalender vorher=0 nachher=0 gleich=ja
+```
+
+Block fixtures (Rohdatei fixtures.txt, zweiter Lauf nach den sieben Messläufen):
+
+```
+WIEDERHOLUNG Grund: erster Lauf dieses Blocks lag vor den sieben Laeufen aus Task 2 (Docker stand still); die Discovery-Fixtures und der Vergleich A1 entstehen erst jetzt, die Objekte der Tasks-App sind dieselben
+FIXTURE discovery tests/fixtures/caldav_home_fresh_account.xml quelle=raw/discovery-35.txt (discovery-frisch) sha256_gleich=ja sha256=93fbe221c1b539686fe6c8f1c656c3b6081ded51ab9eae3c01ecaf7aa1a71f8c bytes=5619 sammlungen=5 aufgabenlisten=0 nur_probewerte=ja
+FIXTURE discovery tests/fixtures/caldav_home_task_lists.xml quelle=raw/discovery-35.txt (discovery-vorbereitet) sha256_gleich=ja sha256=9ae4460702ca914b61e01c74fad53834ebc1ab0a1ce38c013c20bebfdb99c653 bytes=11470 sammlungen=11 aufgabenlisten=4 nur_probewerte=ja
+FIXTURE ganztag quelle=raw/ui-a/4EA29582-E2DB-4C8D-AAB9-7D57EABD83BA.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/all_day.ics sha256=8800a16c0426b15472659092e07bfbf4d98cb86d885df870527ba878723c187e merkmal=DUE als Datum prodid_tasks_app=ja
+FIXTURE uhrzeit quelle=raw/ui-a/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/with_time.ics sha256=693350c5ead0939acea0693c598a25d6382e95d8eb0f06ffcd0c58f3a32de034 merkmal=DUE mit Uhrzeit prodid_tasks_app=ja
+FIXTURE unteraufgabe quelle=raw/ui-a/7CB0DDE8-C2D1-4640-B1D0-808CA11B3E2E.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/subtask.ics sha256=04636818f69b036c9989a9af49c3dda37b7dd5eb67e4c27153f6777b74f97f3e merkmal=RELATED-TO prodid_tasks_app=ja
+FIXTURE unteraufgabe quelle=raw/ui-a/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/subtask_parent.ics sha256=f8130a8ddc2d2228cbd617286c8df64f37e48bb7dbda8c96ce813f69d3018b8f merkmal=kein RELATED-TO prodid_tasks_app=ja
+FIXTURE wiederkehrend quelle=raw/ui-a/7B483532-932E-4791-B363-DD0F4E3C8FEF.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/recurring.ics sha256=3781d31ae75218e775c0c8ed359460f7cccac33d8f2b96d7dc4afe410bcdd7a1 merkmal=RRULE prodid_tasks_app=ja
+FIXTURE tags quelle=raw/ui-a/F2771C57-9EFA-4F40-9558-DA8132B79147.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/tags.ics sha256=a275be382b3b7366fa62381a47c4a3ddf88d824d3e056abb1d3c641071e66311 merkmal=CATEGORIES prodid_tasks_app=ja
+FIXTURE abgehakt quelle=raw/ui-b/4BFE626B-9A78-493B-9A99-78CC0FFC7D38.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/completed.ics sha256=407596b89ba646c35d24ddb8d50e51eb3e899e5698d95084ad22be66ab665ee5 merkmal=STATUS:COMPLETED und COMPLETED prodid_tasks_app=ja
+FIXTURE wieder-geoeffnet quelle=raw/ui-b/2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/reopened.ics sha256=dc20515aed07b18f4c92b4a2fa8d9d5390f849d96372cc15dbd93a0b405b849d merkmal=STATUS:NEEDS-ACTION prodid_tasks_app=ja
+KONTROLLE s30 unberuehrt in_beiden_staenden_gleich=ja (Positivkontrolle)
+PROVENANCE tests/fixtures/tasks_app/PROVENANCE.md geschrieben
+A2 related_to_gleich_eltern_uid=ja gleiche_liste=ja reltype=fehlt related_to=dd207b48-0e3c-459d-a852-3868aefe8c36 eltern_uid=dd207b48-0e3c-459d-a852-3868aefe8c36 liste_kind=spike30-liste-1 liste_eltern=spike30-liste-1 (Listen aus den Zeilen UI-OBJEKT stand=a in raw/ui-sitzung.txt)
+ZEITFORM fixture=all_day.ics DUE=date
+ZEITFORM fixture=with_time.ics DUE=utc DTSTART=utc
+ZEITFORM fixture=subtask.ics (keine Zeitangabe)
+ZEITFORM fixture=subtask_parent.ics (keine Zeitangabe)
+ZEITFORM fixture=recurring.ics DUE=utc
+ZEITFORM fixture=tags.ics (keine Zeitangabe)
+ZEITFORM fixture=completed.ics COMPLETED=utc
+ZEITFORM fixture=reopened.ics (keine Zeitangabe)
+A3 zeitform due=date+utc dtstart=utc completed=utc (value_form ueber die Zeile, alle Fixtures)
+A3 gegenprobe icalendar due=date+utc dtstart=utc completed=utc gleich=ja (dieselben Werte mit der Bibliothek icalendar gelesen)
+A3 schwebend_vorhanden=nein tzid_vorhanden=nein
+A1 abfrage=ohne-filter gleich=ja abweichend=keine treffer=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+A1 abfrage=offen gleich=ja abweichend=keine treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+A1 abfrage=fenster gleich=ja abweichend=keine treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-im-fenster,q-offen-undatiert
+A1 abfrage=text gleich=ja abweichend=keine treffer=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert
+A1 abfrage=eltern gleich=ja abweichend=keine treffer=q-kind
+A1 abfrage=erledigt gleich=ja abweichend=keine treffer=q-erledigt
+A1 alle_sechs_abfragen_auf_allen_versionen_gleich=ja versionen=32.0.15,33.0.9,34.0.4,35.0.2 vollstaendig=ja
+```
+
+Rohantwort der Discovery des frischen Kontos auf 35.0.2 (Rohdatei discovery-35.txt, zwischen den Zeilen ROHANTWORT-ANFANG und ROHANTWORT-ENDE, unverändert auch in tests/fixtures/caldav_home_fresh_account.xml):
+
+```
+ROHANTWORT-ANFANG discovery-frisch status=207 bytes=5619 sha256=93fbe221c1b539686fe6c8f1c656c3b6081ded51ab9eae3c01ecaf7aa1a71f8c
+<?xml version="1.0"?>
+<d:multistatus xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:cal="urn:ietf:params:xml:ns:caldav" xmlns:cs="http://calendarserver.org/ns/" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"><d:response><d:href>/remote.php/dav/calendars/fresh30/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/></d:resourcetype><d:current-user-privilege-set><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-acl/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><cal:supported-calendar-component-set/><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/fresh30/personal/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:displayname>Personal</d:displayname><cal:supported-calendar-component-set><cal:comp name="VEVENT"/></cal:supported-calendar-component-set><d:current-user-privilege-set><d:privilege><d:write-acl/></d:privilege><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/fresh30/contact_birthdays/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:calendar/></d:resourcetype><d:displayname>Contact birthdays</d:displayname><cal:supported-calendar-component-set><cal:comp name="VEVENT"/></cal:supported-calendar-component-set><d:current-user-privilege-set><d:privilege><d:write-properties/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege><d:privilege><cal:read-free-busy/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/fresh30/inbox/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:schedule-inbox/></d:resourcetype><d:current-user-privilege-set><d:privilege><cal:schedule-deliver/></d:privilege><d:privilege><cal:schedule-deliver-invite/></d:privilege><d:privilege><cal:schedule-deliver-reply/></d:privilege><d:privilege><cal:schedule-query-freebusy/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><cal:supported-calendar-component-set/><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/fresh30/outbox/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><cal:schedule-outbox/></d:resourcetype><d:current-user-privilege-set><d:privilege><cal:schedule-send/></d:privilege><d:privilege><cal:schedule-send-invite/></d:privilege><d:privilege><cal:schedule-send-reply/></d:privilege><d:privilege><cal:schedule-send-freebusy/></d:privilege><d:privilege><cal:schedule-post-vevent/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><cal:supported-calendar-component-set/><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response><d:response><d:href>/remote.php/dav/calendars/fresh30/trashbin/</d:href><d:propstat><d:prop><d:resourcetype><d:collection/><x1:trash-bin xmlns:x1="http://nextcloud.com/ns"/></d:resourcetype><d:current-user-privilege-set><d:privilege><d:all/></d:privilege><d:privilege><d:read/></d:privilege><d:privilege><d:write/></d:privilege><d:privilege><d:write-properties/></d:privilege><d:privilege><d:write-content/></d:privilege><d:privilege><d:unlock/></d:privilege><d:privilege><d:bind/></d:privilege><d:privilege><d:unbind/></d:privilege><d:privilege><d:write-acl/></d:privilege><d:privilege><d:read-acl/></d:privilege><d:privilege><d:read-current-user-privilege-set/></d:privilege></d:current-user-privilege-set></d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat><d:propstat><d:prop><d:displayname/><cal:supported-calendar-component-set/><cs:source/><oc:read-only/></d:prop><d:status>HTTP/1.1 404 Not Found</d:status></d:propstat></d:response></d:multistatus>
+
+ROHANTWORT-ENDE discovery-frisch
 ```

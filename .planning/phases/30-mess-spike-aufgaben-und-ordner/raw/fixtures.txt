@@ -1,0 +1,87 @@
+
+# Lauf blocks=fixtures start=2026-11-12T00:55:14Z (neue Datei)
+
+== fixtures, start 2026-11-12T00:55:14Z ==
+
+== discovery-fixtures ==
+FIXTURE discovery tests/fixtures/caldav_home_fresh_account.xml nicht angelegt grund=die Rohantwort discovery-frisch fehlt in raw/discovery-35.txt oder ihr sha256 stimmt nicht
+FIXTURE discovery tests/fixtures/caldav_home_task_lists.xml nicht angelegt grund=die Rohantwort discovery-vorbereitet fehlt in raw/discovery-35.txt oder ihr sha256 stimmt nicht
+
+== objekte der tasks-app ==
+FIXTURE ganztag quelle=raw/ui-a/4EA29582-E2DB-4C8D-AAB9-7D57EABD83BA.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/all_day.ics sha256=8800a16c0426b15472659092e07bfbf4d98cb86d885df870527ba878723c187e merkmal=DUE als Datum prodid_tasks_app=ja
+FIXTURE uhrzeit quelle=raw/ui-a/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/with_time.ics sha256=693350c5ead0939acea0693c598a25d6382e95d8eb0f06ffcd0c58f3a32de034 merkmal=DUE mit Uhrzeit prodid_tasks_app=ja
+FIXTURE unteraufgabe quelle=raw/ui-a/7CB0DDE8-C2D1-4640-B1D0-808CA11B3E2E.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/subtask.ics sha256=04636818f69b036c9989a9af49c3dda37b7dd5eb67e4c27153f6777b74f97f3e merkmal=RELATED-TO prodid_tasks_app=ja
+FIXTURE unteraufgabe quelle=raw/ui-a/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/subtask_parent.ics sha256=f8130a8ddc2d2228cbd617286c8df64f37e48bb7dbda8c96ce813f69d3018b8f merkmal=kein RELATED-TO prodid_tasks_app=ja
+FIXTURE wiederkehrend quelle=raw/ui-a/7B483532-932E-4791-B363-DD0F4E3C8FEF.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/recurring.ics sha256=3781d31ae75218e775c0c8ed359460f7cccac33d8f2b96d7dc4afe410bcdd7a1 merkmal=RRULE prodid_tasks_app=ja
+FIXTURE tags quelle=raw/ui-a/F2771C57-9EFA-4F40-9558-DA8132B79147.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/tags.ics sha256=a275be382b3b7366fa62381a47c4a3ddf88d824d3e056abb1d3c641071e66311 merkmal=CATEGORIES prodid_tasks_app=ja
+FIXTURE abgehakt quelle=raw/ui-b/4BFE626B-9A78-493B-9A99-78CC0FFC7D38.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/completed.ics sha256=407596b89ba646c35d24ddb8d50e51eb3e899e5698d95084ad22be66ab665ee5 merkmal=STATUS:COMPLETED und COMPLETED prodid_tasks_app=ja
+FIXTURE wieder-geoeffnet quelle=raw/ui-b/2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/reopened.ics sha256=dc20515aed07b18f4c92b4a2fa8d9d5390f849d96372cc15dbd93a0b405b849d merkmal=STATUS:NEEDS-ACTION prodid_tasks_app=ja
+KONTROLLE s30 unberuehrt in_beiden_staenden_gleich=ja (Positivkontrolle)
+PROVENANCE tests/fixtures/tasks_app/PROVENANCE.md geschrieben
+
+== annahmen A2 und A3 ==
+A2 related_to_gleich_eltern_uid=ja gleiche_liste=ja reltype=fehlt related_to=dd207b48-0e3c-459d-a852-3868aefe8c36 eltern_uid=dd207b48-0e3c-459d-a852-3868aefe8c36 liste_kind=spike30-liste-1 liste_eltern=spike30-liste-1 (Listen aus den Zeilen UI-OBJEKT stand=a in raw/ui-sitzung.txt)
+ZEITFORM fixture=all_day.ics DUE=date
+ZEITFORM fixture=with_time.ics DUE=utc DTSTART=utc
+ZEITFORM fixture=subtask.ics (keine Zeitangabe)
+ZEITFORM fixture=subtask_parent.ics (keine Zeitangabe)
+ZEITFORM fixture=recurring.ics DUE=utc
+ZEITFORM fixture=tags.ics (keine Zeitangabe)
+ZEITFORM fixture=completed.ics COMPLETED=utc
+ZEITFORM fixture=reopened.ics (keine Zeitangabe)
+A3 zeitform due=date+utc dtstart=utc completed=utc (value_form ueber die Zeile, alle Fixtures)
+A3 gegenprobe icalendar due=date+utc dtstart=utc completed=utc gleich=ja (dieselben Werte mit der Bibliothek icalendar gelesen)
+A3 schwebend_vorhanden=nein tzid_vorhanden=nein
+
+== abfragen A1 ==
+A1 abfrage=ohne-filter ungemessen grund=keine Zeile ABFRAGE in den Rohdateien
+A1 abfrage=offen ungemessen grund=keine Zeile ABFRAGE in den Rohdateien
+A1 abfrage=fenster ungemessen grund=keine Zeile ABFRAGE in den Rohdateien
+A1 abfrage=text ungemessen grund=keine Zeile ABFRAGE in den Rohdateien
+A1 abfrage=eltern ungemessen grund=keine Zeile ABFRAGE in den Rohdateien
+A1 abfrage=erledigt ungemessen grund=keine Zeile ABFRAGE in den Rohdateien
+A1 alle_sechs_abfragen_auf_allen_versionen_gleich=nein versionen=32 (keine Datei),33 (keine Datei),34 (keine Datei),35 (keine Datei) vollstaendig=nein
+
+# Lauf blocks=fixtures start=2026-11-12T01:30:09Z (angehaengt an bestehende Datei)
+WIEDERHOLUNG Grund: erster Lauf dieses Blocks lag vor den sieben Laeufen aus Task 2 (Docker stand still); die Discovery-Fixtures und der Vergleich A1 entstehen erst jetzt, die Objekte der Tasks-App sind dieselben
+
+== fixtures, start 2026-11-12T01:30:09Z ==
+
+== discovery-fixtures ==
+FIXTURE discovery tests/fixtures/caldav_home_fresh_account.xml quelle=raw/discovery-35.txt (discovery-frisch) sha256_gleich=ja sha256=93fbe221c1b539686fe6c8f1c656c3b6081ded51ab9eae3c01ecaf7aa1a71f8c bytes=5619 sammlungen=5 aufgabenlisten=0 nur_probewerte=ja
+FIXTURE discovery tests/fixtures/caldav_home_task_lists.xml quelle=raw/discovery-35.txt (discovery-vorbereitet) sha256_gleich=ja sha256=9ae4460702ca914b61e01c74fad53834ebc1ab0a1ce38c013c20bebfdb99c653 bytes=11470 sammlungen=11 aufgabenlisten=4 nur_probewerte=ja
+
+== objekte der tasks-app ==
+FIXTURE ganztag quelle=raw/ui-a/4EA29582-E2DB-4C8D-AAB9-7D57EABD83BA.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/all_day.ics sha256=8800a16c0426b15472659092e07bfbf4d98cb86d885df870527ba878723c187e merkmal=DUE als Datum prodid_tasks_app=ja
+FIXTURE uhrzeit quelle=raw/ui-a/FEC4C13F-9381-4D0F-8348-F6D2643BDE32.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/with_time.ics sha256=693350c5ead0939acea0693c598a25d6382e95d8eb0f06ffcd0c58f3a32de034 merkmal=DUE mit Uhrzeit prodid_tasks_app=ja
+FIXTURE unteraufgabe quelle=raw/ui-a/7CB0DDE8-C2D1-4640-B1D0-808CA11B3E2E.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/subtask.ics sha256=04636818f69b036c9989a9af49c3dda37b7dd5eb67e4c27153f6777b74f97f3e merkmal=RELATED-TO prodid_tasks_app=ja
+FIXTURE unteraufgabe quelle=raw/ui-a/231A6117-89EA-417C-952A-9BB4A2AE9A60.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/subtask_parent.ics sha256=f8130a8ddc2d2228cbd617286c8df64f37e48bb7dbda8c96ce813f69d3018b8f merkmal=kein RELATED-TO prodid_tasks_app=ja
+FIXTURE wiederkehrend quelle=raw/ui-a/7B483532-932E-4791-B363-DD0F4E3C8FEF.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/recurring.ics sha256=3781d31ae75218e775c0c8ed359460f7cccac33d8f2b96d7dc4afe410bcdd7a1 merkmal=RRULE prodid_tasks_app=ja
+FIXTURE tags quelle=raw/ui-a/F2771C57-9EFA-4F40-9558-DA8132B79147.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/tags.ics sha256=a275be382b3b7366fa62381a47c4a3ddf88d824d3e056abb1d3c641071e66311 merkmal=CATEGORIES prodid_tasks_app=ja
+FIXTURE abgehakt quelle=raw/ui-b/4BFE626B-9A78-493B-9A99-78CC0FFC7D38.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/completed.ics sha256=407596b89ba646c35d24ddb8d50e51eb3e899e5698d95084ad22be66ab665ee5 merkmal=STATUS:COMPLETED und COMPLETED prodid_tasks_app=ja
+FIXTURE wieder-geoeffnet quelle=raw/ui-b/2D4850EC-8E4C-4BDF-A1E5-58559950667D.ics sha256_gleich=ja datei=tests/fixtures/tasks_app/reopened.ics sha256=dc20515aed07b18f4c92b4a2fa8d9d5390f849d96372cc15dbd93a0b405b849d merkmal=STATUS:NEEDS-ACTION prodid_tasks_app=ja
+KONTROLLE s30 unberuehrt in_beiden_staenden_gleich=ja (Positivkontrolle)
+PROVENANCE tests/fixtures/tasks_app/PROVENANCE.md geschrieben
+
+== annahmen A2 und A3 ==
+A2 related_to_gleich_eltern_uid=ja gleiche_liste=ja reltype=fehlt related_to=dd207b48-0e3c-459d-a852-3868aefe8c36 eltern_uid=dd207b48-0e3c-459d-a852-3868aefe8c36 liste_kind=spike30-liste-1 liste_eltern=spike30-liste-1 (Listen aus den Zeilen UI-OBJEKT stand=a in raw/ui-sitzung.txt)
+ZEITFORM fixture=all_day.ics DUE=date
+ZEITFORM fixture=with_time.ics DUE=utc DTSTART=utc
+ZEITFORM fixture=subtask.ics (keine Zeitangabe)
+ZEITFORM fixture=subtask_parent.ics (keine Zeitangabe)
+ZEITFORM fixture=recurring.ics DUE=utc
+ZEITFORM fixture=tags.ics (keine Zeitangabe)
+ZEITFORM fixture=completed.ics COMPLETED=utc
+ZEITFORM fixture=reopened.ics (keine Zeitangabe)
+A3 zeitform due=date+utc dtstart=utc completed=utc (value_form ueber die Zeile, alle Fixtures)
+A3 gegenprobe icalendar due=date+utc dtstart=utc completed=utc gleich=ja (dieselben Werte mit der Bibliothek icalendar gelesen)
+A3 schwebend_vorhanden=nein tzid_vorhanden=nein
+
+== abfragen A1 ==
+A1 abfrage=ohne-filter gleich=ja abweichend=keine treffer=q-abgebrochen,q-erledigt,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+A1 abfrage=offen gleich=ja abweichend=keine treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert,q-wiederkehrend
+A1 abfrage=fenster gleich=ja abweichend=keine treffer=q-abgebrochen,q-in-arbeit,q-kind,q-offen-im-fenster,q-offen-undatiert
+A1 abfrage=text gleich=ja abweichend=keine treffer=q-offen-ausserhalb,q-offen-im-fenster,q-offen-undatiert
+A1 abfrage=eltern gleich=ja abweichend=keine treffer=q-kind
+A1 abfrage=erledigt gleich=ja abweichend=keine treffer=q-erledigt
+A1 alle_sechs_abfragen_auf_allen_versionen_gleich=ja versionen=32.0.15,33.0.9,34.0.4,35.0.2 vollstaendig=ja
