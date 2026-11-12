@@ -1047,7 +1047,7 @@ STAND nc=35.0.0.10 nutzer=alice dateien_alice=158 papierkorb_alice=1 kontingent_
 GESTOPPT nc35 (stop, nie down; Volumes und Container bleiben; es läuft nur der fremde Container gameworld-dev-gameworld-docker-proxy-1)
 GEHEIMNISPRUEFUNG (Stand nach Abschnitt 5) nc35-ordner.txt und die Zeilen des ersten Laufs gegen die Werte von APP_SECRET, HP_SHARED_KEY, beiden App-Passwörtern und beiden Kontopasswörtern aus .env.nc35, gegen die ersten 12 Zeichen der vier langen Werte und gegen die Zeichenkette des AppAPI-Kopfs: kein Fund
 
-== (6) Vierter Lauf des Live-Tests: der Lauf des Protokolls ==
+== (6) Vierter Lauf des Live-Tests ==
 
 RAM frei_host_gb=6.02 schwelle=4.0 ergebnis=ok (vor dem erneuten Start, kein eigener Container läuft; Messungen 6315796, 6311224, 6313796 KiB)
     docker start nc35-nc -> nc35-nc
@@ -1059,64 +1059,8 @@ RAM frei_host_gb=6.02 schwelle=4.0 ergebnis=ok (vor dem erneuten Start, kein eig
     occ status: versionstring 35.0.0, version 35.0.0.10 (VERSION OF RECORD wie in Abschnitt 1)
 RAM frei_host_gb=5.71 schwelle=4.0 ergebnis=ok (nach dem erneuten Start, nc35 läuft; Messungen 5989620, 6015300, 6013596 KiB)
     $ uv run --no-sync pytest tests/integration/test_files_create_folder_live.py -m integration -s --tb=line        (vierter Lauf, HEAD ea16b9c)
-LAUF ordner31 stempel=e25b1473 wurzel=/ordner31-e25b1473 container=nc35-nc
-VERSION nc=35.0.0.10 versionstring=35.0.0 (occ status)
-DATENPFAD ls -d exit=0 ausgabe=/var/www/html/data/alice/files
-KONTROLLE 1 nc=35.0.0.10 nutzer=alice ergebnis=ok | mode=appapi NC_MCP_APP_PASSWORD or NC_MCP_STATIC_BEARER set in the process=no; the credential is APP_SECRET and no app password
-.
-KONTROLLE 2 nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:401,MKCOL:401 ergebnis=ok | tool: ToolError reason=guard_tripped message='The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld.'; dav.make_folder: ToolError reason=unspecified message='Nextcloud rejected the app password.'; file system has /ordner31-e25b1473/kontrolle-falsch=no
-.
-ORDNER frei nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,MKCOL:201 ergebnis=ok | {"created": true, "id": "file:23590", "path": "/ordner31-e25b1473/frei"}; oc:fileid by app password PROPFIND=23590; one MKCOL 201; id from oc-fileid, no read; file system test -d /ordner31-e25b1473/frei
-.
-ORDNER vorhanden nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,MKCOL:405,PROPFIND:207 ergebnis=ok | {"created": false, "id": "file:23590", "path": "/ordner31-e25b1473/frei"}; oc:fileid by app password PROPFIND=23590; MKCOL 405; PROPFIND 207
-.
-ORDNER datei nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,MKCOL:405,PROPFIND:207,systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:207 ergebnis=ok | ConflictError reason=unspecified message='A file, not a folder, already exists at /ordner31-e25b1473/datei.txt.'; sentence of a file at the path; chain below the file: ConflictError reason=unspecified message='A file, not a folder, already exists at /ordner31-e25b1473/datei.txt.'; A5 PROPFIND below the file: PROPFIND /datei.txt/x/y:404, PROPFIND /datei.txt/x:404, PROPFIND /datei.txt:207; no MKCOL below the file; file unchanged (GET with app password); file system test -f /ordner31-e25b1473/datei.txt
-.
-ORDNER eltern-fehlt nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,MKCOL:409 ergebnis=ok | ToolError reason=unknown_id message='The parent folder /ordner31-e25b1473/fehlt of /ordner31-e25b1473/fehlt/kind does not exist.'; one MKCOL 409; file system without /ordner31-e25b1473/fehlt
-.
-ORDNER kette nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:207,MKCOL:201,MKCOL:201,MKCOL:201,MKCOL:201 ergebnis=ok | {"created": true, "created_folders": ["/ordner31-e25b1473/k", "/ordner31-e25b1473/k/a", "/ordner31-e25b1473/k/a/b", "/ordner31-e25b1473/k/a/b/c"], "id": "file:23595", "path": "/ordner31-e25b1473/k/a/b/c"}; created_folders top down; oc:fileid by app password PROPFIND=23595; four MKCOL 201; file system: all four folders
-.
-ORDNER deckel nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:207 ergebnis=ok | ToolError reason=unspecified message='Creating /ordner31-e25b1473/d/1/2/3/4/5/6/7/8/9/10 needs 11 new folders; one call creates at most 10.'; names the cap of 10; no MKCOL; twelve PROPFIND of the count; file system without /ordner31-e25b1473/d
-.
-ORDNER teilabbruch-wettlauf nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:207,MKCOL:201,MKCOL:405,PROPFIND:207 ergebnis=ok | ConflictError reason=unspecified message='A file, not a folder, already exists at /ordner31-e25b1473/w/x. Already created in this call and left in place: /ordner31-e25b1473/w.'; the addition names what was created; file system test -d /ordner31-e25b1473/w; file system test -f /ordner31-e25b1473/w/x; file system without /ordner31-e25b1473/w/x/y
-.
-ORDNER geteilt-nur-lesen nc=35.0.0.10 nutzer=bob status=systemtags.PROPFIND:207,MKCOL:403,systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:207,MKCOL:403,systemtags.PROPFIND:207,MKCOL:201 ergebnis=ok | ToolError reason=permission_denied message='No permission to create a folder at /mcp-share-a6cd5d25e3/neu-e25b1473.'; reason permission_denied; without the addition Already created; ToolError reason=permission_denied message='No permission to create a folder at /mcp-share-a6cd5d25e3/k-e25b1473.'; reason permission_denied; without the addition Already created; two MKCOL 403; oc:permissions of /mcp-share-a6cd5d25e3 by app password PROPFIND: bob=SGDN alice=RGDNVCK; positive control in the own home: {"created": true, "id": "file:23598", "path": "/eigen-e25b1473"}; file system of alice without neu-e25b1473 and k-e25b1473
-.
-ORDNER kein-ki nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,systemtags.PROPFIND:207,REPORT:207,systemtags.PROPFIND:207,REPORT:207,MKCOL:409,systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | tagged: ToolError reason=unknown_id message='The parent folder /ordner31-e25b1473/gesperrt of /ordner31-e25b1473/gesperrt/neu does not exist.'; invented: ToolError reason=unknown_id message='The parent folder /ordner31-e25b1473/erfunden of /ordner31-e25b1473/erfunden/neu does not exist.'; equal once the folder is renamed; tagged chain: ToolError reason=unknown_id message='The parent folder /ordner31-e25b1473/gesperrt/a of /ordner31-e25b1473/gesperrt/a/b does not exist.'; tagged calls without MKCOL and PROPFIND on files (systemtags.PROPFIND:207,REPORT:207,systemtags.PROPFIND:207,REPORT:207); file system without gesperrt/neu, gesperrt/a and erfunden; positive control offen/neu: {"created": true, "id": "file:23601", "path": "/ordner31-e25b1473/offen/neu"}
-.
-ORDNER sandbox nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201,systemtags.PROPFIND:207,REPORT:207,PROPFIND:404,PROPFIND:404 ergebnis=ok | ToolError reason=unspecified message='The folder path is the root folder, which always exists.'; root refusal without a single request; /a is on the file system at /ordner31-e25b1473/root/a: {"created": true, "id": "file:23603", "path": "/ordner31-e25b1473/root/a"}; missing root: ToolError reason=unknown_id message='The parent folder /ordner31-e25b1473/root-fehlt of /ordner31-e25b1473/root-fehlt/a does not exist.'; no MKCOL with a missing root; file system without /ordner31-e25b1473/root-fehlt; file system without /a above the root
-.
-ORDNER teilabbruch-name nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,PROPFIND:404,PROPFIND:500 ergebnis=ok | ToolError reason=unspecified message='Nextcloud does not accept the folder name in /ordner31-e25b1473/n/ok/.htaccess/x.'; the sentence of a refused folder name, for the target; file system holds nothing of the chain, and the sentence says so; no .htaccess on disk
-.
-NAME '.htaccess' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:400 ergebnis=ok | ToolError reason=unspecified message='Nextcloud does not accept the folder name in /ordner31-e25b1473/namen/.htaccess.'; file system has it=no
-NAME 'x.part' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:405,PROPFIND:207 ergebnis=ok | ConflictError reason=unspecified message='A file, not a folder, already exists at /ordner31-e25b1473/namen/x.part.'; file system has it=no
-NAME 'x.filepart' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:400 ergebnis=ok | ToolError reason=unspecified message='Nextcloud does not accept the folder name in /ordner31-e25b1473/namen/x.filepart.'; file system has it=no
-NAME 'con' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | {"created": true, "id": "file:23605", "path": "/ordner31-e25b1473/namen/con"}; file system test -d of the answered path
-NAME 'ende-leer ' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | {"created": true, "id": "file:23606", "path": "/ordner31-e25b1473/namen/ende-leer"}; file system test -d of the answered path
-NAME 'ende-punkt.' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | {"created": true, "id": "file:23607", "path": "/ordner31-e25b1473/namen/ende-punkt."}; file system test -d of the answered path
-ORDNER namen nc=35.0.0.10 nutzer=alice status=MKCOL:400,MKCOL:405,MKCOL:400,MKCOL:201,MKCOL:201,MKCOL:201 ergebnis=ok | '.htaccess': named refusal or real folder; 'x.part': named refusal or real folder; 'x.filepart': named refusal or real folder; 'con': named refusal or real folder; 'ende-leer ': named refusal or real folder; 'ende-punkt.': named refusal or real folder; file system ls -1A /ordner31-e25b1473/namen: ['con', 'ende-leer', 'ende-punkt.']
-.
-ZUSATZ name-mit-leerzeichen-in-kette nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,PROPFIND:404,PROPFIND:404,PROPFIND:207,MKCOL:201,MKCOL:409 befund=ja | ToolError reason=unknown_id message='The parent folder /ordner31-e25b1473/zusatz/mitte-leer  of /ordner31-e25b1473/zusatz/mitte-leer /kind does not exist. Already created in this call and left in place: /ordner31-e25b1473/zusatz/mitte-leer .'; named as created: ['/ordner31-e25b1473/zusatz/mitte-leer ']; file system ls -1A /ordner31-e25b1473/zusatz: ['mitte-leer']
-.
-SPERRE versuch=bob-via-share nc=35.0.0.10 LOCK status=200 token=yes UNLOCK status=204 tool status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 | LOCK answer: <?xml version="1.0"?> <d:prop xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"> <d:lockdiscovery> <d:activelock> <d:lockscope> <d...; tool: {"created": true, "id": "file:23613", "path": "/ordner31-e25b1473/lock-e25b1473-a/kind"}
-SPERRE versuch=alice-own-token nc=35.0.0.10 LOCK status=200 token=yes UNLOCK status=204 tool status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 | LOCK answer: <?xml version="1.0"?> <d:prop xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"> <d:lockdiscovery> <d:activelock> <d:lockscope> <d...; tool: {"created": true, "id": "file:23614", "path": "/ordner31-e25b1473/lock-e25b1473-b/kind"}
-SPERRE versuch=alice-x-user-lock nc=35.0.0.10 LOCK status=200 token=no UNLOCK status=200 tool status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 | LOCK answer: <?xml version="1.0"?> <d:prop xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"> <d:getetag>6af5fefbefdd8</d:getetag> <nc:lock>1</...; tool: {"created": true, "id": "file:23615", "path": "/ordner31-e25b1473/lock-e25b1473-c/kind"}
-UNGEMESSEN sperre-423 grund=no LOCK on this instance made the MKCOL answer 423 (three attempts, raw output in the SPERRE lines); the 423 branch is covered by unit tests only
-ORDNER sperre-423 nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201,systemtags.PROPFIND:207,REPORT:207,MKCOL:201,systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | bob-via-share: LOCK 200, MKCOL [201]; alice-own-token: LOCK 200, MKCOL [201]; alice-x-user-lock: LOCK 200, MKCOL [201]; 423 not reproducible on this instance
-.
-QUELLE mkcol-404 nc=35.0.0.10 CorePlugin.php httpMkcol exit=0 lines with NotFound, Conflict or createCollection: 560: $result = $this->server->createCollection($path, $mkcol);
-UNGEMESSEN mkcol-404 grund=the MKCOL below a parent that was just deleted answers [409], not 404; httpMkcol in CorePlugin.php: 560: $result = $this->server->createCollection($path, $mkcol);; the 404 branch is covered by unit tests only
-ORDNER mkcol-404 nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,PROPFIND:404,PROPFIND:207,MKCOL:409 ergebnis=ok | ToolError reason=unknown_id message='The parent folder /ordner31-e25b1473/geloescht-e25b1473 of /ordner31-e25b1473/geloescht-e25b1473/kind does not exist.'; MKCOL after the parent was deleted: [409]; file system without /ordner31-e25b1473/geloescht-e25b1473; 404 not reproducible on this instance
-.
-ORDNER kontingent-knapp nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201,systemtags.PROPFIND:207,REPORT:207,MKCOL:507,systemtags.PROPFIND:207,REPORT:207,MKCOL:507 ergebnis=ok | used 65184233 B, quota before: The setting does not exist for user "alice".; quota used plus 4096 B: {"created": true, "id": "file:23618", "path": "/ordner31-e25b1473/q-e25b1473/knapp"}; on disk; quota used plus 1024 B: MKCOL [507] ToolError reason=unspecified message='Not enough space in Nextcloud to create /ordner31-e25b1473/q-e25b1473/eng.'; nothing on disk; quota 1 B: MKCOL [507] ToolError reason=unspecified message='Not enough space in Nextcloud to create /ordner31-e25b1473/q-e25b1473/voll.'; nothing on disk; quota back to: The setting does not exist for user "alice".
-.CLEANUP PROPFIND /ordner31-e25b1473: 404
-BASELINE dateien_alice vorher=158 nachher=158 gleich=ja
-BASELINE papierkorb_alice vorher=1 nachher=1 gleich=ja
-BASELINE kontingent_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
-BASELINE tag_zuordnungen vorher=tags=keine zuordnungen=0 nachher=tags=keine zuordnungen=0 gleich=ja
-BASELINE freigaben_alice vorher=3 nachher=3 gleich=ja
-18 passed, 1 warning in 19.67s
-    exit=0
+    Ergebnis des vierten Laufs: exit=0, 18 passed. Seine Protokollzeilen stehen in raw/nc35-ordner-vorlaeufe.txt; der Lauf des
+    Protokolls ist der fünfte in Abschnitt (7), mit dem Endstand des Tests (zwei Erwartungen nach dem Lauf auf Nextcloud 32).
 STAND nc=35.0.0.10 nutzer=alice dateien_alice=158 papierkorb_alice=1 kontingent_alice=The setting does not exist for user "alice". tags=keine freigaben_alice=3
     $ docker stop nc35-nc nc35-harp nc35-caddy nc_app_mcp_connector
     nc35-nc
@@ -1127,3 +1071,91 @@ STAND nc=35.0.0.10 nutzer=alice dateien_alice=158 papierkorb_alice=1 kontingent_
     gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 3 hours
 GESTOPPT nc35 (zweiter Stopp nach dem vierten Lauf; stop, nie down; es läuft nur der fremde Container gameworld-dev-gameworld-docker-proxy-1)
 GEHEIMNISPRUEFUNG (Endstand) nc35-ordner.txt und nc35-ordner-vorlaeufe.txt gegen dieselben Werte und Anfangsstücke wie oben: kein Fund
+
+== (7) Fünfter Lauf des Live-Tests mit dem Endstand des Tests: der Lauf des Protokolls ==
+
+RAM frei_host_gb=5.79 schwelle=4.0 ergebnis=ok (vor dem dritten Start, kein eigener Container läuft (Strecke 32 gestoppt); Messungen 6085736, 6068852, 6154772 KiB)
+    $ docker ps -a --filter name=nc-mcp-exapp        (Strecke 32 gestoppt)
+    nc-mcp-exapp-caddy Exited (0) About a minute ago
+    nc-mcp-exapp-harp Exited (0) About a minute ago
+    nc-mcp-exapp-nc Exited (0) 59 seconds ago
+    nc-mcp-exapp-registry Exited (2) About a minute ago
+    nc-mcp-exapp-greenmail Exited (143) About a minute ago
+    docker start nc35-nc -> nc35-nc
+    nc35-nc: installed (Versuch 1)
+    docker start nc35-harp -> nc35-harp
+    docker start nc35-caddy -> nc35-caddy
+    docker start nc_app_mcp_connector -> nc_app_mcp_connector
+    GET http://127.0.0.1:8082/status.php -> HTTP 200 (Versuch 1)
+    occ status: versionstring 35.0.0, version 35.0.0.10
+RAM frei_host_gb=5.61 schwelle=4.0 ergebnis=ok (nach dem dritten Start, nc35 läuft; Messungen 5901120, 5897168, 5879328 KiB)
+    $ uv run --no-sync pytest tests/integration/test_files_create_folder_live.py -m integration -s --tb=line        (fünfter Lauf, HEAD f78fdd1)
+LAUF ordner31 stempel=de78de28 wurzel=/ordner31-de78de28 container=nc35-nc
+VERSION nc=35.0.0.10 versionstring=35.0.0 (occ status)
+DATENPFAD ls -d exit=0 ausgabe=/var/www/html/data/alice/files
+KONTROLLE 1 nc=35.0.0.10 nutzer=alice ergebnis=ok | mode=appapi NC_MCP_APP_PASSWORD or NC_MCP_STATIC_BEARER set in the process=no; the credential is APP_SECRET and no app password
+.
+KONTROLLE 2 nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:401,MKCOL:401 ergebnis=ok | tool: ToolError reason=guard_tripped message='The exclusion check (tag kein-ki) could not be answered, so entries that may carry file content are withheld.'; dav.make_folder: ToolError reason=unspecified message='Nextcloud rejected the app password.'; file system has /ordner31-de78de28/kontrolle-falsch=no
+.
+ORDNER frei nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,MKCOL:201 ergebnis=ok | {"created": true, "id": "file:23620", "path": "/ordner31-de78de28/frei"}; oc:fileid by app password PROPFIND=23620; one MKCOL 201; id from oc-fileid, no read; file system test -d /ordner31-de78de28/frei
+.
+ORDNER vorhanden nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,MKCOL:405,PROPFIND:207 ergebnis=ok | {"created": false, "id": "file:23620", "path": "/ordner31-de78de28/frei"}; oc:fileid by app password PROPFIND=23620; MKCOL 405; PROPFIND 207
+.
+ORDNER datei nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,MKCOL:405,PROPFIND:207,systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:207 ergebnis=ok | ConflictError reason=unspecified message='A file, not a folder, already exists at /ordner31-de78de28/datei.txt.'; sentence of a file at the path; chain below the file: ConflictError reason=unspecified message='A file, not a folder, already exists at /ordner31-de78de28/datei.txt.'; A5 PROPFIND below the file: PROPFIND /datei.txt/x/y:404, PROPFIND /datei.txt/x:404, PROPFIND /datei.txt:207; no MKCOL below the file; file unchanged (GET with app password); file system test -f /ordner31-de78de28/datei.txt
+.
+ORDNER eltern-fehlt nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,MKCOL:409 ergebnis=ok | ToolError reason=unknown_id message='The parent folder /ordner31-de78de28/fehlt of /ordner31-de78de28/fehlt/kind does not exist.'; one MKCOL 409; file system without /ordner31-de78de28/fehlt
+.
+ORDNER kette nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:207,MKCOL:201,MKCOL:201,MKCOL:201,MKCOL:201 ergebnis=ok | {"created": true, "created_folders": ["/ordner31-de78de28/k", "/ordner31-de78de28/k/a", "/ordner31-de78de28/k/a/b", "/ordner31-de78de28/k/a/b/c"], "id": "file:23625", "path": "/ordner31-de78de28/k/a/b/c"}; created_folders top down; oc:fileid by app password PROPFIND=23625; four MKCOL 201; file system: all four folders
+.
+ORDNER deckel nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:207 ergebnis=ok | ToolError reason=unspecified message='Creating /ordner31-de78de28/d/1/2/3/4/5/6/7/8/9/10 needs 11 new folders; one call creates at most 10.'; names the cap of 10; no MKCOL; twelve PROPFIND of the count; file system without /ordner31-de78de28/d
+.
+ORDNER teilabbruch-wettlauf nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:404,PROPFIND:207,MKCOL:201,MKCOL:405,PROPFIND:207 ergebnis=ok | ConflictError reason=unspecified message='A file, not a folder, already exists at /ordner31-de78de28/w/x. Already created in this call and left in place: /ordner31-de78de28/w.'; the addition names what was created; file system test -d /ordner31-de78de28/w; file system test -f /ordner31-de78de28/w/x; file system without /ordner31-de78de28/w/x/y
+.
+ORDNER geteilt-nur-lesen nc=35.0.0.10 nutzer=bob status=systemtags.PROPFIND:207,MKCOL:403,systemtags.PROPFIND:207,PROPFIND:404,PROPFIND:404,PROPFIND:207,MKCOL:403,systemtags.PROPFIND:207,MKCOL:201 ergebnis=ok | ToolError reason=permission_denied message='No permission to create a folder at /mcp-share-a6cd5d25e3/neu-de78de28.'; reason permission_denied; without the addition Already created; ToolError reason=permission_denied message='No permission to create a folder at /mcp-share-a6cd5d25e3/k-de78de28.'; reason permission_denied; without the addition Already created; two MKCOL 403; oc:permissions of /mcp-share-a6cd5d25e3 by app password PROPFIND: bob=SGDN alice=RGDNVCK; positive control in the own home: {"created": true, "id": "file:23628", "path": "/eigen-de78de28"}; file system of alice without neu-de78de28 and k-de78de28
+.
+ORDNER kein-ki nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,systemtags.PROPFIND:207,REPORT:207,systemtags.PROPFIND:207,REPORT:207,MKCOL:409,systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | tagged: ToolError reason=unknown_id message='The parent folder /ordner31-de78de28/gesperrt of /ordner31-de78de28/gesperrt/neu does not exist.'; invented: ToolError reason=unknown_id message='The parent folder /ordner31-de78de28/erfunden of /ordner31-de78de28/erfunden/neu does not exist.'; equal once the folder is renamed; tagged chain: ToolError reason=unknown_id message='The parent folder /ordner31-de78de28/gesperrt/a of /ordner31-de78de28/gesperrt/a/b does not exist.'; tagged calls without MKCOL and PROPFIND on files (systemtags.PROPFIND:207,REPORT:207,systemtags.PROPFIND:207,REPORT:207); file system without gesperrt/neu, gesperrt/a and erfunden; positive control offen/neu: {"created": true, "id": "file:23631", "path": "/ordner31-de78de28/offen/neu"}
+.
+ORDNER sandbox nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201,systemtags.PROPFIND:207,REPORT:207,PROPFIND:404,PROPFIND:404 ergebnis=ok | ToolError reason=unspecified message='The folder path is the root folder, which always exists.'; root refusal without a single request; /a is on the file system at /ordner31-de78de28/root/a: {"created": true, "id": "file:23633", "path": "/ordner31-de78de28/root/a"}; missing root: ToolError reason=unknown_id message='The parent folder /ordner31-de78de28/root-fehlt of /ordner31-de78de28/root-fehlt/a does not exist.'; no MKCOL with a missing root; file system without /ordner31-de78de28/root-fehlt; file system without /a above the root
+.
+ORDNER teilabbruch-name nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,PROPFIND:404,PROPFIND:500 ergebnis=ok | ToolError reason=unspecified message='Nextcloud does not accept the folder name in /ordner31-de78de28/n/ok/.htaccess/x.'; the sentence of a refused folder name, for the target or for the refused link; file system holds nothing of the chain, and the sentence says so; no .htaccess on disk
+.
+NAME '.htaccess' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:400 ergebnis=ok | ToolError reason=unspecified message='Nextcloud does not accept the folder name in /ordner31-de78de28/namen/.htaccess.'; file system has it=no
+NAME 'x.part' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:405,PROPFIND:207 ergebnis=ok | ConflictError reason=unspecified message='A file, not a folder, already exists at /ordner31-de78de28/namen/x.part.'; file system has it=no
+NAME 'x.filepart' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:400 ergebnis=ok | ToolError reason=unspecified message='Nextcloud does not accept the folder name in /ordner31-de78de28/namen/x.filepart.'; file system has it=no
+NAME 'con' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | {"created": true, "id": "file:23635", "path": "/ordner31-de78de28/namen/con"}; file system test -d of the answered path
+NAME 'ende-leer ' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | {"created": true, "id": "file:23636", "path": "/ordner31-de78de28/namen/ende-leer"}; file system test -d of the answered path
+NAME 'ende-punkt.' nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | {"created": true, "id": "file:23637", "path": "/ordner31-de78de28/namen/ende-punkt."}; file system test -d of the answered path
+ORDNER namen nc=35.0.0.10 nutzer=alice status=MKCOL:400,MKCOL:405,MKCOL:400,MKCOL:201,MKCOL:201,MKCOL:201 ergebnis=ok | '.htaccess': named refusal or real folder; 'x.part': named refusal or real folder; 'x.filepart': named refusal or real folder; 'con': named refusal or real folder; 'ende-leer ': named refusal or real folder; 'ende-punkt.': named refusal or real folder; file system ls -1A /ordner31-de78de28/namen: ['con', 'ende-leer', 'ende-punkt.']
+.
+ZUSATZ name-mit-leerzeichen-in-kette nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,PROPFIND:404,PROPFIND:404,PROPFIND:207,MKCOL:201,MKCOL:409 befund=ja | ToolError reason=unknown_id message='The parent folder /ordner31-de78de28/zusatz/mitte-leer  of /ordner31-de78de28/zusatz/mitte-leer /kind does not exist. Already created in this call and left in place: /ordner31-de78de28/zusatz/mitte-leer .'; named as created: ['/ordner31-de78de28/zusatz/mitte-leer ']; file system ls -1A /ordner31-de78de28/zusatz: ['mitte-leer']
+.
+SPERRE versuch=bob-via-share nc=35.0.0.10 LOCK status=200 token=yes UNLOCK status=204 tool status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 | LOCK answer: <?xml version="1.0"?> <d:prop xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"> <d:lockdiscovery> <d:activelock> <d:lockscope> <d...; tool: {"created": true, "id": "file:23643", "path": "/ordner31-de78de28/lock-de78de28-a/kind"}
+SPERRE versuch=alice-own-token nc=35.0.0.10 LOCK status=200 token=yes UNLOCK status=204 tool status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 | LOCK answer: <?xml version="1.0"?> <d:prop xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"> <d:lockdiscovery> <d:activelock> <d:lockscope> <d...; tool: {"created": true, "id": "file:23644", "path": "/ordner31-de78de28/lock-de78de28-b/kind"}
+SPERRE versuch=alice-x-user-lock nc=35.0.0.10 LOCK status=200 token=no UNLOCK status=200 tool status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201 | LOCK answer: <?xml version="1.0"?> <d:prop xmlns:d="DAV:" xmlns:s="http://sabredav.org/ns" xmlns:oc="http://owncloud.org/ns" xmlns:nc="http://nextcloud.org/ns"> <d:getetag>6af6031b44ed0</d:getetag> <nc:lock>1</...; tool: {"created": true, "id": "file:23645", "path": "/ordner31-de78de28/lock-de78de28-c/kind"}
+UNGEMESSEN sperre-423 grund=no LOCK on this instance made the MKCOL answer 423 (three attempts, raw output in the SPERRE lines); the 423 branch is covered by unit tests only
+ORDNER sperre-423 nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201,systemtags.PROPFIND:207,REPORT:207,MKCOL:201,systemtags.PROPFIND:207,REPORT:207,MKCOL:201 ergebnis=ok | bob-via-share: LOCK 200, MKCOL [201]; alice-own-token: LOCK 200, MKCOL [201]; alice-x-user-lock: LOCK 200, MKCOL [201]; 423 not reproducible on this instance
+.
+QUELLE mkcol-404 nc=35.0.0.10 CorePlugin.php httpMkcol exit=0 lines with NotFound, Conflict or createCollection: 560: $result = $this->server->createCollection($path, $mkcol);
+UNGEMESSEN mkcol-404 grund=the MKCOL below a parent that was just deleted answers [409], not 404; httpMkcol in CorePlugin.php: 560: $result = $this->server->createCollection($path, $mkcol);; the 404 branch is covered by unit tests only
+ORDNER mkcol-404 nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,PROPFIND:404,PROPFIND:207,MKCOL:409 ergebnis=ok | ToolError reason=unknown_id message='The parent folder /ordner31-de78de28/geloescht-de78de28 of /ordner31-de78de28/geloescht-de78de28/kind does not exist.'; MKCOL after the parent was deleted: [409]; file system without /ordner31-de78de28/geloescht-de78de28; 404 not reproducible on this instance
+.
+ORDNER kontingent-knapp nc=35.0.0.10 nutzer=alice status=systemtags.PROPFIND:207,REPORT:207,MKCOL:201,systemtags.PROPFIND:207,REPORT:207,MKCOL:507,systemtags.PROPFIND:207,REPORT:207,MKCOL:507 ergebnis=ok | used 65184233 B, quota before: The setting does not exist for user "alice".; quota used plus 8192 B: {"created": true, "id": "file:23648", "path": "/ordner31-de78de28/q-de78de28/knapp"}; on disk; quota used plus 1024 B: MKCOL [507] ToolError reason=unspecified message='Not enough space in Nextcloud to create /ordner31-de78de28/q-de78de28/eng.'; nothing on disk; quota 1 B: MKCOL [507] ToolError reason=unspecified message='Not enough space in Nextcloud to create /ordner31-de78de28/q-de78de28/voll.'; nothing on disk; quota back to: The setting does not exist for user "alice".
+.
+CLEANUP PROPFIND /ordner31-de78de28: 404
+BASELINE dateien_alice vorher=158 nachher=158 gleich=ja
+BASELINE papierkorb_alice vorher=1 nachher=1 gleich=ja
+BASELINE kontingent_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
+BASELINE tag_zuordnungen vorher=tags=keine zuordnungen=0 nachher=tags=keine zuordnungen=0 gleich=ja
+BASELINE freigaben_alice vorher=3 nachher=3 gleich=ja
+18 passed, 1 warning in 19.79s
+    exit=0
+STAND nc=35.0.0.10 nutzer=alice dateien_alice=158 papierkorb_alice=1 kontingent_alice=The setting does not exist for user "alice". tags=keine freigaben_alice=3
+    $ docker stop nc35-nc nc35-harp nc35-caddy nc_app_mcp_connector
+    nc35-nc
+    nc35-harp
+    nc35-caddy
+    nc_app_mcp_connector
+    $ docker ps
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 3 hours
+GESTOPPT nc35 (dritter Stopp nach dem fünften Lauf; stop, nie down; es läuft nur der fremde Container gameworld-dev-gameworld-docker-proxy-1)
+GEHEIMNISPRUEFUNG (nach Abschnitt 7) nc35-ordner.txt und nc35-ordner-vorlaeufe.txt gegen dieselben Werte und Anfangsstücke wie oben: kein Fund
