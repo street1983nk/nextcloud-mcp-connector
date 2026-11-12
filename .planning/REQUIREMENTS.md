@@ -109,7 +109,7 @@ Was auch nach dem Owner-Entscheid vom 11.11.2026 draußen bleibt:
 
 - Aufgabenlisten anlegen, umbenennen, freigeben oder löschen: Verwaltung bleibt in der Tasks-App
 - Wiederkehrende Aufgaben ändern oder abhaken und jede RRULE-Expansion: bewusste Grenze des Projekts; ändernde Zugriffe auf wiederkehrende Aufgaben werden abgelehnt, sofern MESS-05 nichts anderes ergibt
-- Mehrere Aufgaben in einem Aufruf ändern
+- Mehrere Aufgaben in einem Aufruf ändern, ausgenommen die Unteraufgaben einer genannten Aufgabe beim Abhaken, Verschieben und Löschen (Owner-Entscheid vom 12.11.2026)
 - Zwischenzustände setzen (`IN-PROCESS`, `CANCELLED`, Prozentwerte zwischen 0 und 100), Erinnerungen (`VALARM`), Ort, URL, Klassifizierung, Sortierung und Anheften: nur die in E7 und E8 genannten Felder
 - `ATTACH` lesen oder schreiben: das Bundle würde dateitragend
 - Deck über CalDAV (`app-generated--`): Doppelung zu `deck_browse` und Abfluss der Kartenbeschreibung (E9)
