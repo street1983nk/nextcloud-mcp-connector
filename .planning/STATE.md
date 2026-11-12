@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: executing
-last_updated: "2026-11-11T17:35:00.000Z"
-last_activity: 2026-11-11
+last_updated: "2026-11-12T01:45:00.000Z"
+last_activity: 2026-11-12
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
-  percent: 60
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -20,20 +20,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-11)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) läuft: 30-01, 30-02 und 30-03 sind ausgeführt, als Nächstes folgt 30-04.
+**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) läuft: 30-01 bis 30-04 sind ausgeführt, als Nächstes folgt 30-05.
 
 ## Current Position
 
 Phase: 30 von 30 bis 34 (Mess-Spike Aufgaben und Ordner), in Ausführung
-Plan: 30-04 von 30-01 bis 30-05 ist der nächste; 30-01, 30-02 und 30-03 sind abgeschlossen
-Status: 30-03 ausgeführt (MESS-06 gemessen bis auf die Vorlage von E15 in 30-05: Abbruchkriterium MOVE nicht ausgelöst, Ergebniswort für das Löschen "wiederherstellbar"), nächster Schritt Ausführung 30-04
-Last activity: 2026-11-11, Plan 30-03 ausgeführt (MOVE und DELETE unter Impersonation auf nc35, Löschmatrix auf Nextcloud 32 bis 35, Ergebniswort nach E13), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
+Plan: 30-05 von 30-01 bis 30-05 ist der nächste; 30-01 bis 30-04 sind abgeschlossen
+Status: 30-04 ausgeführt (MESS-03 und MESS-04 gemessen: frisches Konto ohne Aufgabenliste, Sammlungsarten in der Discovery, Abfragen auf 32 bis 35 gleich, Kosten bei 2000 Aufgaben auf SQLite und PostgreSQL, Fixtures der Tasks-App), nächster Schritt Ausführung 30-05
+Last activity: 2026-11-12, Plan 30-04 ausgeführt (Discovery auf 32.0.15 und 35.0.2, Abfragen auf 32 bis 35, Provider-Link, Kosten der Aufgabensuche auf SQLite und PostgreSQL, create-only PUT unter Impersonation auf nc35, Fixtures), lokal committet auf plan/v1.8-tasks-080, nicht gepusht
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 175
+- Total plans completed: 176
 - Average duration: 35 min
 - Total execution time: 15.2 hours
 
@@ -64,7 +64,7 @@ Last activity: 2026-11-11, Plan 30-03 ausgeführt (MOVE und DELETE unter Imperso
 | 27 | 10 | - | - |
 | 28 | 12 | - | - |
 | 29 | 9 | - | - |
-| 30 | 3 | 205 min | 68 min |
+| 30 | 4 | 385 min | 96 min |
 
 **Recent Trend:**
 
@@ -219,6 +219,7 @@ Last activity: 2026-11-11, Plan 30-03 ausgeführt (MOVE und DELETE unter Imperso
 | Phase 30 P01 | 30 min | 3 tasks | 7 files |
 | Phase 30 P02 | 100 min | 3 tasks | 11 files |
 | Phase 30 P03 | 75 min | 3 tasks | 9 files |
+| Phase 30 P04 | 180 min | 3 tasks | 23 files |
 
 ## Accumulated Context
 
@@ -805,6 +806,13 @@ Recent decisions affecting current work:
 - [Phase 30]: 30-03: A18 auf Nextcloud 32.0.15, 33.0.9, 34.0.4 und 35.0.2 (Wegwerf-Instanzen, SQLite, App-Passwort): `DELETE` 204, die Aufgabe steht im Papierkorb des Kalenders und kommt per `MOVE` auf `trashbin/restore/file` mit gleicher UID und gleichem sha256 zurück; in einer geteilten Liste steht sie im Papierkorb beider Konten, löschendes Konto und Eigentümer können wiederherstellen; ohne Schreibrecht 404. Mit `calendarRetentionObligation` gleich 0 löscht `DELETE` endgültig. Standardfrist 2592000 Sekunden (30 Tage)
 - [Phase 30]: 30-03: Vorab-Test für TMOD-07: `PROPFIND` Depth 0 auf `calendars/<konto>/trashbin/` nach `{http://nextcloud.com/ns}trash-bin-retention-duration`; eine Zahl größer 0 heißt "Papierkorb wirkt" und ist die Frist in Sekunden, 0 heißt aus. Die Existenz der Sammlung, der `DAV`-Kopf und die Capabilities unterscheiden die Zustände nicht. Ein Papierkorb mit der Frist 1 erscheint als "an" und ist nach dem nächsten Aufräumlauf leer
 - [Phase 30]: 30-03: ERGEBNIS LOESCHEN (E13): wiederherstellbar, nach der Lesart nach TMOD-07 (Owner, 11.11.2026, "Ok"); TMOD-07 ist für Phase 33 planbar, mit den Auflagen aus Bericht 4.5. Nach der wörtlichen Lesart von E13 wäre es "nicht wiederherstellbar" (Rohbefund in Bericht 4.4)
+- [Phase 30]: 30-04: Ein Konto nach echter Erstanmeldung (Basic mit Passwort) hat auf Nextcloud 32.0.15 und 35.0.2 die Kalender `personal` und `contact_birthdays`, beide nur `VEVENT`, und keine Aufgabenliste (`FRISCHES KONTO aufgabenlisten=0`); die Rohantwort von 35.0.2 ist `tests/fixtures/caldav_home_fresh_account.xml` (TASK-03). Ein Konto, das nur mit App-Passwort aus occ oder unter Impersonation arbeitet, hatte nicht einmal `personal` (beobachtet, keine eigene Reihe)
+- [Phase 30]: 30-04: Aufgabenliste im Sinn von TASK-01 ist enger als das Komponenten-Set: resourcetype `calendar` UND `VTODO` im Set UND kein Präfix `app-generated--`. Ein gelöschter Kalender (resourcetype `deleted-calendar`) und ein Abonnement (`subscribed`) tragen `VTODO` im Set samt Schreibprivileg; der Deck-Kalender ist nur am Präfix zu erkennen (`calendar`, nur `VTODO`, kein Schreibprivileg). A4 belegt (`read-only` fehlt, leer oder 1), A11 belegt, A5 für gelöschte Kalender widerlegt, föderiert ungemessen
+- [Phase 30]: 30-04: A1 belegt: sechs `calendar-query`-Filter liefern auf 32.0.15, 33.0.9, 34.0.4 und 35.0.2 dieselben Treffermengen. Der `time-range` des Servers liefert undatierte Aufgaben mit, der Vorfilter `COMPLETED` nicht definiert liefert `CANCELLED` mit; beides filtert der Connector (TASK-02)
+- [Phase 30]: 30-04: Kosten bei 2000 Aufgaben in einer Liste auf 35.0.2 (A6): Modus alle Median 148 ms (SQLite) und 186 ms (PostgreSQL 17.11) bei 1 521 874 Bytes, Modus offen 108 und 150 ms bei 70 274 Bytes, `calendar-search` 77 und 110 ms (ein Aufruf). Vorschlag nach der vorab festgelegten Ableitungsregel: eine Abfrage je Liste ohne zusätzlichen Deckel unter 2000 Objekten, Zeitbudget je Liste 1 s; gemessen auf einem Einzelhost ohne Netzwerkstrecke, also Untergrenze
+- [Phase 30]: 30-04: Der Suchprovider `tasks` gehört zur dav-App und liefert nur bei aktiver Tasks-App Treffer; Link `<Instanz>/apps/tasks/calendars/<uri>/tasks/<name>`, ohne Raten auf Kalender-URI und Objektname auflösbar (35.0.2, Tasks 0.18.1). Create-only `PUT` eines VTODO unter Impersonation auf nc35: 201, zweiter 412, Objekt unverändert
+- [Phase 30]: 30-04: A2 und A3 belegt für Tasks 0.18.1: `RELATED-TO` ist die UID der Elternaufgabe, ohne `RELTYPE`, gleiche Liste; Zeiten nur UTC und Datum, nie schwebend, nie `TZID`. Acht Fixtures unter `tests/fixtures/tasks_app/`, byte-gleich mit den Rohobjekten; für die Zeitformen mit Zone und schwebend gibt es keine von der App geschriebenen Objekte
+- [Phase 30]: 30-04: Lehren für die Messstrecke: nach `occ app:install` oder `app:disable` den Webserver neu starten, sonst antwortet die App über HTTP mit 404 (APCu); die Docker-VM hält nach dem Abbau einer Instanz Seitencache, der dem Host als belegter Speicher fehlt (vor einem Lauf `drop_caches` bei abgebauter Instanz); Fixtures brauchen `-text` in `.gitattributes`
 
 ### Pending Todos
 
@@ -826,7 +834,7 @@ Recent decisions affecting current work:
 - Phase 30 braucht in 30-02 eine Browser-Sitzung in der Tasks-App (Owner oder Hauptsitzung mit Playwright); im Repo ist kein Browser-Treiber installiert und es wird keiner installiert
 - Phase 30 RAM: schwere Läufe nur bei mindestens 4 GB freiem Host-RAM, nie parallel zu einem anderen Docker-Lauf, immer nur eine Nextcloud-Instanz (Gate im Messskript)
 - v1.8 offene Owner-Entscheidung E15: eigener Admin-Schalter für die ändernden Aufgaben-Werkzeuge (Präzedenz NC_MCP_FILES_UPDATE) oder nur die Abschaltung des Bundles `tasks`; dem Owner noch nicht vorgelegt, Checkpoint am Ende von Phase 30
-- v1.8: kein Abbruchkriterium der Phase 30 ist bisher ausgelöst. Belegt sind seit 30-01 `MKCOL` auf `files/` (201), seit 30-02 `PUT` mit `If-Match` (204, veraltet 412) und der Erhalt fremder Eigenschaften, seit 30-03 `MOVE` zwischen Aufgabenlisten (201), jeweils unter Impersonation auf Nextcloud 35.0.0 mit SQLite; 32 bis 34 unter Impersonation ungemessen, dort gibt es keine ExApp-Registrierung. Das Löschen ist auf 32 bis 35 mit App-Passwort gemessen
+- v1.8: kein Abbruchkriterium der Phase 30 ist bisher ausgelöst. Belegt sind seit 30-01 `MKCOL` auf `files/` (201), seit 30-02 `PUT` mit `If-Match` (204, veraltet 412) und der Erhalt fremder Eigenschaften, seit 30-03 `MOVE` zwischen Aufgabenlisten (201), seit 30-04 der create-only `PUT` eines VTODO (201, zweiter 412), jeweils unter Impersonation auf Nextcloud 35.0.0 mit SQLite; 32 bis 34 unter Impersonation ungemessen, dort gibt es keine ExApp-Registrierung. Das Löschen ist auf 32 bis 35 mit App-Passwort gemessen
 - Phase 30, DI-30-01 ist erledigt: die Umgebung des Worktrees tasks-080 trägt das Extra `documents`, der volle Lauf war in 30-02 ohne Ausnahmen grün
 - Phase 30, für den Owner-Checkpoint in 30-05: die Tasks-App hakt Unteraufgaben mit ab und schreibt wiederkehrende Aufgaben fort; die Vorgaben aus TMOD-03 (nicht mit abhaken) und TMOD-01 (wiederkehrende ablehnen) weichen davon ab und brauchen einen ausdrücklichen Entscheid
 - v1.8 ändernde Zugriffe, Verschieben und Löschen sind von der Recherche vom 11.11.2026 nicht abgedeckt; alles dazu ist Annahme bis zum Messbericht (REQUIREMENTS.md, A12 bis A19, A21)
@@ -876,15 +884,15 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 
 ## Session Continuity
 
-Last session: 2026-11-11
-Stopped at: Completed 30-03-PLAN.md (MOVE unter Impersonation, Unteraufgaben, Löschen mit Papierkorb auf 32 bis 35), lokal committet auf plan/v1.8-tasks-080, nicht gepusht; nc35 zurückgebaut und gestoppt, keine Wegwerf-Instanz und kein Volume übrig
-Nächster Schritt: Ausführung 30-04 (Discovery, echte Objekte, Kosten der Aufgabensuche)
+Last session: 2026-11-12
+Stopped at: Completed 30-04-PLAN.md (Discovery, Abfrageverhalten auf 32 bis 35, Kosten der Aufgabensuche, Fixtures der Tasks-App), lokal committet auf plan/v1.8-tasks-080, nicht gepusht; nc35 zurückgebaut und gestoppt, keine Wegwerf-Instanz und kein Volume übrig
+Nächster Schritt: Ausführung 30-05 (Messbericht abschließen, Übergabe an die Phasen 31 bis 33, Owner-Checkpoint E15)
 Resume file: None
 
 ## Operator Next Steps
 
 - Roadmap und Anforderungen für v1.8 prüfen (.planning/ROADMAP.md, .planning/REQUIREMENTS.md); der Branch plan/v1.8-tasks-080 ist nur lokal, Push oder PR nur nach Owner-Entscheid
 - E15 entscheiden (Admin-Schalter für ändernde Aufgaben-Werkzeuge), spätestens am Checkpoint von Phase 30
-- Phase 30: 30-01, 30-02 und 30-03 sind ausgeführt, Befunde in docs/spike-tasks.md (Abschnitte 1 bis 4 und 7) und in den drei SUMMARY-Dateien; weiter mit 30-04. Die Rohobjekte der Tasks-App für 30-04 liegen unter raw/ui-a und raw/ui-b. Für den Owner-Checkpoint in 30-05 aus 30-03: Unteraufgaben beim Verschieben und Löschen mitnehmen (A21), Mindestfrist des Papierkorbs für TMOD-07, Übernahme des Ergebnisworts in REQUIREMENTS.md
+- Phase 30: 30-01 bis 30-04 sind ausgeführt, Befunde in docs/spike-tasks.md (Abschnitte 1 bis 7) und in den vier SUMMARY-Dateien; weiter mit 30-05. Für den Owner-Checkpoint in 30-05 aus 30-03: Unteraufgaben beim Verschieben und Löschen mitnehmen (A21), Mindestfrist des Papierkorbs für TMOD-07, Übernahme des Ergebnisworts in REQUIREMENTS.md. Aus 30-04 für die Übergabe: TASK-01 braucht den resourcetype `calendar` als Bedingung (gelöschte Kalender und Abonnements tragen `VTODO`), der heutige Terminfilter prüft ihn nicht; ein Konto hinter der ExApp kann ganz ohne Kalender sein; Vorschlag für Deckel und Zeitbudget von `tasks_search` steht in Bericht 6 (Untergrenze, Einzelhost)
 - Für 30-02 die Browser-Sitzung in der Tasks-App einplanen (zwölf nummerierte Schritte in zwei Runden, nc35 läuft dabei)
 - Issue-Antworten in #32 und #44 erst nach dem Store-Release von 0.8.0
