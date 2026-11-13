@@ -720,3 +720,11 @@ docker stop nc-mcp-exapp-nc -> nc-mcp-exapp-nc | laeuft=false
 docker stop nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy | laeuft=false
 DOCKER ende eigene_container_laufend=0 fremde=keine
 GEHEIMNISPRUEFUNG t2-nc32 geheimnisse=0 treffer_nur_kontonamen=8 (konto=alice/bob in BASELINE, RUECKBAU, PAPIERKORB)
+
+# 33-01c Task 3 Werte abgeleitet 2026-11-13
+# tasks_modify_measure.py cap 2026-11-13T21:14:06Z
+CAP chain_cap=50 max_gesamt_s=3.688 budget_s=8 regel=33-01c-task-1
+ENTSCHEID etag_nach_veraendertem_text=fehlt quelle=ETAGFORM nc35 (fall=ohne-prodid: der Server ändert den Text beim Speichern, text_gleich_gesendet=nein, die Antwort 204 trägt keine ETag; fall=lf und fall=uid-case speichert er unverändert und antwortet mit ETag gleich GET)
+MESSWERT kette_max_gesamt_s=3.688 quelle=KETTE nc32 modus=move tiefe=1 lauf=1 (über nc35 und nc32, beide Modi, beide Tiefen, je 5 Läufe; größter Wert auf nc35: 2.466 s, move tiefe=3)
+MESSWERT chain_cap=50 regel=derive_budget(max_gesamt_s)<=30 budget_s=8 quelle=nc35+nc32 (D-33-10 bestätigt)
+MESSWERT kette_antwort_ids=50 (gleich chain_cap)

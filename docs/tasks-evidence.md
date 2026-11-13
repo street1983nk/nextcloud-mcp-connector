@@ -224,6 +224,87 @@ Nextcloud 35 the raw subline also carries the id; after the replacement both are
 live run found one more form on Nextcloud 35, see
 [Gap closure 32-09](#gap-closure-32-09-on-nextcloud-35-and-32).
 
+## Measurements before the modifying tools
+
+Plans 33-01b and 33-01c, before any code of `tasks_complete`, `tasks_update` or `tasks_move`
+existed. Owner release for the state changes on both standing instances:
+
+```
+FREIGABE zustand=option-a datum=2026-11-13 umfang=nc35+nc32 quelle=owner-antwort-checkpoint-33-01-task-3
+```
+
+Raw protocol:
+[raw/33-01-messung.txt](../.planning/phases/33-aufgaben-aendern/raw/33-01-messung.txt).
+Every run had a baseline per account before and after, equal on both instances; every test
+object was dropped without trash bin.
+
+### Behaviour of the Tasks app 0.18.1 (plan 33-01b, Nextcloud 35)
+
+The Tasks app was installed for the run and removed afterwards; the steps ran in a browser on
+a throwaway account, every state read under impersonation and compared line by line.
+
+```
+TASKSAPP nc35 vorher=keine
+TASKSAPP nc35 messung=0.18.1
+RUECKBAU nc35 tasksapp=wie-vorher vorher=keine nachher=keine
+ENTSCHEID wiederoeffnen_kinder=bleiben quelle=M1 (D-33-05 bestätigt, kein Auslöser für 33-01c Task 4)
+ENTSCHEID entfernen_due=zeile-weg quelle=M2
+ENTSCHEID entfernen_start=zeile-weg quelle=M2
+ENTSCHEID entfernen_description=leer quelle=M2 rohzeile=DESCRIPTION:
+ENTSCHEID entfernen_parent=zeile-weg quelle=M2
+ENTSCHEID entfernen_priority=zeile-weg quelle=M2 (wie D-33-07)
+ENTSCHEID entfernen_tags=zeile-weg quelle=M2 (wie D-33-07)
+ENTSCHEID pflegefelder_entfernen=DTSTAMP,LAST-MODIFIED
+ENTSCHEID cancelled_kette=unberuehrt quelle=CANCELLED kette (wie D-33-14)
+ENTSCHEID cancelled_direkt=abhaken-und-oeffnen abhaken=STATUS:COMPLETED,PERCENT-COMPLETE:100,COMPLETED(UTC) oeffnen=STATUS:NEEDS-ACTION,COMPLETED und PERCENT-COMPLETE entfernt pflegefelder=DTSTAMP,LAST-MODIFIED (wie D-33-14)
+ABWEICHUNG D-33-05/D-33-07/D-33-14 keine
+```
+
+Reopening a parent leaves its done children done. A removed field goes as a whole line, only
+the description stays as an empty `DESCRIPTION:`. A cancelled child stays untouched when its
+parent is checked off; a cancelled task can be checked off and reopened, and reopening makes it
+`NEEDS-ACTION`, not `CANCELLED` again. Side finding: two parallel writes of the app itself
+failed with `SQLSTATE[HY000]: General error: 5 database is locked` (status 500) on SQLite.
+
+### Cost of a chain of 50 descendants (M-3, D-33-10)
+
+One `REPORT` plus 51 conditional writes under impersonation, descendants in post order and the
+root last: `PUT` with `If-Match`, or `MOVE` with `Overwrite: F` and `If-Match` into a second
+list. Five runs per row, depth 1 (all children of the root) and depth 3.
+
+```
+KETTE nc35 modus=put tiefe=1 min_ms=2037 median_ms=2080 max_ms=2164 laeufe=5
+KETTE nc35 modus=put tiefe=3 min_ms=2051 median_ms=2074 max_ms=2199 laeufe=5
+KETTE nc35 modus=move tiefe=1 min_ms=2063 median_ms=2095 max_ms=2173 laeufe=5
+KETTE nc35 modus=move tiefe=3 min_ms=2077 median_ms=2103 max_ms=2466 laeufe=5
+KETTE nc32 modus=put tiefe=1 min_ms=1935 median_ms=1947 max_ms=1964 laeufe=5
+KETTE nc32 modus=put tiefe=3 min_ms=1920 median_ms=1961 max_ms=2454 laeufe=5
+KETTE nc32 modus=move tiefe=1 min_ms=1961 median_ms=1991 max_ms=3688 laeufe=5
+KETTE nc32 modus=move tiefe=3 min_ms=2016 median_ms=2043 max_ms=2135 laeufe=5
+CAP chain_cap=50 max_gesamt_s=3.688 budget_s=8 regel=33-01c-task-1
+MESSWERT kette_max_gesamt_s=3.688 quelle=KETTE nc32 modus=move tiefe=1 lauf=1 (über nc35 und nc32, beide Modi, beide Tiefen, je 5 Läufe; größter Wert auf nc35: 2.466 s, move tiefe=3)
+MESSWERT chain_cap=50 regel=derive_budget(max_gesamt_s)<=30 budget_s=8 quelle=nc35+nc32 (D-33-10 bestätigt)
+MESSWERT kette_antwort_ids=50 (gleich chain_cap)
+```
+
+Every write answered 204 (`PUT`) or 201 (`MOVE`). The rule was fixed before the measurement:
+the cap of 50 stays if twice the slowest whole chain, rounded up, is at most 30 s, half of a
+usual client wait of 60 s. The slowest chain took 3.688 s, the budget is 8 s, so the cap of 50
+holds. Depth does not change the cost; a chain costs about 40 ms per write.
+
+### ETag after a text the server altered (M-4)
+
+```
+ETAGFORM nc35 fall=ohne-prodid status=204 etag_im_kopf=nein text_gleich_gesendet=nein etag_gleich_get=-
+ETAGFORM nc35 fall=lf status=204 etag_im_kopf=ja text_gleich_gesendet=ja etag_gleich_get=ja
+ETAGFORM nc35 fall=uid-case status=204 etag_im_kopf=ja text_gleich_gesendet=ja etag_gleich_get=ja
+ENTSCHEID etag_nach_veraendertem_text=fehlt quelle=ETAGFORM nc35 (fall=ohne-prodid: der Server ändert den Text beim Speichern, text_gleich_gesendet=nein, die Antwort 204 trägt keine ETag; fall=lf und fall=uid-case speichert er unverändert und antwortet mit ETag gleich GET)
+```
+
+When the server changes the text on storing it (here: a calendar without `PRODID`), the
+accepted `PUT` answers without an ETag. A tool that needs the new ETag has to read the object
+again; it must not assume one comes back.
+
 ## Not measured
 
 - Nextcloud 33 and 34: only through the source, as in the spike of phase 30.
@@ -238,6 +319,11 @@ live run found one more form on Nextcloud 35, see
   not part of the owner release (`HINAUS ... zustand=gruppe entfaellt`), so whether a group
   share shows in `oc:invite` is open. The subline was measured with a due date only; the form
   without one came up in the live run.
+- Measurements before the modifying tools (plans 33-01b and 33-01c): nothing fell away through
+  the owner release, `FREIGABE zustand=option-a` covered nc35 and Nextcloud 32. By plan, the
+  behaviour of the Tasks app and the ETag after an altered text (M-4) were measured on
+  Nextcloud 35 only; the cost of a chain on both. The chains ran on loopback, a real network
+  adds latency per write, which the budget of 8 s against the limit of 30 s absorbs.
 
 ## Nextcloud 35 without the Tasks app
 
