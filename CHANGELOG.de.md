@@ -34,6 +34,17 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
   `parents=true` die Meldung eines abgelehnten Namens statt eines Serverfehlers.
 - Gemessen auf Nextcloud 32 und 35 unter AppAPI-Impersonation, siehe
   `docs/folder-evidence.md`.
+- Drei Werkzeuge im neuen Bundle `tasks`, der zehnten App-Familie, abschaltbar über
+  `NC_MCP_DISABLED_TOOLS`: `tasks_search`, `tasks_read` und `tasks_create`.
+- `tasks_search` durchsucht eigene und geteilte Aufgabenlisten, standardmäßig offene
+  Aufgaben; `status` nimmt open, completed oder all; 25 Treffer je Seite.
+- Eine geteilte Liste erscheint ohne Namen und ohne Kennung der Person, die sie geteilt hat.
+- `tasks_read` liefert eine Aufgabe mit ihren direkten Unteraufgaben.
+- `tasks_create` legt nur an: ohne `list` nur, wenn es genau eine eigene Liste gibt, nie
+  still in eine geteilte Liste und nie in einen Deck-Kalender.
+- Eine Fälligkeit ohne Uhrzeit bleibt auf genau diesem Tag.
+- Gemessen auf Nextcloud 32 und 35 unter AppAPI-Impersonation, siehe
+  `docs/tasks-evidence.md`.
 
 ## [0.7.2] - 2026-11-06
 

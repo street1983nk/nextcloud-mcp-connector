@@ -31,6 +31,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   gets the message of a refused name instead of a server error.
 - Measured on Nextcloud 32 and 35 under AppAPI impersonation, see
   `docs/folder-evidence.md`.
+- Three tools in the new bundle `tasks`, the tenth app family, switchable off through
+  `NC_MCP_DISABLED_TOOLS`: `tasks_search`, `tasks_read` and `tasks_create`.
+- `tasks_search` searches own and shared task lists, open tasks by default; `status`
+  takes open, completed or all; 25 hits per page.
+- A shared list is shown without the name or the id of the person who shared it.
+- `tasks_read` returns one task with its direct subtasks.
+- `tasks_create` is create-only: without `list` only when there is exactly one own list,
+  never silently into a shared list and never into a Deck calendar.
+- A due date without a time stays on exactly that day.
+- Measured on Nextcloud 32 and 35 under AppAPI impersonation, see
+  `docs/tasks-evidence.md`.
 
 ## [0.7.2] - 2026-11-06
 

@@ -35,6 +35,17 @@ dans [CHANGELOG.md](CHANGELOG.md).
   `parents=true`, reçoit le message d'un nom refusé au lieu d'une erreur du serveur.
 - Mesuré sur Nextcloud 32 et 35 sous impersonation AppAPI, voir
   `docs/folder-evidence.md`.
+- Trois outils dans le nouveau bundle `tasks`, la dixième famille d'applications,
+  désactivable via `NC_MCP_DISABLED_TOOLS` : `tasks_search`, `tasks_read` et `tasks_create`.
+- `tasks_search` cherche dans les listes de tâches propres et partagées, par défaut les
+  tâches ouvertes ; `status` accepte open, completed ou all ; 25 résultats par page.
+- Une liste partagée apparaît sans le nom ni l'identifiant de la personne qui l'a partagée.
+- `tasks_read` renvoie une tâche avec ses sous-tâches directes.
+- `tasks_create` ne fait que créer : sans `list` seulement s'il existe exactement une liste
+  propre, jamais en silence dans une liste partagée et jamais dans un agenda Deck.
+- Une échéance sans heure reste exactement sur ce jour.
+- Mesuré sur Nextcloud 32 et 35 sous impersonation AppAPI, voir
+  `docs/tasks-evidence.md`.
 
 ## [0.7.2] - 2026-11-06
 
