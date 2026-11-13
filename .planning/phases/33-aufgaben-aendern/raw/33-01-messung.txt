@@ -599,3 +599,124 @@ docker stop nc35-harp -> nc35-harp | laeuft=false
 docker stop nc35-caddy -> nc35-caddy | laeuft=false
 DOCKER ende eigene_container_laufend=0 fremde=keine
 GEHEIMNISPRUEFUNG t1-nc35 geheimnisse=0 treffer_nur_kontonamen=18 (konto=alice/bob in BASELINE, RUECKBAU, PAPIERKORB)
+
+# 33-01c Task 2 erster Anlauf (verworfen: RAM-Gate zu und fremder Container, nichts gestartet)
+    # 33-01c Task 2 nc32 2026-11-13T21:02:45Z
+    DOCKER fremde_container=keine vor_start nc35_laeuft=0
+    # tasks_measure.py up 2026-11-13T21:02:46Z
+    
+    == up nc32 ==
+    RAM frei_host_gb=3.99 schwelle=4.0 ergebnis=zu wenig
+    avs-phpcheck-17b2  mem 107.1MiB / 2GiB  cpu 37.40%
+    FREMDER CONTAINER avs-phpcheck-17b2 php:8.2-cli 12.47% gemeldet=ja
+    ABBRUCH RAM gate shut: 3.99 GB free (needs 4.0), foreign runs: ['avs-phpcheck-17b2']; nothing was stopped
+DOCKER warten grund=fremder_container pruefung=1 nach_5_min laufend=keine; danach Cache geleert, RAM-Gate erneut
+
+# 33-01c Task 2 nc32 zweiter Anlauf 2026-11-13T21:09:42Z
+DOCKER fremde_container=keine vor_start nc35_laeuft=0
+# tasks_measure.py up 2026-11-13T21:09:42Z
+
+== up nc32 ==
+RAM frei_host_gb=4.14 schwelle=4.0 ergebnis=ok
+(no running container)
+docker start nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+docker start nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy
+nc-mcp-exapp-nc: installed (attempt 1)
+# tasks_modify_measure.py baseline 2026-11-13T21:09:47Z
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+# tasks_modify_measure.py chain 2026-11-13T21:09:48Z
+
+== kette nc32 modus=put tiefe=1 ==
+SETUP MKCALENDAR liste=p3301-kette-a status=201
+SETUP MKCALENDAR liste=p3301-kette-b status=201
+KETTE nc32 modus=put tiefe=1 lauf=1 report_ms=41 schreiben_ms=1923 gesamt_ms=1964 status=[204]
+RUECKBAU kette lauf=1 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=1 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc32 modus=put tiefe=1 lauf=2 report_ms=29 schreiben_ms=1918 gesamt_ms=1947 status=[204]
+RUECKBAU kette lauf=2 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=2 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc32 modus=put tiefe=1 lauf=3 report_ms=29 schreiben_ms=1906 gesamt_ms=1935 status=[204]
+RUECKBAU kette lauf=3 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=3 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc32 modus=put tiefe=1 lauf=4 report_ms=30 schreiben_ms=1921 gesamt_ms=1951 status=[204]
+RUECKBAU kette lauf=4 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=4 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc32 modus=put tiefe=1 lauf=5 report_ms=31 schreiben_ms=1914 gesamt_ms=1945 status=[204]
+RUECKBAU kette lauf=5 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=5 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc32 modus=put tiefe=1 min_ms=1935 median_ms=1947 max_ms=1964 laeufe=5
+# tasks_modify_measure.py chain 2026-11-13T21:10:41Z
+
+== kette nc32 modus=put tiefe=3 ==
+KETTE nc32 modus=put tiefe=3 lauf=1 report_ms=30 schreiben_ms=1932 gesamt_ms=1962 status=[204]
+RUECKBAU kette lauf=1 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=1 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc32 modus=put tiefe=3 lauf=2 report_ms=31 schreiben_ms=1930 gesamt_ms=1961 status=[204]
+RUECKBAU kette lauf=2 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=2 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc32 modus=put tiefe=3 lauf=3 report_ms=30 schreiben_ms=2424 gesamt_ms=2454 status=[204]
+RUECKBAU kette lauf=3 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=3 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc32 modus=put tiefe=3 lauf=4 report_ms=32 schreiben_ms=1888 gesamt_ms=1920 status=[204]
+RUECKBAU kette lauf=4 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=4 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc32 modus=put tiefe=3 lauf=5 report_ms=29 schreiben_ms=1921 gesamt_ms=1950 status=[204]
+RUECKBAU kette lauf=5 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=5 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc32 modus=put tiefe=3 min_ms=1920 median_ms=1961 max_ms=2454 laeufe=5
+# tasks_modify_measure.py chain 2026-11-13T21:11:33Z
+
+== kette nc32 modus=move tiefe=1 ==
+KETTE nc32 modus=move tiefe=1 lauf=1 report_ms=30 schreiben_ms=3658 gesamt_ms=3688 status=[201]
+RUECKBAU kette lauf=1 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=1 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc32 modus=move tiefe=1 lauf=2 report_ms=37 schreiben_ms=1924 gesamt_ms=1961 status=[201]
+RUECKBAU kette lauf=2 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=2 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc32 modus=move tiefe=1 lauf=3 report_ms=30 schreiben_ms=1961 gesamt_ms=1991 status=[201]
+RUECKBAU kette lauf=3 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=3 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc32 modus=move tiefe=1 lauf=4 report_ms=30 schreiben_ms=1962 gesamt_ms=1991 status=[201]
+RUECKBAU kette lauf=4 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=4 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc32 modus=move tiefe=1 lauf=5 report_ms=30 schreiben_ms=2538 gesamt_ms=2569 status=[201]
+RUECKBAU kette lauf=5 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=5 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc32 modus=move tiefe=1 min_ms=1961 median_ms=1991 max_ms=3688 laeufe=5
+# tasks_modify_measure.py chain 2026-11-13T21:12:26Z
+
+== kette nc32 modus=move tiefe=3 ==
+KETTE nc32 modus=move tiefe=3 lauf=1 report_ms=32 schreiben_ms=2084 gesamt_ms=2116 status=[201]
+RUECKBAU kette lauf=1 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=1 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc32 modus=move tiefe=3 lauf=2 report_ms=37 schreiben_ms=2006 gesamt_ms=2043 status=[201]
+RUECKBAU kette lauf=2 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=2 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc32 modus=move tiefe=3 lauf=3 report_ms=30 schreiben_ms=2105 gesamt_ms=2135 status=[201]
+RUECKBAU kette lauf=3 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=3 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc32 modus=move tiefe=3 lauf=4 report_ms=29 schreiben_ms=1987 gesamt_ms=2016 status=[201]
+RUECKBAU kette lauf=4 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=4 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc32 modus=move tiefe=3 lauf=5 report_ms=30 schreiben_ms=1998 gesamt_ms=2028 status=[201]
+RUECKBAU kette lauf=5 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=5 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc32 modus=move tiefe=3 min_ms=2016 median_ms=2043 max_ms=2135 laeufe=5
+# tasks_modify_measure.py cleanup 2026-11-13T21:13:16Z
+
+== rueckbau nc32 ==
+RUECKBAU liste_geloescht konto=alice status=204
+RUECKBAU liste_geloescht konto=alice status=204
+PAPIERKORB nc32 konto=alice gefunden=0 geleert=0
+RUECKBAU reste konto=alice listen_mit_praefix=0
+# tasks_modify_measure.py baseline 2026-11-13T21:13:17Z
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher
+# tasks_measure.py stop 2026-11-13T21:13:18Z
+
+== stop nc32 ==
+docker stop nc-mcp-exapp-nc -> nc-mcp-exapp-nc | laeuft=false
+docker stop nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy | laeuft=false
+DOCKER ende eigene_container_laufend=0 fremde=keine
+GEHEIMNISPRUEFUNG t2-nc32 geheimnisse=0 treffer_nur_kontonamen=8 (konto=alice/bob in BASELINE, RUECKBAU, PAPIERKORB)
