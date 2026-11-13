@@ -508,6 +508,39 @@ async def test_a_descendant_that_cannot_be_changed_refuses_the_chain_without_a_p
 
 
 @pytest.mark.anyio
+async def test_a_descendant_that_is_not_utf8_refuses_the_chain_without_a_put(
+    clients: NcClients, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Plan 33-07: a byte that is no UTF-8 in a subtask would come back as U+FFFD and be
+    stored for good. The REPORT of the mocked list cannot carry such a byte (XML), so the
+    list read hands over the objects with the stored bytes as they are."""
+    store = store_with(
+        ("root.ics", vtodo("root", OPEN)),
+        child("a", "root", OPEN),
+        ("b.ics", vtodo("b", "RELATED-TO:a", OPEN, "DESCRIPTION:PLACEHOLDER")),
+    )
+    blob, tag = store.objects["b.ics"]
+    store.objects["b.ics"] = (blob.replace(b"PLACEHOLDER", b"K\xe4se"), tag)
+
+    async def raw_report(*_args: Any) -> list[Any]:
+        store.reports += 1
+        return [
+            tasks_tools.tasks_client.TodoObject(object_name=name, ics=data, etag=etag)
+            for name, (data, etag) in store.objects.items()
+        ]
+
+    monkeypatch.setattr(tasks_tools.tasks_client, "query_todos", raw_report)
+    with respx.mock(assert_all_called=False) as mock:
+        mount(mock, store)
+        with pytest.raises(ToolError) as caught:
+            await call(clients, store, completed=True)
+    assert store.reports == 1
+    assert store.writes == []
+    assert tid(OWN, "b.ics") in caught.value.message
+    assert "UTF-8" in caught.value.message
+
+
+@pytest.mark.anyio
 async def test_a_412_on_the_second_descendant_stops_and_keeps_the_named_task(
     clients: NcClients,
 ) -> None:

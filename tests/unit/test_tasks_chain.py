@@ -318,6 +318,46 @@ def test_a_read_only_list_is_refused() -> None:
     refusal(task_list(writable=False), [])
 
 
+NOT_UTF8 = b"K\xe4se"  # Latin-1 for "Kaese": one byte that is no UTF-8 at all
+
+
+def not_utf8_child(uid: str, parent: str) -> tasks_client.TodoObject:
+    text = vtodo(uid, f"RELATED-TO:{parent}", summary="SUMMARY-PLACEHOLDER")
+    blob = text.encode("utf-8").replace(b"SUMMARY-PLACEHOLDER", NOT_UTF8)
+    return tasks_client.TodoObject(object_name=f"{uid}.ics", ics=blob, etag=f'"etag-{uid}"')
+
+
+def test_a_descendant_that_is_not_utf8_is_an_entry_without_a_replaced_text() -> None:
+    """Plan 33-07: the text is never decoded with replacement characters, which a write would
+    store for good; the entry stays (it is a descendant) and carries no text at all."""
+    entries, skipped = tasks_tools.chain_entries(
+        task_list(), [obj("root.ics", vtodo("root")), not_utf8_child("b", "root")]
+    )
+    assert skipped == 0
+    (entry,) = [entry for entry in entries if entry["uid"] == "b"]
+    assert entry["text"] is None
+    assert all("�" not in (e["text"] or "") for e in entries)
+
+
+def test_a_descendant_that_is_not_utf8_refuses_the_whole_chain_with_its_id() -> None:
+    entries, _skipped = tasks_tools.chain_entries(
+        task_list(), [child("a", "root"), not_utf8_child("b", "a"), child("c", "root")]
+    )
+    descendants = tasks_tools.descendants_post_order("root", entries)
+    assert uids(descendants) == ["b", "a", "c"]
+    error = refusal(task_list(), descendants)
+    assert ids.encode_task(ids.task_list_key(OWN), "b.ics") in error.message
+    assert "UTF-8" in error.message
+    assert "Nothing was changed" in error.hint
+
+
+def test_the_same_descendant_in_utf8_passes_the_check() -> None:
+    """Positive control of the refusal above: only the one byte makes the difference."""
+    valid = obj("b.ics", vtodo("b", "RELATED-TO:a", summary="Käse"))
+    entries = entries_of(child("a", "root"), valid, child("c", "root"))
+    tasks_tools.check_chain(task_list(), tasks_tools.descendants_post_order("root", entries))
+
+
 def test_no_refusal_sends_a_request() -> None:
     assert not inspect.iscoroutinefunction(tasks_tools.check_chain)
     assert not inspect.iscoroutinefunction(tasks_tools.descendants_post_order)
