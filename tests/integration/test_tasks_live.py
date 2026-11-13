@@ -22,7 +22,9 @@ Everything the run creates is named ``p32live-<stamp>`` and removed by the harne
 module teardown (32-RULES.md section 7): shares withdrawn, every list deleted with
 ``X-NC-CalDAV-No-Trashbin: 1``, the calendar trash bin of both accounts emptied of this run,
 the Deck board deleted, the two TASK-03 accounts and the account of D-32-18 (plan 32-09) deleted
-with ``occ user:delete``.
+with ``occ user:delete``. The test group ``p32live<stamp>grp`` of plan 32-10 (members bob and
+alice) loses every share first and is deleted with ``occ group:delete`` after the lists;
+``GRUPPE`` lines before and after show it absent and without a share.
 ``BASELINE`` lines per account (``calendars``, ``calendarobjects`` with and without
 ``deleted_at``, ``calendarsubscriptions``, ``dav_shares``) before and after must be equal.
 
@@ -34,7 +36,7 @@ Run it against the Nextcloud 32 or 34 route (``compose.exapp.yml``, default name
 
     set -a && . ./.env.exapp && set +a
     NC_MCP_EXPECT_TASKS_APP=0 PYTHONUTF8=1 uv run --no-sync pytest \\
-        tests/integration/test_tasks_live.py -m integration -s -q
+        tests/integration/test_tasks_live.py -m integration -s -q -p no:xdist
 
 and against Nextcloud 35 (``compose.nc35.yml``, containers started, never bootstrapped)::
 
@@ -43,7 +45,13 @@ and against Nextcloud 35 (``compose.nc35.yml``, containers started, never bootst
         NC_MCP_E2E_NEXTCLOUD=nc35-nc NC_MCP_E2E_HARP=nc35-harp NC_MCP_E2E_CADDY=nc35-caddy \\
         NC_MCP_E2E_CONTAINERS=nc35-nc,nc_app_mcp_connector,nc35-harp,nc35-caddy,nc35-greenmail
     NC_MCP_EXPECT_TASKS_APP=1 PYTHONUTF8=1 uv run --no-sync pytest \\
-        tests/integration/test_tasks_live.py -m integration -s -q
+        tests/integration/test_tasks_live.py -m integration -s -q -p no:xdist
+
+Two optional switches of plan 32-10, both unset in CI: ``NC_MCP_TASKS_CAP_SERIES=1`` builds a
+list of bob with 520 open tasks for the cap of 500 (case ``deckel-500``, otherwise
+``entfaellt``), and ``NC_MCP_TASKS_BOB_DISPLAY=<name>`` gives bob that display name for the run
+and puts the old one back before the closing baseline (line ``ANZEIGENAME``), so the scan for
+the owner also covers a display name other than the account id.
 
 The env files are only ever loaded with ``set -a``, never read or quoted. Without that
 environment the module skips; with ``NC_MCP_REQUIRE_LIVE=1`` it fails instead (W3 of phase
@@ -55,11 +63,14 @@ import dataclasses
 import json
 import os
 import secrets
+import statistics
 import subprocess
 import sys
+import time
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 from urllib.parse import quote, unquote
 
@@ -69,7 +80,7 @@ import pytest
 import topology
 from lxml import etree
 
-from mcp_connector import ids
+from mcp_connector import ids, provider_map
 from mcp_connector.config import normalize_base_url
 from mcp_connector.errors import REASON_GUARD_TRIPPED, REASON_UNKNOWN_ID, ToolError
 from mcp_connector.nextcloud import NcClients, capabilities
@@ -179,6 +190,20 @@ $qb->select($qb->func()->count('*', 'n'))->from('calendarobjects', 'o')
     ->andWhere($qb->expr()->eq('c.uri', $qb->createNamedParameter($argv[2])))
     ->andWhere($qb->expr()->eq('o.calendartype', $qb->createNamedParameter(0)))
     ->andWhere($qb->expr()->isNull('o.deleted_at'));
+echo $qb->executeQuery()->fetchOne(), "\n";
+"""
+)
+
+#: Shares of one group in ``dav_shares``: the side of the group (plan 32-10).
+PHP_GROUP_SHARES = (
+    _PHP_BOOT
+    + r"""
+$db = \OCP\Server::get(\OCP\IDBConnection::class);
+$qb = $db->getQueryBuilder();
+$qb->select($qb->func()->count('*', 'n'))->from('dav_shares')
+    ->where($qb->expr()->eq(
+        'principaluri', $qb->createNamedParameter('principals/groups/' . $argv[1])
+    ));
 echo $qb->executeQuery()->fetchOne(), "\n";
 """
 )
@@ -327,6 +352,9 @@ class Run:
     #: The keys of the two shared lists as alice sees them (hashed, D-32-14).
     rw_key: str = ""
     ro_key: str = ""
+    #: The keys of the two lists bob shared with the test group (plan 32-10).
+    grw_key: str = ""
+    gro_key: str = ""
     #: The serialised text of every answer and every refusal of the run (D-32-06).
     answers: list[str] = dataclasses.field(default_factory=list)
     created: dict[str, str] = dataclasses.field(default_factory=dict)
@@ -353,6 +381,9 @@ LISTS = {
     "b": ("alice", f"{P}-b", f"{P}-b"),
     "rw": ("bob", f"{P}-rw", f"{P}-rw"),
     "ro": ("bob", f"{P}-ro", f"{P}-ro"),
+    # Plan 32-10: two lists of bob, shared with the test group that holds alice.
+    "grw": ("bob", f"{P}-grw", f"{P}-grw"),
+    "gro": ("bob", f"{P}-gro", f"{P}-gro"),
 }
 #: The harness tasks: role -> (list role, title, extra lines).
 TASKS = {
@@ -368,11 +399,32 @@ TASKS = {
     "fremdrw": ("rw", f"{P}-fremdrw", ()),
     "fremdfaellig": ("rw", f"{P}-fremdfaellig", ("DUE;VALUE=DATE:20261204",)),
     "fremdro": ("ro", f"{P}-fremdro", ()),
+    "gruppeohne": ("grw", f"{P}-gruppeohne", ()),
+    "gruppefaellig": ("grw", f"{P}-gruppefaellig", ("DUE;VALUE=DATE:20261204",)),
+    "gruppero": ("gro", f"{P}-gruppero", ()),
 }
 FRESH, NEVER = f"{P}-frisch", f"{P}-nie"
 #: D-32-18 (plan 32-09): an account with exactly one own task list, which it shares itself.
 OUT_USER = f"p32live{STAMP}aus"
 OUT_LIST = f"{P}-aus"
+#: Plan 32-10: the test group (bob and alice), the cap list of bob and two optional switches.
+GROUP = f"p32live{STAMP}grp"
+CAP_LIST = f"{P}-deckel"
+CAP_TASKS = 520
+ENV_CAP_SERIES = "NC_MCP_TASKS_CAP_SERIES"
+ENV_BOB_DISPLAY = "NC_MCP_TASKS_BOB_DISPLAY"
+#: The three recurring forms of plan 32-10, put into list b of alice: form -> title.
+RECURRING = {
+    "app": f"{P}-wieder-app",
+    "instanz-erledigt": f"{P}-wieder-instanz",
+    "master-erledigt": f"{P}-wieder-master",
+}
+#: The form of a recurring task the Tasks app 0.18.1 writes (phase 30), the template of all three.
+RECURRING_TEMPLATE = (
+    Path(__file__).resolve().parents[1] / "fixtures" / "tasks_app" / "recurring.ics"
+)
+_SECOND_OCCURRENCE = "20261121T130000Z"
+_DONE_LINES = ("STATUS:COMPLETED", "PERCENT-COMPLETE:100", "COMPLETED:20261121T140000Z")
 
 
 def _environment() -> dict[str, str]:
@@ -395,11 +447,18 @@ def list_url(run: Run, role: str) -> str:
     return owner_harness(run, role).calendar_url(LISTS[role][1])
 
 
-def share_body(user: str, *, writable: bool, remove: bool = False) -> bytes:
-    """The share document of the calendar sharing plugin, as ``scripts/tasks_spike.py``."""
+def share_body(
+    user: str, *, writable: bool, remove: bool = False, principal: str = "users"
+) -> bytes:
+    """The share document of the calendar sharing plugin, as ``scripts/tasks_spike.py``.
+
+    ``principal="groups"`` shares with the group ``user`` instead of a person (plan 32-10).
+    """
     root = etree.Element(f"{{{OC_SHARE_NS}}}share", nsmap={"d": dav_xml.DAV, "o": OC_SHARE_NS})
     entry = etree.SubElement(root, f"{{{OC_SHARE_NS}}}{'remove' if remove else 'set'}")
-    etree.SubElement(entry, f"{{{dav_xml.DAV}}}href").text = f"principal:principals/users/{user}"
+    etree.SubElement(
+        entry, f"{{{dav_xml.DAV}}}href"
+    ).text = f"principal:principals/{principal}/{user}"
     if writable and not remove:
         etree.SubElement(entry, f"{{{OC_SHARE_NS}}}read-write")
     return etree.tostring(root, xml_declaration=True, encoding="utf-8")
@@ -412,8 +471,86 @@ def publish_body(*, publish: bool) -> bytes:
     return etree.tostring(root, xml_declaration=True, encoding="utf-8")
 
 
+def recurring_ics(uid: str, title: str, form: str) -> str:
+    """One recurring form of plan 32-10 from the Tasks app template, as the measuring program
+    builds it (copied, because a test does not load a measuring program)."""
+    lines = RECURRING_TEMPLATE.read_text(encoding="utf-8").replace("\r\n", "\n").splitlines()
+    master = [
+        f"UID:{uid}" if line.startswith("UID:") else line
+        for line in (f"SUMMARY:{title}" if line.startswith("SUMMARY:") else line for line in lines)
+    ]
+    end = master.index("END:VTODO")
+    if form == "master-erledigt":
+        master[end:end] = list(_DONE_LINES)
+    elif form == "instanz-erledigt":
+        master[end + 1 : end + 1] = [
+            "BEGIN:VTODO",
+            f"UID:{uid}",
+            "DTSTAMP:20261121T140000Z",
+            f"SUMMARY:{title}",
+            f"RECURRENCE-ID:{_SECOND_OCCURRENCE}",
+            f"DUE:{_SECOND_OCCURRENCE}",
+            *_DONE_LINES,
+            "END:VTODO",
+        ]
+    return "\r\n".join(master) + "\r\n"
+
+
+def group_members() -> list[str] | None:
+    """The members of the test group, ``None`` when it does not exist."""
+    raw = cw.occ("group:list", "--output=json")
+    members = json.loads(raw[raw.find("{") :]).get(GROUP)
+    if members is None:
+        return None
+    return [str(member) for member in members] if isinstance(members, list) else []
+
+
+def group_line(run: "Run", phase: str) -> tuple[bool, str]:
+    exists = group_members() is not None
+    shares = php(PHP_GROUP_SHARES, GROUP)
+    record(
+        f"GRUPPE nc{run.version} name={GROUP} vorhanden={'ja' if exists else 'nein'} "
+        f"shares={shares} phase={phase}"
+    )
+    return exists, shares
+
+
+def display_name_of(user: str) -> str:
+    info = json.loads(cw.occ("user:info", user, "--output=json"))
+    return str(info.get("display_name") or info.get("displayname") or "")
+
+
+def set_bob_display(run: "Run", value: str) -> str:
+    """The display name of bob set to ``value``: first with occ, then through OCS as bob.
+
+    Returns the way that carried (``occ`` or ``ocs``), empty when neither did.
+    """
+    cw.occ("user:setting", run.bob, "settings", "display_name", value, check_status=False)
+    if display_name_of(run.bob) == value:
+        return "occ"
+    run.harness_bob.request(
+        "PUT",
+        f"{run.env['base_url']}/ocs/v2.php/cloud/users/{quote(run.bob, safe='')}",
+        headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+        data={"key": "displayname", "value": value},
+    )
+    if display_name_of(run.bob) == value:
+        return "ocs"
+    return ""
+
+
 def _build(run: Run) -> None:
     """Lists, shares, tasks and the Deck board, all through the harness with app passwords."""
+    for argv in (
+        ("group:add", GROUP),
+        ("group:adduser", GROUP, run.bob),
+        ("group:adduser", GROUP, run.alice),
+    ):
+        cw.occ(*argv, check_status=False)
+    members = set(group_members() or [])
+    both = {run.alice, run.bob} <= members
+    record(f"SETUP gruppe mitglieder={len(members)} alice_und_bob={'ja' if both else 'nein'}")
+    assert both, "the test group does not hold bob and alice"
     for role, (_, uri, name) in LISTS.items():
         status = owner_harness(run, role).mk_task_list(uri, name)
         assert status == 201, f"MKCALENDAR {uri}: {status}"
@@ -425,6 +562,14 @@ def _build(run: Run) -> None:
             content=share_body(run.alice, writable=writable),
         )
         assert response.status_code < 300, f"share {role}: {response.status_code}"
+    for role, writable in (("grw", True), ("gro", False)):
+        response = run.harness_bob.request(
+            "POST",
+            list_url(run, role),
+            headers={"Content-Type": "application/xml; charset=utf-8"},
+            content=share_body(GROUP, writable=writable, principal="groups"),
+        )
+        assert response.status_code < 300, f"group share {role}: {response.status_code}"
     for role, (list_role, title, extra) in TASKS.items():
         uid = f"{P}-{role}-{uuid.uuid4().hex[:6]}"
         response = owner_harness(run, list_role).request(
@@ -435,9 +580,21 @@ def _build(run: Run) -> None:
         )
         assert response.status_code == 201, f"PUT {role}: {response.status_code}"
         run.objects[role] = f"{uid}.ics"
+    for form, title in RECURRING.items():
+        uid = f"{P}-wieder-{form}-{uuid.uuid4().hex[:6]}"
+        response = run.harness.request(
+            "PUT",
+            f"{list_url(run, 'b')}{uid}.ics",
+            headers={"Content-Type": "text/calendar; charset=utf-8", "If-None-Match": "*"},
+            content=recurring_ics(uid, title, form),
+        )
+        assert response.status_code == 201, f"PUT wieder-{form}: {response.status_code}"
+        run.objects[f"wieder-{form}"] = f"{uid}.ics"
     shared = {entry.name: entry for entry in run.harness.task_lists() if entry.shared}
     run.rw_key = shared[LISTS["rw"][2]].key
     run.ro_key = shared[LISTS["ro"][2]].key
+    run.grw_key = shared[LISTS["grw"][2]].key
+    run.gro_key = shared[LISTS["gro"][2]].key
 
     run.deck_marker = f"dk{uuid.uuid4().hex}"
     run.board_id = run.harness.deck_created("/boards", {"title": f"{P}-deck", "color": "0082c9"})
@@ -450,7 +607,7 @@ def _build(run: Run) -> None:
     assert run.deck_marker in card.text, f"deck card without its marker: {card.status_code}"
 
 
-def _purge_calendar_trash(harness: cw.Harness) -> int:
+def _purge_calendar_trash(harness: cw.Harness) -> tuple[int, int]:
     """Delete every object of this run from the calendar trash bin of the harness account.
 
     ``trashbin/objects/`` answers PROPFIND with 501 (plan 30-02), so it is read with a
@@ -470,45 +627,62 @@ def _purge_calendar_trash(harness: cw.Harness) -> int:
         content=etree.tostring(root, xml_declaration=True, encoding="utf-8"),
     )
     assert response.status_code == 207, f"REPORT trash bin: {response.status_code}"
-    removed = 0
+    found = cleared = 0
     origin = httpx.URL(harness.base_url)
     for entry in etree.fromstring(response.content).iter("{DAV:}response"):
         data = "".join(str(part) for part in entry.itertext())
         data = data.replace("\r\n ", "").replace("\n ", "")
         href = entry.findtext("{DAV:}href") or ""
         if P in data and href:
-            harness.request(
+            gone = harness.request(
                 "DELETE", str(origin.copy_with(path=href, query=None)), headers=NO_TRASHBIN
             )
-            removed += 1
-    return removed
+            found += 1
+            cleared += 1 if gone.status_code in (200, 204) else 0
+    return found, cleared
 
 
 def _teardown(run: Run) -> list[str]:
     """Remove everything of this run through the harness, never through the connector."""
     lines: list[str] = []
-    for role in ("rw", "ro"):
+    for role, sharee, principal in (
+        ("rw", run.alice, "users"),
+        ("ro", run.alice, "users"),
+        ("grw", GROUP, "groups"),
+        ("gro", GROUP, "groups"),
+    ):
         response = run.harness_bob.request(
             "POST",
             list_url(run, role),
             headers={"Content-Type": "application/xml; charset=utf-8"},
-            content=share_body(run.alice, writable=False, remove=True),
+            content=share_body(sharee, writable=False, remove=True, principal=principal),
         )
         lines.append(f"RUECKBAU freigabe {role} status={response.status_code}")
     for role in LISTS:
         status = owner_harness(run, role).delete_calendar_url(list_url(run, role))
         left = owner_harness(run, role).status_of(list_url(run, role))
         lines.append(f"RUECKBAU liste {role} delete={status} no_trashbin=1 danach={left}")
+    cap_url = run.harness_bob.calendar_url(CAP_LIST)
+    status = run.harness_bob.delete_calendar_url(cap_url)
+    lines.append(
+        f"RUECKBAU liste deckel delete={status} no_trashbin=1 "
+        f"danach={run.harness_bob.status_of(cap_url)}"
+    )
     if run.board_id:
         run.harness.deck("DELETE", f"/boards/{run.board_id}")
         lines.append(f"RUECKBAU deck board={run.board_id} {run.harness.board_state(run.board_id)}")
     for label, harness in (("alice", run.harness), ("bob", run.harness_bob)):
-        lines.append(f"RUECKBAU papierkorb {label} entfernt={_purge_calendar_trash(harness)}")
+        found, cleared = _purge_calendar_trash(harness)
+        lines.append(f"RUECKBAU papierkorb {label} entfernt={cleared}")
+        lines.append(f"PAPIERKORB nc{run.version} konto={label} gefunden={found} geleert={cleared}")
     if run.harness_out is not None:
         lines.extend(_teardown_out(run, run.harness_out))
     for uid in (FRESH, NEVER, OUT_USER):
         out = cw.occ("user:delete", uid, check_status=False)
         lines.append(f"RUECKBAU konto {uid} {'geloescht' if 'deleted' in out else 'nicht da'}")
+    if group_members() is not None:
+        cw.occ("group:delete", GROUP, check_status=False)
+    lines.append(f"RUECKBAU gruppe {'noch da' if group_members() is not None else 'geloescht'}")
     rest = [e.uri for e in run.harness.task_lists() if P in e.name or P in e.uri]
     rest += [e.uri for e in run.harness_bob.task_lists() if P in e.uri]
     lines.append(f"RUECKBAU reste listen_mit_kopf={len(rest)}")
@@ -523,19 +697,31 @@ def _teardown_out(run: Run, harness: cw.Harness) -> list[str]:
     body = share_body(run.bob, writable=False, remove=True)
     status = harness.request("POST", url, headers=xml_head, content=body).status_code
     lines.append(f"RUECKBAU freigabe aus status={status}")
+    body = share_body(GROUP, writable=False, remove=True, principal="groups")
+    status = harness.request("POST", url, headers=xml_head, content=body).status_code
+    lines.append(f"RUECKBAU gruppenfreigabe aus status={status}")
     status = harness.request(
         "POST", url, headers=xml_head, content=publish_body(publish=False)
     ).status_code
     lines.append(f"RUECKBAU link aus status={status}")
     # The object deleted after the positive control lies in the trash bin; it is purged
     # before the list goes, so the line shows it (deleting the list would take it as well).
-    purged = _purge_calendar_trash(harness)
+    found, purged = _purge_calendar_trash(harness)
     lines.append(f"RUECKBAU papierkorb {OUT_USER} vor-liste entfernt={purged}")
+    lines.append(
+        f"PAPIERKORB nc{run.version} konto={OUT_USER} gefunden={found} geleert={purged} "
+        "phase=vor-liste"
+    )
     status = harness.delete_calendar_url(url)
     lines.append(
         f"RUECKBAU liste aus delete={status} no_trashbin=1 danach={harness.status_of(url)}"
     )
-    lines.append(f"RUECKBAU papierkorb {OUT_USER} entfernt={_purge_calendar_trash(harness)}")
+    found, purged = _purge_calendar_trash(harness)
+    lines.append(f"RUECKBAU papierkorb {OUT_USER} entfernt={purged}")
+    lines.append(
+        f"PAPIERKORB nc{run.version} konto={OUT_USER} gefunden={found} geleert={purged} "
+        "phase=nach-liste"
+    )
     rest = [e.uri for e in harness.task_lists() if P in e.uri]
     lines.append(f"RUECKBAU reste {OUT_USER} listen_mit_kopf={len(rest)}")
     harness.close()
@@ -572,10 +758,21 @@ def run() -> Iterator[Run]:
     before = {user: baseline_of(user) for user in users}
     for user, value in before.items():
         record(f"BASELINE nc{state.version} konto={user} {value} phase=vorher")
+    group_before = group_line(state, "vorher")
+    assert group_before == (False, "0"), f"the test group exists before the run: {group_before}"
     exclusion_core.clear_cache()
     capabilities.clear_cache()
     lines: list[str] = []
+    display_before = state.bob_display
+    wanted_display = (os.environ.get(ENV_BOB_DISPLAY) or "").strip()
+    display_way = ""
     try:
+        if wanted_display:
+            display_way = set_bob_display(state, wanted_display)
+            if display_way:
+                state.bob_display = wanted_display
+            else:
+                record("ANZEIGENAME bob gesetzt=nein grund=kein-weg-traegt (Grenze im Beleg)")
         _build(state)
         yield state
     finally:
@@ -584,9 +781,22 @@ def run() -> Iterator[Run]:
         finally:
             for line in lines:
                 record(line)
+            if display_way:
+                back = set_bob_display(state, display_before)
+                same = display_name_of(state.bob) == display_before
+                record(
+                    f"ANZEIGENAME bob gesetzt=ja zurueck={'ja' if back else 'nein'} "
+                    f"gleich_vorher={'ja' if same else 'nein'} weg={display_way}"
+                )
+            elif not wanted_display:
+                record("ANZEIGENAME bob gesetzt=nein zurueck=entfaellt gleich_vorher=ja")
             harness.close()
             harness_bob.close()
             exclusion_core.clear_cache()
+    group_after = group_line(state, "nachher")
+    assert group_after == (False, "0"), f"the test group is left: {group_after}"
+    if display_way:
+        assert display_name_of(state.bob) == display_before, "the display name of bob is not back"
     after = {user: baseline_of(user) for user in users}
     for user, value in after.items():
         same = "ja" if before[user] == value else "nein"
@@ -705,7 +915,8 @@ def hit_ids(answer: dict[str, Any]) -> set[str]:
 def task_id(run: Run, role: str) -> str:
     """The id of a harness task: an own list keeps its URI as key, a shared one its hash."""
     list_role = TASKS[role][0]
-    key = {"rw": run.rw_key, "ro": run.ro_key}.get(list_role, LISTS[list_role][1])
+    keys = {"rw": run.rw_key, "ro": run.ro_key, "grw": run.grw_key, "gro": run.gro_key}
+    key = keys.get(list_role, LISTS[list_role][1])
     return ids.encode_task(key, run.objects[role])
 
 
@@ -1126,6 +1337,7 @@ async def _out_refused(run: Run, label: str, **kwargs: Any) -> None:
         case.expect(before == after, f"calendarobjects vorher={before} nachher={after}")
         case.expect(not _names_bob(run, text), "neither the id nor the display name of bob")
         case.expect("_shared_by_" not in text, "no share marker")
+        case.expect(GROUP.casefold() not in text.casefold(), "no group id")
 
 
 async def _out_written(run: Run, label: str, **kwargs: Any) -> str:
@@ -1155,10 +1367,10 @@ async def _out_written(run: Run, label: str, **kwargs: Any) -> str:
     return str(answer["id"])
 
 
-async def test_d_32_18_an_own_list_shared_with_others_is_only_written_when_named(
-    run: Run,
-) -> None:
-    """The account of this case has exactly one own task list; it shares it itself."""
+def _ensure_out(run: Run) -> cw.Harness:
+    """The account of D-32-18 with exactly one own task list, made once per run."""
+    if run.harness_out is not None:
+        return run.harness_out
     password = f"{secrets.token_urlsafe(18)}Aa1!"
     record(f"SETUP d-32-18 occ user:add {add_account(OUT_USER, password)} konto={OUT_USER}")
     run.accounts.append(OUT_USER)
@@ -1166,12 +1378,20 @@ async def test_d_32_18_an_own_list_shared_with_others_is_only_written_when_named
     status = run.harness_out.mk_task_list(OUT_LIST, OUT_LIST)
     record(f"SETUP d-32-18 MKCALENDAR liste={OUT_LIST} status={status}")
     assert status == 201, f"MKCALENDAR {OUT_LIST}: {status}"
+    return run.harness_out
+
+
+async def test_d_32_18_an_own_list_shared_with_others_is_only_written_when_named(
+    run: Run,
+) -> None:
+    """The account of this case has exactly one own task list; it shares it itself."""
+    harness_out = _ensure_out(run)
 
     # Positive control: nobody else sees the list, so it is written without list.
     first = await _out_written(run, "d-32-18-privat")
     _, (_, object_name) = ids.parse(first)
-    gone = run.harness_out.request(
-        "DELETE", f"{run.harness_out.calendar_url(OUT_LIST)}{quote(object_name, safe='')}"
+    gone = harness_out.request(
+        "DELETE", f"{harness_out.calendar_url(OUT_LIST)}{quote(object_name, safe='')}"
     )
     record(f"SETUP d-32-18 DELETE privat-objekt status={gone.status_code} (Papierkorb im Rueckbau)")
 
@@ -1221,18 +1441,20 @@ async def _connector_sublines(run: Run, case: Case, title: str) -> tuple[str | N
     return (sublines[0] if sublines else None), (texts[0] if texts else None)
 
 
-async def _shared_subline_case(run: Run, label: str, role: str, *, dated: bool) -> None:
-    """D-32-17 for one task of the rw share: raw subline first, then the connector."""
+async def _shared_subline_case(
+    run: Run, label: str, role: str, *, dated: bool, list_role: str = "rw"
+) -> None:
+    """D-32-17 for one task of a writable share: raw subline first, then the connector."""
     if not run.expect_app:
         record(
             f"AUFGABE {label} nc={run.version} nutzer={run.alice} status=keine "
             "ergebnis=entfaellt | without the Tasks app the provider tasks does not exist"
         )
         return
-    title, name = TASKS[role][1], LISTS["rw"][2]
+    title, name = TASKS[role][1], LISTS[list_role][2]
     with Case(run, label) as case:
         raw = _raw_provider_subline(run, title)
-        case.expect(raw is not None, "the provider finds the task of the rw share")
+        case.expect(raw is not None, f"the provider finds the task of the {list_role} share")
         raw = raw or ""
         raw_owner = _names_bob(run, raw)
         case.note(f"roh_mit_besitzer={'ja' if raw_owner else 'nein'}")
@@ -1285,6 +1507,293 @@ async def test_d_32_17_the_subline_of_an_own_list_hit_is_unchanged(run: Run) -> 
         subline, text = await _connector_sublines(run, case, title)
         case.expect(raw is not None and subline == (raw or None), "the subline is the raw one")
         case.expect(text == (raw or ""), "search text equals the raw subline")
+
+
+# --- plan 32-10: an own list shared with a group (D-32-18 for groups) -----------------------
+
+
+async def test_d_32_18_an_own_list_shared_with_a_group_is_only_written_when_named(
+    run: Run,
+) -> None:
+    """The account of D-32-18 shares its one own list with the test group, read only and
+    read-write; the account itself is no member of the group."""
+    _ensure_out(run)
+    # Positive control: before the group share the list is written without list.
+    parent = await _out_written(run, "d-32-18-gruppe-privat")
+    status = _out_post(run, share_body(GROUP, writable=False, principal="groups"))
+    record(f"SETUP d-32-18-gruppe FREIGABE an-gruppe-ro status={status}")
+    assert status < 300, f"group share: {status}"
+    await _out_refused(run, "d-32-18-gruppe-ro")
+    status = _out_post(run, share_body(GROUP, writable=True, principal="groups"))
+    record(f"SETUP d-32-18-gruppe FREIGABE an-gruppe-rw status={status}")
+    assert status < 300, f"group share: {status}"
+    await _out_refused(run, "d-32-18-gruppe-rw")
+    await _out_refused(run, "d-32-18-gruppe-parent", parent=parent)
+    status = _out_post(run, share_body(GROUP, writable=False, remove=True, principal="groups"))
+    record(f"SETUP d-32-18-gruppe FREIGABE zurueck status={status}")
+    await _out_written(run, "d-32-18-gruppe-zurueck")
+
+
+# --- plan 32-10: lists bob shared with a group that holds alice -----------------------------
+
+
+def _names_group(text: str) -> bool:
+    return GROUP.casefold() in text.casefold()
+
+
+async def test_group_shares_into_the_account_carry_no_owner_and_the_right_flags(
+    run: Run,
+) -> None:
+    with Case(run, "gruppe-rein-flags") as case:
+        answer = await search(case, query=P, status="all")
+        lists = {
+            hit["list"]["name"]: hit["list"]
+            for hit in answer.get("tasks") or []
+            if isinstance(hit, dict) and isinstance(hit.get("list"), dict)
+        }
+        raw = run.harness.home_raw().text
+        suffixed = sum(1 for role in ("grw", "gro") if f"{LISTS[role][2]} (" in raw)
+        case.note(f"roher displayname mit zusatz in der discovery: {suffixed} von 2")
+        case.expect(suffixed == 2, "positive control: the server adds the owner to both")
+        for role, writable in (("grw", True), ("gro", False)):
+            entry = lists.get(LISTS[role][2])
+            case.expect(
+                entry == {"name": LISTS[role][2], "shared": True, "writable": writable},
+                f"{role}: {entry}",
+            )
+        found = hit_ids(answer)
+        case.expect(task_id(run, "gruppeohne") in found, "the task of grw is a hit")
+        case.expect(task_id(run, "gruppero") in found, "the task of gro is a hit")
+        case.expect(not _names_group(json.dumps(answer)), "no group id in the answer")
+
+
+async def test_without_list_a_group_share_is_offered_by_name_and_key_only(run: Run) -> None:
+    counts = {role: list_objects(run.bob, LISTS[role][1]) for role in ("grw", "gro")}
+    with Case(run, "gruppe-rein-ohne-list") as case:
+        async with measured(case) as clients:
+            exc = await refusal(run, tasks_tools.create_task(clients, summary=f"{P}-gohne"))
+        after = {role: list_objects(run.bob, LISTS[role][1]) for role in ("grw", "gro")}
+        text = f"{exc.message} {exc.hint}"
+        case.expect("more than one task list" in exc.message, told(exc))
+        offered = f"{LISTS['grw'][2]} (shared, key {run.grw_key})"
+        case.expect(offered in exc.hint, f"hint offers the rw group share: {exc.hint!r}")
+        case.expect(LISTS["gro"][2] not in exc.hint, "the read only group share is not offered")
+        case.expect(not methods(case.seen, "PUT"), "the hook saw no PUT")
+        case.expect(counts == after, f"calendarobjects vorher={counts} nachher={after}")
+        case.expect(not _names_bob(run, text), "neither the id nor the display name of bob")
+        case.expect(not _names_group(text) and "_shared_by_" not in text, "no group, no marker")
+
+
+async def test_a_named_group_share_with_write_access_is_written_to(run: Run) -> None:
+    before = list_objects(run.bob, LISTS["grw"][1])
+    with Case(run, "gruppe-rein-rw-mit-list") as case:
+        async with measured(case) as clients:
+            answer = keep(
+                run,
+                await tasks_tools.create_task(
+                    clients, summary=f"{P}-in-grw", list_name=LISTS["grw"][2]
+                ),
+            )
+        _, (key, object_name) = ids.parse(str(answer["id"]))
+        got = run.harness_bob.request("GET", f"{list_url(run, 'grw')}{quote(object_name)}")
+        after = list_objects(run.bob, LISTS["grw"][1])
+        case.expect(key == run.grw_key, f"the id carries the hashed key: {key == run.grw_key}")
+        case.expect(
+            got.status_code == 200 and f"SUMMARY:{P}-in-grw" in got.text,
+            f"GET by the owner {got.status_code}",
+        )
+        case.expect(after == before + 1, f"calendarobjects vorher={before} nachher={after}")
+        case.expect(methods(case.seen, "PUT") == [201], f"PUT {methods(case.seen, 'PUT')}")
+        case.expect(
+            answer.get("list") == {"name": LISTS["grw"][2], "shared": True, "writable": True},
+            f"list {answer.get('list')}",
+        )
+
+
+async def test_a_read_only_group_share_is_refused_before_any_put(run: Run) -> None:
+    before = list_objects(run.bob, LISTS["gro"][1])
+    with Case(run, "gruppe-rein-ro-vorab") as case:
+        async with measured(case) as clients:
+            exc = await refusal(
+                run,
+                tasks_tools.create_task(clients, summary=f"{P}-in-gro", list_name=LISTS["gro"][2]),
+            )
+        after = list_objects(run.bob, LISTS["gro"][1])
+        case.expect(exc.reason == REASON_GUARD_TRIPPED, told(exc))
+        case.expect("read only" in exc.message, exc.message)
+        case.expect(not methods(case.seen, "PUT"), "the hook saw no PUT")
+        case.expect(before == after, f"calendarobjects vorher={before} nachher={after}")
+        case.expect(not _names_group(f"{exc.message} {exc.hint}"), "no group id")
+
+
+async def test_a_parent_in_a_group_share_does_not_name_the_list(run: Run) -> None:
+    """D-32-16 for a group share: ``parent`` alone is no explicit naming."""
+    before = list_objects(run.bob, LISTS["grw"][1])
+    with Case(run, "gruppe-rein-parent") as case:
+        async with measured(case) as clients:
+            exc = await refusal(
+                run,
+                tasks_tools.create_task(
+                    clients, summary=f"{P}-gunter", parent=task_id(run, "gruppeohne")
+                ),
+            )
+        after = list_objects(run.bob, LISTS["grw"][1])
+        case.expect("shared list" in exc.message, told(exc))
+        case.expect("list=" in exc.hint, f"hint {exc.hint!r}")
+        case.expect(not methods(case.seen, "PUT"), "no PUT")
+        case.expect(before == after, f"calendarobjects vorher={before} nachher={after}")
+
+
+async def test_fetch_of_a_group_share_task_links_the_start_page_only(run: Run) -> None:
+    """D-32-15 for a group share: the deep link would carry the account id of bob."""
+    identifier = task_id(run, "gruppeohne")
+    with Case(run, "gruppe-rein-fetch") as case:
+        async with measured(case) as clients:
+            fetched = keep(run, await chatgpt_tools.fetch(clients, identifier))
+        url = str(fetched.get("url") or "")
+        start = f"{run.env['base_url']}{provider_map.TASKS_WEB_PREFIX}"
+        case.note(f"url={url[len(run.env['base_url']) :]!r}")
+        case.expect(url == start, "the link is the start page of the Tasks app")
+        case.expect("_shared_by_" not in url and not _names_bob(run, url), "no owner in the link")
+        case.expect((fetched.get("metadata") or {}).get("shared") == "true", "metadata shared=true")
+        case.expect(fetched.get("title") == TASKS["gruppeohne"][1], f"title {fetched.get('title')}")
+
+
+async def test_d_32_17_the_subline_of_a_group_share_hit_names_nobody(run: Run) -> None:
+    await _shared_subline_case(run, "d-32-17-gruppe", "gruppeohne", dated=False, list_role="grw")
+
+
+async def test_d_32_17_a_dated_group_share_hit_keeps_its_date_and_names_nobody(
+    run: Run,
+) -> None:
+    await _shared_subline_case(
+        run, "d-32-17-gruppe-faellig", "gruppefaellig", dated=True, list_role="grw"
+    )
+
+
+# --- plan 32-10: recurring tasks in the form of the Tasks app (TASK-02) ----------------------
+
+
+async def _recurring_case(run: Run, form: str, *, open_hits: int, status: str) -> None:
+    title = RECURRING[form]
+    expected = ids.encode_task(LISTS["b"][1], run.objects[f"wieder-{form}"])
+    with Case(run, f"wiederkehrend-{form}") as case:
+        found: dict[str, list[dict[str, Any]]] = {}
+        for wanted in ("open", "completed", "all"):
+            answer = await search(case, list_name=LISTS["b"][2], status=wanted)
+            found[wanted] = [
+                hit
+                for hit in answer.get("tasks") or []
+                if isinstance(hit, dict) and hit.get("summary") == title
+            ]
+        case.note(" ".join(f"treffer_{key}={len(value)}" for key, value in found.items()))
+        case.expect(len(found["open"]) == open_hits, f"open: {len(found['open'])}")
+        case.expect(len(found["completed"]) == 1 - open_hits, f"done: {len(found['completed'])}")
+        case.expect(len(found["all"]) == 1, f"all: one hit without expansion, {len(found['all'])}")
+        hit = found["all"][0] if found["all"] else {}
+        case.expect(hit.get("id") == expected, "the hit is the object of the harness")
+        case.expect(hit.get("recurring") is True, f"recurring {hit.get('recurring')}")
+        case.expect(hit.get("status") == status, f"status {hit.get('status')}")
+        async with measured(case) as clients:
+            read = keep(run, await tasks_tools.read_task(clients, task_id=expected))
+        case.note(f"lesen status={read.get('status')} recurring={read.get('recurring')}")
+        case.expect(read.get("recurring") is True, "tasks_read recurring=true")
+        case.expect(read.get("status") == status, f"tasks_read status {read.get('status')}")
+        case.expect(read.get("summary") == title, "the master and not the override")
+        case.expect(
+            read.get("due") == "2026-11-20T13:00:00+00:00", f"DUE as written {read.get('due')}"
+        )
+
+
+async def test_a_recurring_task_of_the_tasks_app_is_one_hit(run: Run) -> None:
+    await _recurring_case(run, "app", open_hits=1, status="open")
+
+
+async def test_a_recurring_task_with_a_completed_instance_stays_one_open_hit(run: Run) -> None:
+    await _recurring_case(run, "instanz-erledigt", open_hits=1, status="open")
+
+
+async def test_a_recurring_task_with_a_completed_master_is_one_completed_hit(run: Run) -> None:
+    await _recurring_case(run, "master-erledigt", open_hits=0, status="completed")
+
+
+# --- plan 32-10: the cap of 500 with 520 open tasks (only with NC_MCP_TASKS_CAP_SERIES=1) ---
+
+
+def _put_cap_series(run: Run) -> tuple[int, int, float]:
+    """520 open tasks into the cap list of bob, serially, with a retry on 5xx."""
+    harness = run.harness_bob
+    url = harness.calendar_url(CAP_LIST)
+    failed = repeated = 0
+    started = time.perf_counter()
+    for number in range(CAP_TASKS):
+        uid = f"{P}-deckel-{number:04d}"
+        status = 0
+        for attempt in range(4):
+            status = harness.request(
+                "PUT",
+                f"{url}{uid}.ics",
+                headers={"Content-Type": "text/calendar; charset=utf-8", "If-None-Match": "*"},
+                content=cw.todo_ics(uid, f"{P}-deckel {number:04d}"),
+            ).status_code
+            if status == 201 or (status == 412 and attempt):
+                break
+            if status < 500:
+                break
+            repeated += 1
+            time.sleep(0.5 * (attempt + 1))
+        failed += 0 if status == 201 or (status == 412 and repeated) else 1
+    return failed, repeated, time.perf_counter() - started
+
+
+async def test_the_cap_of_500_holds_live_with_an_honest_note(run: Run) -> None:
+    if os.environ.get(ENV_CAP_SERIES) != "1":
+        record(
+            f"AUFGABE deckel-500 nc={run.version} nutzer={run.bob} status=keine "
+            f"ergebnis=entfaellt | grund=serie-nicht-angefordert ({ENV_CAP_SERIES} is not 1)"
+        )
+        return
+    status = run.harness_bob.mk_task_list(CAP_LIST, CAP_LIST)
+    record(f"SETUP deckel-500 MKCALENDAR liste={CAP_LIST} status={status}")
+    assert status == 201, f"MKCALENDAR {CAP_LIST}: {status}"
+    failed, repeated, seconds = _put_cap_series(run)
+    rows = list_objects(run.bob, CAP_LIST)
+    record(
+        f"SETUP deckel-500 aufgaben={CAP_TASKS} fehlgeschlagen={failed} wiederholt={repeated} "
+        f"dauer_s={seconds:.0f} GEGENPROBE datenbank_zeilen={rows} "
+        f"gleich={'ja' if rows == CAP_TASKS else 'nein'}"
+    )
+    assert rows == CAP_TASKS, f"the cap list holds {rows} objects"
+    with Case(run, "deckel-500", user=run.bob) as case:
+        pages: list[dict[str, Any]] = []
+        took: list[float] = []
+        cursor: str | None = None
+        while len(pages) < 25:
+            started = time.perf_counter()
+            async with measured(case) as clients:
+                answer = await tasks_tools.search_tasks(clients, list_name=CAP_LIST, cursor=cursor)
+            took.append(time.perf_counter() - started)
+            pages.append(answer)
+            cursor = answer.get("next")
+            if not cursor:
+                break
+        seen = [str(hit.get("id")) for page in pages for hit in page.get("tasks") or []]
+        sizes = sorted({len(page.get("tasks") or []) for page in pages})
+        last = pages[-1]
+        case.note(
+            f"seiten={len(pages)} je_seite={sizes} treffer={len(seen)} eindeutig={len(set(seen))} "
+            f"letzte_truncated={last.get('truncated')} letzte_next={'next' in last} "
+            f"max_seite_ms={max(took) * 1000:.0f} "
+            f"median_seite_ms={statistics.median(took) * 1000:.0f} "
+            f"budget_s={tasks_tools.PER_LIST_TIMEOUT:g}"
+        )
+        case.expect(len(pages) == 20, f"20 pages, got {len(pages)}")
+        case.expect(sizes == [tasks_tools.PAGE_SIZE], f"pages of 25: {sizes}")
+        case.expect(len(set(seen)) == len(seen) == 500, "500 distinct hits")
+        case.expect(last.get("truncated") is True, "last page truncated")
+        case.expect("next" not in last, "no next on the last page")
+        case.expect(last.get("note") == tasks_tools.SEARCH_CAP_NOTE, f"note {last.get('note')!r}")
+        case.expect(not any(page.get("degraded") for page in pages), "no degraded list")
 
 
 # --- last: nobody else's name in any answer (D-32-06, D-32-14) ---------------------------
