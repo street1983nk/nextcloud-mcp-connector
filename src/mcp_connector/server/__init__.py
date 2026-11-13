@@ -42,6 +42,7 @@ from ..errors import (
 __all__ = [
     "CREATE_IDEMPOTENT",
     "CREATE_ONLY",
+    "MODIFY_EXISTING",
     "READ_ONLY",
     "UPDATE_EXISTING",
     "bundle_names",
@@ -97,6 +98,20 @@ UPDATE_EXISTING = ToolAnnotations(
     read_only_hint=False,
     destructive_hint=True,
     idempotent_hint=False,
+    open_world_hint=False,
+)
+
+# The class of the tools that change an existing task in place (D-33-12, owner decision of
+# 2026-11-13). Destructive, because the MCP specification defines destructiveHint false as
+# "the tool performs only additive updates", and overwriting the fields a caller names is
+# more than that; files_update says the same for the same reason. Idempotent, unlike
+# UPDATE_EXISTING: a second identical call finds the target state and changes nothing. A
+# class of its own even where the values could match another one, because the gate holds
+# each class to a different promise.
+MODIFY_EXISTING = ToolAnnotations(
+    read_only_hint=False,
+    destructive_hint=True,
+    idempotent_hint=True,
     open_world_hint=False,
 )
 
