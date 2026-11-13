@@ -1,33 +1,93 @@
 ---
 phase: 32-tasks-bundle-suchen-lesen-anlegen
-verified: 2026-11-13T17:25:00Z
-status: human_needed
-score: 5/5 Erfolgskriterien verifiziert (9/9 Anforderungen TASK-01 bis TASK-09 gedeckt); Lücken W1 bis W5 geschlossen
+verified: 2026-11-13T19:05:00Z
+status: passed
+score: 5/5 Erfolgskriterien verifiziert, 10/10 must-haves aus 32-10 verifiziert (9/9 Anforderungen TASK-01 bis TASK-09 gedeckt)
 overrides_applied: 0
 re_verification:
   previous_status: human_needed
   previous_score: 5/5
   gaps_closed:
-    - "W1 / D-32-17: subline und text von Treffern geteilter Aufgabenlisten in unified_search und search ohne Besitzer"
-    - "W2: fetch einer task:-Id trägt metadata.truncated und <feld>_floating samt Zeilenvermerk"
-    - "W3: Beschreibung von query nennt title, description, tags"
-    - "W4: Deckel 500, recurring und 403 stehen im Abschnitt 'Not reproducible or not measured' von docs/tasks-evidence.md"
-    - "W5 / D-32-18 streng: hinausgeteilte oder per Link veröffentlichte eigene Liste ist ohne list kein Schreibziel"
+    - "HV1: Gruppenfreigaben in beide Richtungen gemessen und live belegt (35 und 32, App-Passwort und Impersonation); _shares_itself trägt Gruppen ohne Codeänderung"
+    - "HV2: wiederkehrende Aufgaben (app, instanz-erledigt, master-erledigt) und Deckel 500 live auf 35 und 32"
+    - "HV3: Security scans 43486678668 auf 57ae658 grün (pip-audit nicht mehr rot)"
+    - "Info Messkommentar: scripts/check_tool_budget.py nennt 18770 Bytes und tasks_create 1380"
+    - "Befund 32-10: PER_LIST_TIMEOUT bei 2000 offenen Aufgaben zu knapp, testgetrieben auf 2.0 (RED ed22627, fix 0f98fd4)"
   gaps_remaining: []
   regressions: []
-human_verification:
-  - test: "Gruppenfreigaben messen (geplanter Messplan 32-10): eigene Liste an eine Gruppe teilen und eine Liste per Gruppe hineinteilen, auf Nextcloud 35 und 32"
-    expected: "oc:invite einer an eine Gruppe geteilten eigenen Liste enthält ein oc:user-Element (Gruppen-Principal), sodass _shares_itself True liefert und tasks_create ohne list ablehnt; eine per Gruppe hineingeteilte Liste trägt _shared_by_ in der URI, ihr Name und ihre subline bleiben ohne Besitzer"
-    why_human: "Bisher nicht gemessen (32-09-SUMMARY Grenzen, docs/tasks-evidence.md). Der Code zählt nur Kindelemente mit lokalem Namen 'user' in oc:invite (clients/tasks.py _shares_itself). Erscheint eine Gruppenfreigabe dort anders, gälte eine an eine Gruppe geteilte eigene Liste als privat, und D-32-18 wäre für diesen Fall verletzt. Braucht Docker und Owner-Freigabe für Zustandsänderungen."
-  - test: "Wiederkehrende Aufgabe und Deckel 500 live (geplanter Messplan 32-10)"
-    expected: "recurring: true als ein Treffer ohne Expansion; Blättern endet bei 500 Treffern mit ehrlicher Notiz"
-    why_human: "Beides bisher nur per Unit belegt (W4 dokumentiert es jetzt ehrlich). Hauptsitzung hat den Messplan dem Owner vorgeschlagen; Phase 32 wird erst danach abgehakt."
-  - test: "Security-Gate pip-audit rot auf 4b88a65 (Run 43471388436): opentelemetry-api 1.45.1, CVE-2026-126360, Fix 1.45.2"
-    expected: "Owner entscheidet über ein Lock-Update (opentelemetry-api auf 1.45.2, transitiv) vor Push/Release; danach Security scans grün"
-    why_human: "Keine Regression von Phase 32: uv.lock ist seit dcda6c8 (dort Security grün) unverändert, origin/main pinnt dieselbe Version. Neue Advisory zwischen den Läufen. Erfolgskriterium 5 verlangt aber alle Gates grün; ohne Lock-Update ist der Stand nicht releasefähig."
 ---
 
-# Phase 32: Tasks-Bundle suchen, lesen, anlegen, Verifikationsbericht (Re-Verifikation)
+# Phase 32: Tasks-Bundle suchen, lesen, anlegen, Verifikationsbericht (Re-Verifikation nach 32-10)
+
+**Phase Goal:** Ein Assistent kann Nextcloud-Aufgaben suchen, lesen und anlegen, als zehnte Familie `tasks`, ohne je in eine fremdsichtbare Liste zu schreiben, ohne Deck-Karten zu zeigen und ohne das Verhalten des Kalender-Bundles zu ändern; die Phase ist ohne Phase 33 releasefähig
+**Verified:** 2026-11-13T19:05:00Z
+**Status:** passed
+**Re-verification:** Ja, nach Gap-Closure-Plan 32-10 (Vorstand e05c57c: human_needed, HV1 bis HV3 offen)
+
+Geprüft im Worktree `tasks-080`, Branch `plan/v1.8-tasks-080`, HEAD `57ae658`. Code-Änderungen von 32-10 per `git diff d1025b3 HEAD -- src/ scripts/check_tool_budget.py`: nur `src/mcp_connector/tools/tasks.py` (Konstante und Kommentar) und Kommentarzeilen in `scripts/check_tool_budget.py`. `clients/tasks.py` und `clients/caldav.py` in 32-10 unverändert.
+
+## Re-Verifikation nach 32-10
+
+### Offene Punkte der Vorverifikation
+
+| Punkt | Geschlossen | Beleg (Code, Test, live), selbst geprüft |
+|-------|-------------|------------------------------------------|
+| HV1 Gruppe hinaus (D-32-18 für Gruppen) | ja | `clients/tasks.py:252-270` `_shares_itself` zählt Kinder mit lokalem Namen `user` in `oc:invite`. Gemessen (`raw/32-10-messung.txt` Z. 46-64 und 173-191): an-gruppe-ro und -rw `eintraege=1 kinder=user principal_art=groups shared_out=ja` auf 35 und 32, basic und appapi; privat und zurückgenommen `shared_out=nein` (Gegenprobe). Fixture `tests/fixtures/caldav_home_group_share.xml` trägt genau diese Form (`<oc:user><d:href>principal:principals/groups/testgroup</d:href>`). Unit `test_tasks_client.py:870-884`, `test_tasks_create.py:899-915`. Live je Lauf `d-32-18-gruppe-ro`, `-rw`, `-parent` ToolError `guard_tripped` ohne PUT, `-privat` und `-zurueck` geschrieben (Positivkontrolle), in allen vier Läufen `ergebnis=ok` |
+| HV1 Gruppe hinein (D-32-14/15/16/17, E4) | ja | Messung Z. 73-77 und 200-204: `uri_mit_marker=ja read_only_2xx=ja shared=ja`, `writable` ja für rw, nein für ro, `name_ohne_besitzer=ja`. Subline: nc35 roh mit Besitzer, `clean_subline` bereinigt (mit und ohne DUE); nc32 roh ohne Besitzer. Unit `test_tasks_client.py:899-932`, `test_tasks_create.py:928-970`. Live `gruppe-rein-flags`, `-ohne-list`, `-rw-mit-list`, `-ro-vorab`, `-parent`, `-fetch` (Link nur `/index.php/apps/tasks/`) ok; `d-32-17-gruppe` und `-faellig` mit Tasks-App ok, ohne Tasks-App `entfaellt` (kein Provider) |
+| HV2 wiederkehrend | ja | Messung Z. 87-89, 214-216: app und instanz-erledigt je 1 Treffer open/all, 0 done, `recurring=ja`; master-erledigt 0 open, 1 done/all. Unit `test_tasks_search.py:876,891`, `test_tasks_read.py:536,551`. Live `wiederkehrend-*` in allen vier Läufen ok |
+| HV2 Deckel 500 live | ja | Live `deckel-500` (520 offene Aufgaben, bob, Impersonation) je Lauf: `seiten=20 je_seite=[25] treffer=500 eindeutig=500 letzte_truncated=True letzte_next=False budget_s=2`, max Seite 203 bis 258 ms. `MAX_RESULTS = 500`, `PAGE_SIZE = 25` unverändert (`tools/tasks.py:44,63`) |
+| PER_LIST_TIMEOUT | ja | `tools/tasks.py:46-54`: `PER_LIST_TIMEOUT = 2.0`, Kommentar mit `MESSWERT per_list_timeout_s=2 regel=max(1,ceil(2*max)) max_s=0.831 quelle=nc32-impersonation`, deckt sich mit `raw/32-10-messung.txt` Z. 224/226 und ENTSCHEID Z. 300. Test `test_tasks_search.py:455` erwartet 2 (RED ed22627 vor fix 0f98fd4). Fehlermeldung über `_seconds` (Z. 550) lautet "2 seconds" |
+| Messkommentar Budget | ja | `scripts/check_tool_budget.py:116-123`: 18770 Bytes, 870/295/1380, Rechnung 21585,5 auf 22000; Diff gegen d1025b3 nur Kommentarzeilen, `BUDGET_BYTES = 22_000`. Selbst gelaufen: `tools/list: 18770 bytes, 27 tools, budget 22000`, `tasks_create: 1380` |
+| HV3 Security | ja | `gh run view 43486678668`: success, headSha 57ae658 |
+
+Rückbau je Lauf selbst geprüft: `GRUPPE ... vorhanden=nein shares=0 phase=nachher` in Messung und allen vier Läufen; keine Zeile `gleich=nein` bei BASELINE; `ANZEIGENAME bob gesetzt=ja zurueck=ja gleich_vorher=ja` in beiden Läufen mit Tasks-App; je Lauf `34 passed`; ABGLEICH `raw/32-10-nc32.txt:361` `fehlen=0`. Owner-Antwort `raw/32-10-push.txt`: `FREIGABE push=ja datum=2026-11-13`.
+
+### Observable Truths (Erfolgskriterien ROADMAP, Stand 57ae658)
+
+| # | Truth | Status | Evidence |
+|---|-------|--------|----------|
+| 1 | Konto ohne Aufgabenliste | VERIFIED | unverändert; Unit grün, live in jedem Lauf 34 passed |
+| 2 | Standard offen, keine Deck-Karte, `degraded`, Termin-Werkzeuge byte-gleich | VERIFIED | Diff gegen 32-BASE für die drei Kalender-Testdateien und `tools/calendar.py` leer; `caldav.py` in 32-10 unberührt; recurring live nach TASK-02-Masterregel |
+| 3 | Ohne `list` nur genau eine eigene Liste, nie fremdsichtbar ohne Nennung | VERIFIED | D-32-18 jetzt auch für Gruppenfreigaben gemessen, unit- und live-belegt; per Gruppe hineingeteilte Liste nur mit `list`, ro vor jedem PUT abgelehnt |
+| 4 | `tasks_read`/`fetch`, Provider-Treffer ohne Besitzer | VERIFIED | D-32-15/17 für Gruppenlisten live (fetch-Link Startseite, subline bereinigt) |
+| 5 | 27 Werkzeuge, `EXPECTED_PUT_CALLS` 6, Budget, Gates grün | VERIFIED | `tests/contract/test_no_destructive_calls.py:480` = 6; Budget 18770/22000, größtes 1380 < 1400; CI 43486678695 und Security 43486678668 success auf 57ae658 |
+
+**Score:** 5/5 Erfolgskriterien, 10/10 must-haves aus 32-10-PLAN
+
+### Behavioral Spot-Checks (selbst gelaufen, RAM frei 5,4 GB, ohne xdist, ohne Docker)
+
+| Behavior | Command | Result | Status |
+|----------|---------|--------|--------|
+| Unit | `uv run --no-sync pytest -q -p no:xdist tests/unit -o addopts="" --import-mode=importlib` | 6272 passed, 35 skipped | PASS |
+| ruff | `ruff check .`, `ruff format --check .` | All checks passed; 392 files already formatted | PASS |
+| pyright | `PYRIGHT_PYTHON_FORCE_VERSION=latest uv run --no-sync pyright` | 0 errors, 0 warnings | PASS |
+| vulture | `uv run --no-sync vulture src scripts vulture_whitelist.py` | Exit 0 | PASS |
+| Budget | `scripts/check_tool_budget.py` | 18770 bytes, 27 tools, budget 22000 | PASS |
+| Kalender unverändert | `git diff --stat <32-BASE> HEAD` auf die vier Kalenderdateien | leer | PASS |
+| CI | `gh run view 43486678695` / `43486678668` | success / success, headSha 57ae658 | PASS |
+
+### Anti-Patterns
+
+Keine `TBD`, `FIXME`, `XXX`, `TODO` oder `HACK` in den in 32-10 geänderten Dateien. Die Info zum Messkommentar aus der Vorverifikation ist erledigt.
+
+| File | Line | Pattern | Severity | Impact |
+|------|------|---------|----------|--------|
+| `src/mcp_connector/tools/tasks.py` | 49-51 | Kommentar nennt "whole call (discovery, REPORT and parsing)"; `asyncio.timeout` (Z. 395) umschließt nur REPORT und Parsen | Info | Messung ist damit eine obere Schranke, Budget eher großzügig; kein Fehler |
+| `raw/32-10-messung.txt` | 98 | DECKEL nc35 bei 2000 offenen Aufgaben brauchte 1056 ms für die erste Seite (über dem KOSTEN-max 819 ms); mit 2 s nur in der Serie mit 520 live nachgemessen, 2000 offene Aufgaben mit Budget 2 s nicht erneut geblättert | Info | Reserve etwa Faktor 1,9 gegenüber dem größten beobachteten Wert; kein Gap, Hinweis für Phase 33/34 |
+
+### Grenzen (bewusst, wie in 32-07 und 32-09 akzeptiert)
+
+- Beweis auf Funktionsebene unter AppAPI-Impersonation, keine ganze Kette über die installierte ExApp.
+- Abhaken einer Instanz durch die Tasks-App selbst (Browser) nicht gemessen.
+- Nextcloud 33 und 34 nur über die Quelle.
+
+### Gaps Summary
+
+Keine Gaps, keine offenen Human-Verification-Punkte. Alle drei Punkte der Vorverifikation sind an Code, Unit-Tests aus gemessenen Fixtures und vier Live-Läufen auf 35 und 32 belegt; der einzige Befund (Budget je Liste) ist RED vor GREEN behoben und live mit Budget 2 s bestätigt. Keine Regression: Kalender-Diff leer, 27 Werkzeuge, `EXPECTED_PUT_CALLS` 6, Budget 22000, alle CI- und Security-Läufe auf 57ae658 grün. Phase 32 ist aus Sicht der Verifikation abhakbar; das Abhaken in ROADMAP und STATE bleibt der Hauptsitzung.
+
+---
+
+## Vorlauf: Re-Verifikation nach 32-09 (Stand e05c57c, unverändert)
 
 **Phase Goal:** Ein Assistent kann Nextcloud-Aufgaben suchen, lesen und anlegen, als zehnte Familie `tasks`, ohne je in eine fremdsichtbare Liste zu schreiben, ohne Deck-Karten zu zeigen und ohne das Verhalten des Kalender-Bundles zu ändern; die Phase ist ohne Phase 33 releasefähig
 **Verified:** 2026-11-13T17:25:00Z
@@ -36,7 +96,7 @@ human_verification:
 
 Geprüft im Worktree `tasks-080`, Branch `plan/v1.8-tasks-080`, HEAD `4b88a65`. Code-Änderungen von 32-09 gelesen per `git diff 669748e HEAD` (22 Dateien, davon fünf in `src/`).
 
-## Lücken der Vorverifikation
+### Lücken der Vorverifikation
 
 | Lücke | Geschlossen | Beleg (Code, Test, live) |
 |-------|-------------|--------------------------|
@@ -46,7 +106,7 @@ Geprüft im Worktree `tasks-080`, Branch `plan/v1.8-tasks-080`, HEAD `4b88a65`. 
 | W4: nicht gemessene Teile nur in der SUMMARY | ja | `docs/tasks-evidence.md` Abschnitt "Not reproducible or not measured" (ab Z. 620): Deckel 500 (Z. 642), `recurring` (Z. 647 mit beiden Unit-Testnamen), 403 gegen 404 (Z. 651 bis 656) |
 | W5 / D-32-18 streng: hinausgeteilte eigene Liste | ja | `clients/tasks.py`: Discovery fragt `oc:invite` und `cs:publish-url`; `_shares_itself` liefert True bei `oc:user` in `oc:invite`, bei belegter `publish-url` und wenn `oc:invite` nicht im 2xx-propstat steht (Punkt 6); für hineingeteilte Listen immer False. `tools/tasks._pick_target`: einzige eigene Liste hinausgeteilt, Fehler mit `list=`-Ausweg (Punkt 1); Elternliste hinausgeteilt, Fehler (Punkt 4); mehrere eigene bleiben "more than one" (Punkt 2); `list` genannt, wird geschrieben. Kein neues Ausgabefeld, `shared_out` und `owner_suffix` mit `repr=False`, außerhalb des Moduls nur in `_pick_target` gelesen; kein `asdict` in `tools/`. Messung `raw/32-09-messung.txt` Z. 286 bis 288 (ENTSCHEID-Zeilen, 32 und 35, App-Passwort und Impersonation). Unit: 8 Tests zu `shared_out`, 8 zur Zielwahl. Live auf 35 (`raw/32-09-nc35.txt` Z. 100 bis 110 und 205 bis 215) und 32: privat geschrieben (Positivkontrolle), geteilt an bob abgelehnt ohne PUT, mit `list` geschrieben, parent abgelehnt, öffentlicher Link abgelehnt, nach Rücknahme wieder geschrieben; Zähler vorher/nachher passend. Grenze: Gruppenfreigabe nicht gemessen (siehe unten) |
 
-## Goal Achievement
+### Goal Achievement
 
 ### Observable Truths (Erfolgskriterien aus ROADMAP.md)
 
