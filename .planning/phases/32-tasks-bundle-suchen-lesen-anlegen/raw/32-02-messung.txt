@@ -398,3 +398,24 @@ BASELINE nc32 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 p
 docker stop nc-mcp-exapp-nc -> nc-mcp-exapp-nc | laeuft=false
 docker stop nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy | laeuft=false
 RUECKBAU nc32 tasksapp=keine (nach dem zweiten Lauf; App-Verzeichnisse custom_apps/tasks und apps/tasks nicht vorhanden)
+
+== Task 6 (2d): abgeleitete Werte ==
+    Schreibrecht der Fixture tests/fixtures/caldav_home_task_lists.xml und caldav_home_fresh_account.xml,
+    gelesen mit "tasks_measure.py privileges" (ohne Docker):
+FIXTURE caldav_home_task_lists.xml art=aufgabenliste read_only=fehlt privilegien=bind,read,read-acl,read-current-user-privilege-set,read-free-busy,unbind,unlock,write,write-acl,write-content,write-properties
+FIXTURE caldav_home_task_lists.xml art=gemischt read_only=fehlt privilegien=bind,read,read-acl,read-current-user-privilege-set,read-free-busy,unbind,unlock,write,write-acl,write-content,write-properties
+FIXTURE caldav_home_task_lists.xml art=geteilt-schreibbar read_only=leer privilegien=bind,read,read-acl,read-current-user-privilege-set,read-free-busy,unbind,unlock,write,write-content,write-properties
+FIXTURE caldav_home_task_lists.xml art=geteilt-nur-lesen read_only=1 privilegien=read,read-acl,read-current-user-privilege-set,read-free-busy,write-properties
+FIXTURE caldav_home_task_lists.xml art=deck read_only=fehlt privilegien=read,read-acl,read-current-user-privilege-set,read-free-busy,write-properties
+FIXTURE caldav_home_fresh_account.xml art=terminkalender read_only=fehlt privilegien=read,read-acl,read-current-user-privilege-set,read-free-busy,write-properties
+    (die übrigen Sammlungen der Fixture: Papierkorb, Abo, Scheduling und gelöschter Kalender, fallen schon über ihre Art heraus)
+
+MESSWERT per_list_timeout_s=1 regel=max(1,ceil(2*max)) max_s=0.113 quelle=nc35-impersonation modus=alle aufgaben=2000 (offen max 0,098 s); Wegwerf-Reihen höchstens 0,255 s (pg, alle); Netzwerkreserve: gemessen über Loopback ohne Netzlaufzeit, die Untergrenze 1 s lässt gegenüber dem größten Wert aller Reihen den Faktor 3,9 und damit rund 0,7 s Netzlaufzeit je Anfrage
+MESSWERT subtask_timeout_s=1 regel=max(1,ceil(2*max)) max_s=0.107 quelle=nc35-impersonation (kinder 0/1/25 und eltern-uid, beide Formen, 2000 Aufgaben); Wegwerf-Reihen höchstens 0,172 s (pg); dieselbe Netzwerkreserve wie per_list_timeout_s
+MESSWERT max_results=500 bestaetigt: Antwort alle bei 2000 Aufgaben 1514508 Bytes (rund 757 Bytes je Aufgabe, 500 Aufgaben rund 0,38 MB) in höchstens 0,113 s; Deckel des Blätterns 500 Treffer gesamt, das sind 20 Seiten zu 25 (D-32-08), danach ehrliche Notiz
+ENTSCHEID collation=i;octet (beide Formen liefern dieselben Treffer auf sqlite, pg und nc35: GEGENPROBE collation treffer_gleich=ja erwartete_anzahl=ja; i;octet vergleicht Bytes ohne Kleinschreibung, die Nachprüfung im Connector bleibt, Abweichung H erledigt)
+ENTSCHEID writable_privilegien=write,write-content,bind,all (mindestens eines; ordnet alle Sammlungen der Fixture und der Messung auf 32 und 35 richtig ein: eigen, gemischt und rw ja, ro, Deck und Geburtstage nein; write-properties zählt nicht, es steht auch bei nur lesbaren Sammlungen)
+ENTSCHEID home404=e6 (gemessen auf 32 und 35: das Kalender-Home eines Kontos ohne jede Anmeldung antwortet unter Impersonation 207 mit null Sammlungen, kein 404, A1 widerlegt; die leere 207 ist Fall E6, ein 404 wird im Client ebenfalls als E6 behandelt)
+ENTSCHEID erkennung=keine (auf 35 spiegeln Navigation und Provider-Liste jeden Zustand sofort, auf 32 nach app:disable ohne Neustart weiter ja und nach app:enable ohne Neustart weiter nein, also falsch und nicht unklar; der Hinweis aus D-32-10 entfällt)
+ENTSCHEID linkform=index.php (auf 32 und 35 unter Impersonation öffnen beide Formen die Seite der Tasks-App mit Status 200; die Form mit index.php hängt nicht an hübschen URLs; der Provider selbst liefert die Form ohne index.php und ohne Prozentkodierung)
+ENTSCHEID namensregel=owner-displayname (auf 32 und 35 zeigt jede geteilte Sammlung, rw und ro, owner_displayname_lesbar=ja und zusatz_passt=ja, der Name ohne Zusatz ist gleich dem Originalnamen; eigene Listen tragen keinen Zusatz)
