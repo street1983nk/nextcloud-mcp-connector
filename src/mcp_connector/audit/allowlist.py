@@ -70,6 +70,7 @@ PARAM_ALLOWLIST: Mapping[str, frozenset[str]] = {
     "tasks_create": frozenset({"due", "list", "parent", "priority", "start", "tags", "timezone"}),
     "tasks_read": frozenset({"task_id"}),
     "tasks_search": frozenset({"cursor", "due_by", "list", "query", "status"}),
+    "tasks_update": frozenset({"due", "etag", "parent", "priority", "start", "tags", "task_id"}),
     "talk_browse": frozenset({"cursor", "level", "limit", "token"}),
     "talk_send": frozenset({"token"}),
     "unified_search": frozenset({"limit", "providers", "query"}),

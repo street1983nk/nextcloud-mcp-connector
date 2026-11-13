@@ -121,3 +121,38 @@ if config.tasks_update_enabled():
                 clients, task_id=task_id, etag=etag, completed=completed
             )
         )
+
+    @mcp.tool(annotations=MODIFY_EXISTING, structured_output=False)
+    @graceful
+    async def tasks_update(
+        task_id: Annotated[str, Field(description="Task id from tasks_search")],
+        etag: Annotated[str, Field(description="etag from tasks_read")],
+        summary: Annotated[str | None, Field(description="New title")] = None,
+        description: Annotated[str | None, Field(description="New longer text")] = None,
+        due: Annotated[str | None, Field(description="New due")] = None,
+        start: Annotated[str | None, Field(description="New start")] = None,
+        priority: Annotated[
+            int | None, Field(ge=0, le=9, description="1 high to 9 low, 0 none")
+        ] = None,
+        tags: Annotated[list[str] | None, Field(description="Replaces all tags")] = None,
+        parent: Annotated[str | None, Field(description="Task id of the new parent")] = None,
+        ctx: Context | None = None,
+    ) -> str:
+        """Change fields of a task; needs its etag from tasks_read. Omit or null keeps a
+        field, an empty value clears it ("", [], priority 0); summary cannot be empty.
+        Times with offset or Z, dates as YYYY-MM-DD."""
+        clients = deps.resolve_clients(ctx)
+        return compact(
+            await tasks_tools.update_task(
+                clients,
+                task_id=task_id,
+                etag=etag,
+                summary=summary,
+                description=description,
+                due=due,
+                start=start,
+                priority=priority,
+                tags=tags,
+                parent=parent,
+            )
+        )

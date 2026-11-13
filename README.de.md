@@ -86,6 +86,7 @@ abweicht.
 | `tasks_read` | read | Eine Aufgabe mit ihrer Beschreibung (gekürzt) und ihren direkten Unteraufgaben |
 | `tasks_create` | create-only | Eine neue Aufgabe; ohne `list` nur, wenn es genau eine eigene Liste gibt und niemand sonst sie sieht, nie in eine Liste, die andere sehen, außer sie wird genannt |
 | `tasks_complete` | modify | Hakt eine Aufgabe ab oder öffnet sie wieder, nur mit dem ETag aus `tasks_read`; beim Abhaken werden die Unteraufgaben zuerst mit abgehakt, wiederkehrende Aufgaben werden abgelehnt; nur verfügbar, wenn der Admin `NC_MCP_TASKS_UPDATE` aktiviert |
+| `tasks_update` | modify | Ändert oder entfernt die genannten Felder einer Aufgabe (Titel, Beschreibung, Fälligkeit, Start, Priorität, Tags, Elternaufgabe), nur mit dem ETag aus `tasks_read`; alle anderen Zeilen der Aufgabe bleiben, wie sie sind, wiederkehrende Aufgaben werden abgelehnt; nur verfügbar, wenn der Admin `NC_MCP_TASKS_UPDATE` aktiviert |
 | `notes_search` | read | Notizen nach Titel und Inhalt, über den Notes-Suchprovider von Nextcloud |
 | `notes_read` | read | Eine Notiz |
 | `notes_create` | create-only | Eine neue Notiz; bestehende Notizen werden nie geändert |

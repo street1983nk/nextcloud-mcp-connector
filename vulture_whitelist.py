@@ -41,6 +41,7 @@ tasks_search
 tasks_read
 tasks_create
 tasks_complete
+tasks_update
 
 # --- Tool logic ahead of its registration (plan 31-02, dissolved in plan 31-03) ---------
 # Empty on purpose: plan 31-02 parked create_folder here, because the tool logic was written
@@ -400,6 +401,5 @@ move_todo
 # which calls it.
 
 # --- Tool logic ahead of its registration, plan 33-07 --------------------------------------
-# Temporary: update_task lands in task 1, its registration tasks_update in task 2 of the
-# same plan; the name leaves this list with task 2.
-update_task
+# Empty again: update_task sat here between task 1 and task 2 and left with tasks_update,
+# which calls it.
