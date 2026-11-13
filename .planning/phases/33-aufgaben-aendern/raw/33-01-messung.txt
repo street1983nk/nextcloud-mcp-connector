@@ -1,2 +1,34 @@
 BASIS 86358131af91c55d79d743048ceefccdefcf51a6
 FREIGABE zustand=option-a datum=2026-11-13 umfang=nc35+nc32 quelle=owner-antwort-checkpoint-33-01-task-3
+
+# 33-01b Task 1 Vorbereitung 2026-11-13
+DOCKER fremde_container=keine vor_start
+# tasks_measure.py up 2026-11-13T20:23:46Z
+
+== up nc35 ==
+RAM frei_host_gb=4.08 schwelle=4.0 ergebnis=ok
+(no running container)
+docker start nc35-nc -> nc35-nc
+docker start nc35-harp -> nc35-harp
+docker start nc35-caddy -> nc35-caddy
+nc35-nc: installed (attempt 1)
+# p33prep install 2026-11-13T20:24:16Z
+TASKSAPP nc35 vorher=keine
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+TASKSAPP nc35 messung=0.18.1
+# p33prep account 2026-11-13T20:24:25Z
+occ user:add --password-from-env p3301ui -> The account "p3301ui" was created successfully
+occ user:auth-tokens:add p3301ui --password-from-env --name spike30 (token kept)
+occ user:setting p3301ui core lang de
+occ user:setting p3301ui core locale de_DE
+UI-KONTO p3301ui angelegt zugang=ausserhalb-repo
+BASELINE nc35 konto=p3301ui calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+# tasks_modify_measure.py snapshot 2026-11-13T20:24:34Z
+
+== snapshot nc35 liste=p3301-probe ==
+ABBRUCH PROPFIND p3301-probe answered 404
+BROWSER vorbereitet schritte=33-01-BROWSER-SCHRITTE.md konto=p3301ui stand_vorher=calendars=0,objekte=0 checkpoint=hauptsitzung
