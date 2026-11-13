@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: executing
-stopped_at: 32-01 abgeschlossen (BOOTSTRAP NC32 ergebnis=bereit); Strecke 32 gestoppt und bereit; lokale Commits nicht gepusht
-last_updated: "2026-11-13T11:35:02.099Z"
-last_activity: "2026-11-13, 32-01 ausgeführt: Messung --name und Heartbeat auf 32/34/35, bootstrap_exapp.sh für Nextcloud 32 repariert (118de59 bis 326240d), FREIGABE unregister=option-a, erster Anlauf von Task 5 abgebrochen (unregister ohne lokalen Prozess, App kurz [disabled]), zweiter Anlauf bereit; als Nächstes 32-02"
+stopped_at: 32-02 abgeschlossen (alle MESSWERT/ENTSCHEID-Zeilen gesetzt, BASELINE auf nc35 und 32 gleich); kein Container läuft; lokale Commits nicht gepusht
+last_updated: "2026-11-13T12:14:35.510Z"
+last_activity: "2026-11-13, 32-02 ausgeführt: Messprogramm scripts/tasks_measure.py (51481ff, 96e0516), FREIGABE zustand=option-a, Wegwerf 35.0.2 SQLite/PostgreSQL und Impersonation auf nc35 und 32 gemessen, Werte abgeleitet (d4d2630), OWNERFRAGE entfaellt; als Nächstes 32-03"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 24
-  completed_plans: 15
-  percent: 40
+  completed_plans: 16
+  percent: 42
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 ## Current Position
 
 Phase: 32 von 30 bis 34 (Tasks-Bundle suchen, lesen, anlegen), geplant und geprüft (10 Pläne, Plan-Check PASS nach einer Revision), Ausführung vom Owner freigegeben (2026-11-13, "Go"); Phase 31 abgeschlossen und verifiziert
-Plan: 32-01 fertig (1 von 10): scripts/bootstrap_exapp.sh erkennt --name aus der occ-Hilfe und registriert manual_install ohne Port; Lauf --manual auf 32.0.15 bereit, Kontrollen 200/alice, 401, 207; als Nächstes 32-02 (Messungen vor dem Bau, gemeinsame Owner-Freigabe)
+Plan: 32-02 fertig (2 von 10): Messungen vor dem Bau; per_list_timeout_s=1, subtask_timeout_s=1, max_results=500, collation=i;octet, writable_privilegien=write,write-content,bind,all, home404=e6, erkennung=keine, linkform=index.php, namensregel=owner-displayname (Beleg docs/tasks-evidence.md); FREIGABE zustand=option-a gilt auch für 32-07 und 32-08; als Nächstes 32-03
 Status: Phase 31 abgeschlossen (2026-11-13); Draft-PR 48 gegen main ist offen, CI auf 30e2134 vollständig grün; die Commits nach 30e2134 (Verifikation, 31-07, Abschluss) sind lokal und warten auf eine Push-Freigabe des Owners; auf der Testinstanz nc35 ist die ExApp jetzt 0.7.2 aus diesem Stand registriert (Rückweg im 31-07-SUMMARY.md), die Datei .env.nc35 liegt im Worktree (gitignored); offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13)
-Last activity: 2026-11-13, 32-01 ausgeführt: Messung --name und Heartbeat auf 32/34/35, bootstrap_exapp.sh für Nextcloud 32 repariert (118de59 bis 326240d), FREIGABE unregister=option-a, erster Anlauf von Task 5 abgebrochen (unregister ohne lokalen Prozess, App kurz [disabled]), zweiter Anlauf bereit; als Nächstes 32-02
+Last activity: 2026-11-13, 32-02 ausgeführt: Messprogramm scripts/tasks_measure.py (51481ff, 96e0516), FREIGABE zustand=option-a, Wegwerf 35.0.2 SQLite/PostgreSQL und Impersonation auf nc35 und 32 gemessen, Werte abgeleitet (d4d2630), OWNERFRAGE entfaellt; als Nächstes 32-03
 
 ## Performance Metrics
 
@@ -823,6 +823,8 @@ Recent decisions affecting current work:
 
 - [Phase 32]: 32-01: bootstrap_exapp.sh setzt --name nur nach Treffer in `occ user:auth-tokens:add --help` (fehlt auf 32.0.15, ab 33 Standard cli) und registriert den Daemon manual_install mit Host host.docker.internal ohne Port (AppAPI 32 hängt den Port an, ab 34 schneidet es ihn ab; Heartbeat auf 32/34/35 gleich http://host.docker.internal:23001); Lauf --manual auf 32 ohne Handeingriff bereit
 - [Phase 32]: 32-01: AppAPI manual-install ruft vor app:unregister /enabled?enabled=0 beim lokalen Prozess; läuft er nicht, scheitert das Abmelden und die App bleibt [disabled] stehen. Vor dem Abmelden also den Prozess starten (erster Anlauf von Task 5 daran abgebrochen, zweiter Anlauf bereit)
+- [Phase 32]: 32-02: Messwerte vor dem Bau: Kinderabfrage und Suche bei 2000 Aufgaben unter 0,12 s unter Impersonation (Budgets je 1 s nach Spike-Regel), max_results=500, text-match mit collation i;octet; owner-displayname trägt auf 32 und 35 (Namensregel ohne Owner-Frage); Home ohne Anmeldung 207 leer (E6); Erkennung der Tasks-App keine (32 bis zum Neustart veraltet); Linkform index.php
+- [Phase 32]: 32-02: AppAPI-Impersonation auf 32 braucht keinen laufenden lokalen Prozess; occ app:remove auf 32.0.15 verweigert eine deaktivierte App (vorher aktivieren)
 
 ### Pending Todos
 
@@ -894,10 +896,10 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 
 ## Session Continuity
 
-Last session: 2026-11-13T11:35:02.076Z
-Stopped at: 32-01 abgeschlossen (BOOTSTRAP NC32 ergebnis=bereit); Strecke 32 gestoppt und bereit; lokale Commits nicht gepusht
-Nächster Schritt: 32-02 ausführen (Strecke 32: compose start mit HP_SHARED_KEY aus nc-mcp-exapp-harp, lokaler Prozess mit den fünf Variablen aus .env.exapp)
-Resume file: .planning/phases/32-tasks-bundle-suchen-lesen-anlegen/32-02-PLAN.md
+Last session: 2026-11-13T12:15:00Z
+Stopped at: 32-02 abgeschlossen (alle MESSWERT/ENTSCHEID-Zeilen gesetzt, BASELINE auf nc35 und 32 gleich); kein Container läuft; lokale Commits nicht gepusht
+Nächster Schritt: 32-03 ausführen (Client-Schicht; Werte aus raw/32-02-messung.txt übernehmen)
+Resume file: .planning/phases/32-tasks-bundle-suchen-lesen-anlegen/32-03-PLAN.md
 
 ## Operator Next Steps
 
