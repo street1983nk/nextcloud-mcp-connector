@@ -189,6 +189,37 @@ async def test_read_returns_the_fields_and_the_list(clients: NcClients) -> None:
 
 
 @pytest.mark.anyio
+async def test_read_returns_the_etag_of_its_get_as_the_server_sent_it(
+    clients: NcClients,
+) -> None:
+    """D-33-03: the ETag needed to change the task, from the one GET, quoted like files."""
+    with respx.mock(assert_all_called=False) as mock:
+        get, _ = mock_task(mock, vtodo(TASK_UID, "mit etag"))
+        get.mock(
+            return_value=httpx.Response(
+                200,
+                text=vtodo(TASK_UID, "mit etag"),
+                headers={"Content-Type": "text/calendar", "ETag": '"0f3c2a"'},
+            )
+        )
+        result = await tasks_tools.read_task(clients, task_id=TASK_ID)
+
+    assert get.call_count == 1
+    assert result["etag"] == '"0f3c2a"'
+    assert result["summary"] == "mit etag"
+
+
+@pytest.mark.anyio
+async def test_read_without_an_etag_header_has_no_etag_field(clients: NcClients) -> None:
+    """No field rather than an empty value a model would copy into the next call."""
+    with respx.mock(assert_all_called=False) as mock:
+        mock_task(mock, vtodo(TASK_UID, "ohne etag"))
+        result = await tasks_tools.read_task(clients, task_id=TASK_ID)
+
+    assert "etag" not in result
+
+
+@pytest.mark.anyio
 async def test_an_empty_description_is_omitted(clients: NcClients) -> None:
     with respx.mock(assert_all_called=False) as mock:
         mock_task(mock, vtodo(TASK_UID, "plain"))

@@ -759,6 +759,28 @@ async def test_a_task_id_of_an_own_list_is_read_with_a_deep_link(clients: NcClie
 
 
 @pytest.mark.anyio
+async def test_a_fetched_task_carries_no_etag_while_tasks_read_does(clients: NcClients) -> None:
+    """D-33-03: the ETag belongs to tasks_read; fetch takes named fields only (counter proof)."""
+    task_id = ids.encode_task(TASK_OWN, TASK_NAME)
+    with respx.mock(assert_all_called=False) as mock:
+        get = mock_one_task(mock, TASK_OWN, task_ics("Mit ETag"))
+        get.mock(
+            return_value=httpx.Response(
+                200,
+                text=task_ics("Mit ETag"),
+                headers={"Content-Type": "text/calendar", "ETag": '"etag-7d41"'},
+            )
+        )
+        fetched = await chatgpt.fetch(clients, task_id)
+        read = await tasks_tools.read_task(clients, task_id=task_id)
+
+    assert read["etag"] == '"etag-7d41"', "the reader got the ETag, so fetch saw it too"
+    assert "etag" not in fetched
+    assert "etag" not in fetched["metadata"]
+    assert "etag-7d41" not in json.dumps(fetched, ensure_ascii=False)
+
+
+@pytest.mark.anyio
 async def test_a_task_text_carries_no_marker_this_server_did_not_write(
     clients: NcClients,
 ) -> None:

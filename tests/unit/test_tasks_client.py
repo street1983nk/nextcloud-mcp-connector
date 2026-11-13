@@ -617,9 +617,76 @@ async def test_get_todo_returns_the_stored_bytes(
                 200, content=stored, headers={"Content-Type": "text/calendar; charset=utf-8"}
             )
         )
-        assert await tasks.get_todo(client, creds, SHARED_LIST, "x.ics") == stored
+        read = await tasks.get_todo(client, creds, SHARED_LIST, "x.ics")
 
+    assert read.ics == stored
+    assert read.object_name == "x.ics"
+    assert read.etag == "", "no ETag header, no ETag"
     assert route.calls[0].request.headers["Accept"] == "text/calendar"
+
+
+@pytest.mark.anyio
+async def test_get_todo_returns_the_etag_of_the_same_get_as_the_server_sent_it(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    """D-33-03: body and ETag come from one GET, the ETag quoted the way the server sent it."""
+    stored = fixture_bytes("tasks_app/subtask.ics")
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.get(f"{SHARED_URL}x.ics").mock(
+            return_value=httpx.Response(
+                200,
+                content=stored,
+                headers={"Content-Type": "text/calendar", "ETag": '"5a1b9c"'},
+            )
+        )
+        read = await tasks.get_todo(client, creds, SHARED_LIST, "x.ics")
+
+    assert route.call_count == 1
+    assert read.ics == stored
+    assert read.etag == '"5a1b9c"'
+
+
+def _report_with_etags(*entries: tuple[str, str | None, str | None]) -> bytes:
+    """A Multi-Status whose entries carry their own getetag, or none at all."""
+    parts = []
+    for href, etag, data in entries:
+        prop = f"<d:getetag>{etag}</d:getetag>" if etag is not None else ""
+        if data is not None:
+            prop += f"<cal:calendar-data>{data}</cal:calendar-data>"
+        parts.append(
+            f"<d:response><d:href>{href}</d:href><d:propstat><d:prop>{prop}</d:prop>"
+            "<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"
+        )
+    body = f'<?xml version="1.0"?><d:multistatus {NS}>{"".join(parts)}</d:multistatus>'
+    return body.encode("utf-8")
+
+
+@pytest.mark.anyio
+async def test_query_todos_keeps_the_etag_of_every_object(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    """The REPORT already asks for getetag; the object now carries it instead of losing it."""
+    with respx.mock(assert_all_called=True) as mock:
+        mock.route(method="REPORT", url=SHARED_URL).mock(
+            return_value=httpx.Response(
+                207,
+                content=_report_with_etags(
+                    (f"{HOME_PATH}{RW_URI}/a.ics", "&quot;e-a&quot;", TODO_TEXT),
+                    (f"{HOME_PATH}{RW_URI}/b.ics", None, TODO_TEXT),
+                    (f"{HOME_PATH}{RW_URI}/c.ics", "&quot;e-c&quot;", None),
+                ),
+            )
+        )
+        found = await tasks.query_todos(client, creds, SHARED_LIST, tasks.build_todo_query())
+
+    assert [(entry.object_name, entry.etag) for entry in found] == [
+        ("a.ics", '"e-a"'),
+        ("b.ics", ""),
+    ], "a missing getetag is an empty ETag, an entry without calendar-data stays out"
+
+
+def test_a_todo_object_carries_no_etag_unless_one_is_given() -> None:
+    assert tasks.TodoObject(object_name="x.ics", ics=b"").etag == ""
 
 
 @pytest.mark.anyio
