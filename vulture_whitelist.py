@@ -385,26 +385,19 @@ background
 tasks_update_enabled
 
 # --- The two conditional writers of the tasks bundle, plan 33-03 ----------------------------
-# Temporary: the client layer lands before the tools that call it. used by
-# tasks_complete/tasks_update (33-06/33-07) and tasks_move (33-08); each name leaves this
-# list with the first plan that calls it.
-put_existing_todo
+# Temporary: the client layer lands before the tools that call it. move_todo is used by
+# tasks_move (33-08) and leaves this list with that plan. put_existing_todo left with plan
+# 33-06, whose complete_task writes with it.
 move_todo
 
 # --- The line editor of the tasks bundle, plan 33-04 ---------------------------------------
-# Temporary: tools/ics_edit.py lands before the tools that edit with it; used by
-# tasks_complete, tasks_update, tasks_move (33-06 to 33-08). Each name leaves this list with
-# the first plan that calls it. inspect is not listed: apply calls it.
-apply
-verify
+# Empty again: apply and verify left with plan 33-06, whose complete_task edits with them.
 
 # --- The chain of descendants of the tasks bundle, plan 33-05 -------------------------------
-# Temporary: the chain lands before the tools that walk it; used by tasks_complete (33-06),
-# tasks_update for its descendant test (33-07) and tasks_move (33-08). Each name leaves this
-# list with the first plan that calls it.
-chain_entries
-descendants_post_order
-check_chain
-read_chain_list
-run_chain
-as_answer
+# Empty again: chain_entries, descendants_post_order, check_chain, read_chain_list, run_chain
+# and as_answer left with plan 33-06, whose complete_task walks the chain.
+
+# --- Tool logic ahead of its registration, plan 33-06 --------------------------------------
+# Temporary: complete_task lands in task 1, its registration tasks_complete in task 2 of the
+# same plan; the name leaves this list with task 2.
+complete_task

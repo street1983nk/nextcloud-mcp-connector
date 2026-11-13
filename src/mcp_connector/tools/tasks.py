@@ -45,7 +45,7 @@ from ..errors import (
     ToolError,
 )
 from ..nextcloud import NcClients
-from ..nextcloud.clients import caldav
+from ..nextcloud.clients import caldav, dav
 from ..nextcloud.clients import tasks as tasks_client
 from . import calendar, ics_edit, marks
 
@@ -1381,3 +1381,192 @@ async def run_chain(
         if is_root:
             report.root_etag = new_etag
     return report
+
+
+# --- Completing and reopening a task (plan 33-06) -------------------------------------------
+
+#: The answer when the server stored a text other than the one it got and sent no ETag
+#: (ENTSCHEID etag_nach_veraendertem_text=fehlt, plan 33-01c): only a new read tells it.
+NEW_ETAG_NOTE = "read the task again for its new etag"
+
+#: Stop reasons after which the named task is known to be as it was: the server refused
+#: its write before storing anything.
+_KEPT_ON_STOP = frozenset({"conflict", "not_found_or_read_only", "refused"})
+
+
+def _crlf(text: str) -> str:
+    """Line ends as RFC 5545 wants them, the same for every input.
+
+    A REPORT can hand the text over with LF only (an XML parser turns CRLF into LF), and
+    some clients store LF. Both become CRLF; a text that already has CRLF stays byte for
+    byte, so the edit keeps every untouched line as it was stored.
+    """
+    return text.replace("\r\n", "\n").replace("\n", "\r\n")
+
+
+def _completion_edit(completed: bool, now: datetime) -> tuple[dict[str, Any], tuple[str, ...]]:
+    """The fields of completing or reopening, as the Tasks app 0.18.1 writes them (D-33-08).
+
+    Completing sets STATUS, PERCENT-COMPLETE and COMPLETED; reopening sets STATUS and drops
+    COMPLETED and PERCENT-COMPLETE. Both bring LAST-MODIFIED and DTSTAMP to the same UTC
+    second; SEQUENCE is never touched.
+    """
+    stamps = {"LAST-MODIFIED": now, "DTSTAMP": now}
+    if completed:
+        return {"STATUS": "COMPLETED", "PERCENT-COMPLETE": 100, "COMPLETED": now, **stamps}, ()
+    return {"STATUS": "NEEDS-ACTION", **stamps}, ("COMPLETED", "PERCENT-COMPLETE")
+
+
+def _edited(text: str, completed: bool, now: datetime) -> bytes:
+    """The new text of one task, checked before it may be written; refuses with EditRefused."""
+    before = _crlf(text)
+    set_fields, drop_fields = _completion_edit(completed, now)
+    after = ics_edit.apply(before, set_fields=set_fields, drop_fields=drop_fields)
+    expected: dict[str, Any] = dict(set_fields)
+    expected.update(dict.fromkeys(drop_fields))
+    ics_edit.verify(before, after, expected)
+    return after.encode("utf-8")
+
+
+def _cannot_change(task_id: str, why: str) -> ToolError:
+    return _refused(
+        f"The task {task_id} cannot be changed safely: {why}.",
+        "Nothing was changed. Fix that task in the Nextcloud Tasks app first.",
+    )
+
+
+def _in_target_state(status: str, completed: bool) -> bool:
+    """Completed when completing, open or in progress when reopening; cancelled never."""
+    if completed:
+        return status == "completed"
+    return status in _OPEN_STATES
+
+
+async def complete_task(
+    clients: NcClients, *, task_id: str, etag: str, completed: bool
+) -> dict[str, Any]:
+    """Complete (``completed`` true) or reopen (false) one task (TMOD-03, D-33-08).
+
+    Refused before any request: an id that is not a task id, a Deck key (answered like an
+    unknown task, E9), an ETag that is not one strong validator and a ``completed`` that is
+    not a bool. Refused after the discovery and the GET, before any write: an unknown list
+    or task (one answer for all of it), a read only list, an ETag other than the one just
+    read (the ETag still goes out as ``If-Match``, so the window after the comparison stays
+    covered), a recurring task, several VTODO and any text the check before the edit
+    refuses (D-33-00a, D-33-03, D-33-11).
+
+    A task already in the target state is a success without a write. Completing reads the
+    list once and completes every descendant first, the named task last, through the chain
+    of plan 33-05; a completed descendant is skipped and a cancelled one is left alone and
+    named (D-33-00b, D-33-09, D-33-14). Every new text is built and checked before the first
+    write, so a refusal never leaves half a chain. Reopening changes the named task only
+    (D-33-05, ENTSCHEID wiederoeffnen_kinder=bleiben). A cancelled task may be completed
+    and reopened directly (ENTSCHEID cancelled_direkt). The answer names task ids and the
+    list, never a URI or an owner.
+    """
+    kind, parts = ids.parse(task_id)
+    if kind != "task":
+        raise _refused(
+            f"{_quoted(task_id)} is not a task id.",
+            "Pass an id of the form task:<list>:<object> from tasks_search or tasks_read.",
+        )
+    list_key, object_name = parts
+    if list_key.startswith(tasks_client.DECK_PREFIX):
+        # A Deck board is never asked, not even through the discovery (E9).
+        raise _unknown_task(task_id)
+    wanted = dav.normalize_etag(etag)
+    if not isinstance(completed, bool):
+        raise _refused(
+            "completed must be true or false.",
+            "Pass completed=true to complete the task or completed=false to reopen it.",
+        )
+
+    lists = await tasks_client.discover_task_lists(clients.client, clients.creds)
+    matches = [entry for entry in lists if entry.key == list_key]
+    if len(matches) != 1:
+        raise _unknown_task(task_id)
+    task_list = matches[0]
+    if not task_list.writable:
+        raise _refused(
+            f"The task list {_list_name(task_list)!r} is read only for this account.",
+            "Ask the owner of that task list for write permission in Nextcloud.",
+        )
+
+    try:
+        stored = await tasks_client.get_todo(clients.client, clients.creds, task_list, object_name)
+    except ToolError as exc:
+        if exc.reason == REASON_UNKNOWN_ID:
+            raise _unknown_task(task_id) from None
+        raise
+    todo = _read_todo(stored.ics)
+    if todo is None:
+        raise _unknown_task(task_id)
+    own_id = ids.encode_task(task_list.key, object_name)
+    if stored.etag and stored.etag != wanted:
+        raise ConflictError(
+            message=f"The task {own_id} changed since it was read.",
+            hint="Nothing was changed: read the task again with tasks_read and use its new etag.",
+        )
+    try:
+        text = stored.ics.decode("utf-8")
+        facts = ics_edit.inspect(_crlf(text))
+    except UnicodeDecodeError:
+        raise _cannot_change(own_id, "its text is not UTF-8") from None
+    except ics_edit.EditRefused as exc:
+        raise _cannot_change(own_id, str(exc)) from None
+    if facts.recurring or todo.get("recurring"):
+        raise _refused(
+            f"The task {own_id} is a recurring task; this server does not change recurring tasks.",
+            "Nothing was changed. Change it in the Nextcloud Tasks app.",
+        )
+
+    status = todo["status"]
+    if _in_target_state(status, completed):
+        return {"id": own_id, "list": _list_info(task_list), "status": status, "already": True}
+
+    now = datetime.now(UTC).replace(microsecond=0)
+    try:
+        payloads = {own_id: _edited(text, completed, now)}
+    except ics_edit.EditRefused as exc:
+        raise _cannot_change(own_id, str(exc)) from None
+    descendants: list[dict[str, Any]] = []
+    skipped = 0
+    if completed:
+        entries, skipped = await read_chain_list(clients, task_list)
+        descendants = descendants_post_order(todo["uid"], entries)
+        check_chain(task_list, descendants)
+        for entry in descendants:
+            if entry["status"] in ("completed", "cancelled"):
+                continue
+            try:
+                payloads[entry["id"]] = _edited(entry["text"], True, now)
+            except ics_edit.EditRefused as exc:
+                raise _cannot_change(entry["id"], str(exc)) from None
+
+    def decide(entry: dict[str, Any]) -> bytes | ChainSkip:
+        if entry["id"] != own_id:
+            if entry["status"] == "completed":
+                return ChainSkip.UNCHANGED
+            if entry["status"] == "cancelled":
+                return ChainSkip.LEFT_ALONE
+        return payloads[entry["id"]]
+
+    async def write(entry: dict[str, Any], payload: bytes, entry_etag: str) -> str:
+        return await tasks_client.put_existing_todo(
+            clients.client, clients.creds, task_list, entry["object_name"], payload, entry_etag
+        )
+
+    root = {"id": own_id, "object_name": object_name, "status": status}
+    report = await run_chain(task_list, root, wanted, descendants, decide, write, skipped=skipped)
+
+    result: dict[str, Any] = {"id": own_id, "already": False}
+    if report.failed is None:
+        result["status"] = "completed" if completed else "open"
+    elif report.failed != own_id or report.reason in _KEPT_ON_STOP:
+        result["status"] = status
+    result.update(report.as_answer())
+    if report.root_etag:
+        result["etag"] = report.root_etag
+    elif report.root_etag == "":
+        result["note"] = NEW_ETAG_NOTE
+    return result
