@@ -182,13 +182,18 @@ def _reason_problem(reason: str) -> str | None:
     return None
 
 
-def freeze_findings(names: Iterable[str]) -> list[str]:
+def freeze_findings(names: Iterable[str], *, switched_on: Iterable[str] = ()) -> list[str]:
     """Every finding of the freeze, in the form the failure message prints.
 
     Shared by the gate and by its counter proofs on purpose: a counter proof that
     reimplements the check proves something about the counter proof.
+
+    ``switched_on`` is the registry with every switch on (phase 33, pitfall 5). An entry for
+    an optional tool is stale only when that registry does not list it either; the tools of
+    ``names`` still have to be classified as before.
     """
     registered = set(names)
+    reachable = registered | set(switched_on)
     classes = {
         "FILE_READERS": FILE_READERS,
         "FILE_WRITERS": FILE_WRITERS,
@@ -203,7 +208,7 @@ def freeze_findings(names: Iterable[str]) -> list[str]:
             problem = _reason_problem(reason)
             if problem is not None:
                 findings.append(f"{problem}: {label}[{name}]")
-    for name in sorted(everywhere.keys() - registered):
+    for name in sorted(everywhere.keys() - reachable):
         findings.append(f"stale: {name}")
     for name, labels in sorted(everywhere.items()):
         if len(labels) > 1:

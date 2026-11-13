@@ -3,15 +3,37 @@
 Bytes instead of tokens on purpose: deterministic, no model choice, no extra package.
 Exit code 1 when the budget is exceeded, plus the five biggest tools so a regression is
 immediately attributable.
+
+Measured with every switch on since phase 33 (TMOD-05, pitfall 6 of 33-RESEARCH.md): the
+optional tools register only behind ``NC_MCP_FILES_UPDATE`` and ``NC_MCP_TASKS_UPDATE``, and a
+gate that weighs the default registry never sees them, neither in the total nor under the per
+tool ceiling. The switches are read when ``mcp_connector.server`` is imported, so each state
+is measured in a fresh interpreter, and the script sets them itself: the CI call stays as it
+is. The default state is printed as a control line and is not what the limits hold.
 """
 
-import asyncio
 import json
+import os
+import subprocess
 import sys
+from typing import Any
 
+#: The switches the authoritative measurement turns on; held equal to the ones of the
+#: contract gates by ``tests/contract/test_tool_surface.py``.
+SWITCHES = ("NC_MCP_FILES_UPDATE", "NC_MCP_TASKS_UPDATE")
+
+_MEASURE = """
+import asyncio, json
 from mcp import Client
-
 from mcp_connector.server import mcp
+
+async def main():
+    async with Client(mcp, raise_exceptions=True) as client:
+        result = await client.list_tools()
+    return result.model_dump(by_alias=True, exclude_none=True, mode="json")
+
+print(json.dumps(asyncio.run(main())))
+"""
 
 # Armed value, not a decorative one. A budget far above the measurement never fails and
 # therefore never protects anything, which was the state until the end of phase 1.
@@ -121,6 +143,13 @@ from mcp_connector.server import mcp
 #   Budget      18770 + 15 percent = 21585.5, rounded up to the next 500 = 22000 bytes,
 #               re-anchored at 22000 by the house rule (E1, TASK-08); phase 33 re-anchors
 #               for its own tools (TMOD-05).
+#
+#   Measurement 2026-11-13, 27 standard tools plus files_update, switches on: 19683 bytes;
+#               standard state 18770 bytes. The first measurement of this gate with every
+#               switch on (plan 33-02); files_update is 912 bytes, below the per tool ceiling.
+#   Budget      unchanged at 22000, because the measurement fits below it. The headroom does
+#               not hold all three modifying task tools, so plans 33-06 to 33-08 re-anchor
+#               with each tool and plan 33-09 anchors on the end state (33-RULES.md, 11).
 BUDGET_BYTES = 22_000
 
 # The second claim, and the one that actually reports a regression. A total with headroom
@@ -158,11 +187,35 @@ BUDGET_BYTES = 22_000
 MAX_TOOL_BYTES = 1400
 
 
-async def main() -> int:
-    async with Client(mcp, raise_exceptions=True) as client:
-        result = await client.list_tools()
+def measure(*, switched_on: bool) -> dict[str, Any]:
+    """The ``tools/list`` payload of a fresh interpreter, with every switch on or none.
 
-    payload = result.model_dump(by_alias=True, exclude_none=True, mode="json")
+    ``NC_MCP_DISABLED_TOOLS`` is taken out as well: the budget is about the whole surface,
+    not about the bundles one installation switched off.
+    """
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key != "NC_MCP_DISABLED_TOOLS" and key not in SWITCHES
+    }
+    env["PYTHONUTF8"] = "1"
+    if switched_on:
+        env.update(dict.fromkeys(SWITCHES, "on"))
+    done = subprocess.run(  # noqa: S603 - the interpreter of this run, a fixed snippet
+        [sys.executable, "-c", _MEASURE],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+        check=False,
+    )
+    if done.returncode != 0:
+        raise RuntimeError(f"measuring the tool surface failed: {done.stderr.strip()}")
+    return json.loads(done.stdout.strip().splitlines()[-1])
+
+
+def sizes(payload: dict[str, Any]) -> tuple[int, list[tuple[int, str]]]:
+    """The total and the per tool sizes of one payload, biggest tool first."""
     blob = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
     size = len(blob.encode("utf-8"))
     per_tool = sorted(
@@ -177,26 +230,51 @@ async def main() -> int:
         ),
         reverse=True,
     )
+    return size, per_tool
 
-    print(f"tools/list: {size} bytes, {len(payload['tools'])} tools, budget {BUDGET_BYTES}")
+
+def findings(size: int, per_tool: list[tuple[int, str]]) -> list[str]:
+    """Every limit one measurement breaks, in the form the failure lines print.
+
+    The one check of this gate, shared with its counter proof in the contract tests.
+    """
+    found: list[str] = []
+    if size > BUDGET_BYTES:
+        found.append(f"tools/list is {size} bytes and exceeds the token budget of {BUDGET_BYTES}")
+    found += [
+        f"{name} is {tool_size} bytes, above the per tool ceiling of {MAX_TOOL_BYTES}"
+        for tool_size, name in per_tool
+        if tool_size > MAX_TOOL_BYTES
+    ]
+    return found
+
+
+def main() -> int:
+    switched = measure(switched_on=True)
+    standard = measure(switched_on=False)
+    size, per_tool = sizes(switched)
+    standard_size, _ = sizes(standard)
+
+    print(
+        f"tools/list with every switch on: {size} bytes, {len(switched['tools'])} tools, "
+        f"budget {BUDGET_BYTES}"
+    )
     for tool_size, name in per_tool[:5]:
         print(f"  {name}: {tool_size} bytes")
+    print(f"control, standard state: {standard_size} bytes, {len(standard['tools'])} tools")
 
-    if size > BUDGET_BYTES:
-        print("FAIL: tools/list exceeds the token budget", file=sys.stderr)
-        return 1
-
-    too_big = [(name, tool_size) for tool_size, name in per_tool if tool_size > MAX_TOOL_BYTES]
-    if too_big:
-        for name, tool_size in too_big:
-            print(
-                f"FAIL: {name} is {tool_size} bytes, above the per tool ceiling "
-                f"of {MAX_TOOL_BYTES}",
-                file=sys.stderr,
-            )
-        return 1
-    return 0
+    found = findings(size, per_tool)
+    missing = {tool["name"] for tool in standard["tools"]} - {
+        tool["name"] for tool in switched["tools"]
+    }
+    found += [
+        f"{name} is registered by default and missing with every switch on"
+        for name in sorted(missing)
+    ]
+    for line in found:
+        print(f"FAIL: {line}", file=sys.stderr)
+    return 1 if found else 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(asyncio.run(main()))
+    raise SystemExit(main())
