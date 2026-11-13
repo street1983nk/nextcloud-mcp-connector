@@ -372,3 +372,7 @@ build_todo_query  # until reg_tasks.py registers the bundle (32-05)
 build_related_query  # until reg_tasks.py registers the bundle (32-05)
 query_todos  # until reg_tasks.py registers the bundle (32-05)
 get_todo  # until reg_tasks.py registers the bundle (32-05)
+
+# --- The tool layer of the tasks bundle, plan 32-04 ----------------------------------------
+# Temporary: the reader lands in task 1, its callers search_tasks and read_task in tasks 2 and 3.
+_read_todo  # until search_tasks calls it (32-04 task 2)
