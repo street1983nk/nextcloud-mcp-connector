@@ -19,7 +19,8 @@ twice: the URI reads ``<uri>_shared_by_<account id>`` and the display name
 D-32-14). Every list gets a ``key`` (the URI for an own list, a neutral hash for a shared
 one, see ``ids.task_list_key``), and the name of a shared list drops the owner suffix, which
 is recognised through the ``owner-displayname`` property and never printed. ``TaskList.uri``
-exists for request URLs only.
+exists for request URLs only. The same suffix leaves the subline of a hit of the search
+provider ``tasks`` through :func:`clean_subline` (D-32-17).
 
 **Write permission is read, never tried.** ``writable`` comes from ``oc:read-only`` and the
 privilege set of the discovery (D-32-06): a read only share answers a PUT with 404, so a
@@ -28,7 +29,7 @@ write attempt would not even give a clear answer.
 Every request body is built with lxml; there is no XML literal in this file (T-01-45).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import unquote, urlsplit
 
 import httpx
@@ -85,13 +86,18 @@ class TaskList:
     ``uri`` is for request URLs only. For a shared list it carries the account id of the
     person who shared it, so it must never reach an answer, a message or a log line; ``key``
     and ``name`` are the two values that may.
+
+    ``owner_suffix`` is the suffix `` (<owner>)`` the name rule of D-32-14 recognised and
+    removed, empty for an own list and when the rule did not match. It leaves this module
+    only through :func:`clean_subline`, never as text. None of the three is in the repr.
     """
 
-    uri: str
+    uri: str = field(repr=False)
     key: str
     name: str
     shared: bool
     writable: bool
+    owner_suffix: str = field(default="", repr=False)
 
     @property
     def own(self) -> bool:
@@ -210,13 +216,15 @@ def parse_task_home(body: str | bytes, home_path: str = "") -> list[TaskList]:
         shared = read_only is not None or SHARED_MARKER in uri
         writable = read_only_text in _NOT_READ_ONLY and bool(WRITE_PRIVILEGES & _privileges(props))
         key = ids.task_list_key(uri)
+        name, owner_suffix = _list_name(uri, key, props, shared=shared)
         found.append(
             TaskList(
                 uri=uri,
                 key=key,
-                name=_list_name(uri, key, props, shared=shared),
+                name=name,
                 shared=shared,
                 writable=writable,
+                owner_suffix=owner_suffix,
             )
         )
     return found
@@ -272,7 +280,9 @@ def _is_task_list(uri: str, props: dict[str, etree._Element]) -> bool:
     return _COMPONENT_TODO in components
 
 
-def _list_name(uri: str, key: str, props: dict[str, etree._Element], *, shared: bool) -> str:
+def _list_name(
+    uri: str, key: str, props: dict[str, etree._Element], *, shared: bool
+) -> tuple[str, str]:
     """The name of a list as a person sees it, without the owner of a shared one.
 
     Own list: the display name, or the URI when there is none. Shared list: the display name
@@ -280,11 +290,14 @@ def _list_name(uri: str, key: str, props: dict[str, etree._Element], *, shared: 
     Nextcloud 32 and 35. When that suffix does not match or the owner name is missing, the
     raw display name is never used; the name is then the part of the URI before the share
     marker, and the key when nothing is left of it.
+
+    The second value is the suffix that was removed, empty whenever the rule did not carry;
+    :func:`clean_subline` needs it and nothing else may print it (D-32-17).
     """
     display_element = props.get(f"{{{xml.DAV}}}displayname")
     display = (display_element.text or "").strip() if display_element is not None else ""
     if not shared:
-        return display or uri
+        return display or uri, ""
 
     owner_element = props.get(f"{{{NS_NEXTCLOUD_COM}}}owner-displayname")
     owner = (owner_element.text or "").strip() if owner_element is not None else ""
@@ -293,9 +306,33 @@ def _list_name(uri: str, key: str, props: dict[str, etree._Element], *, shared: 
         if display.endswith(suffix):
             stripped = display[: -len(suffix)].strip()
             if stripped:
-                return stripped
+                return stripped, suffix
     fallback = uri.split(SHARED_MARKER, 1)[0].strip()
-    return fallback or key
+    return fallback or key, ""
+
+
+def clean_subline(subline: str, task_list: TaskList) -> str | None:
+    """The subline of a search provider hit from a shared list, without its owner (D-32-17).
+
+    Nextcloud 34 and 35 append `` (<display name of the list>)`` to the subline, and the
+    display name of a shared list ends with the owner (measured in plan 32-09). When the
+    subline ends with the raw name, that end becomes `` (<name>)``. A subline that ends
+    otherwise and names neither the owner nor the share marker stays as it is (the form of
+    Nextcloud 32, the due date only). ``None`` in every other case: an own list, a suffix the
+    name rule did not recognise, or the owner still in the text after the replacement. The
+    caller then drops the line rather than pass it on unchecked.
+    """
+    suffix = task_list.owner_suffix
+    if not task_list.shared or len(suffix) < 4:
+        return None
+    owner = suffix[2:-1].casefold()
+    raw_tail = f" ({task_list.name}{suffix})"
+    cleaned = subline
+    if subline.endswith(raw_tail):
+        cleaned = f"{subline[: -len(raw_tail)]} ({task_list.name})"
+    if owner in cleaned.casefold() or SHARED_MARKER in cleaned:
+        return None
+    return cleaned
 
 
 def build_todo_query(completed: bool | None = None) -> bytes:

@@ -32,6 +32,12 @@ only, so that id is resolved into a path when the sandbox or a tagged folder nee
 (:func:`_screen`). A sandbox drop is counted in ``skipped``; a ``kein-ki`` drop leaves no
 trace at all. When the exclusion check cannot be answered, every file-bearing hit is held
 back and ``degraded`` names that once.
+
+**A hit of a shared task list names nobody (D-32-17).** The provider ``tasks`` writes the
+display name of the list into the subline, and for a shared list that name ends with its
+owner. Such a subline is held back, compared with the task discovery of the account (one
+PROPFIND per call, only when such a hit exists) and passed on without the owner; when that is
+not certain, the hit keeps id, title and link and loses only its subline.
 """
 
 import asyncio
@@ -41,11 +47,12 @@ from typing import Any
 
 import httpx
 
-from .. import provider_map
+from .. import ids, provider_map
 from ..errors import ToolError
 from ..nextcloud import NcClients
 from ..nextcloud.clients import dav, ocs
 from ..nextcloud.clients import talk as talk_client
+from ..nextcloud.clients import tasks as tasks_client
 from ..nextcloud.exclusion import TagScope
 from . import talk as talk_tools
 from . import withhold
@@ -182,12 +189,14 @@ async def unified_search(
     withheld = withheld or lookup_failed
 
     results: list[dict[str, Any]] = []
+    held: list[tuple[dict[str, Any], str]] = []
     for provider_id, part in screened:
         kept, dropped = _settle(part.kept, paths, lookup_failed, scope)
         skipped += dropped
-        hits, unusable = _normalise(clients, provider_id, kept)
+        hits, unusable = _normalise(clients, provider_id, kept, held)
         results.extend(hits)
         skipped += unusable
+    await _clean_task_sublines(clients, held)
 
     if withheld:
         degraded.append(withhold.degraded_entry("provider"))
@@ -459,9 +468,16 @@ def _settle(
 
 
 def _normalise(
-    clients: NcClients, provider_id: str, entries: list[dict[str, Any]]
+    clients: NcClients,
+    provider_id: str,
+    entries: list[dict[str, Any]],
+    held: list[tuple[dict[str, Any], str]],
 ) -> tuple[list[dict[str, Any]], int]:
-    """Turn the surviving entries of one provider into compact hits, counting the unusable."""
+    """Turn the surviving entries of one provider into compact hits, counting the unusable.
+
+    The subline of a task from a shared list goes into ``held`` instead of the hit; the same
+    test as the link of :func:`provider_map.hit_url` decides what is shared (D-32-17).
+    """
     hits: list[dict[str, Any]] = []
     skipped = 0
     for entry in entries:
@@ -476,7 +492,10 @@ def _normalise(
             "title": str(entry.get("title") or ""),
         }
         subline = str(entry.get("subline") or "")
-        if subline:
+        raw_url = provider_map.absolute_url(clients.creds.base_url, entry.get("resourceUrl"))
+        if subline and kind == "task" and ids.SHARED_BY_MARKER in raw_url:
+            held.append((hit, subline))
+        elif subline:
             hit["subline"] = subline
         hit["url"] = provider_map.hit_url(clients.creds.base_url, kind, identifier, entry)
         hit["provider"] = provider_id
@@ -486,6 +505,34 @@ def _normalise(
             hit["resolvable"] = False
         hits.append(hit)
     return hits, skipped
+
+
+async def _clean_task_sublines(clients: NcClients, held: list[tuple[dict[str, Any], str]]) -> None:
+    """Give each held task hit its subline without the owner, or none at all (D-32-17).
+
+    One discovery for all of them, and none when nothing is held. The discovery is the one
+    of ``tasks_search``, without a budget of its own. Any failure of it only costs these
+    sublines: the hits stay, the call does not fail, and nothing is added to ``degraded``.
+    """
+    if not held:
+        return
+    try:
+        lists = await tasks_client.discover_task_lists(clients.client, clients.creds)
+    except (ToolError, httpx.HTTPError, TimeoutError):
+        return
+    by_key = {task_list.key: task_list for task_list in lists}
+    for hit, subline in held:
+        try:
+            kind, parts = ids.parse(str(hit["id"]))
+        except ToolError:
+            continue
+        task_list = by_key.get(parts[0]) if kind == "task" and parts else None
+        cleaned = tasks_client.clean_subline(subline, task_list) if task_list else None
+        if cleaned:
+            ordered = {"id": hit.pop("id"), "title": hit.pop("title"), "subline": cleaned}
+            ordered.update(hit)
+            hit.clear()
+            hit.update(ordered)
 
 
 def _reason(exc: BaseException) -> str:
