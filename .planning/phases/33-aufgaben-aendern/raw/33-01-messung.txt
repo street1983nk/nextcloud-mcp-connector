@@ -32,3 +32,435 @@ BASELINE nc35 konto=p3301ui calendars=0 objekte=0 geloescht=0 shares=0 abos=0 ph
 == snapshot nc35 liste=p3301-probe ==
 ABBRUCH PROPFIND p3301-probe answered 404
 BROWSER vorbereitet schritte=33-01-BROWSER-SCHRITTE.md konto=p3301ui stand_vorher=calendars=0,objekte=0 checkpoint=hauptsitzung
+
+# 33-01b Task 1 Browser-Sitzung (Stände per snapshot, gefahren von der Hauptsitzung)
+# tasks_modify_measure.py snapshot 2026-11-13T20:33:42Z
+
+== snapshot nc35 liste=p3301-liste-1 ==
+SNAPSHOT objekt=0E008A2F-E63E-444C-8FAF-0F519E515E38.ics status=200 bytes=301
+SNAPSHOT objekt=6B678BC7-76D0-4294-A913-55D140533DC1.ics status=200 bytes=256
+SNAPSHOT objekt=88950CD5-3782-4B9E-97ED-10E6562B4424.ics status=200 bytes=255
+SNAPSHOT objekt=952018B2-DB3C-4DF7-9F02-7D0499E50EDD.ics status=200 bytes=378
+SNAPSHOT objekt=B2A66E9F-6949-4F3A-94A5-6DE1E03485D6.ics status=200 bytes=301
+SNAPSHOT objekt=B31727DD-3746-4DFD-BDEF-EDE805C734EE.ics status=200 bytes=275
+SNAPSHOT objekt=C0AEF484-248A-4495-98FA-39119F39C567.ics status=200 bytes=306
+SNAPSHOT objekt=CF051232-4C23-44E1-8D47-EED4FCC361CB.ics status=200 bytes=308
+SNAPSHOT objekt=F2D63C23-5A4C-48C8-A4A0-D75131E14EFA.ics status=200 bytes=255
+SNAPSHOT objekt=F5942DC9-5844-4B59-AEF9-0D1135FE707F.ics status=200 bytes=332
+SNAPSHOT gleich_appapi_basic=ja objekte=10 ziel=ui-a
+# tasks_modify_measure.py snapshot 2026-11-13T20:34:28Z
+
+== snapshot nc35 liste=p3301-liste-1 ==
+SNAPSHOT objekt=0E008A2F-E63E-444C-8FAF-0F519E515E38.ics status=200 bytes=369
+SNAPSHOT objekt=6B678BC7-76D0-4294-A913-55D140533DC1.ics status=200 bytes=256
+SNAPSHOT objekt=88950CD5-3782-4B9E-97ED-10E6562B4424.ics status=200 bytes=255
+SNAPSHOT objekt=952018B2-DB3C-4DF7-9F02-7D0499E50EDD.ics status=200 bytes=378
+SNAPSHOT objekt=B2A66E9F-6949-4F3A-94A5-6DE1E03485D6.ics status=200 bytes=301
+SNAPSHOT objekt=B31727DD-3746-4DFD-BDEF-EDE805C734EE.ics status=200 bytes=275
+SNAPSHOT objekt=C0AEF484-248A-4495-98FA-39119F39C567.ics status=200 bytes=306
+SNAPSHOT objekt=CF051232-4C23-44E1-8D47-EED4FCC361CB.ics status=200 bytes=308
+SNAPSHOT objekt=F2D63C23-5A4C-48C8-A4A0-D75131E14EFA.ics status=200 bytes=323
+SNAPSHOT objekt=F5942DC9-5844-4B59-AEF9-0D1135FE707F.ics status=200 bytes=332
+SNAPSHOT gleich_appapi_basic=ja objekte=10 ziel=ui-b1
+# tasks_modify_measure.py snapshot 2026-11-13T20:34:59Z
+
+== snapshot nc35 liste=p3301-liste-1 ==
+SNAPSHOT objekt=0E008A2F-E63E-444C-8FAF-0F519E515E38.ics status=200 bytes=369
+SNAPSHOT objekt=6B678BC7-76D0-4294-A913-55D140533DC1.ics status=200 bytes=256
+SNAPSHOT objekt=88950CD5-3782-4B9E-97ED-10E6562B4424.ics status=200 bytes=255
+SNAPSHOT objekt=952018B2-DB3C-4DF7-9F02-7D0499E50EDD.ics status=200 bytes=378
+SNAPSHOT objekt=B2A66E9F-6949-4F3A-94A5-6DE1E03485D6.ics status=200 bytes=301
+SNAPSHOT objekt=B31727DD-3746-4DFD-BDEF-EDE805C734EE.ics status=200 bytes=275
+SNAPSHOT objekt=C0AEF484-248A-4495-98FA-39119F39C567.ics status=200 bytes=306
+SNAPSHOT objekt=CF051232-4C23-44E1-8D47-EED4FCC361CB.ics status=200 bytes=308
+SNAPSHOT objekt=F2D63C23-5A4C-48C8-A4A0-D75131E14EFA.ics status=200 bytes=276
+SNAPSHOT objekt=F5942DC9-5844-4B59-AEF9-0D1135FE707F.ics status=200 bytes=332
+SNAPSHOT gleich_appapi_basic=ja objekte=10 ziel=ui-b2
+# tasks_modify_measure.py snapshot 2026-11-13T20:35:28Z
+
+== snapshot nc35 liste=p3301-liste-1 ==
+SNAPSHOT objekt=0E008A2F-E63E-444C-8FAF-0F519E515E38.ics status=200 bytes=369
+SNAPSHOT objekt=6B678BC7-76D0-4294-A913-55D140533DC1.ics status=200 bytes=256
+SNAPSHOT objekt=88950CD5-3782-4B9E-97ED-10E6562B4424.ics status=200 bytes=255
+SNAPSHOT objekt=952018B2-DB3C-4DF7-9F02-7D0499E50EDD.ics status=200 bytes=356
+SNAPSHOT objekt=B2A66E9F-6949-4F3A-94A5-6DE1E03485D6.ics status=200 bytes=301
+SNAPSHOT objekt=B31727DD-3746-4DFD-BDEF-EDE805C734EE.ics status=200 bytes=275
+SNAPSHOT objekt=C0AEF484-248A-4495-98FA-39119F39C567.ics status=200 bytes=306
+SNAPSHOT objekt=CF051232-4C23-44E1-8D47-EED4FCC361CB.ics status=200 bytes=308
+SNAPSHOT objekt=F2D63C23-5A4C-48C8-A4A0-D75131E14EFA.ics status=200 bytes=276
+SNAPSHOT objekt=F5942DC9-5844-4B59-AEF9-0D1135FE707F.ics status=200 bytes=332
+SNAPSHOT gleich_appapi_basic=ja objekte=10 ziel=ui-m2-due
+# tasks_modify_measure.py snapshot 2026-11-13T20:35:48Z
+
+== snapshot nc35 liste=p3301-liste-1 ==
+SNAPSHOT objekt=0E008A2F-E63E-444C-8FAF-0F519E515E38.ics status=200 bytes=369
+SNAPSHOT objekt=6B678BC7-76D0-4294-A913-55D140533DC1.ics status=200 bytes=256
+SNAPSHOT objekt=88950CD5-3782-4B9E-97ED-10E6562B4424.ics status=200 bytes=255
+SNAPSHOT objekt=952018B2-DB3C-4DF7-9F02-7D0499E50EDD.ics status=200 bytes=330
+SNAPSHOT objekt=B2A66E9F-6949-4F3A-94A5-6DE1E03485D6.ics status=200 bytes=301
+SNAPSHOT objekt=B31727DD-3746-4DFD-BDEF-EDE805C734EE.ics status=200 bytes=275
+SNAPSHOT objekt=C0AEF484-248A-4495-98FA-39119F39C567.ics status=200 bytes=306
+SNAPSHOT objekt=CF051232-4C23-44E1-8D47-EED4FCC361CB.ics status=200 bytes=308
+SNAPSHOT objekt=F2D63C23-5A4C-48C8-A4A0-D75131E14EFA.ics status=200 bytes=276
+SNAPSHOT objekt=F5942DC9-5844-4B59-AEF9-0D1135FE707F.ics status=200 bytes=332
+SNAPSHOT gleich_appapi_basic=ja objekte=10 ziel=ui-m2-start
+# tasks_modify_measure.py snapshot 2026-11-13T20:36:18Z
+
+== snapshot nc35 liste=p3301-liste-1 ==
+SNAPSHOT objekt=0E008A2F-E63E-444C-8FAF-0F519E515E38.ics status=200 bytes=369
+SNAPSHOT objekt=6B678BC7-76D0-4294-A913-55D140533DC1.ics status=200 bytes=256
+SNAPSHOT objekt=88950CD5-3782-4B9E-97ED-10E6562B4424.ics status=200 bytes=255
+SNAPSHOT objekt=952018B2-DB3C-4DF7-9F02-7D0499E50EDD.ics status=200 bytes=312
+SNAPSHOT objekt=B2A66E9F-6949-4F3A-94A5-6DE1E03485D6.ics status=200 bytes=301
+SNAPSHOT objekt=B31727DD-3746-4DFD-BDEF-EDE805C734EE.ics status=200 bytes=275
+SNAPSHOT objekt=C0AEF484-248A-4495-98FA-39119F39C567.ics status=200 bytes=306
+SNAPSHOT objekt=CF051232-4C23-44E1-8D47-EED4FCC361CB.ics status=200 bytes=308
+SNAPSHOT objekt=F2D63C23-5A4C-48C8-A4A0-D75131E14EFA.ics status=200 bytes=276
+SNAPSHOT objekt=F5942DC9-5844-4B59-AEF9-0D1135FE707F.ics status=200 bytes=332
+SNAPSHOT gleich_appapi_basic=ja objekte=10 ziel=ui-m2-description
+# tasks_modify_measure.py snapshot 2026-11-13T20:36:40Z
+
+== snapshot nc35 liste=p3301-liste-1 ==
+SNAPSHOT objekt=0E008A2F-E63E-444C-8FAF-0F519E515E38.ics status=200 bytes=369
+SNAPSHOT objekt=6B678BC7-76D0-4294-A913-55D140533DC1.ics status=200 bytes=256
+SNAPSHOT objekt=88950CD5-3782-4B9E-97ED-10E6562B4424.ics status=200 bytes=255
+SNAPSHOT objekt=952018B2-DB3C-4DF7-9F02-7D0499E50EDD.ics status=200 bytes=300
+SNAPSHOT objekt=B2A66E9F-6949-4F3A-94A5-6DE1E03485D6.ics status=200 bytes=301
+SNAPSHOT objekt=B31727DD-3746-4DFD-BDEF-EDE805C734EE.ics status=200 bytes=275
+SNAPSHOT objekt=C0AEF484-248A-4495-98FA-39119F39C567.ics status=200 bytes=306
+SNAPSHOT objekt=CF051232-4C23-44E1-8D47-EED4FCC361CB.ics status=200 bytes=308
+SNAPSHOT objekt=F2D63C23-5A4C-48C8-A4A0-D75131E14EFA.ics status=200 bytes=276
+SNAPSHOT objekt=F5942DC9-5844-4B59-AEF9-0D1135FE707F.ics status=200 bytes=332
+SNAPSHOT gleich_appapi_basic=ja objekte=10 ziel=ui-m2-priority
+# tasks_modify_measure.py snapshot 2026-11-13T20:37:03Z
+
+== snapshot nc35 liste=p3301-liste-1 ==
+SNAPSHOT objekt=0E008A2F-E63E-444C-8FAF-0F519E515E38.ics status=200 bytes=369
+SNAPSHOT objekt=6B678BC7-76D0-4294-A913-55D140533DC1.ics status=200 bytes=256
+SNAPSHOT objekt=88950CD5-3782-4B9E-97ED-10E6562B4424.ics status=200 bytes=255
+SNAPSHOT objekt=952018B2-DB3C-4DF7-9F02-7D0499E50EDD.ics status=200 bytes=266
+SNAPSHOT objekt=B2A66E9F-6949-4F3A-94A5-6DE1E03485D6.ics status=200 bytes=301
+SNAPSHOT objekt=B31727DD-3746-4DFD-BDEF-EDE805C734EE.ics status=200 bytes=275
+SNAPSHOT objekt=C0AEF484-248A-4495-98FA-39119F39C567.ics status=200 bytes=306
+SNAPSHOT objekt=CF051232-4C23-44E1-8D47-EED4FCC361CB.ics status=200 bytes=308
+SNAPSHOT objekt=F2D63C23-5A4C-48C8-A4A0-D75131E14EFA.ics status=200 bytes=276
+SNAPSHOT objekt=F5942DC9-5844-4B59-AEF9-0D1135FE707F.ics status=200 bytes=332
+SNAPSHOT gleich_appapi_basic=ja objekte=10 ziel=ui-m2-tags
+# tasks_modify_measure.py snapshot 2026-11-13T20:37:56Z
+
+== snapshot nc35 liste=p3301-liste-1 ==
+SNAPSHOT objekt=0E008A2F-E63E-444C-8FAF-0F519E515E38.ics status=200 bytes=369
+SNAPSHOT objekt=6B678BC7-76D0-4294-A913-55D140533DC1.ics status=200 bytes=256
+SNAPSHOT objekt=88950CD5-3782-4B9E-97ED-10E6562B4424.ics status=200 bytes=255
+SNAPSHOT objekt=952018B2-DB3C-4DF7-9F02-7D0499E50EDD.ics status=200 bytes=266
+SNAPSHOT objekt=B2A66E9F-6949-4F3A-94A5-6DE1E03485D6.ics status=200 bytes=301
+SNAPSHOT objekt=B31727DD-3746-4DFD-BDEF-EDE805C734EE.ics status=200 bytes=275
+SNAPSHOT objekt=C0AEF484-248A-4495-98FA-39119F39C567.ics status=200 bytes=257
+SNAPSHOT objekt=CF051232-4C23-44E1-8D47-EED4FCC361CB.ics status=200 bytes=308
+SNAPSHOT objekt=F2D63C23-5A4C-48C8-A4A0-D75131E14EFA.ics status=200 bytes=276
+SNAPSHOT objekt=F5942DC9-5844-4B59-AEF9-0D1135FE707F.ics status=200 bytes=332
+SNAPSHOT gleich_appapi_basic=ja objekte=10 ziel=ui-m2-parent
+# tasks_modify_measure.py snapshot 2026-11-13T20:38:46Z
+
+== snapshot nc35 liste=p3301-liste-1 ==
+SNAPSHOT objekt=0E008A2F-E63E-444C-8FAF-0F519E515E38.ics status=200 bytes=369
+SNAPSHOT objekt=6B678BC7-76D0-4294-A913-55D140533DC1.ics status=200 bytes=256
+SNAPSHOT objekt=88950CD5-3782-4B9E-97ED-10E6562B4424.ics status=200 bytes=323
+SNAPSHOT objekt=952018B2-DB3C-4DF7-9F02-7D0499E50EDD.ics status=200 bytes=266
+SNAPSHOT objekt=B2A66E9F-6949-4F3A-94A5-6DE1E03485D6.ics status=200 bytes=301
+SNAPSHOT objekt=B31727DD-3746-4DFD-BDEF-EDE805C734EE.ics status=200 bytes=275
+SNAPSHOT objekt=C0AEF484-248A-4495-98FA-39119F39C567.ics status=200 bytes=257
+SNAPSHOT objekt=CF051232-4C23-44E1-8D47-EED4FCC361CB.ics status=200 bytes=376
+SNAPSHOT objekt=F2D63C23-5A4C-48C8-A4A0-D75131E14EFA.ics status=200 bytes=276
+SNAPSHOT objekt=F5942DC9-5844-4B59-AEF9-0D1135FE707F.ics status=200 bytes=332
+SNAPSHOT gleich_appapi_basic=ja objekte=10 ziel=ui-c-kette
+# tasks_modify_measure.py snapshot 2026-11-13T20:39:13Z
+
+== snapshot nc35 liste=p3301-liste-1 ==
+SNAPSHOT objekt=0E008A2F-E63E-444C-8FAF-0F519E515E38.ics status=200 bytes=369
+SNAPSHOT objekt=6B678BC7-76D0-4294-A913-55D140533DC1.ics status=200 bytes=256
+SNAPSHOT objekt=88950CD5-3782-4B9E-97ED-10E6562B4424.ics status=200 bytes=323
+SNAPSHOT objekt=952018B2-DB3C-4DF7-9F02-7D0499E50EDD.ics status=200 bytes=266
+SNAPSHOT objekt=B2A66E9F-6949-4F3A-94A5-6DE1E03485D6.ics status=200 bytes=301
+SNAPSHOT objekt=B31727DD-3746-4DFD-BDEF-EDE805C734EE.ics status=200 bytes=325
+SNAPSHOT objekt=C0AEF484-248A-4495-98FA-39119F39C567.ics status=200 bytes=257
+SNAPSHOT objekt=CF051232-4C23-44E1-8D47-EED4FCC361CB.ics status=200 bytes=376
+SNAPSHOT objekt=F2D63C23-5A4C-48C8-A4A0-D75131E14EFA.ics status=200 bytes=276
+SNAPSHOT objekt=F5942DC9-5844-4B59-AEF9-0D1135FE707F.ics status=200 bytes=332
+SNAPSHOT gleich_appapi_basic=ja objekte=10 ziel=ui-c-direkt-ab
+# tasks_modify_measure.py snapshot 2026-11-13T20:39:45Z
+
+== snapshot nc35 liste=p3301-liste-1 ==
+SNAPSHOT objekt=0E008A2F-E63E-444C-8FAF-0F519E515E38.ics status=200 bytes=369
+SNAPSHOT objekt=6B678BC7-76D0-4294-A913-55D140533DC1.ics status=200 bytes=256
+SNAPSHOT objekt=88950CD5-3782-4B9E-97ED-10E6562B4424.ics status=200 bytes=323
+SNAPSHOT objekt=952018B2-DB3C-4DF7-9F02-7D0499E50EDD.ics status=200 bytes=266
+SNAPSHOT objekt=B2A66E9F-6949-4F3A-94A5-6DE1E03485D6.ics status=200 bytes=301
+SNAPSHOT objekt=B31727DD-3746-4DFD-BDEF-EDE805C734EE.ics status=200 bytes=278
+SNAPSHOT objekt=C0AEF484-248A-4495-98FA-39119F39C567.ics status=200 bytes=257
+SNAPSHOT objekt=CF051232-4C23-44E1-8D47-EED4FCC361CB.ics status=200 bytes=376
+SNAPSHOT objekt=F2D63C23-5A4C-48C8-A4A0-D75131E14EFA.ics status=200 bytes=276
+SNAPSHOT objekt=F5942DC9-5844-4B59-AEF9-0D1135FE707F.ics status=200 bytes=332
+SNAPSHOT gleich_appapi_basic=ja objekte=10 ziel=ui-c-direkt-auf
+# tasks_modify_measure.py diff 2026-11-13T20:40:56Z
+
+== diff ui-a -> ui-b1 ==
+DIFF uid=1a130ea0 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=3d80a7e9 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=6fbc7279 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=7296ca3e hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED leer=-
+DIFF uid=8191728e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8ac9dae4 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=9ed398bd hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED leer=-
+DIFF uid=ab1f2041 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=bdae74c5 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=fdbd590b hinzu=- entfernt=- geaendert=- leer=-
+# tasks_modify_measure.py diff 2026-11-13T20:40:56Z
+
+== diff ui-b1 -> ui-b2 ==
+DIFF uid=1a130ea0 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=3d80a7e9 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=6fbc7279 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=7296ca3e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8191728e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8ac9dae4 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=9ed398bd hinzu=- entfernt=COMPLETED,PERCENT-COMPLETE geaendert=DTSTAMP,LAST-MODIFIED,STATUS leer=-
+DIFF uid=ab1f2041 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=bdae74c5 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=fdbd590b hinzu=- entfernt=- geaendert=- leer=-
+# tasks_modify_measure.py diff 2026-11-13T20:40:57Z
+
+== diff ui-b2 -> ui-m2-due ==
+DIFF uid=1a130ea0 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=3d80a7e9 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=6fbc7279 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=7296ca3e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8191728e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8ac9dae4 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=9ed398bd hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=ab1f2041 hinzu=- entfernt=DUE geaendert=DTSTAMP,LAST-MODIFIED leer=- form_due=zeile-weg
+DIFF uid=bdae74c5 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=fdbd590b hinzu=- entfernt=- geaendert=- leer=-
+# tasks_modify_measure.py diff 2026-11-13T20:40:57Z
+
+== diff ui-m2-due -> ui-m2-start ==
+DIFF uid=1a130ea0 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=3d80a7e9 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=6fbc7279 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=7296ca3e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8191728e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8ac9dae4 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=9ed398bd hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=ab1f2041 hinzu=- entfernt=DTSTART geaendert=DTSTAMP,LAST-MODIFIED leer=- form_start=zeile-weg
+DIFF uid=bdae74c5 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=fdbd590b hinzu=- entfernt=- geaendert=- leer=-
+# tasks_modify_measure.py diff 2026-11-13T20:40:58Z
+
+== diff ui-m2-start -> ui-m2-description ==
+DIFF uid=1a130ea0 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=3d80a7e9 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=6fbc7279 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=7296ca3e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8191728e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8ac9dae4 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=9ed398bd hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=ab1f2041 hinzu=- entfernt=- geaendert=DTSTAMP,LAST-MODIFIED leer=DESCRIPTION form_description=leer
+DIFF uid=bdae74c5 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=fdbd590b hinzu=- entfernt=- geaendert=- leer=-
+# tasks_modify_measure.py diff 2026-11-13T20:40:59Z
+
+== diff ui-m2-description -> ui-m2-priority ==
+DIFF uid=1a130ea0 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=3d80a7e9 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=6fbc7279 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=7296ca3e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8191728e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8ac9dae4 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=9ed398bd hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=ab1f2041 hinzu=- entfernt=PRIORITY geaendert=DTSTAMP,LAST-MODIFIED leer=- form_priority=zeile-weg
+DIFF uid=bdae74c5 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=fdbd590b hinzu=- entfernt=- geaendert=- leer=-
+# tasks_modify_measure.py diff 2026-11-13T20:40:59Z
+
+== diff ui-m2-priority -> ui-m2-tags ==
+DIFF uid=1a130ea0 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=3d80a7e9 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=6fbc7279 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=7296ca3e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8191728e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8ac9dae4 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=9ed398bd hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=ab1f2041 hinzu=- entfernt=CATEGORIES geaendert=DTSTAMP,LAST-MODIFIED leer=- form_tags=zeile-weg
+DIFF uid=bdae74c5 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=fdbd590b hinzu=- entfernt=- geaendert=- leer=-
+# tasks_modify_measure.py diff 2026-11-13T20:41:00Z
+
+== diff ui-m2-tags -> ui-m2-parent ==
+DIFF uid=1a130ea0 hinzu=- entfernt=RELATED-TO geaendert=DTSTAMP,LAST-MODIFIED leer=- form_parent=zeile-weg
+DIFF uid=3d80a7e9 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=6fbc7279 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=7296ca3e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8191728e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8ac9dae4 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=9ed398bd hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=ab1f2041 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=bdae74c5 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=fdbd590b hinzu=- entfernt=- geaendert=- leer=-
+# tasks_modify_measure.py diff 2026-11-13T20:41:00Z
+
+== diff ui-m2-parent -> ui-c-kette ==
+DIFF uid=1a130ea0 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=3d80a7e9 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=6fbc7279 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=7296ca3e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8191728e hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED leer=-
+DIFF uid=8ac9dae4 hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED leer=-
+DIFF uid=9ed398bd hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=ab1f2041 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=bdae74c5 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=fdbd590b hinzu=- entfernt=- geaendert=- leer=-
+# tasks_modify_measure.py diff 2026-11-13T20:41:01Z
+
+== diff ui-c-kette -> ui-c-direkt-ab ==
+DIFF uid=1a130ea0 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=3d80a7e9 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=6fbc7279 hinzu=COMPLETED,PERCENT-COMPLETE entfernt=- geaendert=DTSTAMP,LAST-MODIFIED,STATUS leer=-
+DIFF uid=7296ca3e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8191728e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8ac9dae4 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=9ed398bd hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=ab1f2041 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=bdae74c5 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=fdbd590b hinzu=- entfernt=- geaendert=- leer=-
+# tasks_modify_measure.py diff 2026-11-13T20:41:01Z
+
+== diff ui-c-direkt-ab -> ui-c-direkt-auf ==
+DIFF uid=1a130ea0 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=3d80a7e9 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=6fbc7279 hinzu=- entfernt=COMPLETED,PERCENT-COMPLETE geaendert=DTSTAMP,LAST-MODIFIED,STATUS leer=-
+DIFF uid=7296ca3e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8191728e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8ac9dae4 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=9ed398bd hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=ab1f2041 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=bdae74c5 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=fdbd590b hinzu=- entfernt=- geaendert=- leer=-
+# tasks_modify_measure.py diff 2026-11-13T20:41:02Z
+
+== diff ui-a -> ui-c-direkt-auf ==
+DIFF uid=1a130ea0 hinzu=- entfernt=RELATED-TO geaendert=DTSTAMP,LAST-MODIFIED leer=- form_parent=zeile-weg
+DIFF uid=3d80a7e9 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=6fbc7279 hinzu=- entfernt=- geaendert=DTSTAMP,LAST-MODIFIED,STATUS leer=-
+DIFF uid=7296ca3e hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED leer=-
+DIFF uid=8191728e hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED leer=-
+DIFF uid=8ac9dae4 hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED leer=-
+DIFF uid=9ed398bd hinzu=STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED leer=-
+DIFF uid=ab1f2041 hinzu=- entfernt=CATEGORIES,DTSTART,DUE,PRIORITY geaendert=DTSTAMP,LAST-MODIFIED leer=DESCRIPTION form_due=zeile-weg form_start=zeile-weg form_description=leer form_priority=zeile-weg form_tags=zeile-weg
+DIFF uid=bdae74c5 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=fdbd590b hinzu=- entfernt=- geaendert=- leer=-
+# tasks_modify_measure.py diff 2026-11-13T20:41:02Z
+
+== diff ui-a -> ui-b2 ==
+DIFF uid=1a130ea0 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=3d80a7e9 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=6fbc7279 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=7296ca3e hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED leer=-
+DIFF uid=8191728e hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=8ac9dae4 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=9ed398bd hinzu=STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED leer=-
+DIFF uid=ab1f2041 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=bdae74c5 hinzu=- entfernt=- geaendert=- leer=-
+DIFF uid=fdbd590b hinzu=- entfernt=- geaendert=- leer=-
+# p33log 2026-11-13T20:41:41Z
+UI-ZUGRIFFE schreibende_anfragen=37 (Zugriffsprotokoll nc35-nc, ohne Kontokennung)
+UI-ZUGRIFF 13/Nov/2026:20:27:44 +0000 MKCOL aufgaben status=201
+UI-ZUGRIFF 13/Nov/2026:20:28:04 +0000 MKCOL p3301-liste-1 status=201
+UI-ZUGRIFF 13/Nov/2026:20:28:15 +0000 PUT p3301-liste-1/<p3301_eltern-zu> status=201
+UI-ZUGRIFF 13/Nov/2026:20:28:30 +0000 PUT p3301-liste-1/<p3301_kind-1> status=201
+UI-ZUGRIFF 13/Nov/2026:20:28:35 +0000 PUT p3301-liste-1/<p3301_kind-2> status=201
+UI-ZUGRIFF 13/Nov/2026:20:28:51 +0000 PUT p3301-liste-1/<p3301_felder> status=201
+UI-ZUGRIFF 13/Nov/2026:20:29:46 +0000 PUT p3301-liste-1/<p3301_felder> status=204
+UI-ZUGRIFF 13/Nov/2026:20:30:17 +0000 PUT p3301-liste-1/<p3301_felder> status=204
+UI-ZUGRIFF 13/Nov/2026:20:30:35 +0000 PUT p3301-liste-1/<p3301_felder> status=204
+UI-ZUGRIFF 13/Nov/2026:20:30:53 +0000 PUT p3301-liste-1/<p3301_felder> status=204
+UI-ZUGRIFF 13/Nov/2026:20:31:05 +0000 PUT p3301-liste-1/<p3301_felder> status=204
+UI-ZUGRIFF 13/Nov/2026:20:31:20 +0000 PUT p3301-liste-1/<p3301_felder> status=204
+UI-ZUGRIFF 13/Nov/2026:20:31:28 +0000 PUT p3301-liste-1/<p3301_felder> status=204
+UI-ZUGRIFF 13/Nov/2026:20:31:53 +0000 PUT p3301-liste-1/<p3301_kind-lösen> status=201
+UI-ZUGRIFF 13/Nov/2026:20:32:03 +0000 PUT p3301-liste-1/<p3301_eltern-ab> status=201
+UI-ZUGRIFF 13/Nov/2026:20:32:11 +0000 PUT p3301-liste-1/<p3301_kind-ab-offen> status=201
+UI-ZUGRIFF 13/Nov/2026:20:32:20 +0000 PUT p3301-liste-1/<p3301_kind-ab-abgebrochen> status=201
+UI-ZUGRIFF 13/Nov/2026:20:32:36 +0000 PUT p3301-liste-1/<p3301_kind-ab-abgebrochen> status=204
+UI-ZUGRIFF 13/Nov/2026:20:32:50 +0000 PUT p3301-liste-1/<p3301_abgebrochen> status=201
+UI-ZUGRIFF 13/Nov/2026:20:32:58 +0000 PUT p3301-liste-1/<p3301_abgebrochen> status=204
+UI-ZUGRIFF 13/Nov/2026:20:33:19 +0000 PUT p3301-liste-1/<p3301_unberuehrt> status=201
+UI-ZUGRIFF 13/Nov/2026:20:33:55 +0000 PUT p3301-liste-1/<p3301_kind-1> status=500
+UI-ZUGRIFF 13/Nov/2026:20:33:55 +0000 PUT p3301-liste-1/<p3301_kind-2> status=204
+UI-ZUGRIFF 13/Nov/2026:20:33:55 +0000 PUT p3301-liste-1/<p3301_eltern-zu> status=204
+UI-ZUGRIFF 13/Nov/2026:20:34:33 +0000 PUT p3301-liste-1/<p3301_eltern-zu> status=204
+UI-ZUGRIFF 13/Nov/2026:20:35:13 +0000 PUT p3301-liste-1/<p3301_felder> status=204
+UI-ZUGRIFF 13/Nov/2026:20:35:38 +0000 PUT p3301-liste-1/<p3301_felder> status=204
+UI-ZUGRIFF 13/Nov/2026:20:36:08 +0000 PUT p3301-liste-1/<p3301_felder> status=204
+UI-ZUGRIFF 13/Nov/2026:20:36:30 +0000 PUT p3301-liste-1/<p3301_felder> status=204
+UI-ZUGRIFF 13/Nov/2026:20:36:48 +0000 PUT p3301-liste-1/<p3301_felder> status=204
+UI-ZUGRIFF 13/Nov/2026:20:36:52 +0000 PUT p3301-liste-1/<p3301_felder> status=204
+UI-ZUGRIFF 13/Nov/2026:20:37:38 +0000 PUT p3301-liste-1/<p3301_kind-lösen> status=204
+UI-ZUGRIFF 13/Nov/2026:20:38:03 +0000 PUT p3301-liste-1/<p3301_kind-ab-offen> status=204
+UI-ZUGRIFF 13/Nov/2026:20:38:03 +0000 PUT p3301-liste-1/<p3301_eltern-ab> status=500
+UI-ZUGRIFF 13/Nov/2026:20:38:25 +0000 PUT p3301-liste-1/<p3301_eltern-ab> status=204
+UI-ZUGRIFF 13/Nov/2026:20:38:54 +0000 PUT p3301-liste-1/<p3301_abgebrochen> status=204
+UI-ZUGRIFF 13/Nov/2026:20:39:25 +0000 PUT p3301-liste-1/<p3301_abgebrochen> status=204
+UI-ZUGRIFFE mit_fehlerstatus=2
+UI-SERVERFEHLER 2026-11-13T20:33:55+00:00 PUT <p3301_kind-1> | An exception occurred while executing a query: SQLSTATE[HY000]: General error: 5 database is locked
+UI-SERVERFEHLER 2026-11-13T20:33:55+00:00 PUT <p3301_kind-1> | Uncaught exception
+UI-SERVERFEHLER 2026-11-13T20:38:03+00:00 PUT <p3301_eltern-ab> | An exception occurred while executing a query: SQLSTATE[HY000]: General error: 5 database is locked
+UI-SERVERFEHLER 2026-11-13T20:38:03+00:00 PUT <p3301_eltern-ab> | Uncaught exception
+# 33-01b Task 1 Auswertung 2026-11-13 (diff der Stände, Zugriffsprotokoll, Rückmeldung der Browser-Sitzung)
+UI-SITZUNG zeitzone=Europe/Berlin liste=p3301-liste-1 marken=a,b1,b2,m2-due,m2-start,m2-description,m2-priority,m2-tags,m2-parent,c-kette,c-direkt-ab,c-direkt-auf wiederholungen=keine
+UI-SITZUNG jeder_stand=SNAPSHOT gleich_appapi_basic=ja objekte=10
+UI-SITZUNG abweichung konto_nach_erster_anmeldung=kalender personal (Server) und aufgaben (MKCOL der App) statt keine; Rueckbau ueber user:delete
+UI-SITZUNG abweichung schritt3 DUE-Eingabe per Tastatur RangeError Invalid time value, in Runde A vor Stand a ueber den Datumswaehler korrigiert
+UI-SITZUNG prioritaet_anzeige="Priorität 3: hoch" statusoptionen=Handlungsbedarf,Fertiggestellt,In Bearbeitung,Abgebrochen rueckfragen=keine (Schritte 8, 9, 16, 17, 18)
+UID-ZUORDNUNG 9ed398bd=eltern-zu bdae74c5=kind-1 7296ca3e=kind-2 ab1f2041=felder 1a130ea0=kind-lösen 8ac9dae4=eltern-ab 8191728e=kind-ab-offen 3d80a7e9=kind-ab-abgebrochen 6fbc7279=abgebrochen fdbd590b=unberuehrt
+DIFF a->b1 eltern-zu hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED
+DIFF a->b1 kind-2 hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED
+DIFF a->b1 kind-1 hinzu=- entfernt=- geaendert=- (PUT status=500, SQLite database is locked)
+DIFF b1->b2 eltern-zu hinzu=- entfernt=COMPLETED,PERCENT-COMPLETE geaendert=DTSTAMP,LAST-MODIFIED,STATUS status_danach=NEEDS-ACTION; kind-1, kind-2 und alle anderen differenz=leer
+M1 WIEDEROEFFNEN-ELTERN kinder_geoeffnet=nein eltern_felder=hinzu=- entfernt=COMPLETED,PERCENT-COMPLETE geaendert=DTSTAMP,LAST-MODIFIED,STATUS puts=1 status_danach=NEEDS-ACTION erledigte_kinder_vorher=1/2 (kind-2; kind-1 blieb nach PUT 500 offen) kind-2_nachher=COMPLETED
+M2 ENTFERNEN feld=due form=zeile-weg pflegefelder=DTSTAMP,LAST-MODIFIED sonst=leer puts=1
+M2 ENTFERNEN feld=start form=zeile-weg pflegefelder=DTSTAMP,LAST-MODIFIED sonst=leer puts=1
+M2 ENTFERNEN feld=description form=leer pflegefelder=DTSTAMP,LAST-MODIFIED sonst=leer puts=1 rohzeile=DESCRIPTION:
+M2 ENTFERNEN feld=priority form=zeile-weg pflegefelder=DTSTAMP,LAST-MODIFIED sonst=leer puts=1 weg=Wert löschen
+M2 ENTFERNEN feld=tags form=zeile-weg pflegefelder=DTSTAMP,LAST-MODIFIED sonst=leer puts=2 (je Schlagwort ein PUT, erst nach dem zweiten fehlt CATEGORIES)
+M2 ENTFERNEN feld=parent form=zeile-weg pflegefelder=DTSTAMP,LAST-MODIFIED sonst=leer puts=1 weg=ziehen auf die oberste Ebene (auf die Zeile von p3301 unberuehrt), kein neues RELATED-TO
+CANCELLED kette kind_abgebrochen=unberuehrt kind_offen=erledigt puts=3 (kind-ab-offen 204, eltern-ab 500 database is locked, eltern-ab erneut 204; kein PUT auf kind-ab-abgebrochen, sha256 und ETag in allen Ständen gleich)
+CANCELLED kette eltern-ab hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED; kind-ab-offen hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=- geaendert=DTSTAMP,LAST-MODIFIED
+CANCELLED direkt abhaken=hinzu=COMPLETED,PERCENT-COMPLETE entfernt=- geaendert=DTSTAMP,LAST-MODIFIED,STATUS status_danach=COMPLETED puts=1 app_moeglich=ja (Kontrollkästchen "Aufgabe wurde abgebrochen")
+CANCELLED direkt wiederoeffnen=hinzu=- entfernt=COMPLETED,PERCENT-COMPLETE geaendert=DTSTAMP,LAST-MODIFIED,STATUS status_danach=NEEDS-ACTION puts=1 (nicht zurück auf CANCELLED)
+KONTROLLE unberuehrt differenz=leer sha256=1fd648704bb6 etag_gleich=ja staende=12 (auch nach dem Ziehen von kind-lösen auf seine Zeile)
+NEBENBEFUND sqlite parallele_puts_der_app=2 fehlschlaege=2 status=500 meldung=SQLSTATE[HY000]: General error: 5 database is locked (wie Phase 30, 3.6)
+# p33back 2026-11-13T20:42:57Z
+BASELINE nc35 konto=p3301ui calendars=4 objekte=12 geloescht=0 shares=0 abos=0 phase=vor-rueckbau
+
+== rueckbau nc35 ==
+RUECKBAU liste_geloescht konto=p3301ui status=204
+PAPIERKORB nc35 konto=p3301ui gefunden=0 geleert=0
+RUECKBAU reste konto=p3301ui listen_mit_praefix=0
+BASELINE nc35 konto=p3301ui calendars=3 objekte=2 geloescht=0 shares=0 abos=0 phase=nach-listen-rueckbau
+occ user:delete p3301ui -> The specified user was deleted
+occ user:info p3301ui -> user not found
+occ app:remove tasks -> Disabled app 'tasks' (uninstall steps executed). Removed app 'tasks' (version 0.18.1).
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+RUECKBAU nc35 tasksapp=wie-vorher vorher=keine nachher=keine
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=p3301ui calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher-konto-geloescht
+# tasks_measure.py stop 2026-11-13T20:43:05Z
+
+== stop nc35 ==
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
+DOCKER ende eigene_container_laufend=0 fremde=keine
