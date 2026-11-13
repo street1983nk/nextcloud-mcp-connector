@@ -110,11 +110,11 @@ IDEMPOTENT_CREATE_TOOLS = {"files_create_folder"}
 # The tools that change an existing object in place (D-33-12): an overwrite of fields the
 # caller names, so destructive in the words of the MCP specification ("false" means "only
 # additive updates"), and idempotent, because the second identical call finds the target
-# state and changes nothing. Empty in plan 33-02; plan 33-06 entered tasks_complete, plans
-# 33-07 and 33-08 enter tasks_update and tasks_move. Every member is optional, so the live
+# state and changes nothing. Empty in plan 33-02; plan 33-06 entered tasks_complete, plan
+# 33-07 tasks_update, plan 33-08 enters tasks_move. Every member is optional, so the live
 # registry this file freezes never lists one: they are checked on the switched-on surface
 # below.
-MODIFY_TOOLS: frozenset[str] = frozenset({"tasks_complete"})
+MODIFY_TOOLS: frozenset[str] = frozenset({"tasks_complete", "tasks_update"})
 
 # The documented exception to the schema diet: ChatGPT reads structured content (D-14).
 STRUCTURED_TOOLS = {"search", "fetch"}
@@ -962,15 +962,17 @@ def test_the_gate_refuses_a_planted_class_for_a_modifying_tool(
     [READ_ONLY, CREATE_ONLY, CREATE_IDEMPOTENT, UPDATE_EXISTING],
     ids=["read_only", "create_only", "create_idempotent", "update_existing"],
 )
-def test_tasks_complete_with_a_planted_class_turns_the_gate_red(
-    planted: ToolAnnotations,
+@pytest.mark.parametrize("tool", ["tasks_complete", "tasks_update"])
+def test_a_modifying_task_tool_with_a_planted_class_turns_the_gate_red(
+    tool: str, planted: ToolAnnotations
 ) -> None:
-    """Plan 33-06: tasks_complete stands in MODIFY_TOOLS, so only MODIFY_EXISTING passes;
-    the positive control is the live class, which the switched-on gate above accepts."""
-    assert "tasks_complete" in MODIFY_TOOLS
-    _check_annotations("tasks_complete", MODIFY_EXISTING)
+    """Plans 33-06 and 33-07: the tool stands in MODIFY_TOOLS, so only MODIFY_EXISTING
+    passes; the positive control is the live class, which the switched-on gate above
+    accepts."""
+    assert tool in MODIFY_TOOLS
+    _check_annotations(tool, MODIFY_EXISTING)
     with pytest.raises(AssertionError):
-        _check_annotations("tasks_complete", planted)
+        _check_annotations(tool, planted)
 
 
 def test_the_live_class_of_files_create_folder_passes_the_gate() -> None:

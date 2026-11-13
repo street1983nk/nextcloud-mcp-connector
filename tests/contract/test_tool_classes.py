@@ -21,14 +21,15 @@ from mcp_connector.server import mcp
 TOTAL = 27
 
 # The same registry with every switch on: the default plus every optional tool. 28 in plan
-# 33-02 (files_update), 29 since plan 33-06 (tasks_complete); plans 33-07 and 33-08 raise it
-# with each tool behind NC_MCP_TASKS_UPDATE.
-TOTAL_SWITCHED_ON = 29
+# 33-02 (files_update), 29 since plan 33-06 (tasks_complete), 30 since plan 33-07
+# (tasks_update); plan 33-08 raises it with tasks_move behind NC_MCP_TASKS_UPDATE.
+TOTAL_SWITCHED_ON = 30
 
-# The optional tools that carry a class entry: tasks_complete since plan 33-06 (UNAFFECTED).
-# files_update stays unclassified as before phase 33. Named as a literal, so a new entry has
-# to pass this door on purpose like a standard tool.
-CLASSIFIED_OPTIONAL = frozenset({"tasks_complete"})
+# The optional tools that carry a class entry: tasks_complete since plan 33-06 and
+# tasks_update since plan 33-07 (both UNAFFECTED). files_update stays unclassified as before
+# phase 33. Named as a literal, so a new entry has to pass this door on purpose like a
+# standard tool.
+CLASSIFIED_OPTIONAL = frozenset({"tasks_complete", "tasks_update"})
 
 
 async def _tools() -> dict[str, Tool]:
