@@ -1,0 +1,14 @@
+BASIS b40f7623a5111b95a3fe3cf6e5295c4965ca7056
+    Rohprotokoll Plan 32-02 (Messungen vor dem Bau). Beginn 2026-11-13T11:38:59Z, Worktree tasks-080,
+    Branch plan/v1.8-tasks-080. Messprogramm scripts/tasks_measure.py (Task 1). Jede Ausgabe
+    lief zuerst ins Scratchpad und durch die Geheimnisprüfung (32-RULES.md Abschnitt 8).
+
+== Task 2: gemeinsame Owner-Freigabe für Zustandsänderungen auf nc35 und der 32er Strecke ==
+    Vorgelegte Liste (gilt für 32-02, 32-07, 32-08): auf nc35 und der 32er Strecke Installation
+    und Entfernung der Tasks-App, je mit Neustart des Nextcloud-Containers; Testkonten
+    (p3202frisch, p3202nie, in 32-07 p32live-Konten); Aufgabenlisten und Freigaben bob an alice;
+    eine Serie mit 2000 Aufgaben für alice auf nc35; ein Deck-Board mit Karte (32-07); Rückbau
+    nach 32-RULES.md Abschnitt 7 ohne Papierkorb, mit BASELINE vorher und nachher.
+    Antwort des Owners per Abfrage über den Orchestrator am 2026-11-13: option-a
+    (Freigabe für nc35 und die 32er Strecke).
+FREIGABE zustand=option-a datum=2026-11-13
