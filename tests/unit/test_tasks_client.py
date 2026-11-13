@@ -780,3 +780,63 @@ def test_clean_subline_removes_an_owner_name_with_brackets_of_its_own() -> None:
 def test_clean_subline_never_touches_an_own_list() -> None:
     entry = parse(collection("mine", displayname="Mine", owner="alice"))[0]
     assert tasks.clean_subline("Due soon (Mine)", entry) is None
+
+
+# --------------------------------------------------------------------------------------
+# D-32-18 (plan 32-09): own lists the account shares itself, measured through oc:invite
+# --------------------------------------------------------------------------------------
+
+
+def shared_out_home() -> dict[str, tasks.TaskList]:
+    return by_uri(
+        tasks.parse_task_home(fixture_bytes("caldav_home_shared_out.xml"), home_path=HOME_PATH)
+    )
+
+
+def test_the_measured_discovery_tells_an_own_list_shared_with_others() -> None:
+    lists = shared_out_home()
+    out = lists["p3209-aus"]
+    assert out.shared_out is True
+    assert out.shared is False
+    assert out.key == "p3209-aus"
+
+
+def test_an_own_list_nobody_else_sees_is_not_shared_out() -> None:
+    assert shared_out_home()["p3202-eigen"].shared_out is False
+
+
+def test_a_list_shared_into_the_account_is_never_shared_out() -> None:
+    inbound = shared_out_home()["p3209-rein_shared_by_sharee"]
+    assert inbound.shared is True
+    assert inbound.shared_out is False
+
+
+def test_an_own_list_published_by_link_is_shared_out() -> None:
+    assert shared_out_home()["p3209-link"].shared_out is True
+
+
+def test_an_own_list_without_a_readable_invite_counts_as_shared_out() -> None:
+    """Point 6 of D-32-18: plan 32-09 measured oc:invite readable on every own list."""
+    assert parse(collection("mine", displayname="Mine"))[0].shared_out is True
+
+
+def test_an_empty_invite_in_a_2xx_propstat_is_not_shared_out() -> None:
+    entry = parse(
+        collection("mine", displayname="Mine").replace(
+            "<d:displayname>", "<oc:invite/><d:displayname>"
+        )
+    )[0]
+    assert entry.shared_out is False
+
+
+def test_the_repr_of_a_list_shared_with_others_says_nothing_of_it() -> None:
+    text = repr(shared_out_home()["p3209-aus"])
+    assert "shared_out" not in text
+    assert "sharee" not in text.casefold()
+
+
+def test_the_task_discovery_asks_for_invite_and_publish_url() -> None:
+    body = etree.fromstring(tasks.build_task_discovery_body(), parser=davxml.hardened_parser())
+    asked = {str(element.tag) for element in body.iter() if isinstance(element.tag, str)}
+    assert "{http://owncloud.org/ns}invite" in asked
+    assert "{http://calendarserver.org/ns/}publish-url" in asked

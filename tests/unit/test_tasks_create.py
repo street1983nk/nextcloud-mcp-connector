@@ -88,7 +88,9 @@ def vtodo(uid: str, summary: str, *lines: str) -> str:
 def home_entry(uri: str, name: str, *, owner: str | None = None, writable: bool = True) -> str:
     """One task list of a discovery answer; ``owner`` makes it a share of that person."""
     privilege = "<d:privilege><d:write/></d:privilege>" if writable else ""
-    shared = ""
+    # An own list reports oc:invite in its 2xx propstat, empty when nobody else sees it
+    # (measured in plan 32-09); a share into the account has its own marks below.
+    shared = "<oc:invite/>"
     if owner is not None:
         shared = (
             f"<oc:read-only>{'0' if writable else '1'}</oc:read-only>"
@@ -129,11 +131,22 @@ ONLY_SHARED = home(
 )
 
 
+def recorded_home() -> str:
+    """The recorded home of the spike, with the empty ``oc:invite`` the discovery of plan
+    32-09 reads on each own list (the spike did not ask for it)."""
+    text = fixture("caldav_home_task_lists.xml")
+    for own in (OWN, MIXED):
+        marker = f"<d:displayname>{own}</d:displayname>"
+        assert text.count(marker) == 1
+        text = text.replace(marker, f"{marker}<oc:invite/>")
+    return text
+
+
 def mock_discovery(mock: respx.MockRouter, body: str | None = None) -> respx.Route:
     return mock.route(method="PROPFIND", url=CALENDAR_HOME).mock(
         return_value=httpx.Response(
             207,
-            text=body if body is not None else fixture("caldav_home_task_lists.xml"),
+            text=body if body is not None else recorded_home(),
             headers={"Content-Type": "application/xml"},
         )
     )
@@ -700,3 +713,142 @@ async def test_the_answer_has_the_planned_shape_and_read_task_resolves_its_id(
     assert read["due"] == "2026-11-20"
     assert read["priority"] == 2
     assert read["tags"] == ["kunde"]
+
+
+# --- D-32-18 (plan 32-09): an own list shared with others is only written to when named ------
+
+#: The measured mark of an own list the account shares itself: ``oc:invite`` with one user.
+SHARED_OUT_INVITE = (
+    "<oc:invite><oc:user><d:href>principal:principals/users/sharee</d:href>"
+    "<oc:common-name>Sharee</oc:common-name><oc:invite-accepted/>"
+    "<oc:access><oc:read/></oc:access></oc:user></oc:invite>"
+)
+OUT_LEAKS = ("sharee", "Sharee", "principal", "_shared_by_")
+
+
+def shared_out_entry(uri: str, name: str) -> str:
+    """An own list whose ``oc:invite`` names one sharee, as measured in plan 32-09."""
+    return home_entry(uri, name).replace("<oc:invite/>", SHARED_OUT_INVITE)
+
+
+#: The only own writable list is shared with others, plus the two shares of bob.
+ONE_OWN_SHARED_OUT = home(
+    shared_out_entry(OWN, OWN),
+    home_entry(SHARED_RW, "spike30-b-rw", owner="bob"),
+    home_entry(SHARED_RO, "spike30-b-ro", owner="bob", writable=False),
+)
+
+
+def assert_names_nobody(error: ToolError) -> None:
+    text = error.message + error.hint
+    for leak in (*LEAKS, *OUT_LEAKS):
+        assert leak not in text, leak
+
+
+@pytest.mark.anyio
+async def test_the_only_own_list_shared_with_others_is_no_default_target(
+    clients: NcClients,
+) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        stores = mock_stores(mock, ONE_OWN_SHARED_OUT)
+        with pytest.raises(ToolError) as caught:
+            await tasks_tools.create_task(clients, summary="t")
+    assert caught.value.reason == REASON_GUARD_TRIPPED
+    assert "shared with others" in caught.value.message
+    assert OWN in caught.value.message
+    assert f"list={OWN}" in caught.value.hint or "list=<name>" in caught.value.hint
+    assert OWN in caught.value.hint
+    assert puts(stores) == 0
+    assert_names_nobody(caught.value)
+
+
+@pytest.mark.anyio
+async def test_the_own_list_shared_with_others_is_written_when_named(clients: NcClients) -> None:
+    result, stores = await create(clients, ONE_OWN_SHARED_OUT, summary="t", list_name=OWN)
+    assert len(stores[OWN].puts) == 1
+    assert result["list"] == {"name": OWN, "shared": False, "writable": True}
+
+
+@pytest.mark.anyio
+async def test_two_own_lists_one_shared_with_others_stay_more_than_one(
+    clients: NcClients,
+) -> None:
+    body = home(shared_out_entry(OWN, OWN), home_entry(MIXED, MIXED))
+    with respx.mock(assert_all_called=False) as mock:
+        stores = mock_stores(mock, body)
+        with pytest.raises(ToolError) as caught:
+            await tasks_tools.create_task(clients, summary="t")
+    assert "more than one task list" in caught.value.message
+    assert puts(stores) == 0
+    assert_names_nobody(caught.value)
+
+
+@pytest.mark.anyio
+async def test_an_unshared_own_list_beside_a_share_of_bob_is_still_the_target(
+    clients: NcClients,
+) -> None:
+    result, stores = await create(clients, ONE_OWN, summary="t")
+    assert len(stores[OWN].puts) == 1
+    assert result["list"]["shared"] is False
+
+
+@pytest.mark.anyio
+async def test_an_own_list_without_a_readable_share_state_counts_as_shared(
+    clients: NcClients,
+) -> None:
+    """Point 6: the measured property missing from the 2xx propstat means "maybe shared"."""
+    body = home(home_entry(OWN, OWN).replace("<oc:invite/>", ""))
+    with respx.mock(assert_all_called=False) as mock:
+        stores = mock_stores(mock, body)
+        with pytest.raises(ToolError) as caught:
+            await tasks_tools.create_task(clients, summary="t")
+    assert "shared with others" in caught.value.message
+    assert puts(stores) == 0
+
+
+@pytest.mark.anyio
+async def test_a_published_own_list_counts_as_shared_with_others(clients: NcClients) -> None:
+    published = home_entry(OWN, OWN).replace(
+        "<oc:invite/>",
+        "<oc:invite/><cs:publish-url><d:href>https://nc.test/public/TOKEN</d:href>"
+        "</cs:publish-url>",
+    )
+    body = home(published).replace(
+        'xmlns:x1="http://nextcloud.com/ns"',
+        'xmlns:x1="http://nextcloud.com/ns" xmlns:cs="http://calendarserver.org/ns/"',
+    )
+    with respx.mock(assert_all_called=False) as mock:
+        stores = mock_stores(mock, body)
+        with pytest.raises(ToolError) as caught:
+            await tasks_tools.create_task(clients, summary="t")
+    assert "shared with others" in caught.value.message
+    assert "TOKEN" not in caught.value.message + caught.value.hint
+    assert puts(stores) == 0
+
+
+@pytest.mark.anyio
+async def test_a_parent_in_an_own_list_shared_with_others_does_not_name_it(
+    clients: NcClients,
+) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        stores = mock_stores(mock, ONE_OWN_SHARED_OUT)
+        parent = with_parent(stores[OWN])
+        with pytest.raises(ToolError) as caught:
+            await tasks_tools.create_task(clients, summary="t", parent=parent)
+    assert "shared with others" in caught.value.message
+    assert f"list={OWN!r}" in caught.value.hint
+    assert puts(stores) == 0
+    assert stores[OWN].gets == []
+    assert_names_nobody(caught.value)
+
+
+@pytest.mark.anyio
+async def test_a_parent_in_an_own_list_shared_with_others_is_written_when_named(
+    clients: NcClients,
+) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        stores = mock_stores(mock, ONE_OWN_SHARED_OUT)
+        parent = with_parent(stores[OWN])
+        await tasks_tools.create_task(clients, summary="t", parent=parent, list_name=OWN)
+    assert len(stores[OWN].puts) == 1
+    assert f"RELATED-TO:{PARENT_UID}\r\n" in stores[OWN].body
