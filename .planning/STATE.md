@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: executing
-stopped_at: 32-05b abgeschlossen (Kanarie mit Aufgabenliste und Deck-Marker, Abnahmeskript, test_tasks_live.py mit Schalter, CI-Schritte mit und ohne Tasks-App); kein Docker, kein Live-Lauf; lokale Commits nicht gepusht
-last_updated: "2026-11-13T16:40:00.000Z"
-last_activity: "2026-11-13, 32-05b ausgeführt: Kanarie und Abnahme (55b4216), Live-Test unter Impersonation samt conftest-Fix für NC_MCP_REQUIRE_LIVE (58816dc), CI-Schritte und Pins (41ac266); Gates 6344 passed, 35 skipped; als Nächstes 32-07"
+stopped_at: 32-07 abgeschlossen (Live-Beweis: nc35 ganze Kette mit 27 Werkzeugen und bytegleichen Termin-Antworten, 35 und 32 je ohne und mit Tasks-App 0.18.1 je 17 passed, Kanarie nc35 4 passed, Abnahme auf 32 alle Aufgabenschritte OK); kein Container läuft; lokale Commits nicht gepusht
+last_updated: "2026-11-13T15:14:23.601Z"
+last_activity: "2026-11-13, 32-07 ausgeführt: Messprogramm (5057987), Owner-Freigabe (ce5b173), nc35 (ce6c3bf), nc32 und Beleg (b480ae1); TASK-01 bis TASK-07 und TASK-09 abgehakt; Gates 6344 passed, 35 skipped; als Nächstes 32-08"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 24
-  completed_plans: 22
-  percent: 54
+  completed_plans: 23
+  percent: 40
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 ## Current Position
 
 Phase: 32 von 30 bis 34 (Tasks-Bundle suchen, lesen, anlegen), geplant und geprüft (10 Pläne, Plan-Check PASS nach einer Revision), Ausführung vom Owner freigegeben (2026-11-13, "Go"); Phase 31 abgeschlossen und verifiziert
-Plan: 32-05b fertig (8 von 10): Kanarie zählt 27 Werkzeuge, Aufgabenliste der Welt nur VTODO mit Kontrollaufgabe, Schreibart task, Deck-Marker mit Positivkontrolle; Abnahmeskript mit tasks-Block; tests/integration/test_tasks_live.py (17 Tests, BASELINE, Rückbau ohne Papierkorb, NC_MCP_EXPECT_TASKS_APP); CI: Job exapp ohne Tasks-App, Job canary-nc35 Installation vor und Messung nach der Kanarie; tests/conftest.py überspringt unter NC_MCP_REQUIRE_LIVE=1 nicht mehr; als Nächstes 32-07
+Plan: 32-07 fertig (9 von 10): Live-Beweis auf nc35 (ganze Kette über die neu registrierte ExApp, Image sha256:00a2e4b0, Rückweg-Tag 0.7.2-vor32) und auf 32, je ohne und mit Tasks-App; docs/tasks-evidence.md vollständig bis auf CI und Owner-Abnahme; als Nächstes 32-08
 Status: Phase 31 abgeschlossen (2026-11-13); Draft-PR 48 gegen main ist offen, CI auf 30e2134 vollständig grün; die Commits nach 30e2134 (Verifikation, 31-07, Abschluss) sind lokal und warten auf eine Push-Freigabe des Owners; auf der Testinstanz nc35 ist die ExApp jetzt 0.7.2 aus diesem Stand registriert (Rückweg im 31-07-SUMMARY.md), die Datei .env.nc35 liegt im Worktree (gitignored); offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13)
-Last activity: 2026-11-13, 32-05b ausgeführt: Kanarie und Abnahme (55b4216), Live-Test unter Impersonation samt conftest-Fix für NC_MCP_REQUIRE_LIVE (58816dc), CI-Schritte und Pins (41ac266); Gates 6344 passed, 35 skipped; als Nächstes 32-07
+Last activity: 2026-11-13, 32-07 ausgeführt: Messprogramm (5057987), Owner-Freigabe (ce5b173), nc35 (ce6c3bf), nc32 und Beleg (b480ae1); TASK-01 bis TASK-07 und TASK-09 abgehakt; Gates 6344 passed, 35 skipped; als Nächstes 32-08
 
 ## Performance Metrics
 
@@ -833,6 +833,9 @@ Recent decisions affecting current work:
 - [Phase 32]: 32-04b: tasks_create ohne list nur bei genau einer eigenen beschreibbaren Liste, sonst Fehler mit allen beschreibbaren Listen (geteilte mit Schlüssel); Ziel wird vor dem GET der Elternaufgabe gewählt; Tags getrimmt
 - [Phase 32]: 32-05: tasks_create auf 1364 Bytes gekürzt (Prototyp 1417), MAX_TOOL_BYTES bleibt 1400; BUDGET_BYTES 22000 (18747 + 15 Prozent = 21560, nächste 500); Phase 33 verankert erneut (TMOD-05)
 - [Phase 32]: 32-05: Bundle tasks alphabetisch nach talk (bundle_names sortiert); TASK-02, TASK-04, TASK-05, TASK-06, TASK-08 abgehakt, TASK-03 und TASK-07 bleiben bis 32-05b/32-06/32-07 offen
+- [Phase 32]: 32-07: Owner-Entscheid (13.11.2026, "Ok, wie deine Empfehlung"): ein Provider-Treffer mit fremdem Ursprung bleibt eine task:-Id, wie überall im Modul
+- [Phase 32]: 32-07: nc35-ExApp nach FREIGABE owner=option-a auf das Image dieses Branches neu registriert (unregister ohne --rm-data, bootstrap --nc35); altes Image lokal als 127.0.0.1:5000/mcp_connector:0.7.2-vor32
+- [Phase 32]: 32-07: Abnahmeskript nur auf der 32er Strecke, nicht auf nc35 (hinterlässt Objekte, Regel aus 31-05); X-NC-CalDAV-No-Trashbin wirkt nur beim Löschen einer Sammlung
 - [Phase 32]: 32-06: Provider-Link mit fremdem Ursprung wird wie im ganzen Modul auf base_url neu gebaut und bleibt task:-Id (statt url-Id), weil die ExApp Nextcloud oft unter einer anderen Adresse anspricht als der öffentlichen; fetch löst nur gegen die eigene Discovery auf
 - [Phase 32]: 32-06: Auch der Suchtreffer einer geteilten Liste (hit_url) zeigt nur die Startseite der Tasks-App; fetch-metadata shared als "true"/"false" (dict[str, str])
 - [Phase 32]: 32-05b: tests/conftest.py setzt unter NC_MCP_REQUIRE_LIVE=1 keinen Skip-Marker mehr (W3); die Kanarie nutzt den Stamm als Titel und Suchwort, nie den Marker; Aufgabenliste der Welt als zweite Sammlung, Kalender der Welt bleibt VEVENT
@@ -907,10 +910,10 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 
 ## Session Continuity
 
-Last session: 2026-11-13T16:40:00.000Z
-Stopped at: 32-05b abgeschlossen (Kanarie mit Aufgabenliste und Deck-Marker, Abnahmeskript, test_tasks_live.py mit Schalter, CI-Schritte mit und ohne Tasks-App); kein Docker, kein Live-Lauf; lokale Commits nicht gepusht
-Nächster Schritt: 32-05b ausführen (Kanarie, Abnahmeskript, Live-Test mit Schalter, CI mit und ohne Tasks-App); 32-07 prüft live, dass ein Provider-Treffer und tasks_read dieselbe Aufgabe treffen, und bestätigt den fremden Ursprung als task:-Id (Abweichung 1 im 32-06-SUMMARY)
-Resume file: .planning/phases/32-tasks-bundle-suchen-lesen-anlegen/32-07-PLAN.md
+Last session: 2026-11-13T15:14:23.578Z
+Stopped at: 32-07 abgeschlossen (Live-Beweis: nc35 ganze Kette mit 27 Werkzeugen und bytegleichen Termin-Antworten, 35 und 32 je ohne und mit Tasks-App 0.18.1 je 17 passed, Kanarie nc35 4 passed, Abnahme auf 32 alle Aufgabenschritte OK); kein Container läuft; lokale Commits nicht gepusht
+Nächster Schritt: 32-08 ausführen (gemeinsame Abnahme in der Tasks-App per Playwright, Owner-Checkpoint zum Push, CI-Lauf beider Beine)
+Resume file: .planning/phases/32-tasks-bundle-suchen-lesen-anlegen/32-08-PLAN.md
 
 ## Operator Next Steps
 
