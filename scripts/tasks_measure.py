@@ -20,6 +20,9 @@ This program asks a running Nextcloud instead:
   ``oc:invite``, ``cs:invite``, ``DAV:share-access``, ``cs:publish-url``; step ``hinaus``,
   D-32-18) and the form of the provider subline for a shared list (step ``subline``,
   D-32-17), both printed as marks and counts only.
+* plan 32-10: a list shared with a group, out of the account and into it (step ``gruppe``),
+  three forms of a recurring task (step ``wieder``) and the cap of 500 with the budget of
+  one list at 600 and 2000 open tasks (step ``deckel``).
 
 Subcommands::
 
@@ -53,6 +56,7 @@ import math
 import os
 import re
 import secrets
+import statistics
 import sys
 import time
 from collections.abc import Mapping, Sequence
@@ -66,8 +70,12 @@ from urllib.parse import quote, unquote, urlsplit
 import httpx
 from lxml import etree
 
+from mcp_connector.errors import ToolError
+from mcp_connector.nextcloud import NcClients
+from mcp_connector.nextcloud.clients import tasks as tasks_client
 from mcp_connector.nextcloud.clients import xml
 from mcp_connector.nextcloud.credentials import MODE_APPAPI, MODE_BASIC, Credentials
+from mcp_connector.tools import tasks as tasks_tools
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SPIKE_FILE = REPO_ROOT / "scripts" / "tasks_spike.py"
@@ -109,7 +117,9 @@ GAP_PREFIX = "p3209"
 LIST_OUT = f"{GAP_PREFIX}-aus"
 LIST_IN = f"{GAP_PREFIX}-rein"
 SUBLINE_TERM = f"{GAP_PREFIX}sub"
-PREFIXES = (PREFIX, GAP_PREFIX)
+#: Plan 32-10: group shares, recurring tasks and the cap.
+GROUP_PREFIX = "p3210"
+PREFIXES = (PREFIX, GAP_PREFIX, GROUP_PREFIX)
 #: The anonymised raw discoveries of plan 32-09 go here, never into the repository.
 SCRATCH_DIR = Path(os.environ.get("P3209_SCRATCH", ".")).resolve()
 
@@ -372,6 +382,132 @@ def navigation_lists(payload: Any, app: str) -> bool | None:
     if not entries:
         return None
     return any(app in (entry.get("app"), entry.get("id")) for entry in entries)
+
+
+# --- pure helpers of plan 32-10 (tests/unit/test_tasks_measure.py) -------------------------------
+
+
+def group_share_body(gid: str, *, writable: bool, remove: bool = False) -> bytes:
+    """The share document for the group ``gid``: set (read only or read-write) or remove."""
+    root = etree.Element(
+        f"{{{spike.OC_SHARE_NS}}}share", nsmap={"d": xml.DAV, "o": spike.OC_SHARE_NS}
+    )
+    entry = etree.SubElement(root, f"{{{spike.OC_SHARE_NS}}}{'remove' if remove else 'set'}")
+    etree.SubElement(entry, f"{{{xml.DAV}}}href").text = f"principal:principals/groups/{gid}"
+    if writable and not remove:
+        etree.SubElement(entry, f"{{{spike.OC_SHARE_NS}}}read-write")
+    return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+
+@dataclass(frozen=True, slots=True)
+class InviteShape:
+    """The form of one ``oc:invite``: number of entries, local names of the entries, kinds.
+
+    Never a href, a principal or a name: ``kinds`` is ``users``, ``groups``, ``andere`` or a
+    ``+`` join of them, ``keine`` without any entry.
+    """
+
+    entries: int
+    children: tuple[str, ...]
+    kinds: str
+
+
+def _principal_kind(entry: etree._Element) -> str:
+    href = next(
+        (
+            (element.text or "").strip()
+            for element in entry.iter(f"{{{xml.DAV}}}href")
+            if (element.text or "").strip()
+        ),
+        "",
+    )
+    if "principals/users/" in href:
+        return "users"
+    if "principals/groups/" in href:
+        return "groups"
+    return "andere"
+
+
+def invite_shape(element: etree._Element) -> InviteShape:
+    entries = [child for child in element if isinstance(child.tag, str)]
+    children = tuple(sorted({etree.QName(child).localname for child in entries}))
+    kinds = "+".join(sorted({_principal_kind(child) for child in entries})) or "keine"
+    return InviteShape(len(entries), children, kinds)
+
+
+#: The form of a recurring task the Tasks app 0.18.1 writes (measured in phase 30).
+RECURRING_TEMPLATE = REPO_ROOT / "tests" / "fixtures" / "tasks_app" / "recurring.ics"
+RECURRING_FORMS = ("app", "instanz-erledigt", "master-erledigt")
+#: The second occurrence of the template (DUE 2026-11-20 13:00 UTC, daily).
+_SECOND_OCCURRENCE = "20261121T130000Z"
+_DONE_LINES = ("STATUS:COMPLETED", "PERCENT-COMPLETE:100", "COMPLETED:20261121T140000Z")
+
+
+def recurring_todo(uid: str, summary: str, form: str) -> str:
+    """One of the three recurring forms of plan 32-10, built from the Tasks app template.
+
+    ``app``: the template with ``uid`` and ``summary``. ``instanz-erledigt``: the same master
+    and, in the same object, an override of the second occurrence that is done.
+    ``master-erledigt``: the master with the rule, done.
+    """
+    if form not in RECURRING_FORMS:
+        raise ValueError(f"unknown recurring form {form!r}")
+    lines = RECURRING_TEMPLATE.read_text(encoding="utf-8").replace("\r\n", "\n").splitlines()
+    master: list[str] = []
+    for line in lines:
+        if line.startswith("UID:"):
+            line = f"UID:{uid}"
+        elif line.startswith("SUMMARY:"):
+            line = f"SUMMARY:{summary}"
+        master.append(line)
+    end = master.index("END:VTODO")
+    if form == "master-erledigt":
+        master[end:end] = list(_DONE_LINES)
+    elif form == "instanz-erledigt":
+        override = [
+            "BEGIN:VTODO",
+            f"UID:{uid}",
+            "DTSTAMP:20261121T140000Z",
+            f"SUMMARY:{summary}",
+            f"RECURRENCE-ID:{_SECOND_OCCURRENCE}",
+            f"DUE:{_SECOND_OCCURRENCE}",
+            *_DONE_LINES,
+            "END:VTODO",
+        ]
+        master[end + 1 : end + 1] = override
+    return "\r\n".join(spike.fold_line(line) for line in master) + "\r\n"
+
+
+@dataclass(frozen=True, slots=True)
+class PagingSummary:
+    """A walk through the pages of ``tasks_search``: only counts and yes/no."""
+
+    pages: int
+    per_page: int
+    hits: int
+    unique: int
+    last_note: bool
+    last_next: bool
+    degraded: bool
+
+
+def paging_summary(pages: Sequence[Mapping[str, Any]]) -> PagingSummary:
+    ids_seen: list[str] = []
+    per_page = 0
+    for page in pages:
+        tasks = [hit for hit in page.get("tasks") or [] if isinstance(hit, dict)]
+        per_page = max(per_page, len(tasks))
+        ids_seen.extend(str(hit.get("id")) for hit in tasks)
+    last = pages[-1] if pages else {}
+    return PagingSummary(
+        pages=len(pages),
+        per_page=per_page,
+        hits=len(ids_seen),
+        unique=len(set(ids_seen)),
+        last_note=bool(last.get("note")),
+        last_next=bool(last.get("next")),
+        degraded=any(page.get("degraded") for page in pages),
+    )
 
 
 # --- small helpers -------------------------------------------------------------------------------
@@ -814,7 +950,7 @@ async def prefixed_lists(client: httpx.AsyncClient, creds: Credentials) -> list[
     return [entry for entry in spike.parse_home(result.body) if entry.uri.startswith(PREFIXES)]
 
 
-async def purge_trash(client: httpx.AsyncClient, creds: Credentials) -> int:
+async def purge_trash(client: httpx.AsyncClient, creds: Credentials) -> tuple[int, int]:
     """Delete every object of this plan from the calendar trash bin of ``creds.user``.
 
     The collection ``trashbin/objects/`` answers PROPFIND with 501 and names its objects
@@ -828,8 +964,9 @@ async def purge_trash(client: httpx.AsyncClient, creds: Credentials) -> int:
     )
     if listed.status != 207:
         note(f"PAPIERKORB konto={creds.user} objects status={listed.status}")
-        return 0
+        return 0, 0
     removed = 0
+    cleared = 0
     for href, props in xml.parse_multistatus(listed.body):
         data = props.get(f"{{{xml.CAL}}}calendar-data", "")
         if not any(f"UID:{p}" in spike.unfold(data) for p in PREFIXES):
@@ -839,13 +976,15 @@ async def purge_trash(client: httpx.AsyncClient, creds: Credentials) -> int:
             client, creds, "DELETE", f"{creds.base_url}{path}", extra_headers=NO_TRASHBIN
         )
         removed += 1
+        cleared += 1 if gone.status in (200, 204) else 0
         note(f"PAPIERKORB konto={creds.user} objekt_geloescht status={gone.status}")
-    return removed
+    return removed, cleared
 
 
 async def teardown(target: Target, env: Mapping[str, str]) -> None:
     """Shares back, lists deleted without trash bin, trash emptied, accounts deleted."""
     spike.section(f"rueckbau {target.name}")
+    await group_teardown(target, env)
     async with spike.new_client() as client:
         bob = appapi_creds(env, target.base_url, target.bob)
         for uri in (LIST_RW, LIST_RO):
@@ -887,13 +1026,15 @@ async def teardown(target: Target, env: Mapping[str, str]) -> None:
                     extra_headers=NO_TRASHBIN,
                 )
                 note(f"RUECKBAU liste_geloescht konto={user} status={gone.status} no_trashbin=1")
-            removed = await purge_trash(client, creds)
+            removed, cleared = await purge_trash(client, creds)
             note(f"RUECKBAU papierkorb konto={user} entfernte_eintraege={removed}")
+            note(f"PAPIERKORB {target.name} konto={user} gefunden={removed} geleert={cleared}")
             left = await prefixed_lists(client, creds)
             note(f"RUECKBAU reste konto={user} listen_mit_praefix={len(left)}")
     for user in (FRESH_USER, NEVER_USER):
         out = spike.occ(target.container, "user:delete", user, check=False)
         note(f"occ user:delete {user} -> {spike._one_line(out)[:120]}")
+    group_delete(target)
 
 
 # --- live: names ---------------------------------------------------------------------------------
@@ -1400,6 +1541,514 @@ async def gap(target: Target, env: Mapping[str, str], steps: Sequence[str], run:
                 )
 
 
+# --- live: group shares, recurring tasks and the cap (plan 32-10) ------------------------------
+
+#: The group of this plan. Its id names neither alice nor bob; it is only printed in the
+#: lines ``GRUPPE``.
+GROUP_ID = f"{GROUP_PREFIX}grp"
+LIST_GROUP_OUT = f"{GROUP_PREFIX}-aus"
+LIST_GROUP_RW = f"{GROUP_PREFIX}-rein-rw"
+LIST_GROUP_RO = f"{GROUP_PREFIX}-rein-ro"
+LIST_RECURRING = f"{GROUP_PREFIX}-wieder"
+LIST_CAP = f"{GROUP_PREFIX}-deckel"
+GROUP_TERM = f"{GROUP_PREFIX}sub"
+CAP_SIZES = (600, 2000)
+GROUP_STEPS = ("gruppe", "wieder", "deckel")
+#: The budget of a list while the wall clock of one call is measured: high enough that the
+#: product budget never cuts the measurement short.
+MEASURING_BUDGET = 60.0
+SHARED_MARKER_TEXT = "_shared_by_"
+
+#: Shares of one group, counted in ``dav_shares`` (32-10: the side of the group).
+PHP_GROUP_SHARES = (
+    spike._PHP_BOOT
+    + r"""
+$db = \OCP\Server::get(\OCP\IDBConnection::class);
+$qb = $db->getQueryBuilder();
+$qb->select($qb->func()->count('*', 'n'))->from('dav_shares')
+    ->where($qb->expr()->eq(
+        'principaluri', $qb->createNamedParameter('principals/groups/' . $argv[1])
+    ));
+echo $qb->executeQuery()->fetchOne(), "\n";
+"""
+)
+
+
+def group_members(target: Target, gid: str) -> list[str] | None:
+    """The members of ``gid``, ``None`` when the group does not exist."""
+    listed = spike._json_or_text(
+        spike.occ(target.container, "group:list", "--output=json", check=False)
+    )
+    if not isinstance(listed, dict):
+        raise spike.RunFailed("occ group:list --output=json returned no JSON object")
+    members = listed.get(gid)
+    if members is None:
+        return None
+    return [str(member) for member in members] if isinstance(members, list) else []
+
+
+def group_state(target: Target, phase: str) -> bool:
+    exists = group_members(target, GROUP_ID) is not None
+    shares = spike.php(target.container, PHP_GROUP_SHARES, GROUP_ID).strip()
+    note(
+        f"GRUPPE {target.name} name={GROUP_ID} vorhanden={yes_no(exists)} shares={shares} "
+        f"phase={phase}"
+    )
+    return exists
+
+
+def nc_clients(creds: Credentials) -> NcClients:
+    return NcClients(client=httpx.AsyncClient(follow_redirects=False, timeout=60.0), creds=creds)
+
+
+async def product_discovery(client: httpx.AsyncClient, creds: Credentials) -> bytes:
+    """The discovery with exactly the body of the product."""
+    result = await spike.dav_request(
+        client,
+        creds,
+        "PROPFIND",
+        home_url(creds.base_url, creds.user),
+        depth="1",
+        body=tasks_client.build_task_discovery_body(),
+    )
+    if result.status != 207:
+        raise spike.RunFailed(f"the discovery answered {result.status}")
+    return result.body
+
+
+def _responses(body: bytes) -> dict[str, etree._Element]:
+    root = xml.parse_root(body)
+    found: dict[str, etree._Element] = {}
+    for response in root.findall(f"{{{xml.DAV}}}response"):
+        path = urlsplit((response.findtext(f"{{{xml.DAV}}}href") or "").strip()).path
+        found[unquote(path.rstrip("/").rsplit("/", 1)[-1])] = response
+    return found
+
+
+def _in_propstat(response: etree._Element, name: str) -> tuple[str, etree._Element | None]:
+    """``2xx``, the other status code or ``fehlt``, with the element of a 2xx propstat."""
+    for propstat in response.findall(f"{{{xml.DAV}}}propstat"):
+        element = propstat.find(f"{{{xml.DAV}}}prop/{name}")
+        if element is None:
+            continue
+        status_line = propstat.findtext(f"{{{xml.DAV}}}status") or ""
+        code = next((part for part in status_line.split() if part.isdigit()), "")
+        if code.startswith("2"):
+            return "2xx", element
+        return code or "unklar", None
+    return "fehlt", None
+
+
+def _text(element: etree._Element | None) -> str:
+    return (element.text or "").strip() if element is not None else ""
+
+
+def _names_owner(text: str, account: str, display: str) -> bool:
+    by_id = re.search(rf"(?<![A-Za-z0-9]){re.escape(account)}(?![A-Za-z0-9])", text) is not None
+    return by_id or (bool(display.strip()) and display.casefold() in text.casefold())
+
+
+def anonymise_group(body: bytes, target: Target, bob_display: str) -> bytes:
+    return anonymise(body, target, bob_display).replace(GROUP_ID.encode(), b"testgroup")
+
+
+async def group_steps(target: Target, env: Mapping[str, str], run: str) -> None:
+    """Step ``gruppe``: only marks, counts and yes/no, never a name or a href."""
+    base = target.base_url
+    alice = basic_creds(env, base, target.alice, "NC_MCP_TEST_APP_PASSWORD")
+    bob = basic_creds(env, base, target.bob, "NC_MCP_TEST_APP_PASSWORD2")
+    alice_aa = appapi_creds(env, base, target.alice)
+    bob_display = display_name(target, target.bob)
+    if bob_display and bob_display != target.bob:
+        spike.remember_secret("BOB_DISPLAY", bob_display)
+    home_path = urlsplit(home_url(base, target.alice)).path
+    for argv in (
+        ("group:add", GROUP_ID),
+        ("group:adduser", GROUP_ID, target.bob),
+        ("group:adduser", GROUP_ID, target.alice),
+    ):
+        spike.occ(target.container, *argv, check=False)
+    members = group_members(target, GROUP_ID) or []
+    both = {target.alice, target.bob} <= set(members)
+    note(f"SETUP GRUPPE angelegt mitglieder={len(members)} alice_und_bob={yes_no(both)}")
+    if not both:
+        raise spike.RunFailed("the test group does not hold both test accounts")
+    out_url = list_url(base, target.alice, LIST_GROUP_OUT)
+    async with spike.new_client() as client:
+
+        async def post(creds: Credentials, url: str, body: bytes, label: str) -> None:
+            result = await spike.dav_request(client, creds, "POST", url, body=body)
+            note(f"SETUP {label} status={result.status}")
+            if result.status >= 300:
+                raise spike.RunFailed(f"{label} answered {result.status}")
+
+        await make_list(client, alice, LIST_GROUP_OUT)
+
+        async def probe_out(state: str) -> None:
+            for auth, creds in (("basic", alice), ("appapi", alice_aa)):
+                body = await product_discovery(client, creds)
+                responses = _responses(body)
+                response = responses.get(LIST_GROUP_OUT)
+                if response is None:
+                    raise spike.RunFailed(f"{LIST_GROUP_OUT} is missing in the discovery")
+                status, invite = _in_propstat(response, f"{{{xml.OC}}}invite")
+                shape = invite_shape(invite) if invite is not None else InviteShape(0, (), "keine")
+                lists = tasks_client.parse_task_home(body, home_path=home_path)
+                own = next((entry for entry in lists if entry.uri == LIST_GROUP_OUT), None)
+                if own is None:
+                    raise spike.RunFailed(f"parse_task_home does not hold {LIST_GROUP_OUT}")
+                note(
+                    f"GRUPPE-HINAUS {target.name} zustand={state} auth={auth} "
+                    f"invite_status={status} eintraege={shape.entries} "
+                    f"kinder={','.join(shape.children) or 'keine'} principal_art={shape.kinds} "
+                    f"shared_out={yes_no(own.shared_out)}"
+                )
+                if state.startswith("an-gruppe"):
+                    seen = sum(1 for uri in responses if uri.startswith(LIST_GROUP_OUT))
+                    note(
+                        f"GRUPPE-SELBST {target.name} zustand={state} auth={auth} "
+                        f"eigene_liste_doppelt={yes_no(seen > 1)}"
+                    )
+                if auth == "basic":
+                    keep = SCRATCH_DIR / f"discovery-gruppe-{state}-{target.name}.xml"
+                    keep.write_bytes(anonymise_group(body, target, bob_display))
+                    note(f"ROHKOERPER zustand={state} anonymisiert bytes={keep.stat().st_size}")
+
+        await probe_out("privat")
+        await post(
+            alice, out_url, group_share_body(GROUP_ID, writable=False), "FREIGABE an-gruppe-ro"
+        )
+        await probe_out("an-gruppe-ro")
+        await post(
+            alice, out_url, group_share_body(GROUP_ID, writable=True), "FREIGABE an-gruppe-rw"
+        )
+        await probe_out("an-gruppe-rw")
+        await post(
+            alice,
+            out_url,
+            group_share_body(GROUP_ID, writable=False, remove=True),
+            "FREIGABE an-gruppe zurueck",
+        )
+        await probe_out("zurueckgenommen")
+
+        # Into the account: two lists of bob, shared with the group that holds alice.
+        placed: dict[tuple[str, bool], str] = {}
+        for kind, uri, writable in (("rw", LIST_GROUP_RW, True), ("ro", LIST_GROUP_RO, False)):
+            await make_list(client, bob, uri)
+            await post(
+                bob,
+                list_url(base, target.bob, uri),
+                group_share_body(GROUP_ID, writable=writable),
+                f"FREIGABE {kind} an-gruppe",
+            )
+            for due in (False, True):
+                form = "faellig" if due else "ohne"
+                uid = f"{GROUP_PREFIX}-rein-{kind}-{form}-{run}"
+                title = f"{GROUP_TERM} {kind} {form}"
+                extra = ["DUE:20261204T090000Z"] if due else []
+                status = await put_task(
+                    client, bob, uri, f"{uid}.ics", spike.simple_todo(uid, title, extra)
+                )
+                note(f"SETUP PUT gruppe-aufgabe liste={kind} faellig={yes_no(due)} status={status}")
+                placed[(kind, due)] = title
+
+        shared: dict[str, tasks_client.TaskList] = {}
+        raw_names: dict[str, str] = {}
+        owners: dict[str, str] = {}
+        for auth, creds in (("basic", alice), ("appapi", alice_aa)):
+            body = await product_discovery(client, creds)
+            responses = _responses(body)
+            lists = tasks_client.parse_task_home(body, home_path=home_path)
+            for kind, uri in (("rw", LIST_GROUP_RW), ("ro", LIST_GROUP_RO)):
+                matching = [found for found in responses if found.startswith(uri)]
+                if not matching:
+                    note(f"GRUPPE-REIN {target.name} liste={kind} auth={auth} sichtbar=nein")
+                    continue
+                found_uri = matching[0]
+                response = responses[found_uri]
+                ro_status, _ = _in_propstat(response, f"{{{xml.OC}}}read-only")
+                owner = _text(_in_propstat(response, OWNER_DISPLAYNAME)[1])
+                raw = _text(_in_propstat(response, f"{{{xml.DAV}}}displayname")[1])
+                entry = next((item for item in lists if item.uri == found_uri), None)
+                if entry is None:
+                    note(f"GRUPPE-REIN {target.name} liste={kind} auth={auth} parse=fehlt")
+                    continue
+                if auth == "basic":
+                    shared[kind] = entry
+                    raw_names[kind] = raw
+                    owners[kind] = owner
+                clean_name = (
+                    entry.name == uri
+                    and not _names_owner(entry.name, target.bob, bob_display)
+                    and SHARED_MARKER_TEXT not in entry.name
+                )
+                note(
+                    f"GRUPPE-REIN {target.name} liste={kind} auth={auth} sichtbar=ja "
+                    f"eintraege={len(matching)} "
+                    f"uri_mit_marker={yes_no(SHARED_MARKER_TEXT in found_uri)} "
+                    f"read_only_2xx={yes_no(ro_status == '2xx')} "
+                    f"owner_displayname_passt={yes_no(bool(owner) and owner == bob_display)} "
+                    f"shared={yes_no(entry.shared)} writable={yes_no(entry.writable)} "
+                    f"name_ohne_besitzer={yes_no(clean_name)}"
+                )
+            if auth == "basic":
+                keep = SCRATCH_DIR / f"discovery-gruppe-rein-{target.name}.xml"
+                keep.write_bytes(anonymise_group(body, target, bob_display))
+                note(f"ROHKOERPER zustand=rein anonymisiert bytes={keep.stat().st_size}")
+
+        response = await client.get(
+            f"{base}/ocs/v2.php/search/providers/tasks/search",
+            params={"term": GROUP_TERM},
+            headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+            auth=alice.auth(),
+        )
+        try:
+            entries = response.json()["ocs"]["data"]["entries"]
+        except (ValueError, KeyError, TypeError):
+            entries = None
+        count = "unlesbar" if not isinstance(entries, list) else str(len(entries))
+        note(f"PROVIDER gruppe status={response.status_code} eintraege={count}")
+        for (kind, due), title in placed.items():
+            hit = next(
+                (e for e in entries or [] if isinstance(e, dict) and e.get("title") == title), None
+            )
+            task_list = shared.get(kind)
+            if hit is None or task_list is None:
+                note(
+                    f"GRUPPE-SUBLINE {target.name} liste={kind} faellig={yes_no(due)} "
+                    "vorhanden=nein"
+                )
+                continue
+            subline = str(hit.get("subline") or "")
+            raw = raw_names.get(kind, "")
+            owner = owners.get(kind) or bob_display
+            cleaned = tasks_client.clean_subline(subline, task_list)
+            if cleaned is None:
+                outcome, without = "weggelassen", True
+            else:
+                outcome = "unveraendert" if cleaned == subline else "bereinigt"
+                without = not _names_owner(cleaned, target.bob, owner)
+            note(
+                f"GRUPPE-SUBLINE {target.name} liste={kind} faellig={yes_no(due)} "
+                f"endet_mit_rohname={yes_no(bool(raw) and subline.endswith(f'({raw})'))} "
+                f"enthaelt_besitzer={yes_no(_names_owner(subline, target.bob, owner))} "
+                f"clean_subline={outcome} clean_subline_ohne_besitzer={yes_no(without)}"
+            )
+
+
+async def recurring_steps(target: Target, env: Mapping[str, str], run: str) -> None:
+    """Step ``wieder``: the three recurring forms in one own list of alice."""
+    base = target.base_url
+    alice = appapi_creds(env, base, target.alice)
+    titles: dict[str, str] = {}
+    names_by_form: dict[str, str] = {}
+    async with spike.new_client() as client:
+        await make_list(client, alice, LIST_RECURRING)
+        for form in RECURRING_FORMS:
+            uid = f"{GROUP_PREFIX}-wieder-{form}-{run}"
+            title = f"{GROUP_PREFIX}wieder {form}"
+            status = await put_task(
+                client, alice, LIST_RECURRING, f"{uid}.ics", recurring_todo(uid, title, form)
+            )
+            note(f"SETUP PUT wiederkehrend form={form} status={status}")
+            if status not in (201, 204):
+                raise spike.RunFailed(f"PUT of the recurring form {form} answered {status}")
+            titles[form] = title
+            names_by_form[form] = f"{uid}.ics"
+        report = await spike.dav_request(
+            client,
+            alice,
+            "REPORT",
+            list_url(base, target.alice, LIST_RECURRING),
+            depth="1",
+            body=tasks_client.build_todo_query(False),
+        )
+        prefiltered = {unquote(urlsplit(href).path.rsplit("/", 1)[-1]) for href in hrefs_of(report)}
+    answers: dict[str, dict[str, Any]] = {}
+    for status in ("open", "completed", "all"):
+        clients = nc_clients(alice)
+        async with clients.client:
+            answers[status] = await tasks_tools.search_tasks(
+                clients, list_name=LIST_RECURRING, status=status
+            )
+    for form in RECURRING_FORMS:
+        hits = {
+            status: [h for h in answer.get("tasks") or [] if h.get("summary") == titles[form]]
+            for status, answer in answers.items()
+        }
+        every = hits["all"]
+        recurring = bool(every) and all(hit.get("recurring") is True for hit in every)
+        state = str(every[0].get("status")) if every else "fehlt"
+        read_recurring, read_status = "fehlt", "fehlt"
+        if every:
+            clients = nc_clients(alice)
+            async with clients.client:
+                read = await tasks_tools.read_task(clients, task_id=str(every[0]["id"]))
+            read_recurring = yes_no(read.get("recurring") is True)
+            read_status = str(read.get("status"))
+        note(
+            f"WIEDER {target.name} form={form} "
+            f"filter_offen={yes_no(names_by_form[form] in prefiltered)} "
+            f"treffer_offen={len(hits['open'])} treffer_erledigt={len(hits['completed'])} "
+            f"treffer_alle={len(every)} recurring={yes_no(recurring)} status={state} "
+            f"lesen_recurring={read_recurring} lesen_status={read_status}"
+        )
+
+
+def cap_todo(run: str, number: int) -> tuple[str, str]:
+    """Task ``number`` of the open series of the cap: never done, every second one due."""
+    uid = f"{GROUP_PREFIX}-deckel-{run}-{number:04d}"
+    extra = [
+        (
+            "DESCRIPTION:Eine offene Aufgabe der Messreihe mit einer Beschreibung von "
+            "ueblicher Laenge\\, damit die Antwort nicht kuenstlich klein ausfaellt."
+        ),
+        f"CATEGORIES:{GROUP_PREFIX}",
+    ]
+    if number % 2 == 0:
+        extra.append(f"DUE:202612{number % 28 + 1:02d}T100000Z")
+    return f"{uid}.ics", spike.simple_todo(uid, f"{GROUP_PREFIX} deckel {number:04d}", extra)
+
+
+async def fill_cap(creds: Credentials, target: Target, run: str, start: int, stop: int) -> None:
+    """Serial PUTs with a retry on 5xx, then the rows counted in the database."""
+    failed: list[str] = []
+    repeated = 0
+    started = time.perf_counter()
+    async with spike.new_client() as client:
+        for number in range(start, stop):
+            name, text = cap_todo(run, number)
+            status = 0
+            for attempt in range(6):
+                try:
+                    status = await put_task(client, creds, LIST_CAP, name, text)
+                except httpx.HTTPError:
+                    status = 0
+                if status in (201, 204) or (status == 412 and attempt):
+                    status = 201
+                    break
+                if 0 < status < 500:
+                    break
+                repeated += 1
+                await asyncio.sleep(0.5 * (attempt + 1))
+            if status not in (201, 204):
+                failed.append(f"{number}:{status}")
+    seconds = time.perf_counter() - started
+    if failed:
+        raise spike.RunFailed(f"{len(failed)} PUT of the cap failed, first: {failed[:3]}")
+    rows = spike.php(target.container, spike.PHP_COUNT_LIST_OBJECTS, creds.user, LIST_CAP).strip()
+    note(
+        f"AUFBAU {target.name} aufgaben={stop} neu={stop - start} erledigt=0 "
+        f"mit_faelligkeit={(stop + 1) // 2} dauer_s={seconds:.0f} gleichzeitig=1 "
+        f"wiederholte_put={repeated} GEGENPROBE datenbank_zeilen={rows} "
+        f"gleich={yes_no(rows == str(stop))}"
+    )
+    if rows != str(stop):
+        raise spike.RunFailed(f"the database holds {rows} objects of {LIST_CAP}")
+
+
+async def timed_search(creds: Credentials, **kwargs: Any) -> tuple[float, dict[str, Any] | str]:
+    """One call of ``search_tasks`` and its wall clock; a refusal comes back as its message."""
+    clients = nc_clients(creds)
+    async with clients.client:
+        started = time.perf_counter()
+        try:
+            answer: dict[str, Any] | str = await tasks_tools.search_tasks(clients, **kwargs)
+        except ToolError as exc:
+            answer = exc.message
+        return time.perf_counter() - started, answer
+
+
+async def cap_steps(target: Target, env: Mapping[str, str], run: str) -> None:
+    """Step ``deckel``: 600, then 2000 open tasks in one own list of alice."""
+    alice = appapi_creds(env, target.base_url, target.alice)
+    url = list_url(target.base_url, target.alice, LIST_CAP)
+    containers = (target.container,)
+    async with spike.new_client() as client:
+        await make_list(client, alice, LIST_CAP)
+    filled = 0
+    worst = 0.0
+    for size in CAP_SIZES:
+        await fill_cap(alice, target, run, filled, size)
+        filled = size
+        found = await measure(
+            alice, url, tasks_client.build_todo_query(False), containers, warm=3, runs=15
+        )
+        note(f"KOSTEN deckel-report aufgaben={size} impersonation=ja {found.line()}")
+        budget = tasks_tools.PER_LIST_TIMEOUT
+        tasks_tools.PER_LIST_TIMEOUT = MEASURING_BUDGET
+        try:
+            await timed_search(alice, list_name=LIST_CAP)
+            calls = [await timed_search(alice, list_name=LIST_CAP) for _ in range(10)]
+        finally:
+            tasks_tools.PER_LIST_TIMEOUT = budget
+        stats = spike.summarize([entry[0] for entry in calls])
+        worst = max(worst, stats["max"])
+        answered = all(isinstance(entry[1], dict) for entry in calls)
+        note(
+            f"KOSTEN deckel-aufruf aufgaben={size} median_ms={stats['median'] * 1000:.0f} "
+            f"max_ms={stats['max'] * 1000:.0f} beantwortet={yes_no(answered)} "
+            f"budget_waehrend_messung_s={MEASURING_BUDGET:g} (n={len(calls)})"
+        )
+        pages: list[dict[str, Any]] = []
+        page_seconds: list[float] = []
+        cursor: str | None = None
+        refused = False
+        while len(pages) <= 40:
+            took, answer = await timed_search(alice, list_name=LIST_CAP, cursor=cursor)
+            page_seconds.append(took)
+            if isinstance(answer, str):
+                refused = True
+                break
+            pages.append(answer)
+            cursor = answer.get("next")
+            if not cursor:
+                break
+        summary = paging_summary(pages)
+        same_note = bool(pages) and pages[-1].get("note") == tasks_tools.SEARCH_CAP_NOTE
+        note(
+            f"DECKEL {target.name} aufgaben={size} seiten={summary.pages} "
+            f"je_seite={summary.per_page} treffer={summary.hits} eindeutig={summary.unique} "
+            f"letzte_note={yes_no(summary.last_note)} letzte_next={yes_no(summary.last_next)} "
+            f"note_gleich={yes_no(same_note)} degraded={yes_no(summary.degraded or refused)} "
+            f"max_seite_ms={max(page_seconds) * 1000:.0f} "
+            f"median_seite_ms={statistics.median(page_seconds) * 1000:.0f} "
+            f"budget_s={tasks_tools.PER_LIST_TIMEOUT:g}"
+        )
+    note(
+        f"MESSWERT per_list_timeout_s={derive_budget(worst)} max_s={worst:.3f} "
+        f"quelle={target.name}-impersonation"
+    )
+
+
+async def group_teardown(target: Target, env: Mapping[str, str]) -> None:
+    """The group shares of this plan back; the lists fall with the loop of ``teardown``."""
+    async with spike.new_client() as client:
+        for user, uri in (
+            (target.alice, LIST_GROUP_OUT),
+            (target.bob, LIST_GROUP_RW),
+            (target.bob, LIST_GROUP_RO),
+        ):
+            creds = appapi_creds(env, target.base_url, user)
+            result = await spike.dav_request(
+                client,
+                creds,
+                "POST",
+                list_url(target.base_url, user, uri),
+                body=group_share_body(GROUP_ID, writable=False, remove=True),
+            )
+            note(f"RUECKBAU gruppenfreigabe_entfernt liste={uri} status={result.status}")
+
+
+def group_delete(target: Target) -> None:
+    if group_members(target, GROUP_ID) is None:
+        note("RUECKBAU gruppe entfaellt grund=nicht-vorhanden")
+        return
+    spike.occ(target.container, "group:delete", GROUP_ID, check=False)
+    left = group_members(target, GROUP_ID) is not None
+    note(f"RUECKBAU gruppe_geloescht noch_vorhanden={yes_no(left)}")
+
+
 # --- live: the run -------------------------------------------------------------------------------
 
 
@@ -1463,6 +2112,8 @@ async def live(target: Target, env: Mapping[str, str], steps: Sequence[str]) -> 
             left = await prefixed_lists(client, appapi_creds(env, target.base_url, user))
             if left:
                 raise spike.RunFailed(f"{len(left)} lists of this plan are left; teardown first")
+    if "gruppe" in steps and group_state(target, "vorher"):
+        raise spike.RunFailed("the test group exists before the run; nothing was changed")
     before = baseline(target, "vorher")
     run = datetime.now(UTC).strftime("%H%M%S")
     containers = (target.container,)
@@ -1481,7 +2132,7 @@ async def live(target: Target, env: Mapping[str, str], steps: Sequence[str]) -> 
             await children_series(
                 alice, containers, run, db=target.name, impersonation=True, warm=1, runs=6
             )
-        if not series:
+        if not series and not set(steps) <= set(GROUP_STEPS):
             async with spike.new_client() as client:
                 await make_list(client, alice, LIST_OWN)
         if "names" in steps:
@@ -1494,11 +2145,19 @@ async def live(target: Target, env: Mapping[str, str], steps: Sequence[str]) -> 
             await appstate(target, env)
         if "hinaus" in steps or "subline" in steps:
             await gap(target, env, steps, run)
+        if "gruppe" in steps:
+            await group_steps(target, env, run)
+        if "wieder" in steps:
+            await recurring_steps(target, env, run)
+        if "deckel" in steps:
+            await cap_steps(target, env, run)
     except Exception as failure:
         note(f"BLOCK FAILED | live {target.name} | {type(failure).__name__}: {str(failure)[:300]}")
         raise
     finally:
         await teardown(target, env)
+        if "gruppe" in steps:
+            group_state(target, "nachher")
         restore_tasks_app(target, before_app)
         after = baseline(target, "nachher")
         for user, value in before.items():
