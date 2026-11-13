@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: verifying
-stopped_at: "32-08 abgeschlossen (Owner-Abnahme der Aufgabenansicht in der Tasks-App 0.18.1 auf nc35 am 13.11.2026: abgenommen; CI 43453276557 auf dcda6c8 alle Jobs grün, exapp 17 passed ohne Tasks-App auf 34.0.3, canary-nc35 17 passed mit Tasks-App auf 35.0.1); Phase 32 10/10, Verifikation der Phase steht aus; kein Container läuft"
-last_updated: "2026-11-13T15:42:37.323Z"
-last_activity: "2026-11-13, 32-08 ausgeführt: Abnahme vorbereitet (577635c), Owner-Abnahme und Rückbau (7c7d5b8), Push-Freigabe (dcda6c8, gepusht von der Hauptsitzung), CI-Beleg (8941fd9); Gates 6344 passed, 35 skipped; als Nächstes Verifikation von Phase 32"
+stopped_at: "32-09 (gap closure) ausgeführt bis zur Push-Frage (Task 6, angehalten): D-32-17, D-32-18, W2, W3, W4 gebaut und live auf nc35 und nc32 je ohne und mit Tasks-App belegt (je 21 passed), Befund zur subline ohne Fälligkeit behoben (39c1be9); 19 Commits lokal vor origin (inkl. Abschluss-Commit), nichts gepusht; Phase 32 nicht abgeschlossen, Re-Verifikation durch die Hauptsitzung; kein Container läuft"
+last_updated: "2026-11-13T17:20:00.000Z"
+last_activity: "2026-11-13, 32-09 ausgeführt bis Task 5 (ca68abd); Gates 6399 passed, 35 skipped, tools/list 18770 Bytes; Push-Frage offen; als Nächstes Owner-Frage zum Push und Re-Verifikation von Phase 32"
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 24
-  completed_plans: 24
+  total_plans: 25
+  completed_plans: 25
   percent: 60
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 ## Current Position
 
 Phase: 32 von 30 bis 34 (Tasks-Bundle suchen, lesen, anlegen), geplant und geprüft (10 Pläne, Plan-Check PASS nach einer Revision), Ausführung vom Owner freigegeben (2026-11-13, "Go"); Phase 31 abgeschlossen und verifiziert
-Plan: 32-08 fertig (10 von 10): Owner-Abnahme in der Tasks-App per Playwright (abgenommen), CI-Lauf 43453276557 beider Beine grün; docs/tasks-evidence.md vollständig; Verifikation der Phase 32 steht aus
-Status: Phase 32 ausgeführt (10/10, 2026-11-13), Verifikation steht aus; Draft-PR 48 gegen main ist offen, Branch bis dcda6c8 gepusht (Owner-Freigabe 13.11.2026), CI auf dcda6c8 vollständig grün; 8941fd9 und der Abschluss-Commit von 32-08 sind lokal; auf nc35 ist die ExApp 0.7.2 aus diesem Stand registriert (Rückweg im 32-07-SUMMARY.md), Tasks-App dort wieder entfernt; offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13)
-Last activity: 2026-11-13, 32-08 ausgeführt: Abnahme vorbereitet (577635c), Owner-Abnahme und Rückbau (7c7d5b8), Push-Freigabe (dcda6c8, gepusht von der Hauptsitzung), CI-Beleg (8941fd9); Gates 6344 passed, 35 skipped; als Nächstes Verifikation von Phase 32
+Plan: 32-09 (gap closure) ausgeführt bis zur Push-Frage: D-32-17 (subline ohne Besitzer), D-32-18 (hinausgeteilte eigene Liste ohne list kein Ziel), W2, W3, W4; live auf nc35 und nc32 je ohne und mit Tasks-App grün; Task 6 (Push-Frage) offen, raw/32-09-push.txt fehlt noch
+Status: Phase 32 ausgeführt inkl. Gap Closure 32-09 (lokal, 19 Commits vor origin/plan/v1.8-tasks-080, nichts gepusht), Re-Verifikation durch die Hauptsitzung steht aus; Draft-PR 48 offen; Tasks-App auf nc35 und nc32 wieder entfernt, keine Instanz läuft; offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13), Gruppenfreigabe einer eigenen Aufgabenliste nicht gemessen
+Last activity: 2026-11-13, 32-09 ausgeführt bis Task 5 (ca68abd): Fix der subline ohne Fälligkeit (e672187 RED, 39c1be9), Live-Fälle (83030c1, b0cadfe), Beleg und Changelogs (ca68abd); Gates 6399 passed, 35 skipped; als Nächstes Push-Frage und Re-Verifikation von Phase 32
 
 ## Performance Metrics
 

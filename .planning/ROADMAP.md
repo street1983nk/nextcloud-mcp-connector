@@ -209,7 +209,7 @@ Plans:
 - [x] 32-05b-PLAN.md: Kanarie, Abnahmeskript, Live-Test mit Schalter, CI mit und ohne Tasks-App (TASK-01 bis TASK-03, TASK-05 bis TASK-07, TASK-09; D-32-11)
 - [x] 32-07-PLAN.md: Live-Beweis auf Nextcloud 35 und 32, je ohne und mit Tasks-App, `docs/tasks-evidence.md` (TASK-01 bis TASK-07, TASK-09; D-32-11, D-32-12)
 - [x] 32-08-PLAN.md: gemeinsame Abnahme in der Tasks-App per Playwright, Owner-Checkpoint zum Push, CI-Lauf beider Beine (TASK-05, TASK-07; D-32-11, D-32-13)
-- [ ] 32-09-PLAN.md: Lücken nach der Verifikation (gap closure): Messung der Freigabe eigener Listen und der Provider-subline auf 35 und 32, subline und text ohne Besitzer (D-32-17), hinausgeteilte eigene Liste ohne `list` nicht beschreiben (D-32-18), `fetch` mit Kürzungsvermerk und Schwebe-Kennzeichen (W2), Beschreibung von `query` (W3), nicht gemessene Teile im Beleg (W4), Live-Beweis, Owner-Frage zum Push (TASK-02, TASK-05 bis TASK-07, TASK-09)
+- [x] 32-09-PLAN.md: Lücken nach der Verifikation (gap closure): Messung der Freigabe eigener Listen und der Provider-subline auf 35 und 32, subline und text ohne Besitzer (D-32-17), hinausgeteilte eigene Liste ohne `list` nicht beschreiben (D-32-18), `fetch` mit Kürzungsvermerk und Schwebe-Kennzeichen (W2), Beschreibung von `query` (W3), nicht gemessene Teile im Beleg (W4), Live-Beweis, Owner-Frage zum Push (TASK-02, TASK-05 bis TASK-07, TASK-09); ausgeführt 2026-11-13 bis zur Push-Frage, die offen ist
 
 **Abtrennbar**: TASK-09 (`task:`-Id über `fetch` und Provider) ist ein eigener Plan und nur per Owner-Entscheid verschiebbar
 
@@ -286,7 +286,7 @@ Plans:
 | 29. Prüfkommando und Doku | v1.7 | 9/9 | Complete    | 2026-10-01 |
 | 30. Mess-Spike Aufgaben und Ordner | v1.8 | 5/5 | Complete    | 2026-11-12 |
 | 31. Ordner anlegen | v1.8 | 0/6 | Planned | - |
-| 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 10/10 | Human Needed | - |
+| 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 11/11 | Human Needed | - |
 | 33. Aufgaben ändern | v1.8 | 0/TBD | Not started | - |
 | 34. Doku, Store, Release 0.8.0 | v1.8 | 0/TBD | Not started | - |
 
