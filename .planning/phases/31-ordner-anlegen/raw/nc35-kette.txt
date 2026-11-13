@@ -1,0 +1,519 @@
+Rohprotokoll Plan 31-07, Teil A: files_create_folder als ganze Kette auf Nextcloud 35
+====================================================================================
+Datum: 2026-11-13 (UTC). Strecke: compose.nc35.yml (nc35-nc, nc35-harp, nc35-caddy, nc_app_mcp_connector).
+Kette: MCP-Client des SDK (scripts/oauth_flow_check.py, geladen von scripts/folder_chain_evidence.py)
+  -> http://127.0.0.1:8082 (Caddy) -> HaRP -> ExApp-Container -> Nextcloud (AppAPI-Impersonation).
+Anmeldung: OAuth-Fluss des Connectors (Registrierung, PKCE, Anmeldung, Zustimmung, Codetausch), Konto alice.
+Jede Ausgabe ging zuerst in eine Zwischendatei außerhalb des Repos und wurde gegen die Werte der
+Env-Dateien geprüft. <scratch> steht für dieses Verzeichnis; Token liegen nur dort.
+Hilfsskripte im Scratchpad (nicht im Repo): step.sh ruft folder_chain_evidence.py call, liest danach
+die neuen Audit-Zeilen (occ mcp_connector:audit:read) und prüft das Dateisystem (docker exec nc35-nc
+test -d); dav.sh schickt eine DAV-Anfrage mit dem App-Passwort des Kontos (auth=basic) als Gegenprobe.
+Form einer Audit-Zeile: seq - Zeit - Kette - Werkzeug - Client - ... - Ausgang - Kennung - Dauer ms -
+Namen der gesetzten Parameter. Werte von Parametern stehen nie darin.
+
+(1) Stand vor dem Update
+------------------------
+$ date -u +%Y-%m-%dT%H:%M:%SZ; git rev-parse HEAD; docker exec --user www-data nc35-nc php occ status | grep version; docker exec --user www-data nc35-nc php occ app_api:app:list; docker exec --user www-data nc35-nc php occ app:list --output=json | tr ',' '\n' | grep -E '"(app_api|groupfolders|files_external|systemtags)"'
+2026-11-13T02:56:40Z
+dccb134b08967c388a7b0754efc96fdf1ecee5e9
+  - version: 35.0.0.10
+  - versionstring: 35.0.0
+ExApps:
+mcp_connector (MCP Connector): 0.3.2 [enabled]
+"app_api":"35.0.0"
+"systemtags":"2.0.0-dev.0"
+"files_external":"2.0.0-dev.0"
+(exit=0)
+$ docker inspect nc_app_mcp_connector --format 'container={{.Name}} image={{.Config.Image}} image_id={{.Image}} created={{.Created}} netz={{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}} mounts={{range .Mounts}}{{.Name}}:{{.Destination}} {{end}}'; docker image inspect 127.0.0.1:5000/mcp_connector:0.3.2 --format 'repo_digests={{.RepoDigests}}'
+container=/nc_app_mcp_connector image=127.0.0.1:5000/mcp_connector:0.3.2 image_id=sha256:08e87ea24503afee1ec7edd89657451e8c243d664ec32edabceca75211a44457 created=2026-10-01T11:26:20.06248479Z netz=nc-mcp-nc35-net mounts=nc_app_mcp_connector_data:/nc_app_mcp_connector_data 
+repo_digests=[127.0.0.1:5000/mcp_connector@sha256:08e87ea24503afee1ec7edd89657451e8c243d664ec32edabceca75211a44457]
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ mcp_connector:audit:read --help 2>&1 | head -40
+Description:
+  Read the audit log of this instance and hand it over: which account ran which tool, when, through which app, and whether the call was carried out or refused. No parameter value and no part of a result is written down, so none can be printed here either.
+
+Usage:
+  mcp_connector:audit:read [options]
+  mcp_connector:audit:read
+  mcp_connector:audit:read --user=alice --limit=50
+  mcp_connector:audit:read --since=7 --json
+
+Options:
+      --user[=USER]     Read the entries of one Nextcloud account only, named by its user id, or of the instance itself with the word instance, or the refused token exchange attempts of this instance with the word refusals. Those two words are the ones here that are not accounts. Without this option every account is read.
+      --since[=SINCE]   How many whole days back to read, counted from the moment of the call. Days and never a date, because a number can be checked before it is used. At most 3650, which is also the window a value this app cannot read as a number falls back to.
+      --limit[=LIMIT]   How many entries at most, newest first. Without it 200 are read, and 5000 is the ceiling whatever number is given. Every answer names the ceiling it applied, so a part of the log cannot be mistaken for the whole of it.
+      --json            Hand the same entries over as one JSON document, in the order of the chain, for a script that keeps them or checks them. Its first key says whether the read happened, because the exit code of this command is always 0.
+  -h, --help            Display help for the given command. When no command is given display help for the list command
+      --silent          Do not output any message
+  -q, --quiet           Only errors are displayed. All other output is suppressed
+  -V, --version         Display this application version
+      --ansi|--no-ansi  Force (or disable --no-ansi) ANSI output
+  -n, --no-interaction  Do not ask any interactive question
+      --no-warnings     Skip global warnings, show command output only
+  -v|vv|vvv, --verbose  Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ mcp_connector:audit:verify 2>&1 | head -20
+checked 5 chains with 621 entries
+chains verified, no break found
+0 tombstones in the instance chain, explaining 0 entries that were removed
+This check finds an entry that was changed or removed unnoticed. It does not find somebody who can write this file, because whoever can write it can recompute the chain behind the change.
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ mcp_connector:audit:read --json --limit=5000 | grep -o '"seq"' | wc -l; docker exec --user www-data nc35-nc php occ mcp_connector:audit:read --limit=3
+621
+3 entries, newest first, at most 3 per read
+621 - 2026-10-01T05:06:22Z - i:instance - - - - - unknown - off - - - - - - - -
+620 - 2026-10-01T02:56:07Z - i:instance - - - - - unknown - on - - - - - - - -
+619 - 2026-09-30T04:00:46Z - u:admin - files_list - n8n MCP Client - - - ok - - - 215 - path - -
+This read stops at the number of entries the first line names, and asking for more costs one option. It says nothing about whether the chain behind these entries is unbroken, which is what occ mcp_connector:audit:verify answers.
+(exit=0)
+$ folder_chain_evidence.py connect --token-file <scratch>/alt.json   (alter Stand 0.3.2)
+[connect] POST /register -> 201 | cache_control=no-store | client_id=c7b1627f-626...
+VERBINDUNG nutzer=alice weg=oauth ergebnis=ok
+(exit=0)
+$ folder_chain_evidence.py tools --token-file <scratch>/alt.json
+WERKZEUGE nutzer=alice anzahl=22 files_create_folder=nein
+WERKZEUGE namen=calendar_create_event,calendar_list_events,contacts_search,deck_browse,deck_create_card,fetch,files_download,files_list,files_read,files_search,files_upload,mail_browse,notes_create,notes_read,notes_search,prepare_context,search,tables_browse,tables_create_row,talk_browse,talk_send,unified_search
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ app_api:app:config:get mcp_connector audit_log; docker exec --user www-data nc35-nc php occ app_api:app:config:list mcp_connector 2>&1 | cut -c1-60 | sed -E 's/(: ).*/\1<wert nicht protokolliert>/' | head -30
+ExApp mcp_connector config audit_log not found
+ExApp mcp_connector configs:
+{
+    "mcp_connector": <wert nicht protokolliert>
+        "oauth_data_key": <wert nicht protokolliert>
+    }
+}
+(exit=0)
+BASELINE-AUSGANG (vor jedem Schritt dieses Plans):
+dateien_alice=283
+papierkorb_alice=0
+kontingent_alice=The setting does not exist for user "alice".
+tags=[]
+freigaben_alice=3
+gruppen={"admin":["admin"]}
+gruppenordner_verzeichnisse=0
+
+(2) Update: Registry, unregister ohne --rm-data, bootstrap_exapp.sh --nc35
+---------------------------------------------------------------------------
+$ docker exec --user www-data nc35-nc php occ app_api:app:unregister --help | sed -n 1,25p
+Description:
+  Unregister external app
+
+Usage:
+  app_api:app:unregister [options] [--] <appid>
+  app_api:app:unregister test_app
+  app_api:app:unregister test_app --silent
+  app_api:app:unregister test_app --rm-data
+  app_api:app:unregister test_app --silent --force --rm-data
+
+Arguments:
+  appid                 
+
+Options:
+      --silent          Do not output any message
+      --force           Continue removal even if errors.
+      --keep-data       Keep ExApp data (volume) [deprecated, data is kept by default].
+      --rm-data         Remove ExApp data (persistent storage volume).
+  -h, --help            Display help for the given command. When no command is given display help for the list command
+  -q, --quiet           Only errors are displayed. All other output is suppressed
+  -V, --version         Display this application version
+      --ansi|--no-ansi  Force (or disable --no-ansi) ANSI output
+  -n, --no-interaction  Do not ask any interactive question
+      --no-warnings     Skip global warnings, show command output only
+  -v|vv|vvv, --verbose  Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ app_api:app:update --help | sed -n 1,30p
+Description:
+  Update ExApp
+
+Usage:
+  app_api:app:update [options] [--] [<appid>]
+
+Arguments:
+  appid                      Update the specified app
+
+Options:
+      --info-xml=INFO-XML    Path to ExApp info.xml file (url or local absolute path)
+      --json-info=JSON-INFO  ExApp info.xml in JSON format
+      --force-scopes         Force new ExApp scopes approval[deprecated]
+      --wait-finish          Wait until finish
+      --silent               Do not output any message
+      --all                  Updates all enabled and updatable apps
+      --showonly             Additional flag for "--all" to only show all updatable apps
+      --include-disabled     Additional flag for "--all" to also update disabled apps
+  -h, --help                 Display help for the given command. When no command is given display help for the list command
+  -q, --quiet                Only errors are displayed. All other output is suppressed
+  -V, --version              Display this application version
+      --ansi|--no-ansi       Force (or disable --no-ansi) ANSI output
+  -n, --no-interaction       Do not ask any interactive question
+      --no-warnings          Skip global warnings, show command output only
+  -v|vv|vvv, --verbose       Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug
+(exit=0)
+$ powershell -NoProfile -Command '(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory'; docker stats --no-stream --format '{{.Name}} {{.MemUsage}}'
+5479180
+gameworld-dev-gameworld-docker-proxy-1 28.66MiB / 5.786GiB
+nc_app_mcp_connector 90.14MiB / 5.786GiB
+nc35-greenmail 117.1MiB / 5.786GiB
+nc35-caddy 11.5MiB / 5.786GiB
+nc35-harp 75.25MiB / 5.786GiB
+nc35-nc 211.7MiB / 5.786GiB
+(exit=0)
+$ docker start nc-mcp-exapp-registry; sleep 3; docker ps --filter name=nc-mcp-exapp --format '{{.Names}} {{.Status}} {{.Ports}}'; curl -s http://127.0.0.1:5000/v2/mcp_connector/tags/list
+nc-mcp-exapp-registry
+nc-mcp-exapp-registry Up 3 seconds 127.0.0.1:5000->5000/tcp
+{"errors":[{"code":"NAME_UNKNOWN","message":"repository name not known to registry","detail":{"name":"mcp_connector"}}]}
+(exit=0)
+$ git status --short | wc -l; git diff --stat HEAD -- src pyproject.toml uv.lock Dockerfile entrypoint.sh start.sh healthcheck.sh | wc -l; docker buildx build --platform linux/amd64 --load -t 127.0.0.1:5000/mcp_connector:0.7.2 . 2>&1 | tail -12; docker image inspect 127.0.0.1:5000/mcp_connector:0.7.2 --format 'image_id={{.Id}} created={{.Created}}'
+0
+0
+#22 exporting layers 3.6s done
+#22 exporting manifest sha256:9ca2d0f64ada062a0b4339ca17c79809be085289651da72dfde4b16c8a41e679 0.0s done
+#22 exporting config sha256:cf61f681b7e4162d3805788ffe4ba8ae8501c63462a3503418c5cfadfaedc705 0.0s done
+#22 exporting attestation manifest sha256:38ee75193b1b82a481c6cd2e455a1b9493a0170dddd822e4589290775f03e127 0.0s done
+#22 exporting manifest list sha256:7952f829d81a90fe0ded54e10d2af5abf952a62e5e90103a88d06e88a905af7d
+#22 exporting manifest list sha256:7952f829d81a90fe0ded54e10d2af5abf952a62e5e90103a88d06e88a905af7d 0.0s done
+#22 naming to 127.0.0.1:5000/mcp_connector:0.7.2 done
+#22 unpacking to 127.0.0.1:5000/mcp_connector:0.7.2
+#22 unpacking to 127.0.0.1:5000/mcp_connector:0.7.2 1.3s done
+#22 DONE 5.1s
+
+View build details: docker-desktop://dashboard/build/desktop-linux/desktop-linux/ptwebiahg5lep39wdhkbam05n
+image_id=sha256:7952f829d81a90fe0ded54e10d2af5abf952a62e5e90103a88d06e88a905af7d created=2026-11-13T03:00:15.592326944Z
+(exit=0)
+$ date -u +%Y-%m-%dT%H:%M:%SZ; docker exec --user www-data nc35-nc php occ app_api:app:unregister mcp_connector; docker exec --user www-data nc35-nc php occ app_api:app:list; docker ps -a --filter name=nc_app_mcp_connector --format '{{.Names}} {{.Image}} {{.Status}}'; docker volume ls --format '{{.Name}}' | grep nc_app_mcp_connector; docker exec --user www-data nc35-nc php occ app_api:app:config:list mcp_connector 2>&1 | cut -c1-60 | sed -E 's/("[a-z_]+": ).*/\1<wert nicht protokolliert>/'
+2026-11-13T03:00:35Z
+ExApp mcp_connector successfully disabled.
+ExApp mcp_connector successfully removed
+ExApp mcp_connector successfully unregistered.
+ExApps:
+nc_app_mcp_connector_data
+ExApp mcp_connector not found.
+(exit=0)
+$ export HP_SHARED_KEY=<aus .env.nc35>; bash scripts/bootstrap_exapp.sh --nc35
+== ExApp topology bootstrap ==
+nextcloud: installed
+app notes: enabled
+app deck: enabled
+app tables: enabled
+app mail: enabled
+app spreed: enabled
+user alice: exists
+user bob: exists
+mail account alice: exists on greenmail:3143 (id 1)
+test mails alice: delivered 6 over greenmail:3025
+test mails alice: keyword $label1 on message 4: OK
+mail sync alice: account 1 synchronised
+calendar alice/personal: present (attempt 1)
+addressbook alice/contacts: already there
+calendar bob/personal: present (attempt 1)
+files home alice: initialised
+files home bob: initialised
+share folder /mcp-share-a6cd5d25e3: already there
+file alice/mcp-share-a6cd5d25e3/mcp-shared-file-a6cd5d25e3.md: already there
+file alice/mcp-private-a6cd5d25e3.md: already there
+share auto accept: on (test instance)
+read-only share /mcp-share-a6cd5d25e3 to bob: present (attempt 1)
+talk conversation MCP-Talk-offen-Grüße-aus-Hamburg: exists (2uqkjpn2)
+talk conversation MCP-Talk-offen-Grüße-aus-Hamburg: readonly=0
+talk conversation MCP-Talk-nurlesen-Straße-ohne-Ausgang: exists (hbkwbtyk)
+talk conversation MCP-Talk-nurlesen-Straße-ohne-Ausgang: readonly=1
+bruteforce protection: disabled (test instance)
+rate limit protection: disabled (test instance)
+app app_api: enabled
+daemon harp_proxy_docker: exists
+image 127.0.0.1:5000/mcp_connector:0.7.2: built and pushed (sha256:cf01fc50812e4e0c89c713a9cd6866ca0274942ef85ab9b23ba949977a4c21d0)
+image digest sha256:cf01fc50812e4e0c89c713a9cd6866ca0274942ef85ab9b23ba949977a4c21d0: unchanged since the push
+exapp mcp_connector: registered and deployed
+exapp mcp_connector: enabled
+app passwords: created for alice and bob
+wrote .env.nc35
+
+== verification ==
+Registered ExApp daemon configs:
++-----+-------------------+---------------------+----------------+----------+----------------------------+--------------+---------+------------------+-------------------------+
+| Def | Name              | Display name        | Deploy ID      | Protocol | Host                       | NC Url       | Is HaRP | HaRP FRP Address | HaRP Docker Socket Port |
++-----+-------------------+---------------------+----------------+----------+----------------------------+--------------+---------+------------------+-------------------------+
+|     | manual_install    | Manual Install      | manual-install | http     | host.docker.internal:23011 | http://caddy | no      | (none)           | (none)                  |
+| *   | harp_proxy_docker | Harp Proxy (Docker) | docker-install | http     | appapi-harp:8780           | http://caddy | yes     | appapi-harp:8782 | 24000                   |
++-----+-------------------+---------------------+----------------+----------+----------------------------+--------------+---------+------------------+-------------------------+
+ExApps:
+mcp_connector (MCP Connector): 0.7.2 [enabled]
+
+Ready. The app answers under:
+  http://127.0.0.1:8082/exapps/mcp_connector/mcp
+(exit=0)
+
+(3) Stand nach dem Update, alte Verbindung, Audit-Schalter für die Messung
+--------------------------------------------------------------------------
+$ date -u +%Y-%m-%dT%H:%M:%SZ; docker exec --user www-data nc35-nc php occ app_api:app:list; docker inspect nc_app_mcp_connector --format 'container={{.Name}} image={{.Config.Image}} image_id={{.Image}} created={{.Created}} status={{.State.Status}} netz={{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}} mounts={{range .Mounts}}{{.Name}}:{{.Destination}} {{end}}'; docker image inspect 127.0.0.1:5000/mcp_connector:0.7.2 --format 'repo_digests={{.RepoDigests}}'; curl -s http://127.0.0.1:5000/v2/mcp_connector/tags/list; echo; grep -E '^APP_VERSION=' .env.nc35; cmp -s <(sed -n 's/^APP_SECRET=//p' .env.nc35) <(sed -n 's/^APP_SECRET=//p' C:/Users/Student/nextcloud-mcp-connector/.env.nc35) && echo 'APP_SECRET gleich dem der Datei vor dem Lauf=ja' || echo 'APP_SECRET gleich=nein'
+2026-11-13T03:01:54Z
+ExApps:
+mcp_connector (MCP Connector): 0.7.2 [enabled]
+container=/nc_app_mcp_connector image=127.0.0.1:5000/mcp_connector:0.7.2 image_id=sha256:cf01fc50812e4e0c89c713a9cd6866ca0274942ef85ab9b23ba949977a4c21d0 created=2026-11-13T03:01:24.34086982Z status=running netz=nc-mcp-nc35-net mounts=nc_app_mcp_connector_data:/nc_app_mcp_connector_data 
+repo_digests=[127.0.0.1:5000/mcp_connector@sha256:cf01fc50812e4e0c89c713a9cd6866ca0274942ef85ab9b23ba949977a4c21d0]
+{"name":"mcp_connector","tags":["0.7.2"]}
+
+APP_VERSION=0.7.2
+APP_SECRET gleich dem der Datei vor dem Lauf=ja
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ mcp_connector:audit:verify 2>&1 | head -3; docker exec --user www-data nc35-nc php occ mcp_connector:audit:read --limit=3 | head -5; docker exec --user www-data nc35-nc php occ app_api:app:config:list mcp_connector 2>&1 | cut -c1-60 | sed -E 's/("[a-z_]+": ).*/\1<wert nicht protokolliert>/'
+checked 5 chains with 621 entries
+chains verified, no break found
+0 tombstones in the instance chain, explaining 0 entries that were removed
+3 entries, newest first, at most 3 per read
+621 - 2026-10-01T05:06:22Z - i:instance - - - - - unknown - off - - - - - - - -
+620 - 2026-10-01T02:56:07Z - i:instance - - - - - unknown - on - - - - - - - -
+619 - 2026-09-30T04:00:46Z - u:admin - files_list - n8n MCP Client - - - ok - - - 215 - path - -
+This read stops at the number of entries the first line names, and asking for more costs one option. It says nothing about whether the chain behind these entries is unbroken, which is what occ mcp_connector:audit:verify answers.
+ExApp mcp_connector configs:
+{
+    "mcp_connector": <wert nicht protokolliert>
+        "oauth_data_key": <wert nicht protokolliert>
+    }
+}
+(exit=0)
+$ folder_chain_evidence.py tools --token-file <scratch>/alt.json   (Verbindung von vor dem Update)
+WERKZEUGE nutzer=alice anzahl=24 files_create_folder=ja
+WERKZEUGE namen=calendar_create_event,calendar_list_events,contacts_search,deck_browse,deck_create_card,fetch,files_create_folder,files_download,files_list,files_read,files_read_as_markdown,files_search,files_upload,mail_browse,notes_create,notes_read,notes_search,prepare_context,search,tables_browse,tables_create_row,talk_browse,talk_send,unified_search
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ app_api:app:config:set mcp_connector audit_log --value yes 2>&1 | cut -c1-200; docker restart nc_app_mcp_connector; for i in $(seq 1 30); do c=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8082/exapps/mcp_connector/.well-known/oauth-protected-resource/mcp); [ "$c" = 200 ] && break; sleep 2; done; echo prm=$c; sleep 3; docker exec --user www-data nc35-nc php occ mcp_connector:audit:read --limit=2 | sed -n 1,3p
+ExApp mcp_connector config audit_log set to yes 
+nc_app_mcp_connector
+prm=200
+2 entries, newest first, at most 2 per read
+622 - 2026-11-13T03:02:22Z - i:instance - - - - - unknown - on - - - - - - - -
+621 - 2026-10-01T05:06:22Z - i:instance - - - - - unknown - off - - - - - - - -
+(exit=0)
+
+(4) Aufbau für die Aufrufe (Lauf-Präfix, getaggter Ordner)
+----------------------------------------------------------
+$ date -u +%Y-%m-%dT%H:%M:%SZ; <scratch>/dav.sh alice MKCOL kette31-d20e956d; <scratch>/dav.sh alice MKCOL kette31-d20e956d/gesperrt; <scratch>/dav.sh alice MKCOL kette31-d20e956d/offen; <scratch>/dav.sh alice PROPFIND kette31-d20e956d/gesperrt
+2026-11-13T03:06:45Z
+MKCOL /kette31-d20e956d auth=basic nutzer=alice status=201
+MKCOL /kette31-d20e956d/gesperrt auth=basic nutzer=alice status=201
+MKCOL /kette31-d20e956d/offen auth=basic nutzer=alice status=201
+PROPFIND /kette31-d20e956d/gesperrt auth=basic nutzer=alice status=207 fileid=23780 permissions=RGDNVCK
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ tag:add kein-ki public --output=json; echo; docker exec --user www-data nc35-nc php occ tag:files:add 23780 kein-ki public; docker exec --user www-data nc35-nc php occ tag:list --output=json
+{"id":"253","name":"kein-ki","access":"public"}
+
+public tag named kein-ki added.
+{"253":{"name":"kein-ki","access":"public"}}
+(exit=0)
+
+(5) Die Aufrufe über die Kette
+------------------------------
+$ folder_chain_evidence.py connect --token-file <scratch>/neu.json   (neuer Stand 0.7.2)
+[connect] POST /register -> 201 | cache_control=no-store | client_id=51052289-5d2...
+VERBINDUNG nutzer=alice weg=oauth ergebnis=ok
+(exit=0)
+$ folder_chain_evidence.py tools --token-file <scratch>/neu.json
+WERKZEUGE nutzer=alice anzahl=24 files_create_folder=ja
+WERKZEUGE namen=calendar_create_event,calendar_list_events,contacts_search,deck_browse,deck_create_card,fetch,files_create_folder,files_download,files_list,files_read,files_read_as_markdown,files_search,files_upload,mail_browse,notes_create,notes_read,notes_search,prepare_context,search,tables_browse,tables_create_row,talk_browse,talk_send,unified_search
+(exit=0)
+$ step frei
+KETTE frei nutzer=alice argumente={"path": "/kette31-d20e956d/frei"} fehler=nein | {"created": true, "id": "file:23782", "path": "/kette31-d20e956d/frei"}
+  exit=0
+  AUDIT frei neue_zeilen=1 (seq 622 -> 623)
+  AUDIT 623 - 2026-11-13T03:07:20Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 183 - path - -
+  DATEISYSTEM frei test -d '/var/www/html/data/alice/files/kette31-d20e956d/frei' = ja
+PROPFIND /kette31-d20e956d/frei auth=basic nutzer=alice status=207 fileid=23782 permissions=RGDNVCK
+(exit=0)
+$ step vorhanden
+KETTE vorhanden nutzer=alice argumente={"path": "/kette31-d20e956d/frei"} fehler=nein | {"created": false, "id": "file:23782", "path": "/kette31-d20e956d/frei"}
+  exit=0
+  AUDIT vorhanden neue_zeilen=1 (seq 623 -> 624)
+  AUDIT 624 - 2026-11-13T03:07:27Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 132 - path - -
+  DATEISYSTEM vorhanden test -d '/var/www/html/data/alice/files/kette31-d20e956d/frei' = ja
+PROPFIND /kette31-d20e956d/frei auth=basic nutzer=alice status=207 fileid=23782 permissions=RGDNVCK
+(exit=0)
+$ step kette
+KETTE kette nutzer=alice argumente={"parents": true, "path": "/kette31-d20e956d/k/a/b"} fehler=nein | {"created": true, "created_folders": ["/kette31-d20e956d/k", "/kette31-d20e956d/k/a", "/kette31-d20e956d/k/a/b"], "id": "file:23785", "path": "/kette31-d20e956d/k/a/b"}
+  exit=0
+  AUDIT kette neue_zeilen=1 (seq 624 -> 625)
+  AUDIT 625 - 2026-11-13T03:07:46Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 487 - parents,path - -
+  DATEISYSTEM kette test -d '/var/www/html/data/alice/files/kette31-d20e956d/k' = ja
+  DATEISYSTEM kette test -d '/var/www/html/data/alice/files/kette31-d20e956d/k/a' = ja
+  DATEISYSTEM kette test -d '/var/www/html/data/alice/files/kette31-d20e956d/k/a/b' = ja
+PROPFIND /kette31-d20e956d/k/a/b auth=basic nutzer=alice status=207 fileid=23785 permissions=RGDNVCK
+(exit=0)
+$ step kein-ki
+KETTE kein-ki nutzer=alice argumente={"path": "/kette31-d20e956d/gesperrt/neu"} fehler=ja | Error executing tool files_create_folder: The parent folder /kette31-d20e956d/gesperrt of /kette31-d20e956d/gesperrt/neu does not exist. Hint: Create the missing folder first, in Nextcloud or with files_create_folder where that tool is offered (parents=true creates the whole chain), and check that no file stands in the path.
+  exit=0
+  AUDIT kein-ki neue_zeilen=1 (seq 625 -> 626)
+  AUDIT 626 - 2026-11-13T03:07:54Z - u:alice - files_create_folder - OAuth flow check - - - rejected - unknown_id - 45 - path - -
+  DATEISYSTEM kein-ki test -d '/var/www/html/data/alice/files/kette31-d20e956d/gesperrt' = ja
+  DATEISYSTEM kein-ki test -d '/var/www/html/data/alice/files/kette31-d20e956d/gesperrt/neu' = nein
+(exit=0)
+$ step kein-ki-kontrolle
+KETTE kein-ki-kontrolle nutzer=alice argumente={"path": "/kette31-d20e956d/offen/neu"} fehler=nein | {"created": true, "id": "file:23786", "path": "/kette31-d20e956d/offen/neu"}
+  exit=0
+  AUDIT kein-ki-kontrolle neue_zeilen=1 (seq 626 -> 627)
+  AUDIT 627 - 2026-11-13T03:08:02Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 137 - path - -
+  DATEISYSTEM kein-ki-kontrolle test -d '/var/www/html/data/alice/files/kette31-d20e956d/offen/neu' = ja
+(exit=0)
+$ step leerraum
+KETTE leerraum nutzer=alice argumente={"path": "/kette31-d20e956d/ende-leer "} fehler=ja | Error executing tool files_create_folder: The folder name 'ende-leer ' in '/kette31-d20e956d/ende-leer ' starts or ends with whitespace. Hint: Remove the whitespace at the start and the end of every folder name and call again; nothing was created.
+  exit=0
+  AUDIT leerraum neue_zeilen=1 (seq 627 -> 628)
+  AUDIT 628 - 2026-11-13T03:08:09Z - u:alice - files_create_folder - OAuth flow check - - - rejected - unspecified - 0 - path - -
+  DATEISYSTEM leerraum test -d '/var/www/html/data/alice/files/kette31-d20e956d/ende-leer ' = nein
+  DATEISYSTEM leerraum test -d '/var/www/html/data/alice/files/kette31-d20e956d/ende-leer' = nein
+  DATEISYSTEM ls -1A [frei]
+  DATEISYSTEM ls -1A [gesperrt]
+  DATEISYSTEM ls -1A [k]
+  DATEISYSTEM ls -1A [offen]
+(exit=0)
+
+(6) Rückbau und Baseline
+------------------------
+$ date -u +%Y-%m-%dT%H:%M:%SZ; docker exec --user www-data nc35-nc php occ tag:delete 253; docker exec --user www-data nc35-nc php occ tag:list --output=json; docker exec --user www-data nc35-nc rm -rf /var/www/html/data/alice/files/kette31-d20e956d && echo 'rm -rf /var/www/html/data/alice/files/kette31-d20e956d -> entfernt'; docker exec --user www-data nc35-nc php occ files:scan --path=/alice/files --quiet; echo scan_exit=$?; <scratch>/dav.sh alice PROPFIND kette31-d20e956d
+2026-11-13T03:08:29Z
+The specified tag was deleted
+[]
+rm -rf /var/www/html/data/alice/files/kette31-d20e956d -> entfernt
+scan_exit=0
+PROPFIND /kette31-d20e956d auth=basic nutzer=alice status=404 exception=Sabre\DAV\Exception\NotFound
+(exit=0)
+BASELINE dateien_alice vorher=283 nachher=283 gleich=ja
+BASELINE papierkorb_alice vorher=0 nachher=0 gleich=ja
+BASELINE kontingent_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
+BASELINE tags vorher=[] nachher=[] gleich=ja
+BASELINE freigaben_alice vorher=3 nachher=3 gleich=ja
+BASELINE gruppen vorher={"admin":["admin"]} nachher={"admin":["admin"]} gleich=ja
+BASELINE gruppenordner_verzeichnisse vorher=0 nachher=0 gleich=ja
+
+(7) Abschluss nach Teil B: Audit-Schalter zurück, Kette geprüft, Strecke gestoppt
+---------------------------------------------------------------------------------
+$ date -u +%Y-%m-%dT%H:%M:%SZ; docker exec --user www-data nc35-nc php occ app_api:app:config:delete mcp_connector audit_log 2>&1 | cut -c1-200; docker exec --user www-data nc35-nc php occ app_api:app:config:get mcp_connector audit_log; docker restart nc_app_mcp_connector; for i in $(seq 1 30); do c=$(curl -s -m 5 -o /dev/null -w '%{http_code}' http://127.0.0.1:8082/exapps/mcp_connector/.well-known/oauth-protected-resource/mcp); [ "$c" = 200 ] && break; sleep 2; done; echo prm=$c; sleep 5; docker exec --user www-data nc35-nc php occ mcp_connector:audit:read --limit=2 | sed -n 1,3p; docker exec --user www-data nc35-nc php occ mcp_connector:audit:verify | head -2; docker exec --user www-data nc35-nc php occ mcp_connector:audit:read --user=alice --since=1 | grep -c files_create_folder; docker exec --user www-data nc35-nc php occ app_api:app:list
+2026-11-13T03:14:51Z
+ExApp mcp_connector config audit_log deleted.
+ExApp mcp_connector config audit_log not found
+nc_app_mcp_connector
+prm=200
+2 entries, newest first, at most 2 per read
+636 - 2026-11-13T03:14:54Z - i:instance - - - - - unknown - off - - - - - - - -
+635 - 2026-11-13T03:12:37Z - u:alice - files_create_folder - OAuth flow check - - - rejected - permission_denied - 86 - path - -
+checked 5 chains with 636 entries
+chains verified, no break found
+13
+ExApps:
+mcp_connector (MCP Connector): 0.7.2 [enabled]
+(exit=0)
+$ date -u +%Y-%m-%dT%H:%M:%SZ; docker stop nc_app_mcp_connector nc35-caddy nc35-harp nc35-nc; docker ps --format '{{.Names}} {{.Status}}'; docker ps -a --filter name=nc35 --filter name=nc_app_mcp_connector --filter name=nc-mcp-exapp-registry --format '{{.Names}} {{.Image}} {{.Status}}'; docker volume ls --format '{{.Name}}' | grep -E 'nc35|nc_app_mcp_connector|nc-mcp-exapp'
+2026-11-13T03:15:25Z
+nc_app_mcp_connector
+nc35-caddy
+nc35-harp
+nc35-nc
+gameworld-dev-gameworld-docker-proxy-1 Up 12 hours
+nc_app_mcp_connector 127.0.0.1:5000/mcp_connector:0.7.2 Exited (0) 1 second ago
+nc-mcp-exapp-registry registry:2 Exited (2) 5 minutes ago
+nc35-test-issuer caddy:2 Exited (0) 6 weeks ago
+nc35-greenmail greenmail/standalone:2.1.12 Exited (143) 5 minutes ago
+nc35-caddy caddy:2 Exited (0) 1 second ago
+nc35-harp ghcr.io/nextcloud/nextcloud-appapi-harp:release Exited (0) 1 second ago
+nc35-nc nextcloud:35.0.0-apache-local Exited (0) Less than a second ago
+nc-mcp-exapp_nextcloud-exapp-data
+nc-mcp-exapp_registry-exapp-data
+nc-mcp-nc35_nc35-harp-certs
+nc-mcp-nc35_nextcloud-nc35-data
+nc_app_mcp_connector_data
+(exit=0)
+BASELINE am Ende (nach Teil B, vor dem Stoppen):
+BASELINE dateien_alice vorher=283 nachher=283 gleich=ja
+BASELINE papierkorb_alice vorher=0 nachher=0 gleich=ja
+BASELINE kontingent_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
+BASELINE tags vorher=[] nachher=[] gleich=ja
+BASELINE freigaben_alice vorher=3 nachher=3 gleich=ja
+BASELINE gruppen vorher={"admin":["admin"]} nachher={"admin":["admin"]} gleich=ja
+BASELINE gruppenordner_verzeichnisse vorher=0 nachher=0 gleich=ja
+
+(8) Anhang: die Hilfsskripte des Laufs, wörtlich
+------------------------------------------------
+
+--- <scratch>/step.sh ---
+#!/usr/bin/env bash
+# step.sh LABEL CASE PATH PARENTS(0|1) TOKENFILE FSROOT [checkpath...]
+export MSYS_NO_PATHCONV=1
+cd C:/Users/Student/nextcloud-mcp-connector-worktrees/tasks-080
+set -a; . ./.env.nc35; set +a; export PYTHONPATH=src PYTHONUTF8=1
+label="$1"; case="$2"; path="$3"; parents="$4"; tok="$5"; fsroot="$6"; shift 6
+OCC='docker exec --user www-data nc35-nc php occ'
+seq0="$($OCC mcp_connector:audit:read --limit=1 | tr -d '\r' | sed -n 2p | cut -d' ' -f1)"
+args=(call --token-file "$tok" --label "$label" --case "$case" --path "$path")
+[ "$parents" = 1 ] && args+=(--parents)
+uv run --no-sync python scripts/folder_chain_evidence.py "${args[@]}"
+echo "  exit=$?"
+sleep 1
+seq1="$($OCC mcp_connector:audit:read --limit=1 | tr -d '\r' | sed -n 2p | cut -d' ' -f1)"
+neu=$((seq1-seq0))
+echo "  AUDIT $case neue_zeilen=$neu (seq $seq0 -> $seq1)"
+if [ "$neu" -gt 0 ]; then $OCC mcp_connector:audit:read --limit="$neu" | tr -d '\r' | sed -n "2,$((neu+1))p" | sed 's/^/  AUDIT /'; fi
+for p in "$@"; do
+  if docker exec nc35-nc test -d "$fsroot/$p"; then r=ja; else r=nein; fi
+  echo "  DATEISYSTEM $case test -d '$fsroot/$p' = $r"
+done
+
+--- <scratch>/stepb.sh ---
+#!/usr/bin/env bash
+# stepb.sh CASE PATH PARENTS(0|1) TOKENFILE FSROOT [checkpath...] : like step.sh, plus the access log of Nextcloud.
+export MSYS_NO_PATHCONV=1
+cd C:/Users/Student/nextcloud-mcp-connector-worktrees/tasks-080
+set -a; . ./.env.nc35; set +a; export PYTHONPATH=src PYTHONUTF8=1
+case="$1"; path="$2"; parents="$3"; tok="$4"; fsroot="$5"; shift 5
+OCC='docker exec --user www-data nc35-nc php occ'
+seq0="$($OCC mcp_connector:audit:read --limit=1 | tr -d '\r' | sed -n 2p | cut -d' ' -f1)"
+n0="$(docker logs nc35-nc 2>&1 | wc -l)"
+args=(call --token-file "$tok" --label GF --case "$case" --path "$path")
+[ "$parents" = 1 ] && args+=(--parents)
+uv run --no-sync python scripts/folder_chain_evidence.py "${args[@]}"
+echo "  exit=$?"
+sleep 1
+docker logs nc35-nc 2>&1 | tail -n +$((n0+1)) | tr -d '\r' | grep -E '/dav/(files|systemtags)' | grep -oE '[a-z-]+ \[[^]]*\] "[A-Z]+ [^"]*" [0-9]{3} [0-9]+ "[^"]*" "[^"]*"' | sed "s/^/  ZUGRIFFSLOG $case /"
+seq1="$($OCC mcp_connector:audit:read --limit=1 | tr -d '\r' | sed -n 2p | cut -d' ' -f1)"
+neu=$((seq1-seq0))
+echo "  AUDIT $case neue_zeilen=$neu (seq $seq0 -> $seq1)"
+if [ "$neu" -gt 0 ]; then $OCC mcp_connector:audit:read --limit="$neu" | tr -d '\r' | sed -n "2,$((neu+1))p" | sed 's/^/  AUDIT /'; fi
+for p in "$@"; do
+  if docker exec nc35-nc test -d "$fsroot/$p"; then r=ja; else r=nein; fi
+  echo "  DATEISYSTEM $case test -d '$fsroot/$p' = $r"
+done
+
+--- <scratch>/dav.sh ---
+#!/usr/bin/env bash
+# dav.sh USERVAR METHOD PATH : one DAV request as alice or bob with the app password (curl config on stdin).
+# Prints "<METHOD> <path> auth=basic nutzer=<u> status=<code> fileid=<oc:fileid> permissions=<oc:permissions> exception=<s:exception>"
+set -a; . C:/Users/Student/nextcloud-mcp-connector-worktrees/tasks-080/.env.nc35; set +a
+u="$1"; m="$2"; p="$3"
+pw="$NC_MCP_TEST_APP_PASSWORD"; [ "$u" = bob ] && pw="$NC_MCP_TEST_APP_PASSWORD2"
+enc="$(printf '%s' "$p" | sed 's/ /%20/g')"
+body=""
+if [ "$m" = PROPFIND ]; then body='<?xml version="1.0"?><d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns"><d:prop><oc:fileid/><oc:permissions/><d:resourcetype/></d:prop></d:propfind>'; fi
+out="$(printf 'user = "%s:%s"\n' "$u" "$pw" | curl -s -m 60 -K - -X "$m" -H 'Depth: 0' ${body:+-H 'Content-Type: application/xml' --data "$body"} -w '\nHTTPSTATUS=%{http_code}' "$NC_MCP_URL/remote.php/dav/files/$u/$enc")"
+code="$(printf '%s' "$out" | sed -n 's/^HTTPSTATUS=//p')"
+fid="$(printf '%s' "$out" | grep -o '<oc:fileid>[0-9-]*' | head -n1 | sed 's/.*>//')"
+perm="$(printf '%s' "$out" | grep -o '<oc:permissions>[A-Z]*' | head -n1 | sed 's/.*>//')"
+exc="$(printf '%s' "$out" | grep -o '<s:exception>[^<]*' | head -n1 | sed 's/.*>//')"
+echo "$m /$p auth=basic nutzer=$u status=$code${fid:+ fileid=$fid}${perm:+ permissions=$perm}${exc:+ exception=$exc}"
+
+--- <scratch>/baseline.sh ---
+#!/usr/bin/env bash
+# Prints the state of alice in five values; app password only through a curl config on stdin.
+set -a; . C:/Users/Student/nextcloud-mcp-connector-worktrees/tasks-080/.env.nc35; set +a
+B="$NC_MCP_URL"
+cfg() { printf 'user = "alice:%s"\n' "$NC_MCP_TEST_APP_PASSWORD"; }
+OCC='docker exec --user www-data nc35-nc php occ'
+n=$(cfg | curl -s -K - -X PROPFIND -H 'Depth: infinity' "$B/remote.php/dav/files/alice/" | grep -o '<d:response>' | wc -l)
+t=$(cfg | curl -s -K - -X PROPFIND -H 'Depth: 1' "$B/remote.php/dav/trashbin/alice/trash/" | grep -o '<d:response>' | wc -l)
+q=$($OCC user:setting alice files quota 2>&1 | tr -d '\r')
+tags=$($OCC tag:list --output=json 2>&1 | tr -d '\r')
+sh=$(cfg | curl -s -K - -H 'OCS-APIRequest: true' "$B/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json" | grep -o '"id":"[0-9]*"' | wc -l)
+gf=$(docker exec nc35-nc sh -c 'ls -1A /var/www/html/data/__groupfolders 2>/dev/null | wc -l')
+echo "dateien_alice=$((n-1))"
+echo "papierkorb_alice=$((t-1))"
+echo "kontingent_alice=$q"
+echo "tags=$tags"
+echo "freigaben_alice=$sh"
+echo "gruppen=$($OCC group:list --output=json 2>&1 | tr -d '\r')"
+echo "gruppenordner_verzeichnisse=$gf"

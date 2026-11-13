@@ -1,0 +1,253 @@
+Rohprotokoll Plan 31-07, Teil B: files_create_folder gegen einen Gruppenordner mit ACL
+======================================================================================
+Datum: 2026-11-13 (UTC). Dieselbe laufende Instanz wie in Teil A (raw/nc35-kette.txt): Nextcloud
+35.0.0.10, ExApp mcp_connector 0.7.2 aus dem Image dieses Standes, ganze Kette, Konto alice, dieselbe
+OAuth-Verbindung (<scratch>/neu.json). Das Rohprotokoll gleichen Namens im Ordner der Phase 30 ist
+eine andere Datei (roher MKCOL des Spike-Skripts) und unverändert.
+stepb.sh im Scratchpad arbeitet wie step.sh aus Teil A. Den Rohstatus der Anfragen des Werkzeugs
+zeigt das Zugriffslog der Nextcloud (docker logs nc35-nc): Zeilen mit dem User-Agent
+nextcloud-mcp-connector/0.1 stammen von der ExApp, Zeilen mit curl von der Gegenprobe dav.sh.
+Nur auf 35 gemessen; D-31-07 verlangt den Gruppenordner einmal.
+
+(1) Aufbau
+----------
+$ date -u +%Y-%m-%dT%H:%M:%SZ; powershell -NoProfile -Command '(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory'; docker ps --format '{{.Names}} {{.Status}}'; docker exec --user www-data nc35-nc php occ status | grep version; docker exec --user www-data nc35-nc php occ app_api:app:list
+2026-11-13T03:09:14Z
+4457628
+nc_app_mcp_connector Up 6 minutes (healthy)
+nc-mcp-exapp-registry Up 9 minutes
+gameworld-dev-gameworld-docker-proxy-1 Up 12 hours
+nc35-greenmail Up 13 minutes
+nc35-caddy Up 13 minutes
+nc35-harp Up 13 minutes (healthy)
+nc35-nc Up 13 minutes (healthy)
+  - version: 35.0.0.10
+  - versionstring: 35.0.0
+ExApps:
+mcp_connector (MCP Connector): 0.7.2 [enabled]
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ app:list --output=json | tr ',{' '\n\n' | grep -c '"groupfolders"'; docker exec --user www-data nc35-nc php occ groupfolders:list --output=json 2>&1 | head -3
+0
+
+                                                                  
+  There are no commands defined in the "groupfolders" namespace.  
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ app:install groupfolders; docker exec --user www-data nc35-nc php occ app:list --output=json | tr ',{' '\n\n' | grep '"groupfolders"'; docker exec --user www-data nc35-nc php occ groupfolders:list --output=json
+groupfolders 23.0.1 installed
+groupfolders enabled
+"groupfolders":"23.0.1"
+[]
+(exit=0)
+$ docker stop nc-mcp-exapp-registry nc35-greenmail
+nc-mcp-exapp-registry
+nc35-greenmail
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ group:add p3107grp; docker exec --user www-data nc35-nc php occ group:adduser p3107grp alice; docker exec --user www-data nc35-nc php occ groupfolders:create p3107gf
+Created group "p3107grp"
+user alice added
+3
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ groupfolders:group 3 p3107grp read write share delete; docker exec --user www-data nc35-nc php occ groupfolders:permissions 3 --enable; docker exec --user www-data nc35-nc php occ groupfolders:list --output=json | cut -c1-400
+[{"id":3,"quota":-3,"acl":true,"acl_default_no_permission":false,"groups":{"p3107grp":{"displayName":"p3107grp","permissions":31,"type":"group"}},"manage":[],"options":{"separate-storage":true},"team_circle_id":null,"size":0,"groups_list":{"p3107grp":31},"mountPoint":"p3107gf","rootId":23790,"storageId":36}]
+(exit=0)
+$ <scratch>/dav.sh alice PROPFIND p3107gf; <scratch>/dav.sh alice MKCOL p3107gf/rw; <scratch>/dav.sh alice MKCOL p3107gf/ro; <scratch>/dav.sh alice MKCOL p3107gf/rw/zu; docker exec nc35-nc sh -c 'ls -1A /var/www/html/data/__groupfolders/; ls -1AR /var/www/html/data/__groupfolders/3/files'
+PROPFIND /p3107gf auth=basic nutzer=alice status=207 fileid=23790 permissions=RMGDNVCK
+MKCOL /p3107gf/rw auth=basic nutzer=alice status=201
+MKCOL /p3107gf/ro auth=basic nutzer=alice status=201
+MKCOL /p3107gf/rw/zu auth=basic nutzer=alice status=201
+3
+/var/www/html/data/__groupfolders/3/files:
+ro
+rw
+
+/var/www/html/data/__groupfolders/3/files/ro:
+
+/var/www/html/data/__groupfolders/3/files/rw:
+zu
+
+/var/www/html/data/__groupfolders/3/files/rw/zu:
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ groupfolders:permissions --help | sed -n 1,22p
+Description:
+  Configure advanced permissions for a configured Team folder
+
+Usage:
+  groupfolders:permissions [options] [--] <folder_id> [<path> [<permissions>...]]
+
+Arguments:
+  folder_id              Id of the folder to configure
+  path                   The path within the folder to set permissions for
+  permissions            The permissions to set for the user or group as a white space separated list (ex: +read "-write"). Use "clear" to remove all permissions. Prepend the permission list with -- to allow parsing the - character.
+
+Options:
+  -e, --enable           Enable advanced permissions for the folder
+  -d, --disable          Disable advanced permissions for the folder
+  -m, --manage-add       Add manage permission for user or group
+  -r, --manage-remove    Remove manage permission for user or group
+  -u, --user=USER        The user to configure the permissions for
+  -g, --group=GROUP      The group to configure the permissions for
+  -c, --team=TEAM        The circle/team to configure the permissions for
+  -t, --test             Test the permissions for the set path
+      --output[=OUTPUT]  Output format (plain, json or json_pretty, default is plain) [default: "plain"]
+  -h, --help             Display help for the given command. When no command is given display help for the list command
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ groupfolders:permissions 3 --group p3107grp ro -- +read -write -create -delete; docker exec --user www-data nc35-nc php occ groupfolders:permissions 3 --user alice rw/zu -- +read -write -create -delete; docker exec --user www-data nc35-nc php occ groupfolders:permissions 3; docker exec --user www-data nc35-nc php occ groupfolders:permissions 3 --user alice --test ro; docker exec --user www-data nc35-nc php occ groupfolders:permissions 3 --user alice --test rw/zu; docker exec --user www-data nc35-nc php occ groupfolders:permissions 3 --user alice --test rw
++-------+----------------------------+---------------------------------+
+| Path  | User/Group                 | Permissions                     |
++-------+----------------------------+---------------------------------+
+| ro    | group: p3107grp (p3107grp) | +read, -write, -create, -delete |
+| rw/zu | user: alice (alice)        | +read, -write, -create, -delete |
++-------+----------------------------+---------------------------------+
++read, -write, -create, -delete, +share
++read, -write, -create, -delete, +share
++read, +write, +create, +delete, +share
+(exit=0)
+$ <scratch>/dav.sh alice PROPFIND p3107gf/rw; <scratch>/dav.sh alice PROPFIND p3107gf/ro; <scratch>/dav.sh alice PROPFIND p3107gf/rw/zu
+PROPFIND /p3107gf/rw auth=basic nutzer=alice status=207 fileid=23791 permissions=RMGDNVCK
+PROPFIND /p3107gf/ro auth=basic nutzer=alice status=207 fileid=23792 permissions=RMG
+PROPFIND /p3107gf/rw/zu auth=basic nutzer=alice status=207 fileid=23793 permissions=RMG
+(exit=0)
+
+(2) Messung
+-----------
+$ stepb rw-neu
+2026-11-13T03:10:47Z
+GF rw-neu nutzer=alice argumente={"path": "/p3107gf/rw/neu"} fehler=nein | {"created": true, "id": "file:23794", "path": "/p3107gf/rw/neu"}
+  exit=0
+  AUDIT rw-neu neue_zeilen=1 (seq 628 -> 629)
+  AUDIT 629 - 2026-11-13T03:10:50Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 144 - path - -
+  DATEISYSTEM rw-neu test -d '/var/www/html/data/__groupfolders/3/files/rw/neu' = ja
+PROPFIND /p3107gf/rw/neu auth=basic nutzer=alice status=207 fileid=23794 permissions=RMGDNVCK
+(exit=0)
+$ stepb rw-erneut
+GF rw-erneut nutzer=alice argumente={"path": "/p3107gf/rw/neu"} fehler=nein | {"created": false, "id": "file:23794", "path": "/p3107gf/rw/neu"}
+  exit=0
+  AUDIT rw-erneut neue_zeilen=1 (seq 629 -> 630)
+  AUDIT 630 - 2026-11-13T03:10:59Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 138 - path - -
+  DATEISYSTEM rw-erneut test -d '/var/www/html/data/__groupfolders/3/files/rw/neu' = ja
+(exit=0)
+$ stepb rw-kette
+GF rw-kette nutzer=alice argumente={"parents": true, "path": "/p3107gf/rw/k/a/b"} fehler=nein | {"created": true, "created_folders": ["/p3107gf/rw/k", "/p3107gf/rw/k/a", "/p3107gf/rw/k/a/b"], "id": "file:23797", "path": "/p3107gf/rw/k/a/b"}
+  exit=0
+  AUDIT rw-kette neue_zeilen=1 (seq 630 -> 631)
+  AUDIT 631 - 2026-11-13T03:11:09Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 529 - parents,path - -
+  DATEISYSTEM rw-kette test -d '/var/www/html/data/__groupfolders/3/files/rw/k' = ja
+  DATEISYSTEM rw-kette test -d '/var/www/html/data/__groupfolders/3/files/rw/k/a' = ja
+  DATEISYSTEM rw-kette test -d '/var/www/html/data/__groupfolders/3/files/rw/k/a/b' = ja
+PROPFIND /p3107gf/rw/k/a/b auth=basic nutzer=alice status=207 fileid=23797 permissions=RMGDNVCK
+(exit=0)
+$ stepb ro-neu
+GF ro-neu nutzer=alice argumente={"path": "/p3107gf/ro/neu"} fehler=ja | Error executing tool files_create_folder: No permission to create a folder at /p3107gf/ro/neu. Hint: The share, group folder or storage does not allow creating folders there; ask its owner for the create permission.
+  exit=0
+  AUDIT ro-neu neue_zeilen=1 (seq 631 -> 632)
+  AUDIT 632 - 2026-11-13T03:11:18Z - u:alice - files_create_folder - OAuth flow check - - - rejected - permission_denied - 94 - path - -
+  DATEISYSTEM ro-neu test -d '/var/www/html/data/__groupfolders/3/files/ro/neu' = nein
+MKCOL /p3107gf/ro/neu-basic auth=basic nutzer=alice status=403 exception=Sabre\DAV\Exception\Forbidden
+  DATEISYSTEM ls -1A /var/www/html/data/__groupfolders/3/files/ro: []
+(exit=0)
+$ echo 'ZUGRIFFSLOG nachgelesen für die Fälle rw-neu, rw-erneut, rw-kette, ro-neu (docker logs nc35-nc, Zeilen mit p3107gf oder systemtags seit dem Aufbau; der Zeitfilter --since lieferte auf diesem Host 0 Zeilen):'; docker logs nc35-nc --tail 600 2>&1 | tr -d '\r' | grep -E '/dav/(files/alice/p3107gf|systemtags)' | grep -oE '[a-z-]+ \[[^]]*\] "[A-Z]+ [^"]*" [0-9]{3} [0-9]+ "[^"]*" "[^"]*"' | sed 's/^/  ZUGRIFFSLOG /' | tail -22
+ZUGRIFFSLOG nachgelesen für die Fälle rw-neu, rw-erneut, rw-kette, ro-neu (docker logs nc35-nc, Zeilen mit p3107gf oder systemtags seit dem Aufbau; der Zeitfilter --since lieferte auf diesem Host 0 Zeilen):
+  ZUGRIFFSLOG alice [13/Nov/2026:03:09:59 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/zu HTTP/1.1" 201 1360 "-" "curl/8.19.0"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:10:32 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/rw HTTP/1.1" 207 1829 "-" "curl/8.19.0"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:10:32 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/ro HTTP/1.1" 207 1820 "-" "curl/8.19.0"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:10:33 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/rw/zu HTTP/1.1" 207 1825 "-" "curl/8.19.0"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:10:50 +0000] "PROPFIND /remote.php/dav/systemtags/ HTTP/1.1" 207 1789 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:10:50 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/neu HTTP/1.1" 201 1360 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:10:53 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/rw/neu HTTP/1.1" 207 1833 "-" "curl/8.19.0"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:10:59 +0000] "PROPFIND /remote.php/dav/systemtags/ HTTP/1.1" 207 1779 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:10:59 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/neu HTTP/1.1" 405 1648 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:10:59 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/rw/neu HTTP/1.1" 207 1810 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:08 +0000] "PROPFIND /remote.php/dav/systemtags/ HTTP/1.1" 207 1783 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:08 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/rw/k/a/b HTTP/1.1" 404 1745 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:08 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/rw/k/a HTTP/1.1" 404 1741 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:08 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/rw/k HTTP/1.1" 404 1735 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:08 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/rw HTTP/1.1" 207 1803 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:09 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/k HTTP/1.1" 201 1358 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:09 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/k/a HTTP/1.1" 201 1356 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:09 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/k/a/b HTTP/1.1" 201 1354 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:12 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/rw/k/a/b HTTP/1.1" 207 1838 "-" "curl/8.19.0"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:18 +0000] "PROPFIND /remote.php/dav/systemtags/ HTTP/1.1" 207 1777 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:18 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/ro/neu HTTP/1.1" 403 1479 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:21 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/ro/neu-basic HTTP/1.1" 403 1479 "-" "curl/8.19.0"
+(exit=0)
+$ stepb ro-kette (erstes neues Glied im nur lesbaren Teil)
+GF ro-kette nutzer=alice argumente={"parents": true, "path": "/p3107gf/ro/x/y"} fehler=ja | Error executing tool files_create_folder: No permission to create a folder at /p3107gf/ro/x. Hint: The share, group folder or storage does not allow creating folders there; ask its owner for the create permission.
+  exit=0
+  AUDIT ro-kette neue_zeilen=1 (seq 632 -> 633)
+  AUDIT 633 - 2026-11-13T03:12:18Z - u:alice - files_create_folder - OAuth flow check - - - rejected - permission_denied - 382 - parents,path - -
+  DATEISYSTEM ro-kette test -d '/var/www/html/data/__groupfolders/3/files/ro/x' = nein
+  DATEISYSTEM ro-kette test -d '/var/www/html/data/__groupfolders/3/files/ro/x/y' = nein
+(exit=0)
+$ stepb rw-nach-ro-kette (Kette beginnt im schreibbaren Teil und führt in rw/zu)
+GF rw-nach-ro-kette nutzer=alice argumente={"parents": true, "path": "/p3107gf/rw/zu/x/y"} fehler=ja | Error executing tool files_create_folder: No permission to create a folder at /p3107gf/rw/zu/x. Hint: The share, group folder or storage does not allow creating folders there; ask its owner for the create permission.
+  exit=0
+  AUDIT rw-nach-ro-kette neue_zeilen=1 (seq 633 -> 634)
+  AUDIT 634 - 2026-11-13T03:12:28Z - u:alice - files_create_folder - OAuth flow check - - - rejected - permission_denied - 223 - parents,path - -
+  DATEISYSTEM rw-nach-ro-kette test -d '/var/www/html/data/__groupfolders/3/files/rw/zu' = ja
+  DATEISYSTEM rw-nach-ro-kette test -d '/var/www/html/data/__groupfolders/3/files/rw/zu/x' = nein
+  DATEISYSTEM rw-nach-ro-kette test -d '/var/www/html/data/__groupfolders/3/files/rw/zu/x/y' = nein
+(exit=0)
+$ stepb rw-nach-ro-ohne-parents
+GF rw-nach-ro-ohne-parents nutzer=alice argumente={"path": "/p3107gf/rw/zu/x"} fehler=ja | Error executing tool files_create_folder: No permission to create a folder at /p3107gf/rw/zu/x. Hint: The share, group folder or storage does not allow creating folders there; ask its owner for the create permission.
+  exit=0
+  AUDIT rw-nach-ro-ohne-parents neue_zeilen=1 (seq 634 -> 635)
+  AUDIT 635 - 2026-11-13T03:12:37Z - u:alice - files_create_folder - OAuth flow check - - - rejected - permission_denied - 86 - path - -
+  DATEISYSTEM rw-nach-ro-ohne-parents test -d '/var/www/html/data/__groupfolders/3/files/rw/zu/x' = nein
+MKCOL /p3107gf/rw/zu/x-basic auth=basic nutzer=alice status=403 exception=Sabre\DAV\Exception\Forbidden
+  DATEISYSTEM find /var/www/html/data/__groupfolders/3/files: [./ro ./rw ./rw/k ./rw/k/a ./rw/k/a/b ./rw/neu ./rw/zu ]
+(exit=0)
+$ echo 'ZUGRIFFSLOG nachgelesen für die Fälle ro-kette, rw-nach-ro-kette, rw-nach-ro-ohne-parents (docker logs --tail 400 nc35-nc, Zeilen ab 03:12:00 mit p3107gf oder systemtags):'; docker logs --tail 400 nc35-nc 2>&1 | tr -d '\r' | grep -E '/dav/(files/alice/p3107gf|systemtags)' | grep -oE '[a-z-]+ \[[^]]*\] "[A-Z]+ [^"]*" [0-9]{3} [0-9]+ "[^"]*" "[^"]*"' | awk '{t=substr($2,14,8); if (t >= "03:12:00") print "  ZUGRIFFSLOG " $0}'
+ZUGRIFFSLOG nachgelesen für die Fälle ro-kette, rw-nach-ro-kette, rw-nach-ro-ohne-parents (docker logs --tail 400 nc35-nc, Zeilen ab 03:12:00 mit p3107gf oder systemtags):
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:18 +0000] "PROPFIND /remote.php/dav/systemtags/ HTTP/1.1" 207 1781 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:18 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/ro/x/y HTTP/1.1" 404 1735 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:18 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/ro/x HTTP/1.1" 404 1741 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:18 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/ro HTTP/1.1" 207 1810 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:18 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/ro/x HTTP/1.1" 403 1475 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:27 +0000] "PROPFIND /remote.php/dav/systemtags/ HTTP/1.1" 207 1789 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:27 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/rw/zu/x/y HTTP/1.1" 404 1744 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:28 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/rw/zu/x HTTP/1.1" 404 1742 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:28 +0000] "PROPFIND /remote.php/dav/files/alice/p3107gf/rw/zu HTTP/1.1" 207 1812 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:28 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/zu/x HTTP/1.1" 403 1481 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:37 +0000] "PROPFIND /remote.php/dav/systemtags/ HTTP/1.1" 207 1785 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:37 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/zu/x HTTP/1.1" 403 1479 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:41 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/zu/x-basic HTTP/1.1" 403 1485 "-" "curl/8.19.0"
+(exit=0)
+$ echo 'UNGEMESSEN gf-teilabbruch grund=mit festen ACL-Regeln nicht herstellbar: eine Regel hängt an einem vorhandenen Ordner; liegt er in der Kette, ist schon das erste neue Glied darunter verboten (Fälle ro-kette und rw-nach-ro-kette, je ein MKCOL 403, nichts angelegt), und ein in diesem Aufruf neu angelegter Ordner erbt die Schreibrechte seines Elternordners. Der Zusatz Already created nach einem 403 mitten in der Kette bleibt nur per Unit-Test belegt (tests/unit/test_files_create_folder.py).'
+UNGEMESSEN gf-teilabbruch grund=mit festen ACL-Regeln nicht herstellbar: eine Regel hängt an einem vorhandenen Ordner; liegt er in der Kette, ist schon das erste neue Glied darunter verboten (Fälle ro-kette und rw-nach-ro-kette, je ein MKCOL 403, nichts angelegt), und ein in diesem Aufruf neu angelegter Ordner erbt die Schreibrechte seines Elternordners. Der Zusatz Already created nach einem 403 mitten in der Kette bleibt nur per Unit-Test belegt (tests/unit/test_files_create_folder.py).
+(exit=0)
+
+(3) Rückbau und Baseline
+------------------------
+$ date -u +%Y-%m-%dT%H:%M:%SZ; docker exec --user www-data nc35-nc php occ groupfolders:delete --force 3; docker exec --user www-data nc35-nc php occ groupfolders:list --output=json; docker exec nc35-nc sh -c 'ls -1AR /var/www/html/data/__groupfolders 2>&1 | head -20'
+2026-11-13T03:14:09Z
+[]
+/var/www/html/data/__groupfolders:
+(exit=0)
+$ docker exec --user www-data nc35-nc rmdir /var/www/html/data/__groupfolders && echo 'rmdir /var/www/html/data/__groupfolders (leer) -> entfernt'; docker exec --user www-data nc35-nc php occ group:delete p3107grp; docker exec --user www-data nc35-nc php occ app:disable groupfolders; docker exec --user www-data nc35-nc php occ app:remove groupfolders; docker exec --user www-data nc35-nc php occ config:list groupfolders | tr -d '\n' | tr -s ' '; echo
+rmdir /var/www/html/data/__groupfolders (leer) -> entfernt
+Group "p3107grp" was removed
+groupfolders 23.0.1 disabled
+Disabled app 'groupfolders' (uninstall steps executed).
+Removed app 'groupfolders' (version 23.0.1).
+{ "apps": { "groupfolders": { "installed_version": "23.0.1", "enabled": "no", "types": "filesystem,dav" } }}
+(exit=0)
+$ docker exec --user www-data nc35-nc php occ config:app:delete groupfolders installed_version; docker exec --user www-data nc35-nc php occ config:app:delete groupfolders enabled; docker exec --user www-data nc35-nc php occ config:app:delete groupfolders types; docker exec --user www-data nc35-nc php occ config:list groupfolders | tr -d '\n' | tr -s ' '; echo; docker exec --user www-data nc35-nc php occ app:list --output=json | tr ',{' '\n\n' | grep -c '"groupfolders"'; docker exec --user www-data nc35-nc php occ group:list --output=json; docker exec --user www-data nc35-nc php occ user:list --output=json; docker exec nc35-nc sh -c 'ls -d /var/www/html/data/__groupfolders /var/www/html/custom_apps/groupfolders 2>&1'; docker exec --user www-data nc35-nc php occ files:scan --path=/alice/files --quiet; echo scan_exit=$?
+Config value installed_version of app groupfolders deleted
+Config value enabled of app groupfolders deleted
+Config value types of app groupfolders deleted
+{ "apps": { "groupfolders": [] }}
+0
+{"admin":["admin"]}
+{"admin":"admin","alice":"alice","bob":"bob"}
+ls: cannot access '/var/www/html/data/__groupfolders': No such file or directory
+ls: cannot access '/var/www/html/custom_apps/groupfolders': No such file or directory
+scan_exit=0
+(exit=0)
+BASELINE dateien_alice vorher=283 nachher=283 gleich=ja
+BASELINE papierkorb_alice vorher=0 nachher=0 gleich=ja
+BASELINE kontingent_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
+BASELINE tags vorher=[] nachher=[] gleich=ja
+BASELINE freigaben_alice vorher=3 nachher=3 gleich=ja
+BASELINE gruppen vorher={"admin":["admin"]} nachher={"admin":["admin"]} gleich=ja
+BASELINE gruppenordner_verzeichnisse vorher=0 nachher=0 gleich=ja
+Gestoppt wurde die Strecke danach, siehe raw/nc35-kette.txt Abschnitt (7).
