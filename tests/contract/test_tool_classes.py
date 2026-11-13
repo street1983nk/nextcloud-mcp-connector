@@ -25,6 +25,11 @@ TOTAL = 27
 # with each tool behind NC_MCP_TASKS_UPDATE.
 TOTAL_SWITCHED_ON = 29
 
+# The optional tools that carry a class entry: tasks_complete since plan 33-06 (UNAFFECTED).
+# files_update stays unclassified as before phase 33. Named as a literal, so a new entry has
+# to pass this door on purpose like a standard tool.
+CLASSIFIED_OPTIONAL = frozenset({"tasks_complete"})
+
 
 async def _tools() -> dict[str, Tool]:
     async with Client(mcp, raise_exceptions=True) as client:
@@ -68,8 +73,9 @@ async def test_an_entry_registered_nowhere_stays_stale_with_every_switch_on(
     monkeypatch.setitem(tool_classes.UNAFFECTED, optional, "Answers its own path and an etag.")
 
     assert tool_classes.freeze_findings(names, switched_on=switched_on) == ["stale: tasks_probe"]
+    # Without the switched-on names every classified optional tool reads as stale as well.
     assert tool_classes.freeze_findings(names) == [
-        f"stale: {name}" for name in sorted({"tasks_probe", optional})
+        f"stale: {name}" for name in sorted({"tasks_probe", optional, *CLASSIFIED_OPTIONAL})
     ]
 
 
@@ -144,9 +150,9 @@ def test_the_three_classes_add_up_to_the_frozen_surface() -> None:
         + len(tool_classes.FILE_WRITERS)
         + len(tool_classes.UNAFFECTED)
     )
-    assert total == TOTAL
+    assert total == TOTAL + len(CLASSIFIED_OPTIONAL)
     assert (
         len(tool_classes.FILE_READERS),
         len(tool_classes.FILE_WRITERS),
         len(tool_classes.UNAFFECTED),
-    ) == (13, 4, 10)
+    ) == (13, 4, 10 + len(CLASSIFIED_OPTIONAL))

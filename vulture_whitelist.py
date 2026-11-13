@@ -40,6 +40,7 @@ contacts_search
 tasks_search
 tasks_read
 tasks_create
+tasks_complete
 
 # --- Tool logic ahead of its registration (plan 31-02, dissolved in plan 31-03) ---------
 # Empty on purpose: plan 31-02 parked create_folder here, because the tool logic was written
@@ -378,11 +379,8 @@ background
 # (plan 32-04b) left with plan 32-05, whose reg_tasks.py calls all three.
 
 # --- The switch of the modifying task tools, plan 33-02 ------------------------------------
-# Temporary: the switch chain of NC_MCP_TASKS_UPDATE lands before any tool hangs on it
-# (D-33-00d). Its reader is reg_tasks.py once plan 33-06 registers tasks_complete behind it,
-# and the name leaves this list with that plan; until then the unit tests and the ExApp start
-# test in a fresh interpreter (tests/unit/test_exapp_tasks_update_switch.py) call it.
-tasks_update_enabled
+# Empty again: tasks_update_enabled left with plan 33-06, whose reg_tasks.py registers
+# tasks_complete behind it.
 
 # --- The two conditional writers of the tasks bundle, plan 33-03 ----------------------------
 # Temporary: the client layer lands before the tools that call it. move_todo is used by
@@ -398,6 +396,5 @@ move_todo
 # and as_answer left with plan 33-06, whose complete_task walks the chain.
 
 # --- Tool logic ahead of its registration, plan 33-06 --------------------------------------
-# Temporary: complete_task lands in task 1, its registration tasks_complete in task 2 of the
-# same plan; the name leaves this list with task 2.
-complete_task
+# Empty again: complete_task sat here between task 1 and task 2 and left with tasks_complete,
+# which calls it.

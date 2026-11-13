@@ -66,6 +66,7 @@ PARAM_ALLOWLIST: Mapping[str, frozenset[str]] = {
     "search": frozenset({"query"}),
     "tables_browse": frozenset({"cursor", "level", "limit", "table_id"}),
     "tables_create_row": frozenset({"table_id"}),
+    "tasks_complete": frozenset({"completed", "etag", "task_id"}),
     "tasks_create": frozenset({"due", "list", "parent", "priority", "start", "tags", "timezone"}),
     "tasks_read": frozenset({"task_id"}),
     "tasks_search": frozenset({"cursor", "due_by", "list", "query", "status"}),

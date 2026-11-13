@@ -11,9 +11,9 @@ from typing import Annotated, Literal
 from mcp.server.mcpserver import Context
 from pydantic import Field
 
-from .. import deps
+from .. import config, deps
 from ..tools import tasks as tasks_tools
-from . import CREATE_ONLY, READ_ONLY, compact, graceful, mcp
+from . import CREATE_ONLY, MODIFY_EXISTING, READ_ONLY, compact, graceful, mcp
 
 
 @mcp.tool(annotations=READ_ONLY, structured_output=False)
@@ -101,3 +101,23 @@ async def tasks_create(
             parent=parent,
         )
     )
+
+
+if config.tasks_update_enabled():
+
+    @mcp.tool(annotations=MODIFY_EXISTING, structured_output=False)
+    @graceful
+    async def tasks_complete(
+        task_id: Annotated[str, Field(description="Task id from tasks_search")],
+        etag: Annotated[str, Field(description="etag from tasks_read")],
+        completed: Annotated[bool, Field(description="true: complete, false: reopen")],
+        ctx: Context | None = None,
+    ) -> str:
+        """Complete or reopen a task; needs its etag from tasks_read. Completing also
+        completes its subtasks first. Recurring tasks are refused."""
+        clients = deps.resolve_clients(ctx)
+        return compact(
+            await tasks_tools.complete_task(
+                clients, task_id=task_id, etag=etag, completed=completed
+            )
+        )
