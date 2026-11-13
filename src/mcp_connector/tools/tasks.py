@@ -580,12 +580,12 @@ async def read_task(clients: NcClients, *, task_id: str) -> dict[str, Any]:
     task_list = matches[0]
 
     try:
-        raw = await tasks_client.get_todo(clients.client, clients.creds, task_list, object_name)
+        stored = await tasks_client.get_todo(clients.client, clients.creds, task_list, object_name)
     except ToolError as exc:
         if exc.reason == REASON_UNKNOWN_ID:
             raise _unknown_task(task_id) from None
         raise
-    todo = _read_todo(raw)
+    todo = _read_todo(stored.ics)
     if todo is None:
         raise _unknown_task(task_id)
     own_id = ids.encode_task(task_list.key, object_name)
@@ -624,6 +624,10 @@ async def read_task(clients: NcClients, *, task_id: str) -> dict[str, Any]:
         if field in todo:
             result[field] = todo[field]
     result["list"] = _list_info(task_list)
+    if stored.etag:
+        # The ETag a change of this task needs, as the server sent it (D-33-03); no field
+        # at all rather than an empty value a model would copy into the next call.
+        result["etag"] = stored.etag
 
     if isinstance(parent, BaseException):
         result["parent_unavailable"] = _side_reason(parent, "The parent task could not be read")
@@ -1018,12 +1022,12 @@ async def _parent_uid(
 ) -> str:
     """The UID of the parent task, read from the target list; unknown ids get one answer."""
     try:
-        raw = await tasks_client.get_todo(clients.client, clients.creds, task_list, object_name)
+        stored = await tasks_client.get_todo(clients.client, clients.creds, task_list, object_name)
     except ToolError as exc:
         if exc.reason == REASON_UNKNOWN_ID:
             raise _unknown_task(parent) from None
         raise
-    todo = _read_todo(raw)
+    todo = _read_todo(stored.ics)
     if todo is None or not todo["uid"]:
         raise _unknown_task(parent)
     return todo["uid"]
@@ -1091,8 +1095,8 @@ async def _confirm(
 ) -> bool:
     """Read the new object once. A failure here never undoes or fails the write."""
     try:
-        raw = await tasks_client.get_todo(clients.client, clients.creds, task_list, object_name)
+        stored = await tasks_client.get_todo(clients.client, clients.creds, task_list, object_name)
     except (ToolError, TimeoutError, httpx.TimeoutException, httpx.RequestError):
         return False
-    todo = _read_todo(raw)
+    todo = _read_todo(stored.ics)
     return todo is not None and todo["uid"] == uid

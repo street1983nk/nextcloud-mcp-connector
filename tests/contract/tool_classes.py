@@ -120,12 +120,12 @@ UNAFFECTED: dict[str, str] = {
         "never read and the description stays out (tools/tasks.py:154-181, :505-520)."
     ),
     "tasks_read": (
-        "Answers one task and its subtasks; DESCRIPTION is capped foreign text, not a file, "
-        "and ATTACH is never read (tools/tasks.py:154-181, :603-641)."
+        "Answers one task, its ETag and its subtasks; DESCRIPTION is capped foreign text, not a "
+        "file, and ATTACH is never read (tools/tasks.py:154-181, :603-645)."
     ),
     "tasks_create": (
         "Answers id, summary, list, created, confirmed, due and start of its own task and "
-        "takes no file argument (tools/tasks.py:806-817)."
+        "takes no file argument (tools/tasks.py:810-821)."
     ),
 }
 

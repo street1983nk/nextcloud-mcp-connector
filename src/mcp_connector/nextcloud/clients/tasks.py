@@ -121,10 +121,15 @@ class TaskList:
 
 @dataclass(frozen=True, slots=True)
 class TodoObject:
-    """One object of a task list: its name from the href and its raw iCalendar bytes."""
+    """One object of a task list: its name from the href, its raw iCalendar bytes, its ETag.
+
+    ``etag`` is the value the server sent (``getetag`` of the REPORT, the ``ETag`` header of
+    the GET), quotes included, and empty when it sent none (D-33-03).
+    """
 
     object_name: str
     ics: bytes
+    etag: str = ""
 
 
 #: The sentences of the create-only writer for tasks. The label is always the name of the
@@ -461,25 +466,36 @@ async def query_todos(
         object_name = "" if path.endswith("/") else unquote(path.rsplit("/", 1)[-1])
         if not object_name:
             continue
-        data = _collect_props(entry).get(f"{{{xml.CAL}}}calendar-data")
+        props = _collect_props(entry)
+        data = props.get(f"{{{xml.CAL}}}calendar-data")
         text = data.text if data is not None else None
         if not text or not text.strip():
             continue
-        found.append(TodoObject(object_name=object_name, ics=text.encode("utf-8")))
+        tag = props.get(f"{{{xml.DAV}}}getetag")
+        etag = (tag.text or "").strip() if tag is not None else ""
+        found.append(TodoObject(object_name=object_name, ics=text.encode("utf-8"), etag=etag))
     return found
 
 
 async def get_todo(
     client: httpx.AsyncClient, creds: Credentials, task_list: TaskList, object_name: str
-) -> bytes:
-    """GET one object of a task list and return its raw iCalendar bytes."""
+) -> TodoObject:
+    """GET one object of a task list: its raw iCalendar bytes and the ETag of the same GET.
+
+    Body and ETag come from one response, so the ETag always names the bytes the caller
+    reads (D-33-03). A response without the header gives an empty ETag.
+    """
     response = await client.get(
         caldav.object_url(creds, task_list.uri, object_name),
         headers={"Accept": "text/calendar"},
         auth=creds.auth(),
     )
     _check(response, f"the task {object_name} in the list {task_list.name}")
-    return response.content
+    return TodoObject(
+        object_name=object_name,
+        ics=response.content,
+        etag=response.headers.get("etag", "").strip(),
+    )
 
 
 def _check(response: httpx.Response, what: str) -> None:
