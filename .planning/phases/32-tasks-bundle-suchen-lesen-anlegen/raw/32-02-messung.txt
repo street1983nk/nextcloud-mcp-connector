@@ -142,3 +142,130 @@ Volume nc-mcp-spike-tags-pg_nc-spike-tags-pgdb-data Removing / Network nc-mcp-sp
 ABBAU Container vorhanden: nein
 ABBAU Volume vorhanden: nein
 DAUER 154 s; ENDE 2026-11-13T11:59:19Z
+
+== Task 4 (2b): nc35 unter Impersonation (FREIGABE zustand=option-a) ==
+    Geheimnisprüfung gegen alle Werte von .env.nc35 und .env.exapp (voll und erste 12 Zeichen):
+    Treffer nur auf öffentliche Werte (APP_ID, APP_VERSION, URL-Anfang http://127.0.0, Kontonamen
+    alice und bob); kein Treffer aus APP_SECRET, Passwort-Variablen, HP_SHARED_KEY oder dem Kopfnamen.
+    Erster Start: RAM-Gate rot (3,51 GB), nichts gestartet; drop_caches, 75 s, zweiter Start.
+    Der ExApp-Container nc_app_mcp_connector blieb gestoppt. Messung als alice (Serie, Namen,
+    Links, App-Zustand) und bob (Listen und Freigaben) unter Impersonation, Konten p3202frisch und
+    p3202nie per occ.
+
+# tasks_measure.py up 2026-11-13T11:59:41Z
+
+== up nc35 ==
+RAM frei_host_gb=3.51 schwelle=4.0 ergebnis=zu wenig
+(no running container)
+ABBRUCH RAM gate shut: 3.51 GB free (needs 4.0), foreign runs: []; nothing was stopped
+# tasks_measure.py up 2026-11-13T12:01:07Z
+
+== up nc35 ==
+RAM frei_host_gb=5.34 schwelle=4.0 ergebnis=ok
+(no running container)
+docker start nc35-nc -> nc35-nc
+docker start nc35-harp -> nc35-harp
+docker start nc35-caddy -> nc35-caddy
+nc35-nc: installed (attempt 1)
+# tasks_measure.py live 2026-11-13T12:01:21Z
+
+== live nc35 steps=search,children,names,link,home,appstate, start 2026-11-13T12:01:21Z ==
+EXAPP nc35 info_xml=0.7.2 registriert=mcp_connector (MCP Connector): 0.7.2 [enabled]
+GET http://127.0.0.1:8082/status.php -> HTTP 200
+VERSION OF RECORD nc35 35.0.0
+dbtype: sqlite3
+KONTROLLE impersonation status=200 gleich=ja
+TASKSAPP nc35 vorher=keine
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+TASKSAPP nc35 messung=0.18.1
+SETUP MKCALENDAR liste=p3202-serie status=201
+AUFBAU nc35 aufgaben=2000 erledigt=1900 kinder_von_eltern=0,1,25 dauer_s=85 gleichzeitig=1 wiederholte_put=0 GEGENPROBE datenbank_zeilen=2000 gleich=ja
+KOSTEN suche modus=offen impersonation=ja db=nc35 status=207 median_ms=91 max_ms=98 min_ms=86 p95_zweitgroesster_ms=96 bytes=70218 treffer=100 (n=15)
+KOSTEN suche modus=alle impersonation=ja db=nc35 status=207 median_ms=108 max_ms=113 min_ms=103 p95_zweitgroesster_ms=113 bytes=1514508 treffer=2000 (n=15)
+KOSTEN kinder impersonation=ja kinder=0 collation=ohne db=nc35 status=207 median_ms=88 max_ms=94 min_ms=83 p95_zweitgroesster_ms=92 bytes=239 treffer=0 (n=6)
+KOSTEN kinder impersonation=ja kinder=0 collation=i;octet db=nc35 status=207 median_ms=85 max_ms=107 min_ms=83 p95_zweitgroesster_ms=91 bytes=239 treffer=0 (n=6)
+KOSTEN kinder impersonation=ja kinder=1 collation=ohne db=nc35 status=207 median_ms=87 max_ms=91 min_ms=84 p95_zweitgroesster_ms=88 bytes=978 treffer=1 (n=6)
+KOSTEN kinder impersonation=ja kinder=1 collation=i;octet db=nc35 status=207 median_ms=83 max_ms=87 min_ms=79 p95_zweitgroesster_ms=86 bytes=978 treffer=1 (n=6)
+KOSTEN kinder impersonation=ja kinder=25 collation=ohne db=nc35 status=207 median_ms=87 max_ms=89 min_ms=85 p95_zweitgroesster_ms=88 bytes=19004 treffer=25 (n=6)
+KOSTEN kinder impersonation=ja kinder=25 collation=i;octet db=nc35 status=207 median_ms=88 max_ms=92 min_ms=86 p95_zweitgroesster_ms=89 bytes=19004 treffer=25 (n=6)
+KOSTEN eltern-uid impersonation=ja collation=ohne db=nc35 status=207 median_ms=93 max_ms=99 min_ms=87 p95_zweitgroesster_ms=96 bytes=949 treffer=1 (n=6)
+KOSTEN eltern-uid impersonation=ja collation=i;octet db=nc35 status=207 median_ms=89 max_ms=91 min_ms=86 p95_zweitgroesster_ms=90 bytes=949 treffer=1 (n=6)
+GEGENPROBE collation db=nc35 treffer_gleich=ja erwartete_anzahl=ja kinder0=0/0 kinder1=1/1 kinder25=25/25 eltern=1/1 (Mengen der Objekt-Hrefs, ohne/i;octet; erwartet kinder0=0 kinder1=1 kinder25=25 eltern=1)
+SETUP MKCALENDAR liste=p3202-rw status=201
+SETUP FREIGABE liste=p3202-rw schreibrecht=ja status=200
+SETUP MKCALENDAR liste=p3202-ro status=201
+SETUP FREIGABE liste=p3202-ro schreibrecht=nein status=200
+PROPFIND Depth 1 kalender-home status=207 bytes=19140
+NAMEN nc35 sammlung=eigen owner_displayname_lesbar=ja zusatz_passt=nein name_ohne_zusatz_gleich_original=ja owner_gleich_eigenem_owner=ja read_only=fehlt privilegien=bind,read,read-acl,read-current-user-privilege-set,read-free-busy,unbind,unlock,write,write-acl,write-content,write-properties schreibrecht_spike_menge=ja shared_by_in_uri=nein komponenten=VTODO
+NAMEN nc35 sammlung=rw owner_displayname_lesbar=ja zusatz_passt=ja name_ohne_zusatz_gleich_original=ja owner_gleich_eigenem_owner=nein read_only=leer privilegien=bind,read,read-acl,read-current-user-privilege-set,read-free-busy,unbind,unlock,write,write-acl,write-content,write-properties schreibrecht_spike_menge=ja shared_by_in_uri=ja komponenten=VTODO
+NAMEN nc35 sammlung=ro owner_displayname_lesbar=ja zusatz_passt=ja name_ohne_zusatz_gleich_original=ja owner_gleich_eigenem_owner=nein read_only=1 privilegien=read,read-acl,read-current-user-privilege-set,read-free-busy,write-properties schreibrecht_spike_menge=nein shared_by_in_uri=ja komponenten=VTODO
+NAMEN nc35 sammlung=deck owner_displayname_lesbar=nein zusatz_passt=nein name_ohne_zusatz_gleich_original=n/a owner_gleich_eigenem_owner=nein read_only=fehlt privilegien=read,read-acl,read-current-user-privilege-set,read-free-busy,write-properties schreibrecht_spike_menge=nein shared_by_in_uri=nein komponenten=VTODO
+SETUP MKCALENDAR liste=p3202-sonder-äö status=201
+SETUP PUT link-aufgabe fall=eigen status=201
+SETUP PUT link-aufgabe fall=geteilt status=201
+SETUP PUT link-aufgabe fall=sonderzeichen status=201
+PROVIDER suche status=200 eintraege=3
+PROVIDERLINK nc35 fall=eigen form=pfad index_php=nein aufloesbar=ja shared_by_im_link=nein prozentkodiert=nein link={base}/apps/tasks/calendars/p3202-serie/tasks/p3202-link-eigen-120124.ics
+PROVIDERLINK nc35 fall=geteilt form=pfad index_php=nein aufloesbar=ja shared_by_im_link=ja prozentkodiert=nein link={base}/apps/tasks/calendars/p3202-rw_shared_by_<konto>/tasks/p3202-link-geteilt-120124.ics
+PROVIDERLINK nc35 fall=sonderzeichen form=pfad index_php=nein aufloesbar=ja shared_by_im_link=nein prozentkodiert=nein link={base}/apps/tasks/calendars/p3202-sonder-äö/tasks/p3202-link-sonder-ä&+ 120124.ics
+LINK nc35 form=index.php auth=anonym status=401 ziel=fehler location=-
+LINK nc35 form=index.php auth=impersonation status=200 ziel=aufgabe location=-
+LINK nc35 form=ohne auth=anonym status=401 ziel=fehler location=-
+LINK nc35 form=ohne auth=impersonation status=200 ziel=aufgabe location=-
+LINK nc35 form=startseite auth=impersonation status=200 ziel=aufgabe
+occ user:add --password-from-env p3202frisch (password via stdin)
+occ user:add --password-from-env p3202nie (password via stdin, never used)
+ERSTANMELDUNG konto=frisch basic GET /ocs/v2.php/cloud/user status=200 kalender_db=2
+HOME nc35 konto=frisch status=207 vtodo_listen=0 kalender=2 nur_vevent=ja zweiter_status=207 kalender_db_vorher=2 kalender_db_danach=2 fehler=(root {DAV:}multistatus)
+HOME nc35 konto=nie status=207 vtodo_listen=0 kalender=0 nur_vevent=nein zweiter_status=207 kalender_db_vorher=0 kalender_db_danach=0 fehler=(root {DAV:}multistatus)
+APPSTATE nc35 zustand=an navigation=ja provider=ja app_list=0.18.1 nav_status=200 provider_suche_status=200 provider_treffer=3
+occ app:disable tasks -> tasks 0.18.1 disabled
+APPSTATE nc35 zustand=disable-ohne-neustart navigation=nein provider=nein app_list=aus-0.18.1 (installed 0.18.1) nav_status=200 provider_suche_status=200 provider_treffer=0
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+APPSTATE nc35 zustand=disable-nach-neustart navigation=nein provider=nein app_list=aus-0.18.1 (installed 0.18.1) nav_status=200 provider_suche_status=200 provider_treffer=0
+occ app:enable tasks -> tasks 0.18.1 enabled
+APPSTATE nc35 zustand=enable-ohne-neustart navigation=ja provider=ja app_list=0.18.1 nav_status=200 provider_suche_status=200 provider_treffer=3
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+APPSTATE nc35 zustand=wieder-an navigation=ja provider=ja app_list=0.18.1 nav_status=200 provider_suche_status=200 provider_treffer=3
+
+== rueckbau nc35 ==
+RUECKBAU freigabe_entfernt liste=p3202-rw status=200
+RUECKBAU freigabe_entfernt liste=p3202-ro status=200
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU papierkorb konto=alice entfernte_eintraege=0
+RUECKBAU reste konto=alice listen_mit_praefix=0
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+RUECKBAU papierkorb konto=bob entfernte_eintraege=0
+RUECKBAU reste konto=bob listen_mit_praefix=0
+occ user:delete p3202frisch -> The specified user was deleted
+occ user:delete p3202nie -> The specified user was deleted
+occ app:disable tasks -> tasks 0.18.1 disabled
+occ app:remove tasks -> Disabled app 'tasks' (uninstall steps executed). Removed app 'tasks' (version 0.18.1).
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+RUECKBAU nc35 tasksapp=wie-vorher vorher=keine nachher=keine
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE-VERGLEICH nc35 konto=alice gleich=ja
+BASELINE-VERGLEICH nc35 konto=bob gleich=ja
+BASELINE-VERGLEICH nc35 konto=p3202frisch gleich=ja
+BASELINE-VERGLEICH nc35 konto=p3202nie gleich=ja
+# tasks_measure.py stop 2026-11-13T12:04:09Z
+
+== stop nc35 ==
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
