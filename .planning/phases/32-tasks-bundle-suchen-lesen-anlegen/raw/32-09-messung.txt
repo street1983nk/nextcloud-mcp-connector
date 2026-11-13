@@ -1,0 +1,294 @@
+BASIS 2cda29ad809d46a364d161ed68fb4f3315451c95
+    Rohprotokoll Plan 32-09, Task 1 (Messung vor dem Bau). Datum 2026-11-13 (UTC), Worktree tasks-080,
+    Branch plan/v1.8-tasks-080. Messprogramm scripts/tasks_measure.py, Schritte hinaus und subline.
+    Jede Ausgabe lief zuerst ins Scratchpad und durch die Geheimnisprüfung (32-RULES.md Abschnitt 8).
+
+Gemeinsame Freigabe aus raw/32-02-messung.txt, auf 32-09 ausgedehnt durch den Auftrag der Hauptsitzung:
+FREIGABE zustand=option-a datum=2026-11-13
+Zusätzliche Owner-Freigabe vom 13.11.2026 per Abfrage (eigene Liste von alice an bob ro und rw,
+öffentlicher Link auf eine Testliste, ein zusätzliches Testkonto, je mit Rückbau):
+FREIGABE zustand-32-09=ja inkl-oeffentlicher-link datum=2026-11-13
+Keine Neuregistrierung der ExApp; gemessen auf Funktionsebene (App-Passwort und AppAPI-Impersonation).
+Gruppenfreigabe: nicht Teil der Owner-Freigabe, daher nicht gemessen (Zeile zustand=gruppe entfaellt).
+
+# tasks_measure.py up 2026-11-13T16:13:16Z
+
+== up nc35 ==
+RAM frei_host_gb=5.17 schwelle=4.0 ergebnis=ok
+(no running container)
+docker start nc35-nc -> nc35-nc
+docker start nc35-harp -> nc35-harp
+docker start nc35-caddy -> nc35-caddy
+nc35-nc: installed (attempt 1)
+# tasks_measure.py live 2026-11-13T16:13:25Z
+
+== live nc35 steps=hinaus,subline, start 2026-11-13T16:13:25Z ==
+EXAPP nc35 info_xml=0.7.2 registriert=mcp_connector (MCP Connector): 0.7.2 [enabled]
+GET http://127.0.0.1:8082/status.php -> HTTP 200
+VERSION OF RECORD nc35 35.0.0
+dbtype: sqlite3
+KONTROLLE impersonation status=200 gleich=ja
+TASKSAPP nc35 vorher=keine
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+TASKSAPP nc35 messung=0.18.1
+SETUP MKCALENDAR liste=p3202-eigen status=201
+SETUP MKCALENDAR liste=p3209-aus status=201
+SETUP MKCALENDAR liste=p3209-rein status=201
+SETUP FREIGABE liste=p3209-rein an=alice schreibrecht=ja status=200
+HINAUS nc35 zustand=privat auth=basic prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc35 zustand=privat auth=basic prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=privat auth=basic prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=privat auth=basic prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=hineingeteilt auth=basic prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc35 zustand=hineingeteilt auth=basic prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=hineingeteilt auth=basic prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=hineingeteilt auth=basic prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=privat auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc35 zustand=privat auth=appapi prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=privat auth=appapi prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=privat auth=appapi prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=hineingeteilt auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc35 zustand=hineingeteilt auth=appapi prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=hineingeteilt auth=appapi prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=hineingeteilt auth=appapi prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+SETUP FREIGABE an-bob-ro status=200
+HINAUS nc35 zustand=an-bob-ro auth=basic prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc35 zustand=an-bob-ro auth=basic prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=an-bob-ro auth=basic prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=an-bob-ro auth=basic prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+ROHKOERPER zustand=an-bob-ro anonymisiert bytes=20918
+HINAUS nc35 zustand=an-bob-ro auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc35 zustand=an-bob-ro auth=appapi prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=an-bob-ro auth=appapi prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=an-bob-ro auth=appapi prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+SETUP FREIGABE an-bob-rw status=200
+HINAUS nc35 zustand=an-bob-rw auth=basic prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc35 zustand=an-bob-rw auth=basic prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=an-bob-rw auth=basic prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=an-bob-rw auth=basic prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=an-bob-rw auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc35 zustand=an-bob-rw auth=appapi prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=an-bob-rw auth=appapi prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=an-bob-rw auth=appapi prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+SETUP FREIGABE zurueck status=200
+SETUP LINK veroeffentlicht status=202
+HINAUS nc35 zustand=veroeffentlicht auth=basic prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc35 zustand=veroeffentlicht auth=basic prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=veroeffentlicht auth=basic prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=veroeffentlicht auth=basic prop={http://calendarserver.org/ns/}publish-url status=2xx belegt=ja eintraege=1
+ROHKOERPER zustand=veroeffentlicht anonymisiert bytes=21018
+HINAUS nc35 zustand=veroeffentlicht auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc35 zustand=veroeffentlicht auth=appapi prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=veroeffentlicht auth=appapi prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=veroeffentlicht auth=appapi prop={http://calendarserver.org/ns/}publish-url status=2xx belegt=ja eintraege=1
+SETUP LINK zurueck status=200
+HINAUS nc35 zustand=zurueckgenommen auth=basic prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc35 zustand=zurueckgenommen auth=basic prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=zurueckgenommen auth=basic prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=zurueckgenommen auth=basic prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=zurueckgenommen auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc35 zustand=zurueckgenommen auth=appapi prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=zurueckgenommen auth=appapi prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=zurueckgenommen auth=appapi prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+HINAUS nc35 zustand=gruppe entfaellt grund=nicht-freigegeben
+SETUP PUT subline-aufgabe fall=eigen status=201
+SETUP PUT subline-aufgabe fall=geteilt status=201
+PROVIDER subline status=200 eintraege=2
+SUBLINE nc35 liste=eigen endet_mit_rohname=ja enthaelt_besitzer=nein bereinigt_moeglich=nein enthaelt_kennung=nein leer=nein owner_displayname_gleich_anzeigename=ja
+SUBLINE nc35 liste=geteilt endet_mit_rohname=ja enthaelt_besitzer=ja bereinigt_moeglich=ja enthaelt_kennung=ja leer=nein owner_displayname_gleich_anzeigename=ja
+
+== rueckbau nc35 ==
+RUECKBAU freigabe_entfernt liste=p3202-rw status=404
+RUECKBAU freigabe_entfernt liste=p3202-ro status=404
+RUECKBAU freigabe_entfernt liste=p3209-aus status=200
+RUECKBAU link_entfernt liste=p3209-aus status=200
+RUECKBAU freigabe_entfernt liste=p3209-rein status=200
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU papierkorb konto=alice entfernte_eintraege=0
+RUECKBAU reste konto=alice listen_mit_praefix=0
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+RUECKBAU papierkorb konto=bob entfernte_eintraege=0
+RUECKBAU reste konto=bob listen_mit_praefix=0
+occ user:delete p3202frisch -> User does not exist
+occ user:delete p3202nie -> User does not exist
+occ app:remove tasks -> Disabled app 'tasks' (uninstall steps executed). Removed app 'tasks' (version 0.18.1).
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+RUECKBAU nc35 tasksapp=wie-vorher vorher=keine nachher=keine
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE-VERGLEICH nc35 konto=alice gleich=ja
+BASELINE-VERGLEICH nc35 konto=bob gleich=ja
+BASELINE-VERGLEICH nc35 konto=p3202frisch gleich=ja
+BASELINE-VERGLEICH nc35 konto=p3202nie gleich=ja
+# tasks_measure.py stop 2026-11-13T16:14:07Z
+
+== stop nc35 ==
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
+
+# tasks_measure.py up 2026-11-13T16:14:16Z
+
+== up nc32 ==
+RAM frei_host_gb=4.75 schwelle=4.0 ergebnis=ok
+(no running container)
+docker start nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+docker start nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy
+nc-mcp-exapp-nc: installed (attempt 1)
+# tasks_measure.py live 2026-11-13T16:14:19Z
+
+== live nc32 steps=hinaus,subline, start 2026-11-13T16:14:19Z ==
+EXAPP nc32 info_xml=0.7.2 registriert=mcp_connector (MCP Connector): 0.7.2 [enabled]
+GET http://127.0.0.1:8081/status.php -> HTTP 200
+VERSION OF RECORD nc32 32.0.15
+dbtype: sqlite3
+KONTROLLE impersonation status=200 gleich=ja
+TASKSAPP nc32 vorher=keine
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+TASKSAPP nc32 messung=0.18.1
+SETUP MKCALENDAR liste=p3202-eigen status=201
+SETUP MKCALENDAR liste=p3209-aus status=201
+SETUP MKCALENDAR liste=p3209-rein status=201
+SETUP FREIGABE liste=p3209-rein an=alice schreibrecht=ja status=200
+HINAUS nc32 zustand=privat auth=basic prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc32 zustand=privat auth=basic prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=privat auth=basic prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=privat auth=basic prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=hineingeteilt auth=basic prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc32 zustand=hineingeteilt auth=basic prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=hineingeteilt auth=basic prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=hineingeteilt auth=basic prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=privat auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc32 zustand=privat auth=appapi prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=privat auth=appapi prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=privat auth=appapi prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=hineingeteilt auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc32 zustand=hineingeteilt auth=appapi prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=hineingeteilt auth=appapi prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=hineingeteilt auth=appapi prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+SETUP FREIGABE an-bob-ro status=200
+HINAUS nc32 zustand=an-bob-ro auth=basic prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc32 zustand=an-bob-ro auth=basic prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=an-bob-ro auth=basic prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=an-bob-ro auth=basic prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+ROHKOERPER zustand=an-bob-ro anonymisiert bytes=9974
+HINAUS nc32 zustand=an-bob-ro auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc32 zustand=an-bob-ro auth=appapi prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=an-bob-ro auth=appapi prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=an-bob-ro auth=appapi prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+SETUP FREIGABE an-bob-rw status=200
+HINAUS nc32 zustand=an-bob-rw auth=basic prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc32 zustand=an-bob-rw auth=basic prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=an-bob-rw auth=basic prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=an-bob-rw auth=basic prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=an-bob-rw auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc32 zustand=an-bob-rw auth=appapi prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=an-bob-rw auth=appapi prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=an-bob-rw auth=appapi prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+SETUP FREIGABE zurueck status=200
+SETUP LINK veroeffentlicht status=202
+HINAUS nc32 zustand=veroeffentlicht auth=basic prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc32 zustand=veroeffentlicht auth=basic prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=veroeffentlicht auth=basic prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=veroeffentlicht auth=basic prop={http://calendarserver.org/ns/}publish-url status=2xx belegt=ja eintraege=1
+ROHKOERPER zustand=veroeffentlicht anonymisiert bytes=10074
+HINAUS nc32 zustand=veroeffentlicht auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc32 zustand=veroeffentlicht auth=appapi prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=veroeffentlicht auth=appapi prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=veroeffentlicht auth=appapi prop={http://calendarserver.org/ns/}publish-url status=2xx belegt=ja eintraege=1
+SETUP LINK zurueck status=200
+HINAUS nc32 zustand=zurueckgenommen auth=basic prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc32 zustand=zurueckgenommen auth=basic prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=zurueckgenommen auth=basic prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=zurueckgenommen auth=basic prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=zurueckgenommen auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc32 zustand=zurueckgenommen auth=appapi prop={http://calendarserver.org/ns/}invite status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=zurueckgenommen auth=appapi prop={DAV:}share-access status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=zurueckgenommen auth=appapi prop={http://calendarserver.org/ns/}publish-url status=404 belegt=nein eintraege=0
+HINAUS nc32 zustand=gruppe entfaellt grund=nicht-freigegeben
+SETUP PUT subline-aufgabe fall=eigen status=201
+SETUP PUT subline-aufgabe fall=geteilt status=201
+PROVIDER subline status=200 eintraege=2
+SUBLINE nc32 liste=eigen endet_mit_rohname=nein enthaelt_besitzer=nein bereinigt_moeglich=nein enthaelt_kennung=nein leer=nein owner_displayname_gleich_anzeigename=ja
+SUBLINE nc32 liste=geteilt endet_mit_rohname=nein enthaelt_besitzer=nein bereinigt_moeglich=nein enthaelt_kennung=nein leer=nein owner_displayname_gleich_anzeigename=ja
+
+== rueckbau nc32 ==
+RUECKBAU freigabe_entfernt liste=p3202-rw status=404
+RUECKBAU freigabe_entfernt liste=p3202-ro status=404
+RUECKBAU freigabe_entfernt liste=p3209-aus status=200
+RUECKBAU link_entfernt liste=p3209-aus status=200
+RUECKBAU freigabe_entfernt liste=p3209-rein status=200
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU papierkorb konto=alice entfernte_eintraege=0
+RUECKBAU reste konto=alice listen_mit_praefix=0
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+RUECKBAU papierkorb konto=bob entfernte_eintraege=0
+RUECKBAU reste konto=bob listen_mit_praefix=0
+occ user:delete p3202frisch -> User does not exist
+occ user:delete p3202nie -> User does not exist
+occ app:remove tasks -> tasks disabled tasks 0.18.1 removed
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+RUECKBAU nc32 tasksapp=wie-vorher vorher=keine nachher=keine
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE-VERGLEICH nc32 konto=alice gleich=ja
+BASELINE-VERGLEICH nc32 konto=bob gleich=ja
+BASELINE-VERGLEICH nc32 konto=p3202frisch gleich=ja
+BASELINE-VERGLEICH nc32 konto=p3202nie gleich=ja
+# tasks_measure.py stop 2026-11-13T16:14:41Z
+
+== stop nc32 ==
+docker stop nc-mcp-exapp-nc -> nc-mcp-exapp-nc | laeuft=false
+docker stop nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy | laeuft=false
+
+== Papierkorb (32-RULES.md Abschnitt 7) ==
+    Aus den Zeilen RUECKBAU papierkorb oben (REPORT calendar-query auf trashbin/objects/, Treffer
+    nach UID-Präfix p3202 oder p3209). Die Listen wurden als Sammlung mit No-Trashbin gelöscht,
+    ihre Objekte landen damit nicht im Papierkorb.
+PAPIERKORB nc35 konto=alice gefunden=0 geleert=0
+PAPIERKORB nc35 konto=bob gefunden=0 geleert=0
+PAPIERKORB nc32 konto=alice gefunden=0 geleert=0
+PAPIERKORB nc32 konto=bob gefunden=0 geleert=0
+
+== Nebenbefunde ==
+    - Der Anzeigename von bob ist auf beiden Instanzen gleich seiner Kennung (Prüfung im Container
+      ohne Ausgabe des Werts: display_eq_id=True). Darum steht in der SUBLINE-Zeile von nc35
+      enthaelt_kennung=ja; nach dem Ersetzen ist auch die Kennung weg (bereinigt_moeglich=ja prüft
+      den Besitzernamen im bereinigten Text).
+    - Im Zustand veroeffentlicht nennt oc:invite einen Eintrag, obwohl die Freigabe an bob vorher
+      zurückgenommen war: Nextcloud führt den öffentlichen Link als Eintrag in oc:invite. Der
+      anonymisierte Rohkörper liegt nur im Scratchpad (p3209/discovery-hinaus-*.xml).
+    - DAV:share-access und cs:invite antworten auf 35 und 32 in jedem Zustand mit 404.
+
+== Entscheid ==
+ENTSCHEID erkennung_hinaus={http://owncloud.org/ns}invite (Begründung: auf nc35 und nc32, unter App-Passwort und Impersonation gleich, steht oc:invite in einem 2xx-propstat; leer mit eintraege=0 bei privat und zurueckgenommen, belegt mit eintraege=1 bei an-bob-ro und an-bob-rw; cs:invite und DAV:share-access tragen nicht, sie antworten immer 404; auf der hineingeteilten Liste ist oc:invite leer, die Regel gilt ohnehin nur für eigene Listen)
+ENTSCHEID erkennung_link={http://owncloud.org/ns}invite (Begründung: veroeffentlicht ist auf beiden Instanzen und unter beiden Anmeldearten in oc:invite belegt; cs:publish-url ist dort zusätzlich belegt und sonst 404, sie wird als zweites Merkmal mitgefragt: belegt eines von beiden, gilt die Liste als hinausgeteilt)
+ENTSCHEID punkt6=unlesbar-gilt-als-hinausgeteilt (Begründung: eine nicht geteilte eigene Liste meldet oc:invite auf 32 und 35 lesbar im 2xx-propstat; fehlt die Eigenschaft dort, gilt eine eigene Liste als hinausgeteilt)
+ENTSCHEID sublineregel=ersetzen (Begründung: auf nc35 endet die subline der geteilten Liste mit dem Rohnamen samt Besitzerzusatz, der Zusatz passt zu owner-displayname und ist nach dem Ersetzen weg; auf nc32 endet die subline nicht mit dem Rohnamen und enthält den Besitzer nicht, sie bleibt nach der Regel wie geliefert; die eigene Liste enthält auf beiden keinen Besitzer. Die Form entspricht der Regel der Planung, kein Anhalten nötig)
+
+Geheimnisprüfung (tasks_measure.py scan gegen .env.nc35, .env.exapp des Worktrees und .env.nc35 des
+Hauptcheckouts, volle Werte und erste 12 Zeichen, Kopfname): 164 Treffer, alle auf öffentliche Werte
+(APP_ID, APP_VERSION, URLs, Kontonamen alice und bob); kein Treffer aus APP_SECRET, Passwörtern,
+App-Passwörtern oder HP_SHARED_KEY; kein Kopfname AUTHORIZATION-APP-API.
