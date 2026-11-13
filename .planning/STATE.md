@@ -3,14 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: executing
-last_updated: "2026-11-12T12:00:00.000Z"
-last_activity: 2026-11-13
+stopped_at: 32-01 abgeschlossen (BOOTSTRAP NC32 ergebnis=bereit); Strecke 32 gestoppt und bereit; lokale Commits nicht gepusht
+last_updated: "2026-11-13T11:35:02.099Z"
+last_activity: "2026-11-13, 32-01 ausgeführt: Messung --name und Heartbeat auf 32/34/35, bootstrap_exapp.sh für Nextcloud 32 repariert (118de59 bis 326240d), FREIGABE unregister=option-a, erster Anlauf von Task 5 abgebrochen (unregister ohne lokalen Prozess, App kurz [disabled]), zweiter Anlauf bereit; als Nächstes 32-02"
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 14
-  completed_plans: 14
-  percent: 45
+  total_plans: 24
+  completed_plans: 15
+  percent: 40
 ---
 
 # Project State
@@ -25,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 ## Current Position
 
 Phase: 32 von 30 bis 34 (Tasks-Bundle suchen, lesen, anlegen), geplant und geprüft (10 Pläne, Plan-Check PASS nach einer Revision), Ausführung vom Owner freigegeben (2026-11-13, "Go"); Phase 31 abgeschlossen und verifiziert
-Plan: Phase 31 mit 31-01 bis 31-07 samt 31-04b und 31-05b fertig; 31-07 (Commits dccb134 bis 1ed43aa): ganze Kette über die installierte ExApp auf Nextcloud 35 und das Werkzeug gegen einen Gruppenordner mit ACL gemessen, kein Produktcode geändert; FOLD-01 bis FOLD-06 abgehakt; Verifikation passed (31-VERIFICATION.md mit Nachtrag); vor Phase 32 steht der kleine Plan für scripts/bootstrap_exapp.sh auf Nextcloud 32 (Owner 2026-11-12)
+Plan: 32-01 fertig (1 von 10): scripts/bootstrap_exapp.sh erkennt --name aus der occ-Hilfe und registriert manual_install ohne Port; Lauf --manual auf 32.0.15 bereit, Kontrollen 200/alice, 401, 207; als Nächstes 32-02 (Messungen vor dem Bau, gemeinsame Owner-Freigabe)
 Status: Phase 31 abgeschlossen (2026-11-13); Draft-PR 48 gegen main ist offen, CI auf 30e2134 vollständig grün; die Commits nach 30e2134 (Verifikation, 31-07, Abschluss) sind lokal und warten auf eine Push-Freigabe des Owners; auf der Testinstanz nc35 ist die ExApp jetzt 0.7.2 aus diesem Stand registriert (Rückweg im 31-07-SUMMARY.md), die Datei .env.nc35 liegt im Worktree (gitignored); offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13)
-Last activity: 2026-11-13, Phase 32 geplant: 32-RESEARCH.md (offene Fragen durch D-32-14 bis D-32-16 aufgelöst), 32-PATTERNS.md, 32-RULES.md (Hausregeln für alle Pläne), zehn Pläne 32-01 bis 32-08 samt 32-04b und 32-05b; Plan-Check erst 3 Blocker (unregister ohne Freigabe, roter Zwischencommit in 32-05, offene Fragen), nach Revision PASS; Owner-Checkpoints: 32-01 Task 4 (unregister auf 32), 32-02 Task 2 (gemeinsame Freigabe für Zustandsänderungen auf nc35 und 32), 32-07 Task 2 (Neuregistrierung nc35), 32-08 Task 3 (Push); als Nächstes Ausführung ab 32-01
+Last activity: 2026-11-13, 32-01 ausgeführt: Messung --name und Heartbeat auf 32/34/35, bootstrap_exapp.sh für Nextcloud 32 repariert (118de59 bis 326240d), FREIGABE unregister=option-a, erster Anlauf von Task 5 abgebrochen (unregister ohne lokalen Prozess, App kurz [disabled]), zweiter Anlauf bereit; als Nächstes 32-02
 
 ## Performance Metrics
 
@@ -820,6 +821,9 @@ Recent decisions affecting current work:
 - [Phase 30]: 30-05: der Bericht prüft sich selbst (`--block report-check`: Überschriften, Zitate gegen die Rohdateien, Annahmen, Abbruchzeilen, Ergebniswort, Striche, Geheimnisse, Kopfblock); die Empfehlungsregel für E15 ist die getestete Funktion `e15_recommendation()`
 - [v1.8]: Owner-Entscheid vom 12.11.2026 (Claude-Code-Sitzung, Auswahl "Löschen raus" nach seiner Frage "Wollten wir das löschen nicht weg lassen ? Der Aufwand gegen Nutzung"): das Löschen einer Aufgabe (TMOD-07, `tasks_delete`) kommt nicht in 0.8.0, obwohl MESS-06 "wiederherstellbar" ergab; E13 ist geändert, TMOD-07 steht in REQUIREMENTS.md unter Out of Scope, Phase 33 hat sieben Requirements, die Messung bleibt als Beleg in `docs/spike-tasks.md`, der Store-Text nennt die Grenze (Phase 34)
 
+- [Phase 32]: 32-01: bootstrap_exapp.sh setzt --name nur nach Treffer in `occ user:auth-tokens:add --help` (fehlt auf 32.0.15, ab 33 Standard cli) und registriert den Daemon manual_install mit Host host.docker.internal ohne Port (AppAPI 32 hängt den Port an, ab 34 schneidet es ihn ab; Heartbeat auf 32/34/35 gleich http://host.docker.internal:23001); Lauf --manual auf 32 ohne Handeingriff bereit
+- [Phase 32]: 32-01: AppAPI manual-install ruft vor app:unregister /enabled?enabled=0 beim lokalen Prozess; läuft er nicht, scheitert das Abmelden und die App bleibt [disabled] stehen. Vor dem Abmelden also den Prozess starten (erster Anlauf von Task 5 daran abgebrochen, zweiter Anlauf bereit)
+
 ### Pending Todos
 
 - **AUTH-04 (Plan 03-09, Owner):** Claude.ai und ChatGPT gegen eine oeffentlich erreichbare Staging-Instanz. Alles, was ohne oeffentliche Domain messbar war, ist mit 03-08 gemessen; offen bleibt genau der Teil, der eine erreichbare Instanz und die beiden gehosteten Oberflaechen braucht.
@@ -890,10 +894,10 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 
 ## Session Continuity
 
-Last session: 2026-11-12
-Stopped at: Phase 31 geplant und geprüft (sechs Pläne, FOLD-01 bis FOLD-06 und D-31-01 bis D-31-07 abgedeckt); lokale Commits liegen vor origin/plan/v1.8-tasks-080 (c2e8fe9), nicht gepusht
-Nächster Schritt: nach Owner-Freigabe `/gsd:execute-phase 31`, beginnend mit 31-01 (Strecke Nextcloud 32 unter Impersonation, Abbruchkriterium)
-Resume file: .planning/phases/31-ordner-anlegen/31-01-PLAN.md
+Last session: 2026-11-13T11:35:02.076Z
+Stopped at: 32-01 abgeschlossen (BOOTSTRAP NC32 ergebnis=bereit); Strecke 32 gestoppt und bereit; lokale Commits nicht gepusht
+Nächster Schritt: 32-02 ausführen (Strecke 32: compose start mit HP_SHARED_KEY aus nc-mcp-exapp-harp, lokaler Prozess mit den fünf Variablen aus .env.exapp)
+Resume file: .planning/phases/32-tasks-bundle-suchen-lesen-anlegen/32-02-PLAN.md
 
 ## Operator Next Steps
 
