@@ -2710,3 +2710,96 @@ def test_no_place_calls_the_audit_log_planned(manifest_root: etree._Element) -> 
         "a place calls the audit log planned, which it has not been since phase 18: "
         + "; ".join(findings)
     )
+
+
+def check_token_name_detection(text: str) -> None:
+    """D-32-13: the app password call names the token only where occ knows ``--name``.
+
+    ``occ user:auth-tokens:add --name`` exists from Nextcloud 33 on; 32.0.15 answers
+    'The "--name" option does not exist.' (raw/32-01-bootstrap.txt). The script detects the
+    option from the help text instead of comparing versions, so the call on 33 to 35 stays
+    literally what it was, and 32 gets the same call without the name.
+    """
+    body = function_body(text, "app_password")
+    assert body, "the bootstrap does not define app_password"
+    assert "user:auth-tokens:add --help" in body, (
+        "app_password does not read the help of user:auth-tokens:add before the call"
+    )
+    call = re.search(r'user:auth-tokens:add "\$uid"[^\n]*', body)
+    assert call is not None, 'app_password no longer calls user:auth-tokens:add "$uid"'
+    assert "--name" not in call.group(0), (
+        f"app_password passes --name unconditionally: {call.group(0)!r}"
+    )
+    assert "token_name_args=(--name" in body, (
+        "--name is not collected in token_name_args after a hit in the help text"
+    )
+    assert body.count("--name") == body.count("token_name_args=(--name") + body.count(
+        "grep -- '--name'"
+    ), "--name appears in app_password outside the detection and its array"
+
+
+def check_portless_manual_daemon_host(text: str) -> None:
+    """D-32-13: the manual-install daemon is registered with a host without a port.
+
+    AppAPI up to stable32 appends the port to the host and built
+    ``host.docker.internal:23001:23001`` ("Invalid host"); from stable33 on it cuts the
+    port off. Without a port all of 32, 34 and 35 build the same heartbeat URL
+    (raw/32-01-bootstrap.txt).
+    """
+    body = function_body(text, "register_manual_install")
+    assert body, "the bootstrap does not define register_manual_install"
+    assert '"host.docker.internal"' in body, (
+        "register_manual_install does not pass the plain host host.docker.internal"
+    )
+    assert "host.docker.internal:${MANUAL_APP_PORT}" not in body, (
+        "register_manual_install still appends the port to the daemon host"
+    )
+
+
+def test_the_bootstrap_detects_the_token_name_option() -> None:
+    check_token_name_detection(BOOTSTRAP.read_text(encoding="utf-8"))
+
+
+def test_the_token_name_gate_fires_on_the_old_call() -> None:
+    """Counter probe: the call from before D-32-13, with a fixed --name, is refused."""
+    old = (
+        "\napp_password() {\n"
+        '  local uid="$1" password="$2" raw token\n'
+        '  raw="$(occ_pw "$password" user:auth-tokens:add "$uid" --password-from-env'
+        ' --name "$TOKEN_NAME")"\n'
+        "}\n"
+    )
+    with pytest.raises(AssertionError):
+        check_token_name_detection(old)
+    # The same help probe in front of the old call is still refused: the fixed --name is
+    # the defect, not only the missing detection.
+    with_help = old.replace(
+        '  raw="$(',
+        "  occ user:auth-tokens:add --help 2>/dev/null | tr -d '\r' | grep -- '--name'"
+        ' >/dev/null\n  raw="$(',
+    )
+    with pytest.raises(AssertionError):
+        check_token_name_detection(with_help)
+
+
+def test_the_manual_daemon_is_registered_without_a_port() -> None:
+    check_portless_manual_daemon_host(BOOTSTRAP.read_text(encoding="utf-8"))
+
+
+def test_the_manual_daemon_host_gate_fires_on_the_old_host() -> None:
+    """Counter probe: the host with the appended port from before D-32-13 is refused."""
+    old = (
+        "\nregister_manual_install() {\n"
+        "  local output\n"
+        '    if ! output="$(occ app_api:daemon:register \\n'
+        '      "${MANUAL_DAEMON_NAME}" "Manual Install" manual-install http \\n'
+        '      "host.docker.internal:${MANUAL_APP_PORT}" "${NC_DAEMON_URL}" 2>&1)"; then\n'
+        "}\n"
+    )
+    with pytest.raises(AssertionError):
+        check_portless_manual_daemon_host(old)
+    both = old.replace(
+        '"${NC_DAEMON_URL}" 2>&1)"', '"${NC_DAEMON_URL}" 2>&1)" # "host.docker.internal"'
+    )
+    with pytest.raises(AssertionError):
+        check_portless_manual_daemon_host(both)
