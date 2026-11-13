@@ -366,6 +366,7 @@ TASKS = {
     "spaeter": ("a", f"{P}-spaeter", ("DUE;VALUE=DATE:20261220",)),
     "zweite": ("b", f"{P}-zweite", ()),
     "fremdrw": ("rw", f"{P}-fremdrw", ()),
+    "fremdfaellig": ("rw", f"{P}-fremdfaellig", ("DUE;VALUE=DATE:20261204",)),
     "fremdro": ("ro", f"{P}-fremdro", ()),
 }
 FRESH, NEVER = f"{P}-frisch", f"{P}-nie"
@@ -1220,15 +1221,16 @@ async def _connector_sublines(run: Run, case: Case, title: str) -> tuple[str | N
     return (sublines[0] if sublines else None), (texts[0] if texts else None)
 
 
-async def test_d_32_17_the_subline_of_a_shared_list_hit_names_nobody(run: Run) -> None:
+async def _shared_subline_case(run: Run, label: str, role: str, *, dated: bool) -> None:
+    """D-32-17 for one task of the rw share: raw subline first, then the connector."""
     if not run.expect_app:
         record(
-            f"AUFGABE d-32-17-geteilt nc={run.version} nutzer={run.alice} status=keine "
+            f"AUFGABE {label} nc={run.version} nutzer={run.alice} status=keine "
             "ergebnis=entfaellt | without the Tasks app the provider tasks does not exist"
         )
         return
-    title = TASKS["fremdrw"][1]
-    with Case(run, "d-32-17-geteilt") as case:
+    title, name = TASKS[role][1], LISTS["rw"][2]
+    with Case(run, label) as case:
         raw = _raw_provider_subline(run, title)
         case.expect(raw is not None, "the provider finds the task of the rw share")
         raw = raw or ""
@@ -1241,17 +1243,33 @@ async def test_d_32_17_the_subline_of_a_shared_list_hit_names_nobody(run: Run) -
         case.note(
             f"subline_vorhanden={'ja' if subline else 'nein'} text_gleich={text == (subline or '')}"
         )
-        for label, value in (("subline", subline or ""), ("text", text or "")):
-            case.expect(not _names_bob(run, value), f"{label} without bob")
-            case.expect("_shared_by_" not in value, f"{label} without the share marker")
+        for part, value in (("subline", subline or ""), ("text", text or "")):
+            case.expect(not _names_bob(run, value), f"{part} without bob")
+            case.expect("_shared_by_" not in value, f"{part} without the share marker")
         if raw_owner:
-            case.expect(
-                bool(subline) and str(subline).endswith(f" ({LISTS['rw'][2]})"),
-                "the subline ends with the list name without the owner",
+            # With a due date the raw subline ends with " (<raw name>)"; without one it is the
+            # bare "(<raw name>)" (measured on 35). The cleaned line keeps the form, no owner.
+            case.note(f"bereinigt={subline!r}")
+            cleaned = str(subline or "")
+            ok = (
+                cleaned.endswith(f" ({name})") and len(cleaned) > len(name) + 3
+                if dated
+                else cleaned == f"({name})"
             )
+            case.expect(ok, "the subline ends with the list name without the owner")
         else:
             case.expect((subline or "") == raw, "without an owner the subline is the raw one")
         case.expect(text == (subline or ""), "search text equals the subline")
+
+
+async def test_d_32_17_the_subline_of_a_shared_list_hit_names_nobody(run: Run) -> None:
+    await _shared_subline_case(run, "d-32-17-geteilt", "fremdrw", dated=False)
+
+
+async def test_d_32_17_a_dated_shared_list_hit_keeps_its_date_and_names_nobody(
+    run: Run,
+) -> None:
+    await _shared_subline_case(run, "d-32-17-geteilt-faellig", "fremdfaellig", dated=True)
 
 
 async def test_d_32_17_the_subline_of_an_own_list_hit_is_unchanged(run: Run) -> None:
