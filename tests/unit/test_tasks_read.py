@@ -212,7 +212,7 @@ async def test_a_forged_marker_is_removed_from_the_description(clients: NcClient
 async def test_a_long_description_is_cut_at_a_utf8_boundary_without_marker(
     clients: NcClients,
 ) -> None:
-    text = "a" + "ä" * 3000
+    text = "a" + "\u00e4" * 3000
     with respx.mock(assert_all_called=False) as mock:
         mock_task(mock, vtodo(TASK_UID, "long", f"DESCRIPTION:{text}"))
         result = await tasks_tools.read_task(clients, task_id=TASK_ID)
