@@ -12,6 +12,15 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-11-13
+
+### Sicherheit
+
+- opentelemetry-api von 1.45.1 auf 1.45.2 angehoben, das behebt CVE-2026-126360
+  (GHSA-mf5v-w3w3-f6cg, niedrig): ein langsamer regulärer Ausdruck beim Lesen des
+  Headers `traceparent` eingehender Anfragen, erreichbar über das MCP-SDK.
+  pip-audit über den ausgelieferten Paketsatz ist wieder sauber.
+
 ## [0.7.2] - 2026-11-06
 
 ### Behoben

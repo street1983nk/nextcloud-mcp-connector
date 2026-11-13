@@ -11,6 +11,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-11-13
+
+### Security
+
+- opentelemetry-api raised from 1.45.1 to 1.45.2, which fixes CVE-2026-126360
+  (GHSA-mf5v-w3w3-f6cg, low): a slow regular expression when parsing the
+  `traceparent` header of incoming requests, reached through the MCP SDK.
+  pip-audit over the shipped set is clean again.
+
 ## [0.7.2] - 2026-11-06
 
 ### Fixed
@@ -1066,7 +1075,8 @@ First release, submitted to the Nextcloud App Store.
   never sees more than that user sees in the web interface.
 - A privacy and data flow description, see [docs/privacy.md](docs/privacy.md).
 
-[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.6.2...v0.7.0
