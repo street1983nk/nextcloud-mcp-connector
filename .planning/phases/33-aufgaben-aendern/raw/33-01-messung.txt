@@ -731,4 +731,4 @@ MESSWERT kette_antwort_ids=50 (gleich chain_cap)
 
 # 33-01c Task 4 Auslöser geprüft 2026-11-13: (1) wiederoeffnen_kinder=bleiben, nicht mit; (2) entfernen_priority=zeile-weg, entfernen_tags=zeile-weg, keine abweichung; (3) cancelled_kette=unberuehrt, cancelled_direkt=abhaken-und-oeffnen, keine abweichung; (4) chain_cap=50
 OWNERFRAGE entfaellt grund=keine-abweichung
-DOCKER planende eigene_container_laufend=0 fremde=
+DOCKER planende eigene_container_laufend=0 fremde=keine
