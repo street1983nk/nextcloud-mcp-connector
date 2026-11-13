@@ -477,3 +477,125 @@ ENTSCHEID pflegefelder_entfernen=DTSTAMP,LAST-MODIFIED
 ENTSCHEID cancelled_kette=unberuehrt quelle=CANCELLED kette (wie D-33-14)
 ENTSCHEID cancelled_direkt=abhaken-und-oeffnen abhaken=STATUS:COMPLETED,PERCENT-COMPLETE:100,COMPLETED(UTC) oeffnen=STATUS:NEEDS-ACTION,COMPLETED und PERCENT-COMPLETE entfernt pflegefelder=DTSTAMP,LAST-MODIFIED (wie D-33-14)
 ABWEICHUNG D-33-05/D-33-07/D-33-14 keine
+
+# 33-01c Task 1 nc35 2026-11-13T20:55:49Z
+DOCKER fremde_container= vor_start
+# tasks_measure.py up 2026-11-13T20:55:49Z
+
+== up nc35 ==
+RAM frei_host_gb=4.23 schwelle=4.0 ergebnis=ok
+(no running container)
+docker start nc35-nc -> nc35-nc
+docker start nc35-harp -> nc35-harp
+docker start nc35-caddy -> nc35-caddy
+nc35-nc: installed (attempt 1)
+# tasks_modify_measure.py baseline 2026-11-13T20:56:02Z
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+# tasks_modify_measure.py chain 2026-11-13T20:56:03Z
+
+== kette nc35 modus=put tiefe=1 ==
+SETUP MKCALENDAR liste=p3301-kette-a status=201
+SETUP MKCALENDAR liste=p3301-kette-b status=201
+KETTE nc35 modus=put tiefe=1 lauf=1 report_ms=81 schreiben_ms=1999 gesamt_ms=2080 status=[204]
+RUECKBAU kette lauf=1 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=1 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc35 modus=put tiefe=1 lauf=2 report_ms=33 schreiben_ms=2022 gesamt_ms=2056 status=[204]
+RUECKBAU kette lauf=2 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=2 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc35 modus=put tiefe=1 lauf=3 report_ms=33 schreiben_ms=2061 gesamt_ms=2094 status=[204]
+RUECKBAU kette lauf=3 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=3 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc35 modus=put tiefe=1 lauf=4 report_ms=38 schreiben_ms=2125 gesamt_ms=2164 status=[204]
+RUECKBAU kette lauf=4 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=4 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc35 modus=put tiefe=1 lauf=5 report_ms=33 schreiben_ms=2004 gesamt_ms=2037 status=[204]
+RUECKBAU kette lauf=5 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=5 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc35 modus=put tiefe=1 min_ms=2037 median_ms=2080 max_ms=2164 laeufe=5
+# tasks_modify_measure.py chain 2026-11-13T20:57:18Z
+
+== kette nc35 modus=put tiefe=3 ==
+KETTE nc35 modus=put tiefe=3 lauf=1 report_ms=36 schreiben_ms=2019 gesamt_ms=2055 status=[204]
+RUECKBAU kette lauf=1 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=1 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc35 modus=put tiefe=3 lauf=2 report_ms=33 schreiben_ms=2166 gesamt_ms=2199 status=[204]
+RUECKBAU kette lauf=2 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=2 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc35 modus=put tiefe=3 lauf=3 report_ms=46 schreiben_ms=2093 gesamt_ms=2140 status=[204]
+RUECKBAU kette lauf=3 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=3 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc35 modus=put tiefe=3 lauf=4 report_ms=34 schreiben_ms=2039 gesamt_ms=2074 status=[204]
+RUECKBAU kette lauf=4 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=4 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc35 modus=put tiefe=3 lauf=5 report_ms=41 schreiben_ms=2010 gesamt_ms=2051 status=[204]
+RUECKBAU kette lauf=5 liste=p3301-kette-a objekte=51 status=[204] no_trashbin=1
+RUECKBAU kette lauf=5 liste=p3301-kette-b objekte=0 status=[] no_trashbin=1
+KETTE nc35 modus=put tiefe=3 min_ms=2051 median_ms=2074 max_ms=2199 laeufe=5
+# tasks_modify_measure.py chain 2026-11-13T20:58:19Z
+
+== kette nc35 modus=move tiefe=1 ==
+KETTE nc35 modus=move tiefe=1 lauf=1 report_ms=34 schreiben_ms=2047 gesamt_ms=2081 status=[201]
+RUECKBAU kette lauf=1 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=1 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc35 modus=move tiefe=1 lauf=2 report_ms=33 schreiben_ms=2123 gesamt_ms=2156 status=[201]
+RUECKBAU kette lauf=2 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=2 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc35 modus=move tiefe=1 lauf=3 report_ms=50 schreiben_ms=2123 gesamt_ms=2173 status=[201]
+RUECKBAU kette lauf=3 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=3 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc35 modus=move tiefe=1 lauf=4 report_ms=33 schreiben_ms=2062 gesamt_ms=2095 status=[201]
+RUECKBAU kette lauf=4 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=4 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc35 modus=move tiefe=1 lauf=5 report_ms=35 schreiben_ms=2028 gesamt_ms=2063 status=[201]
+RUECKBAU kette lauf=5 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=5 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc35 modus=move tiefe=1 min_ms=2063 median_ms=2095 max_ms=2173 laeufe=5
+# tasks_modify_measure.py chain 2026-11-13T20:59:19Z
+
+== kette nc35 modus=move tiefe=3 ==
+KETTE nc35 modus=move tiefe=3 lauf=1 report_ms=33 schreiben_ms=2044 gesamt_ms=2077 status=[201]
+RUECKBAU kette lauf=1 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=1 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc35 modus=move tiefe=3 lauf=2 report_ms=34 schreiben_ms=2134 gesamt_ms=2168 status=[201]
+RUECKBAU kette lauf=2 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=2 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc35 modus=move tiefe=3 lauf=3 report_ms=283 schreiben_ms=2183 gesamt_ms=2466 status=[201]
+RUECKBAU kette lauf=3 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=3 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc35 modus=move tiefe=3 lauf=4 report_ms=32 schreiben_ms=2064 gesamt_ms=2097 status=[201]
+RUECKBAU kette lauf=4 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=4 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc35 modus=move tiefe=3 lauf=5 report_ms=34 schreiben_ms=2069 gesamt_ms=2103 status=[201]
+RUECKBAU kette lauf=5 liste=p3301-kette-a objekte=0 status=[] no_trashbin=1
+RUECKBAU kette lauf=5 liste=p3301-kette-b objekte=51 status=[204] no_trashbin=1
+KETTE nc35 modus=move tiefe=3 min_ms=2077 median_ms=2103 max_ms=2466 laeufe=5
+# tasks_modify_measure.py etag-altered 2026-11-13T21:00:19Z
+
+== etag-altered nc35 ==
+SETUP MKCALENDAR liste=p3301-etag status=201
+ETAGFORM nc35 fall=ohne-prodid status=204 etag_im_kopf=nein text_gleich_gesendet=nein etag_gleich_get=-
+RUECKBAU etag fall=ohne-prodid status=204 no_trashbin=1
+ETAGFORM nc35 fall=lf status=204 etag_im_kopf=ja text_gleich_gesendet=ja etag_gleich_get=ja
+RUECKBAU etag fall=lf status=204 no_trashbin=1
+ETAGFORM nc35 fall=uid-case status=204 etag_im_kopf=ja text_gleich_gesendet=ja etag_gleich_get=ja
+RUECKBAU etag fall=uid-case status=204 no_trashbin=1
+# tasks_modify_measure.py cleanup 2026-11-13T21:00:33Z
+
+== rueckbau nc35 ==
+RUECKBAU liste_geloescht konto=alice status=204
+RUECKBAU liste_geloescht konto=alice status=204
+RUECKBAU liste_geloescht konto=alice status=204
+PAPIERKORB nc35 konto=alice gefunden=0 geleert=0
+RUECKBAU reste konto=alice listen_mit_praefix=0
+# tasks_modify_measure.py baseline 2026-11-13T21:00:34Z
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher
+# tasks_measure.py stop 2026-11-13T21:00:43Z
+
+== stop nc35 ==
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
+DOCKER ende eigene_container_laufend=0 fremde=keine
+GEHEIMNISPRUEFUNG t1-nc35 geheimnisse=0 treffer_nur_kontonamen=18 (konto=alice/bob in BASELINE, RUECKBAU, PAPIERKORB)
