@@ -61,12 +61,12 @@ Geprüft und bewusst nicht übernommen: Die `CLAUDE.md` des Repos sieht kein eig
 
 ### Ordner anlegen (FOLD)
 
-- [ ] **FOLD-01**: `files_create_folder(path)` im Bundle `files` legt genau einen Ordner mit einem `MKCOL` ohne Body an und meldet `created: true`. Fehlender Elternordner, Datei am Zielpfad, fehlendes Schreibrecht, unzulässiger Name (eigener Zweig für 400), Sperre und Serverfehler ergeben je eine eigene, benannte Meldung; kein Fall endet in "unexpected status".
-- [ ] **FOLD-02**: Mit `parents=true` legt das Werkzeug fehlende Elternordner von oben nach unten an und nennt in der Antwort jeden wirklich angelegten Ordner. Je Aufruf entstehen höchstens 10 neue Ordner (E10). Scheitert ein Segment mittendrin, nennt die Antwort die bereits angelegten Ordner und sagt, dass sie stehen bleiben.
-- [ ] **FOLD-03**: Liegt am Ziel bereits ein Ordner, ist die Antwort ein Erfolg mit `created: false` (E5), aber erst nach der Prüfung, dass dort ein Ordner und keine Datei liegt; eine Datei am Pfad bleibt ein Konflikt. Die Annotation des Werkzeugs ist ehrlich (anlegend, nicht destruktiv, idempotent), und das Annotations-Gate trägt diese Klasse ausdrücklich.
-- [ ] **FOLD-04**: Ausschluss und Sandbox gelten wie beim Upload: in einem mit `kein-ki` ausgeschlossenen Ordner oder darunter wird nichts angelegt, die Ablehnung ist byte-gleich zu "Elternordner fehlt"; ist die Ausschlussprüfung nicht beantwortbar, wird nichts geschrieben; geprüft wird vor jedem einzelnen `MKCOL`. Mit `NC_MCP_FILES_ROOT` wird die Wurzel selbst nie angelegt, ein Ziel gleich Wurzel wird vorab abgelehnt, und es werden nur Segmente unterhalb der Wurzel angefasst.
-- [ ] **FOLD-05**: Der neue Schreiber der Dateifläche durchläuft die ganze v1.7-Kette: Eintrag in `FILE_WRITERS` mit Paarfall (Unit und Live), Kanarie mit `MUST_REFUSE` und echtem Aufruf, Audit-Erlaubnisliste und `@graceful`, eingefrorene Werkzeugmenge, Bundle-Zuordnung, Abnahmeskript, eine positive Nadel "`MKCOL` nur in `dav.py`, ohne Body", `EXPECTED_PUT_CALLS` unverändert, Budget der Werkzeugliste grün ohne Anhebung der Decke je Werkzeug. Der Hinweistext von `parent_missing` verweist auf das neue Werkzeug und ist an beiden Stellen (Fabrik und Test) gemeinsam geändert.
-- [ ] **FOLD-06**: Phase 31 ist allein releasefähig: Werkzeugliste, Rechtetabelle und Werkzeugzahl in `README.md`, `README.de.md` und `README.fr.md` nennen `files_create_folder`; `docs/exclusion.md`, `.de.md` und `.fr.md` tragen einen Satz zur neuen Grenze "Ordner neben getaggtem Ordner" mit Befundlink an einem stabilen Ort (nicht unter `.planning/phases/`); `CHANGELOG.md`, `CHANGELOG.de.md` und `CHANGELOG.fr.md` tragen den Eintrag; alle Gates sind auf dem Stand ohne Phase 32 grün.
+- [x] **FOLD-01**: `files_create_folder(path)` im Bundle `files` legt genau einen Ordner mit einem `MKCOL` ohne Body an und meldet `created: true`. Fehlender Elternordner, Datei am Zielpfad, fehlendes Schreibrecht, unzulässiger Name (eigener Zweig für 400), Sperre und Serverfehler ergeben je eine eigene, benannte Meldung; kein Fall endet in "unexpected status".
+- [x] **FOLD-02**: Mit `parents=true` legt das Werkzeug fehlende Elternordner von oben nach unten an und nennt in der Antwort jeden wirklich angelegten Ordner. Je Aufruf entstehen höchstens 10 neue Ordner (E10). Scheitert ein Segment mittendrin, nennt die Antwort die bereits angelegten Ordner und sagt, dass sie stehen bleiben.
+- [x] **FOLD-03**: Liegt am Ziel bereits ein Ordner, ist die Antwort ein Erfolg mit `created: false` (E5), aber erst nach der Prüfung, dass dort ein Ordner und keine Datei liegt; eine Datei am Pfad bleibt ein Konflikt. Die Annotation des Werkzeugs ist ehrlich (anlegend, nicht destruktiv, idempotent), und das Annotations-Gate trägt diese Klasse ausdrücklich.
+- [x] **FOLD-04**: Ausschluss und Sandbox gelten wie beim Upload: in einem mit `kein-ki` ausgeschlossenen Ordner oder darunter wird nichts angelegt, die Ablehnung ist byte-gleich zu "Elternordner fehlt"; ist die Ausschlussprüfung nicht beantwortbar, wird nichts geschrieben; geprüft wird vor jedem einzelnen `MKCOL`. Mit `NC_MCP_FILES_ROOT` wird die Wurzel selbst nie angelegt, ein Ziel gleich Wurzel wird vorab abgelehnt, und es werden nur Segmente unterhalb der Wurzel angefasst.
+- [x] **FOLD-05**: Der neue Schreiber der Dateifläche durchläuft die ganze v1.7-Kette: Eintrag in `FILE_WRITERS` mit Paarfall (Unit und Live), Kanarie mit `MUST_REFUSE` und echtem Aufruf, Audit-Erlaubnisliste und `@graceful`, eingefrorene Werkzeugmenge, Bundle-Zuordnung, Abnahmeskript, eine positive Nadel "`MKCOL` nur in `dav.py`, ohne Body", `EXPECTED_PUT_CALLS` unverändert, Budget der Werkzeugliste grün ohne Anhebung der Decke je Werkzeug. Der Hinweistext von `parent_missing` verweist auf das neue Werkzeug und ist an beiden Stellen (Fabrik und Test) gemeinsam geändert.
+- [x] **FOLD-06**: Phase 31 ist allein releasefähig: Werkzeugliste, Rechtetabelle und Werkzeugzahl in `README.md`, `README.de.md` und `README.fr.md` nennen `files_create_folder`; `docs/exclusion.md`, `.de.md` und `.fr.md` tragen einen Satz zur neuen Grenze "Ordner neben getaggtem Ordner" mit Befundlink an einem stabilen Ort (nicht unter `.planning/phases/`); `CHANGELOG.md`, `CHANGELOG.de.md` und `CHANGELOG.fr.md` tragen den Eintrag; alle Gates sind auf dem Stand ohne Phase 32 grün.
 
 ### Tasks-Bundle: suchen, lesen, anlegen (TASK)
 
@@ -172,12 +172,12 @@ Stand je Annahme nach dem Mess-Spike: docs/spike-tasks.md, Abschnitt 8. Zu A15, 
 | MESS-04 | Phase 30 | Complete |
 | MESS-05 | Phase 30 | Complete |
 | MESS-06 | Phase 30 | Complete |
-| FOLD-01 | Phase 31 | Pending |
-| FOLD-02 | Phase 31 | Pending |
-| FOLD-03 | Phase 31 | Pending |
-| FOLD-04 | Phase 31 | Pending |
-| FOLD-05 | Phase 31 | Pending |
-| FOLD-06 | Phase 31 | Pending |
+| FOLD-01 | Phase 31 | Complete |
+| FOLD-02 | Phase 31 | Complete |
+| FOLD-03 | Phase 31 | Complete |
+| FOLD-04 | Phase 31 | Complete |
+| FOLD-05 | Phase 31 | Complete |
+| FOLD-06 | Phase 31 | Complete |
 | TASK-01 | Phase 32 | Pending |
 | TASK-02 | Phase 32 | Pending |
 | TASK-03 | Phase 32 | Pending |

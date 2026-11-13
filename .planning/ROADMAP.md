@@ -119,7 +119,7 @@ Kein Milestone-Audit (wie v1.5 und v1.6): Aussagen aus den fünf Phase-Verifikat
 ### v1.8 Tasks-Bundle und Ordner anlegen (Phasen 30-34), IN PLANUNG
 
 - [x] **Phase 30: Mess-Spike Aufgaben und Ordner** - Alles, was Recherche und Planung nur annehmen, wird gegen echte Nextcloud-Instanzen gemessen, bevor Produktcode entsteht; zuerst `MKCOL` unter AppAPI-Impersonation, mit Abbruchkriterien (completed 2026-11-12)
-- [ ] **Phase 31: Ordner anlegen** - `files_create_folder` legt Ordner an, wahlweise mit fehlenden Elternordnern, hinter der ganzen v1.7-Kette aus Ausschluss, Sandbox, Paartest, Kanarie und Audit; allein releasefähig
+- [x] **Phase 31: Ordner anlegen** - `files_create_folder` legt Ordner an, wahlweise mit fehlenden Elternordnern, hinter der ganzen v1.7-Kette aus Ausschluss, Sandbox, Paartest, Kanarie und Audit; allein releasefähig
 - [ ] **Phase 32: Tasks-Bundle suchen, lesen, anlegen** - `tasks_search`, `tasks_read` und `tasks_create` über CalDAV VTODO als zehnte Familie, samt `task:`-Id über `fetch`; ohne Phase 33 releasefähig
 - [ ] **Phase 33: Aufgaben ändern** - Abhaken, Wiederöffnen, Felder ändern und Verschieben einer einzelnen Aufgabe, nur mit gelesener ETag; kein Löschen (Owner, 12.11.2026); jeder Teil abtrennbar
 - [ ] **Phase 34: Doku, Store, Release 0.8.0** - Doku und Store-Text in drei Sprachen sagen den Endstand samt präzisierter Schreibzusage, Release 0.8.0 steht mit Owner-Freigabe im Store
@@ -179,6 +179,7 @@ Plans:
 - [x] 31-05-PLAN.md: Live-Test unter Impersonation auf Nextcloud 35 und 32 mit 15 Fällen und 2 Kontrollen, Beleg in `docs/folder-evidence.md` (FOLD-01 bis FOLD-05; D-31-05 bis D-31-07)
 - [x] 31-05b-PLAN.md: Zusatzplan, Ordnernamen mit Leerraum am Rand vorab abgelehnt, Knoten ohne Datei-Id nicht als Datei gemeldet, Abnahmeskript mit allen 24 Werkzeugen, Nachmessung auf Nextcloud 35 und 32 (FOLD-01, FOLD-05; Owner 2026-11-12)
 - [x] 31-06-PLAN.md: `docs/exclusion*.md` mit stabilem Beleganker, drei CHANGELOGs, Umlaut-Audit, voller Lauf ohne Phase 32, Owner-Checkpoint zum Push (FOLD-06)
+- [x] 31-07-PLAN.md: Zusatzplan nach der Verifikation, ganze Kette über die installierte ExApp auf Nextcloud 35 und das Werkzeug gegen einen Gruppenordner mit ACL (FOLD-01, FOLD-05; Owner 2026-11-13)
 
 **Rückfallschnitt**: klemmt Phase 32, ist diese Phase allein als Release lieferbar (Owner-Entscheid)
 

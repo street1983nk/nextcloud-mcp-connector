@@ -7,9 +7,9 @@ last_updated: "2026-11-12T12:00:00.000Z"
 last_activity: 2026-11-13
 progress:
   total_phases: 5
-  completed_phases: 1
-  total_plans: 13
-  completed_plans: 13
+  completed_phases: 2
+  total_plans: 14
+  completed_plans: 14
   percent: 45
 ---
 
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 
 ## Current Position
 
-Phase: 31 von 30 bis 34 (Ordner anlegen), alle Pläne ausgeführt, Phasen-Verifikation steht aus
-Plan: 31-01 bis 31-06 samt Zusatzplänen 31-04b und 31-05b fertig; 31-06 (Commits d8fdb9b, d25249d, 58844ee, dc74cc4): Grenze tech-folder-oracle in den drei exclusion-Seiten, Bundle-Abschnitt und zwei Tabellenzeilen in README.de.md und README.fr.md, files_update in der Bundle-Liste aller drei READMEs (belegt per Lauf und Contract-Test), drei CHANGELOGs mit je acht Punkten unter Unreleased; 5961 Tests grün, Budget 16222 Bytes, 24 Werkzeuge; als Nächstes Phasen-Verifikation, dann Phase 32 planen
-Status: Phase 31 ausgeführt (2026-11-12 und 2026-11-13); Owner-Entscheid option-push am 2026-11-13 für den Branch plan/v1.8-tasks-080; ein reiner Branch-Push löst keinen CI-Lauf aus (ci.yml und security.yml reagieren nur auf main und pull_request), der CI-Beleg entsteht erst mit einer PR (Owner-Frage offen); offen für später: scripts/bootstrap_exapp.sh für Nextcloud 32 anpassen (Daemon-Host ohne Port, `--name` bei user:auth-tokens:add; Owner 2026-11-12, eigener kleiner Plan nach Phase 31), neun Punkte für den README-Faktencheck in Phase 34 (31-06-SUMMARY.md), FOLD-01 bis FOLD-06 in REQUIREMENTS.md erst nach der Verifikation abhaken
-Last activity: 2026-11-13, Plan 31-06 abgeschlossen und Phase 31 damit vollständig ausgeführt; lokal committet auf plan/v1.8-tasks-080, Push vom Owner freigegeben
+Phase: 31 von 30 bis 34 (Ordner anlegen) abgeschlossen und verifiziert; als Nächstes Phase 32 (Tasks-Bundle suchen, lesen, anlegen), noch nicht geplant
+Plan: Phase 31 mit 31-01 bis 31-07 samt 31-04b und 31-05b fertig; 31-07 (Commits dccb134 bis 1ed43aa): ganze Kette über die installierte ExApp auf Nextcloud 35 und das Werkzeug gegen einen Gruppenordner mit ACL gemessen, kein Produktcode geändert; FOLD-01 bis FOLD-06 abgehakt; Verifikation passed (31-VERIFICATION.md mit Nachtrag); vor Phase 32 steht der kleine Plan für scripts/bootstrap_exapp.sh auf Nextcloud 32 (Owner 2026-11-12)
+Status: Phase 31 abgeschlossen (2026-11-13); Draft-PR 48 gegen main ist offen, CI auf 30e2134 vollständig grün; die Commits nach 30e2134 (Verifikation, 31-07, Abschluss) sind lokal und warten auf eine Push-Freigabe des Owners; auf der Testinstanz nc35 ist die ExApp jetzt 0.7.2 aus diesem Stand registriert (Rückweg im 31-07-SUMMARY.md), die Datei .env.nc35 liegt im Worktree (gitignored); offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13)
+Last activity: 2026-11-13, Phase 31 abgeschlossen: Verifikation, CI-Beleg über die Draft-PR, Zusatzplan 31-07, Anforderungen und Roadmap abgehakt
 
 ## Performance Metrics
 

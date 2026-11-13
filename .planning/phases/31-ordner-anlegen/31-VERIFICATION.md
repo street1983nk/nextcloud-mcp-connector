@@ -1,8 +1,8 @@
 ---
 phase: 31-ordner-anlegen
 verified: 2026-11-13T02:35:00Z
-status: human_needed
-score: 4/5 Erfolgskriterien belegt, 1 teilweise (lokal grün, kein CI-Beleg)
+status: passed
+score: 5/5 Erfolgskriterien belegt (Stand nach dem Nachtrag vom 2026-11-13; bei der Erstprüfung 4/5, siehe Abschnitt Nachtrag)
 overrides_applied: 0
 verified_head: 30e21349be20aef68f9be1b55c4dbfee3a2e6f05
 base: 91c3b5113c541999d3d3363ab71c6b26a9dd41c9
@@ -183,3 +183,13 @@ Offen ist allein der Nachweis "alle Gates grün" jenseits des lokalen Rechners (
 
 _Geprüft: 2026-11-13T02:35:00Z_
 _Verifier: Claude (gsd-verifier)_
+
+## Nachtrag der Hauptsitzung (2026-11-13)
+
+Die Erstprüfung oben endete mit `human_needed` (4 von 5 Kriterien belegt, eines teilweise). Die drei tragenden Lücken sind seither geschlossen; der Text oben bleibt unverändert als Stand der Erstprüfung auf 30e2134.
+
+- **W1, kein CI:** geschlossen. Draft-PR 48 von `plan/v1.8-tasks-080` gegen `main` (Owner-Freigabe 2026-11-13), CI auf 30e2134: unit, image, exapp, canary-nc35 und integration bestanden (Lauf 43352751097), CodeQL, CodeQL (python), REUSE und pip-audit bestanden (Lauf 43352751170). Damit ist die Gate-Hälfte von Erfolgskriterium 5 und von FOLD-06 auch außerhalb des lokalen Rechners belegt, einschließlich der 35 Tests, die lokal als Plattform-Skips laufen. Die Commits nach 30e2134 sind Planung, Belege und ein Messprogramm unter `scripts/`; unter `src/` und `tests/` hat sich seit dem CI-Lauf nichts geändert, die lokalen Gates liefen nach 31-07 erneut grün (5961 passed, 35 skipped; ruff über 376 Dateien, pyright, vulture, Budget 16222 Bytes).
+- **W2, Lauf über die ExApp:** geschlossen durch Plan 31-07. Auf Nextcloud 35.0.0.10 läuft die ExApp aus einem Image dieses Standes (0.7.2, 24 Werkzeuge); `files_create_folder` lief über OAuth, MCP-Client, Caddy, HaRP und den ExApp-Container: frei (created true, id), vorhanden (created false, dieselbe id), Kette mit drei Gliedern, kein-ki (Ablehnung wie Elternordner fehlt), Leerraum am Rand (Ablehnung), je Aufruf genau eine Audit-Zeile bei eingeschaltetem Audit-Schalter. Beleg: `docs/folder-evidence.md#whole-chain-through-the-installed-app`, `raw/nc35-kette.txt`.
+- **W5, Gruppenordner:** geschlossen durch Plan 31-07. Das Werkzeug lief über die ganze Kette gegen einen Gruppenordner mit ACL (groupfolders 23.0.1): im schreibbaren Teil angelegt, erneut created false, Kette angelegt; im nur lesbaren Teil je MKCOL 403, Meldung keine Rechte, nichts angelegt. Beleg: `docs/folder-evidence.md#group-folder-with-acl-measured-with-the-tool`, `raw/nc35-gruppenordner.txt`. Grenze: nur auf 35 gemessen (D-31-07).
+
+Weiter offen, ohne ein Erfolgskriterium zu berühren: W3 (der Live-Test mit 18 Fällen steht in keinem CI-Job), W4 (`scripts/bootstrap_exapp.sh` für Nextcloud 32, eigener kleiner Plan nach dieser Phase, Owner 2026-11-12), W6 und die neun Punkte für den README-Faktencheck (Phase 34), Nextcloud 33 und 34 ungemessen, der Zusatz "nennt das Angelegte" nach einem 403 mitten in der Kette ist mit ACL nicht herstellbar und bleibt per Unit-Test belegt, die ganze Kette ist nur auf 35 gemessen.
