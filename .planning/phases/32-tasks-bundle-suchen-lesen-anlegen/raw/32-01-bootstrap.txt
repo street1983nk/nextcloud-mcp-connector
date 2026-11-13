@@ -145,3 +145,9 @@ RUECKWEG daemon:register manual_install "Manual Install" manual-install http hos
     Prozess nach 31-05b wiederherstellbar, nicht über diese Zeile.
     $ docker stop nc-mcp-exapp-nc        (danach läuft nur der fremde Proxy)
     Geheimnisprüfung Task 3: einziger Treffer APP_ID (mcp_connector, öffentlich).
+
+== Task 4: Owner-Freigabe ==
+
+FREIGABE unregister=option-a datum=2026-11-13
+    Antwort des Owners auf die Checkpoint-Frage von Task 4, am 13.11.2026 per Abfrage
+    eingeholt und vom Orchestrator übermittelt.
