@@ -13,7 +13,7 @@ sees. The unified search already guarantees an absolute URL on the configured in
 the fallbacks below exist so a future provider cannot quietly take the citations away.
 
 **``fetch`` owns no reader.** It parses the id once, through the central codec, and then
-calls the tool that already knows how to read that kind. Seven properties of that routing
+calls the tool that already knows how to read that kind. Eight properties of that routing
 are load bearing:
 
 * A prefix is never guessed. An unknown one is refused with the list of the valid ones,
@@ -39,15 +39,20 @@ are load bearing:
 * A table is answered as an excerpt that says how big the table is: title, row count, the
   first :data:`TABLE_ROWS` rows, cut at :data:`MAX_TABLE_BYTES`. ``tables_browse`` is the way
   to the rest, and a table without a row is a sentence rather than a title on its own.
+* A task is read by ``tasks_read``'s own reader, so ``fetch`` and ``tasks_read`` answer one id
+  with one task, and the id is resolved against the task discovery only: a Deck list is refused
+  before any request, a subscription or an unknown list is an unknown id (E9, K2). Its link is
+  the deep link into the Tasks app for an own list and the start page of the app for a shared
+  one, because the deep link of a shared list carries the account id of the sharer (D-32-15).
 
 **No text of an answer carries a marker this server did not write.** ``text`` is one field
 for every kind, so the truncation note of a cut file and the content of a note, a card, a
-mail, a chat message or a table cell land in the same place a model reads. Every one of the
-seven readers therefore filters the marker sequences out of the foreign text
+mail, a chat message, a table cell or a task land in the same place a model reads. Every one of
+the eight readers therefore filters the marker sequences out of the foreign text
 (:mod:`mcp_connector.tools.marks`), and only the file, the mail and the table reader write one
 back in, where a text actually ended; a cut chat message says so beside its text instead,
 because phase 9 put no marker into a text every participant of a conversation may write. The
-rule sits on all seven and not only on the three that append, because a note that forges the
+rule sits on all eight and not only on the three that append, because a note that forges the
 sequence frames itself exactly the same way (BL-09, ME-03), and a mail is the cheapest place
 of all to try it: anybody may write one.
 """
@@ -57,6 +62,7 @@ import re
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -78,6 +84,7 @@ from . import notes as notes_tools
 from . import search as search_tools
 from . import tables as tables_tools
 from . import talk as talk_tools
+from . import tasks as tasks_tools
 
 DEFAULT_LIMIT = search_tools.DEFAULT_LIMIT
 
@@ -153,6 +160,21 @@ _NO_SUBJECT = "(no subject)"
 #: answer produces; an empty title is not readable in a citation list either way.
 _NO_CONVERSATION = "(conversation without a name)"
 _NO_TABLE_TITLE = "(table without a title)"
+_NO_TASK_SUMMARY = "(task without a summary)"
+
+#: The key of a shared task list: ``s`` plus sixteen hex characters (``ids.task_list_key``). Such
+#: a key is a hash and not a URI, so no deep link can be built from it, and the task gets the
+#: start page of the Tasks app like every task of a shared list.
+_HASHED_LIST_KEY = re.compile(r"s[0-9a-f]{16}")
+
+#: The fields of a task that become a line of the fetched text, in this order, with their label.
+_TASK_LINES: tuple[tuple[str, str], ...] = (
+    ("status", "Status"),
+    ("due", "Due"),
+    ("start", "Start"),
+    ("priority", "Priority"),
+    ("completed", "Completed"),
+)
 
 #: A file id the batch lookup may take: ASCII digits, the same rule as the DAV layer.
 #: Anything else goes the single lookup and gets the error it always got there.
@@ -249,6 +271,8 @@ async def fetch(
             return await _fetch_message(clients, parts[0], parts[1])
         case "table":
             return await _fetch_table(clients, parts[0])
+        case "task":
+            return await _fetch_task(clients, resource_id)
         case _:
             raise ToolError(
                 message=_UNFETCHABLE,
@@ -508,6 +532,52 @@ async def _fetch_event(clients: NcClients, calendar_uri: str, object_name: str) 
         "text": marks.without_marks("\n".join(lines)),
         "url": f"{clients.creds.base_url}{CALENDAR_WEB_PREFIX}/{start[:10]}",
         "metadata": metadata,
+    }
+
+
+async def _fetch_task(clients: NcClients, task_id: str) -> dict[str, Any]:
+    """Read one task through ``tasks_read``'s reader and answer in the fetch shape.
+
+    The reader does the whole resolution (discovery, Deck refusal, unknown id), so this
+    function adds nothing but the shape: one line per field, the description last, the link
+    and four metadata values. No URI of a list reaches the answer: the reader never hands one
+    out, and the deep link is built only from the key of an own list, which is its URI.
+    """
+    task = await tasks_tools.read_task(clients, task_id=task_id)
+    _, (list_key, object_name) = ids.parse(str(task["id"]))
+    task_list = task["list"]
+    shared = bool(task_list["shared"])
+    list_name = str(task_list["name"])
+
+    summary = marks.without_marks(str(task.get("summary") or ""))
+    lines = [summary or _NO_TASK_SUMMARY]
+    for field, label in _TASK_LINES:
+        if task.get(field) not in (None, ""):
+            lines.append(f"{label}: {task[field]}")
+    if task.get("tags"):
+        lines.append(f"Tags: {', '.join(str(tag) for tag in task['tags'])}")
+    lines.append(f"List: {list_name}")
+    if task.get("description"):
+        lines.append("")
+        lines.append(str(task["description"]))
+
+    base = f"{clients.creds.base_url}{provider_map.TASKS_WEB_PREFIX}"
+    if shared or _HASHED_LIST_KEY.fullmatch(list_key):
+        url = base
+    else:
+        url = f"{base}calendars/{quote(list_key, safe='')}/tasks/{quote(object_name, safe='')}"
+
+    return {
+        "id": str(task["id"]),
+        "title": summary or _NO_TASK_SUMMARY,
+        "text": marks.without_marks("\n".join(lines)),
+        "url": url,
+        "metadata": {
+            "kind": "task",
+            "list": list_name,
+            "shared": "true" if shared else "false",
+            "status": str(task.get("status") or ""),
+        },
     }
 
 

@@ -56,8 +56,8 @@ FILE_READERS: dict[str, str] = {
     "search": "A projection of unified_search that answers titles and urls of files "
     "(tools/chatgpt.py:168-201).",
     "fetch": (
-        "The id kinds file, note, message and table address files or file references "
-        "(tools/chatgpt.py:236-257)."
+        "The id kinds file, note, message and table address files or file references; "
+        "task is a kind without a file (tools/chatgpt.py:258-282)."
     ),
     "tables_browse": (
         "A text/link cell picked through the files provider stores the file name and "
