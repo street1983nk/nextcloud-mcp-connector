@@ -335,6 +335,90 @@ async def get_event(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class WriteWording:
+    """The sentences of one family for the answers to a create-only PUT.
+
+    One sentence and one hint per branch of the status check. The placeholders are
+    ``{label}`` (the name of the collection the caller hands in), ``{name}`` (the object
+    name) and ``{status}`` (the HTTP status); a sentence uses only the ones it needs.
+    ``what`` names the collection for the general status check. The label is the only name
+    of the collection a sentence carries, so a caller whose collection URI holds personal
+    data passes a neutral label instead of the URI.
+    """
+
+    replaced: str
+    replaced_hint: str
+    exists: str
+    exists_hint: str
+    forbidden: str
+    forbidden_hint: str
+    missing: str
+    missing_hint: str
+    unsupported: str
+    unsupported_hint: str
+    what: str
+    unexpected: str
+    unexpected_hint: str
+
+
+#: The sentences of the calendar bundle, word for word as they were before the writer
+#: became generic. The label of an event calendar is its URI.
+EVENT_WORDING = WriteWording(
+    replaced=(
+        "Nextcloud reports that the write replaced an existing event {name} (status {status})."
+    ),
+    replaced_hint=(
+        "This server sends If-None-Match: * and expects a refusal instead. Report "
+        "this instance: it does not honour the precondition."
+    ),
+    exists="An event object named {name} already exists.",
+    exists_hint="This server never overwrites events. Create the event under a new name.",
+    forbidden="No permission to write to the calendar {label}.",
+    forbidden_hint="Pick one of your own calendars, or ask its owner for write permission.",
+    missing="The calendar {label} does not exist.",
+    missing_hint="Call calendar_list_events once to see the calendars of this account.",
+    unsupported="Nextcloud rejected the event as an unsupported media type.",
+    unsupported_hint="This is a bug in this connector; please report it with the event data.",
+    what="the calendar {label}",
+    unexpected="Nextcloud answered the new event with an unexpected status {status}.",
+    unexpected_hint=(
+        "Check the Nextcloud log for that request; the event was probably not created."
+    ),
+)
+
+
+async def put_new_object(
+    client: httpx.AsyncClient,
+    creds: Credentials,
+    collection_uri: str,
+    object_name: str,
+    ics_bytes: bytes,
+    wording: WriteWording,
+    label: str,
+) -> dict[str, Any]:
+    """Create one object in a CalDAV collection that must not exist yet.
+
+    ``If-None-Match: *`` is the whole overwrite protection and it is evaluated by sabre
+    inside the same request, so there is no probe before it and no race after it
+    (threat T-01-48). This is the one PUT of this module: every family that creates a
+    calendar object comes through here with its own wording, and the result does not carry
+    the collection URI, because the caller knows it and may not want it in an answer.
+    """
+    response = await client.put(
+        object_url(creds, collection_uri, object_name),
+        content=ics_bytes,
+        headers={"If-None-Match": "*", "Content-Type": "text/calendar; charset=utf-8"},
+        auth=creds.auth(),
+    )
+    _check_new_object(response, label, object_name, wording)
+    return {
+        "object_name": object_name,
+        "etag": response.headers.get("etag", ""),
+        "created": True,
+    }
+
+
 async def put_event(
     client: httpx.AsyncClient,
     creds: Credentials,
@@ -342,24 +426,15 @@ async def put_event(
     object_name: str,
     ics_bytes: bytes,
 ) -> dict[str, Any]:
-    """Create one calendar object that must not exist yet.
-
-    ``If-None-Match: *`` is the whole overwrite protection and it is evaluated by sabre
-    inside the same request, so there is no probe before it and no race after it
-    (threat T-01-48).
-    """
-    response = await client.put(
-        object_url(creds, calendar_uri, object_name),
-        content=ics_bytes,
-        headers={"If-None-Match": "*", "Content-Type": "text/calendar; charset=utf-8"},
-        auth=creds.auth(),
+    """Create one calendar object that must not exist yet, with the event wording."""
+    result = await put_new_object(
+        client, creds, calendar_uri, object_name, ics_bytes, EVENT_WORDING, calendar_uri
     )
-    _check_write(response, calendar_uri, object_name)
     return {
         "calendar": calendar_uri,
-        "object_name": object_name,
-        "etag": response.headers.get("etag", ""),
-        "created": True,
+        "object_name": result["object_name"],
+        "etag": result["etag"],
+        "created": result["created"],
     }
 
 
@@ -444,50 +519,47 @@ def _text_of(component: Any, name: str) -> str:
     return str(value) if value is not None else ""
 
 
-def _check_write(response: httpx.Response, calendar_uri: str, object_name: str) -> None:
+def _check_new_object(
+    response: httpx.Response, label: str, object_name: str, wording: WriteWording
+) -> None:
     """Translate the answer to a create-only PUT. 412 is the expected refusal, not a bug."""
     status = response.status_code
+    fields = {"label": label, "name": object_name, "status": status}
     if status == 201:
         return
     if status in (200, 204):
         raise ToolError(
-            message=(
-                f"Nextcloud reports that the write replaced an existing event "
-                f"{object_name} (status {status})."
-            ),
-            hint=(
-                "This server sends If-None-Match: * and expects a refusal instead. Report "
-                "this instance: it does not honour the precondition."
-            ),
+            message=wording.replaced.format(**fields),
+            hint=wording.replaced_hint,
         )
     if status == 412:
         raise ConflictError(
-            message=f"An event object named {object_name} already exists.",
-            hint="This server never overwrites events. Create the event under a new name.",
+            message=wording.exists.format(**fields),
+            hint=wording.exists_hint,
         )
     if status == 403:
         raise ToolError(
-            message=f"No permission to write to the calendar {calendar_uri}.",
-            hint="Pick one of your own calendars, or ask its owner for write permission.",
+            message=wording.forbidden.format(**fields),
+            hint=wording.forbidden_hint,
             # Why the identifier sits at the status branches only: see the docstring of
             # ``_status_error`` in ``ocs.py`` (D-17).
             reason=REASON_PERMISSION_DENIED,
         )
     if status in (404, 409):
         raise ToolError(
-            message=f"The calendar {calendar_uri} does not exist.",
-            hint="Call calendar_list_events once to see the calendars of this account.",
+            message=wording.missing.format(**fields),
+            hint=wording.missing_hint,
             reason=REASON_UNKNOWN_ID,
         )
     if status == 415:
         raise ToolError(
-            message="Nextcloud rejected the event as an unsupported media type.",
-            hint="This is a bug in this connector; please report it with the event data.",
+            message=wording.unsupported.format(**fields),
+            hint=wording.unsupported_hint,
         )
-    _check(response, f"the calendar {calendar_uri}")
+    _check(response, wording.what.format(**fields))
     raise ToolError(
-        message=f"Nextcloud answered the new event with an unexpected status {status}.",
-        hint="Check the Nextcloud log for that request; the event was probably not created.",
+        message=wording.unexpected.format(**fields),
+        hint=wording.unexpected_hint,
     )
 
 
