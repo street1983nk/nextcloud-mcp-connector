@@ -68,7 +68,7 @@ async def tasks_create(
     summary: Annotated[str, Field(description="Title of the new task")],
     list: Annotated[  # noqa: A002 - the wire name of E7, handed on as list_name
         str | None,
-        Field(description="List name or key from tasks_search; required for a shared list"),
+        Field(description="List name or key from tasks_search; required for a list others can see"),
     ] = None,
     description: Annotated[str | None, Field(description="Optional longer text")] = None,
     due: Annotated[str | None, Field(description="YYYY-MM-DD, or ISO 8601 with zone")] = None,
@@ -85,7 +85,7 @@ async def tasks_create(
     ] = None,
     ctx: Context | None = None,
 ) -> str:
-    """Create a task, create-only; never into a shared list unless it is named."""
+    """Create a task, create-only; never into a list others can see unless it is named."""
     clients = deps.resolve_clients(ctx)
     return compact(
         await tasks_tools.create_task(

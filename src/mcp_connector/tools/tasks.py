@@ -928,10 +928,14 @@ def _pick_target(
 ) -> tasks_client.TaskList:
     """The one list a create writes into, after E4 and D-32-16; never positional.
 
-    A named list wins. Without one, the list of the parent if it is an own list; a parent in
-    a shared list is not a naming of that list. Without both, exactly one own writable list,
-    otherwise the caller has to choose from the real names. No fallback on ``personal`` and
-    none on "exactly one list at all": that one could be shared.
+    A named list wins. Without one, the list of the parent if it is an own list nobody else
+    sees; a parent in a shared list, or in an own list the account shares with others or
+    publishes, is not a naming of that list (D-32-16, D-32-18). Without both, exactly one own
+    writable list, and only when nobody else sees it; otherwise the caller has to choose
+    from the real names. Two own lists stay "more than one" even when only one of them is
+    private: a choice that depends on the share state of the others would be unforeseeable.
+    No fallback on ``personal`` and none on "exactly one list at all": that one could be
+    shared.
     """
     if wanted:
         target = _resolve_list(lists, wanted)
@@ -949,9 +953,22 @@ def _pick_target(
                 "To create the subtask there, name that list with "
                 f"list={_list_name(parent_list)!r}.",
             )
+        if parent_list.shared_out:
+            raise _refused(
+                "The parent task lives in a list that is shared with others, and such a list "
+                "is only written to when it is named.",
+                "To create the subtask there, name that list with "
+                f"list={_list_name(parent_list)!r}.",
+            )
         target = parent_list
     else:
         own = [entry for entry in lists if entry.own and entry.writable]
+        if len(own) == 1 and own[0].shared_out:
+            raise _refused(
+                f"The only own task list to write to, {_list_name(own[0])!r}, is shared with "
+                "others, and a list others can see is only written to when it is named.",
+                _writable_hint(lists),
+            )
         if len(own) == 1:
             return own[0]
         raise _no_default_target(lists, own)

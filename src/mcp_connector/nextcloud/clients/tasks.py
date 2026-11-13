@@ -22,6 +22,15 @@ is recognised through the ``owner-displayname`` property and never printed. ``Ta
 exists for request URLs only. The same suffix leaves the subline of a hit of the search
 provider ``tasks`` through :func:`clean_subline` (D-32-17).
 
+**Lists the account shares itself.** An own list that the account has shared with other
+people or published by link is visible to others, and ``tasks_create`` never writes into it
+unless it is named (D-32-18). Plan 32-09 measured on Nextcloud 32 and 35, under an app
+password and under impersonation alike, that ``oc:invite`` stands in the 2xx propstat of
+every own list: empty while nobody else sees the list, one ``oc:user`` per share and one for
+a public link. ``cs:publish-url`` is asked as a second mark of a public link. The entries are
+only counted, never kept, and an own list whose ``oc:invite`` is not readable counts as
+shared. ``shared`` keeps its meaning (shared into the account); ``shared_out`` is internal.
+
 **Write permission is read, never tried.** ``writable`` comes from ``oc:read-only`` and the
 privilege set of the discovery (D-32-06): a read only share answers a PUT with 404, so a
 write attempt would not even give a clear answer.
@@ -77,6 +86,9 @@ _EXCLUDED_TYPES = frozenset(
 )
 _NOT_READ_ONLY = ("", "0", "false")
 _SEARCH_HINT = "Call tasks_search once to see the task lists of this account."
+#: The marks of an own list the account shares itself, decided in plan 32-09 (D-32-18).
+_INVITE = f"{{{xml.OC}}}invite"
+_PUBLISH_URL = f"{{{xml.CS}}}publish-url"
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,7 +101,9 @@ class TaskList:
 
     ``owner_suffix`` is the suffix `` (<owner>)`` the name rule of D-32-14 recognised and
     removed, empty for an own list and when the rule did not match. It leaves this module
-    only through :func:`clean_subline`, never as text. None of the three is in the repr.
+    only through :func:`clean_subline`, never as text. ``shared_out`` marks an own list the
+    account shares with others or publishes (D-32-18), always false for a list shared into
+    the account. None of these three is in the repr.
     """
 
     uri: str = field(repr=False)
@@ -98,6 +112,7 @@ class TaskList:
     shared: bool
     writable: bool
     owner_suffix: str = field(default="", repr=False)
+    shared_out: bool = field(default=False, repr=False)
 
     @property
     def own(self) -> bool:
@@ -148,10 +163,11 @@ def build_task_discovery_body() -> bytes:
     """The PROPFIND body of the task list discovery.
 
     A body of its own: the calendar discovery asks for less and must stay as it is.
+    ``oc:invite`` and ``cs:publish-url`` tell an own list the account shares (D-32-18).
     """
     root = etree.Element(
         f"{{{xml.DAV}}}propfind",
-        nsmap={"d": xml.DAV, "c": xml.CAL, "oc": xml.OC, "nx": NS_NEXTCLOUD_COM},
+        nsmap={"d": xml.DAV, "c": xml.CAL, "oc": xml.OC, "cs": xml.CS, "nx": NS_NEXTCLOUD_COM},
     )
     prop = etree.SubElement(root, f"{{{xml.DAV}}}prop")
     etree.SubElement(prop, f"{{{xml.DAV}}}displayname")
@@ -160,6 +176,8 @@ def build_task_discovery_body() -> bytes:
     etree.SubElement(prop, f"{{{xml.DAV}}}current-user-privilege-set")
     etree.SubElement(prop, f"{{{xml.OC}}}read-only")
     etree.SubElement(prop, f"{{{NS_NEXTCLOUD_COM}}}owner-displayname")
+    etree.SubElement(prop, _INVITE)
+    etree.SubElement(prop, _PUBLISH_URL)
     return etree.tostring(root, xml_declaration=True, encoding="utf-8")
 
 
@@ -225,9 +243,31 @@ def parse_task_home(body: str | bytes, home_path: str = "") -> list[TaskList]:
                 shared=shared,
                 writable=writable,
                 owner_suffix=owner_suffix,
+                shared_out=False if shared else _shares_itself(props),
             )
         )
     return found
+
+
+def _shares_itself(props: dict[str, etree._Element]) -> bool:
+    """Whether an own list is shared with others or published, by the measured marks.
+
+    ``oc:invite`` outside a 2xx propstat means the state is not readable, and then the list
+    counts as shared (point 6 of D-32-18). Only counted: no entry is kept or returned.
+    """
+    invite = props.get(_INVITE)
+    if invite is None:
+        return True
+    if any(
+        isinstance(child.tag, str) and etree.QName(child).localname == "user" for child in invite
+    ):
+        return True
+    published = props.get(_PUBLISH_URL)
+    if published is None:
+        return False
+    return bool((published.text or "").strip()) or any(
+        isinstance(child.tag, str) and (child.text or "").strip() for child in published
+    )
 
 
 def _collect_props(response: etree._Element) -> dict[str, etree._Element]:
