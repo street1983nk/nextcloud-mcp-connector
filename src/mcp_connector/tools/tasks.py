@@ -1445,34 +1445,11 @@ def _cannot_change(task_id: str, why: str) -> ToolError:
     )
 
 
-def _in_target_state(status: str, completed: bool) -> bool:
-    """Completed when completing, open or in progress when reopening; cancelled never."""
-    if completed:
-        return status == "completed"
-    return status in _OPEN_STATES
+def _task_key(task_id: str) -> tuple[str, str]:
+    """List key and object name of a task id a change names; before any request.
 
-
-async def complete_task(
-    clients: NcClients, *, task_id: str, etag: str, completed: bool
-) -> dict[str, Any]:
-    """Complete (``completed`` true) or reopen (false) one task (TMOD-03, D-33-08).
-
-    Refused before any request: an id that is not a task id, a Deck key (answered like an
-    unknown task, E9), an ETag that is not one strong validator and a ``completed`` that is
-    not a bool. Refused after the discovery and the GET, before any write: an unknown list
-    or task (one answer for all of it), a read only list, an ETag other than the one just
-    read (the ETag still goes out as ``If-Match``, so the window after the comparison stays
-    covered), a recurring task, several VTODO and any text the check before the edit
-    refuses (D-33-00a, D-33-03, D-33-11).
-
-    A task already in the target state is a success without a write. Completing reads the
-    list once and completes every descendant first, the named task last, through the chain
-    of plan 33-05; a completed descendant is skipped and a cancelled one is left alone and
-    named (D-33-00b, D-33-09, D-33-14). Every new text is built and checked before the first
-    write, so a refusal never leaves half a chain. Reopening changes the named task only
-    (D-33-05, ENTSCHEID wiederoeffnen_kinder=bleiben). A cancelled task may be completed
-    and reopened directly (ENTSCHEID cancelled_direkt). The answer names task ids and the
-    list, never a URI or an owner.
+    An id that is not a task id is refused, a Deck key gets the answer of an unknown task
+    (E9): a Deck board is never asked, not even through the discovery.
     """
     kind, parts = ids.parse(task_id)
     if kind != "task":
@@ -1482,15 +1459,33 @@ async def complete_task(
         )
     list_key, object_name = parts
     if list_key.startswith(tasks_client.DECK_PREFIX):
-        # A Deck board is never asked, not even through the discovery (E9).
         raise _unknown_task(task_id)
-    wanted = dav.normalize_etag(etag)
-    if not isinstance(completed, bool):
-        raise _refused(
-            "completed must be true or false.",
-            "Pass completed=true to complete the task or completed=false to reopen it.",
-        )
+    return list_key, object_name
 
+
+@dataclass
+class _Stored:
+    """One task as a change found it: list, read fields, text and the check before the edit."""
+
+    task_list: tasks_client.TaskList
+    own_id: str
+    object_name: str
+    todo: dict[str, Any]
+    text: str
+    facts: ics_edit.TodoFacts
+
+
+async def _read_for_change(
+    clients: NcClients, task_id: str, list_key: str, object_name: str, wanted: str
+) -> _Stored:
+    """Discovery, write permission, GET, ETag comparison and the check before the edit.
+
+    Everything a modifying tool refuses after the first request and before any write: an
+    unknown list or task (one answer for all of it), a read only list, an ETag other than
+    the one just read (the ETag still goes out as ``If-Match``, so the window after the
+    comparison stays covered), a text that is not UTF-8, several VTODO, any text
+    ``ics_edit.inspect`` refuses and a recurring task (D-33-00a, D-33-03, D-33-11).
+    """
     lists = await tasks_client.discover_task_lists(clients.client, clients.creds)
     matches = [entry for entry in lists if entry.key == list_key]
     if len(matches) != 1:
@@ -1529,6 +1524,48 @@ async def complete_task(
             f"The task {own_id} is a recurring task; this server does not change recurring tasks.",
             "Nothing was changed. Change it in the Nextcloud Tasks app.",
         )
+    return _Stored(task_list, own_id, object_name, todo, text, facts)
+
+
+def _in_target_state(status: str, completed: bool) -> bool:
+    """Completed when completing, open or in progress when reopening; cancelled never."""
+    if completed:
+        return status == "completed"
+    return status in _OPEN_STATES
+
+
+async def complete_task(
+    clients: NcClients, *, task_id: str, etag: str, completed: bool
+) -> dict[str, Any]:
+    """Complete (``completed`` true) or reopen (false) one task (TMOD-03, D-33-08).
+
+    Refused before any request: an id that is not a task id, a Deck key (answered like an
+    unknown task, E9), an ETag that is not one strong validator and a ``completed`` that is
+    not a bool. Refused after the discovery and the GET, before any write: an unknown list
+    or task (one answer for all of it), a read only list, an ETag other than the one just
+    read (the ETag still goes out as ``If-Match``, so the window after the comparison stays
+    covered), a recurring task, several VTODO and any text the check before the edit
+    refuses (D-33-00a, D-33-03, D-33-11).
+
+    A task already in the target state is a success without a write. Completing reads the
+    list once and completes every descendant first, the named task last, through the chain
+    of plan 33-05; a completed descendant is skipped and a cancelled one is left alone and
+    named (D-33-00b, D-33-09, D-33-14). Every new text is built and checked before the first
+    write, so a refusal never leaves half a chain. Reopening changes the named task only
+    (D-33-05, ENTSCHEID wiederoeffnen_kinder=bleiben). A cancelled task may be completed
+    and reopened directly (ENTSCHEID cancelled_direkt). The answer names task ids and the
+    list, never a URI or an owner.
+    """
+    list_key, object_name = _task_key(task_id)
+    wanted = dav.normalize_etag(etag)
+    if not isinstance(completed, bool):
+        raise _refused(
+            "completed must be true or false.",
+            "Pass completed=true to complete the task or completed=false to reopen it.",
+        )
+
+    loaded = await _read_for_change(clients, task_id, list_key, object_name, wanted)
+    task_list, own_id, todo, text = loaded.task_list, loaded.own_id, loaded.todo, loaded.text
 
     status = todo["status"]
     if _in_target_state(status, completed):
@@ -1578,5 +1615,307 @@ async def complete_task(
     if report.root_etag:
         result["etag"] = report.root_etag
     elif report.root_etag == "":
+        result["note"] = NEW_ETAG_NOTE
+    return result
+
+
+# --- Changing the named fields of a task (plan 33-07) ---------------------------------------
+
+#: The fields of ``tasks_update`` in the order of every answer, with their iCalendar names.
+_UPDATE_FIELDS = {
+    "summary": "SUMMARY",
+    "description": "DESCRIPTION",
+    "due": "DUE",
+    "start": "DTSTART",
+    "priority": "PRIORITY",
+    "tags": "CATEGORIES",
+    "parent": ics_edit.PARENT,
+}
+
+_NO_FIELD_HINT = (
+    "Pass summary, description, due, start, priority, tags or parent; an empty value clears "
+    "a field."
+)
+
+
+def _one_line_end(text: str) -> str:
+    """Line breaks of an input text as LF: RFC 5545 text cannot carry a carriage return
+    (plan 33-04), so it would never read back as it was written."""
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _update_time(text: str, field: str) -> date | datetime:
+    """A date stays a date; a time with an offset or Z is written in UTC (D-33-15)."""
+    value = _parse_task_time(text, field)
+    if value is None:
+        raise _refused(f"{field} is empty.", _TASK_TIME_HINT)
+    if not isinstance(value, datetime):
+        return value
+    if value.microsecond:
+        raise _refused(f"{field} must be given in whole seconds.", _TASK_TIME_HINT)
+    return value.astimezone(UTC)
+
+
+def _wanted_fields(
+    *,
+    summary: str | None,
+    description: str | None,
+    due: str | None,
+    start: str | None,
+    priority: int | None,
+    tags: Sequence[str] | None,
+    parent: str | None,
+) -> dict[str, Any]:
+    """The named fields, checked before any request; ``None`` as a value means "clear".
+
+    A field left out or ``None`` is not in the result and stays as it is; an empty value
+    clears it (``""``, ``[]``, ``priority=0``); an empty summary is refused (D-33-07,
+    D-33-15). ``parent`` stays the task id here, its UID comes from the list later.
+    """
+    wanted: dict[str, Any] = {}
+    if summary is not None:
+        if not summary.strip():
+            raise _refused(
+                "The summary of a task cannot be cleared.",
+                "Give a short title, or leave summary out to keep it.",
+            )
+        wanted["summary"] = _one_line_end(summary)
+    if description is not None:
+        wanted["description"] = _one_line_end(description) if description.strip() else None
+    for field, text in (("due", due), ("start", start)):
+        if text is not None:
+            wanted[field] = _update_time(text, field) if text.strip() else None
+    if priority is not None:
+        _check_priority(priority)
+        wanted["priority"] = priority or None
+    if tags is not None:
+        if isinstance(tags, str):
+            raise _refused("tags must be a list of texts.", "Pass tags=[...], or tags=[] to clear.")
+        wanted["tags"] = _clean_tags([_one_line_end(str(tag)) for tag in tags]) or None
+    if parent is not None:
+        wanted["parent"] = parent.strip() or None
+    if not wanted:
+        raise _refused("Name at least one field to change.", _NO_FIELD_HINT)
+    return wanted
+
+
+def _is_utc(value: date | datetime) -> bool:
+    return (
+        isinstance(value, datetime)
+        and value.tzinfo is not None
+        and value.utcoffset() == timedelta(0)
+        and value.tzname() == "UTC"
+    )
+
+
+def _check_merged_times(
+    wanted: dict[str, Any], todo: dict[str, Any], facts: ics_edit.TodoFacts, own_id: str
+) -> None:
+    """The time checks of ``tasks_create`` on the state after the change (TMOD-04).
+
+    A new due date is checked against the stored start and the other way round: both dates
+    or both times, the start before the due date. A stored floating time or a time in a
+    named zone is not compared with a new UTC time by guessing: both have to be set. A
+    DURATION stands beside DUE or DTSTART only under rules this tool does not keep, so
+    neither may be changed then (RFC 5545).
+    """
+    if "due" not in wanted and "start" not in wanted:
+        return
+    if "DURATION" in facts.fields:
+        raise _refused(
+            f"The task {own_id} has a DURATION, so due and start cannot be changed here.",
+            "Change its dates in the Nextcloud Tasks app.",
+        )
+    final = {
+        field: wanted[field] if field in wanted else todo.get(f"_{field}_value")
+        for field in ("due", "start")
+    }
+    if final["due"] is None or final["start"] is None:
+        return
+    for field, other in (("due", "start"), ("start", "due")):
+        kept = final[other]
+        new_time = field in wanted and isinstance(wanted[field], datetime)
+        if new_time and other not in wanted and isinstance(kept, datetime) and not _is_utc(kept):
+            kind = "a floating time" if kept.tzinfo is None else "a time in a named zone"
+            raise _refused(
+                f"The stored {other} of the task is {kind}, which cannot be compared with a "
+                "time in UTC.",
+                "Set due and start together, both with an offset or Z.",
+            )
+    _check_times(final["due"], final["start"], None)
+
+
+def _raw_tags(prop: Any) -> list[str]:
+    """Every tag as stored, over every CATEGORIES line and in order (pitfall 11)."""
+    return [str(tag) for line in _as_list(prop) for tag in getattr(line, "cats", [line])]
+
+
+def _same_time(old: date | datetime, new: date | datetime) -> bool:
+    """The same moment in the same value type; a floating time never equals a UTC time."""
+    if isinstance(new, datetime):
+        return isinstance(old, datetime) and old.tzinfo is not None and old == new
+    return not isinstance(old, datetime) and old == new
+
+
+def _differs(field: str, value: Any, todo: Any, facts: ics_edit.TodoFacts) -> bool:
+    """Whether the stored task differs from the wanted value (``None``: cleared)."""
+    if field == "parent":
+        return _parents(todo.get("RELATED-TO")) != ([] if value is None else [value])
+    prop = todo.get(_UPDATE_FIELDS[field])
+    if value is None:
+        if field == "description":
+            return bool(str(prop or "")) or "X-ALT-DESC" in facts.fields
+        return prop is not None
+    if prop is None:
+        return True
+    if field == "tags":
+        return _raw_tags(prop) != value
+    if field == "priority":
+        return str(prop).strip() != str(value)
+    if field in ("due", "start"):
+        return not _same_time(prop.dt, value)
+    return str(prop) != value
+
+
+async def _parent_of_update(clients: NcClients, loaded: _Stored, parent: str) -> str:
+    """The UID of the new parent: in the same list, not the task, none of its descendants.
+
+    One REPORT of the list (the chain read of plan 33-05) finds the parent by its object
+    name and the descendants of the task, so a cycle never starts here (TMOD-04).
+    """
+    _key, parent_object = _parse_parent(parent)
+    entries, _skipped = await read_chain_list(clients, loaded.task_list)
+    match = next((entry for entry in entries if entry["object_name"] == parent_object), None)
+    if match is None or not match["uid"]:
+        raise _unknown_task(parent)
+    if match["uid"] == loaded.todo["uid"]:
+        raise _refused("A task cannot be its own parent.", _OTHER_PARENT_HINT)
+    descendants = descendants_post_order(loaded.todo["uid"], entries)
+    if any(entry["object_name"] == parent_object for entry in descendants):
+        raise _refused(
+            f"The task {parent} is a subtask of {loaded.own_id}, so it cannot become its parent.",
+            "Pick a task outside of its subtasks as parent.",
+        )
+    return match["uid"]
+
+
+_OTHER_PARENT_HINT = "Pick another task of the same list as parent."
+
+
+async def update_task(
+    clients: NcClients,
+    *,
+    task_id: str,
+    etag: str,
+    summary: str | None = None,
+    description: str | None = None,
+    due: str | None = None,
+    start: str | None = None,
+    priority: int | None = None,
+    tags: Sequence[str] | None = None,
+    parent: str | None = None,
+) -> dict[str, Any]:
+    """Change or clear the named fields of one task, nothing else (TMOD-02, TMOD-04).
+
+    A field left out or ``None`` stays; an empty value clears it (``""`` for description,
+    due, start and parent, ``[]`` for tags, ``priority=0``); an empty summary is refused
+    (D-33-07, D-33-15). Times with an offset or Z are written in UTC with Z, dates as
+    ``VALUE=DATE``; there is no zone parameter. Status and list are not fields of this tool.
+
+    Refused before any request: the checks of ``tasks_create`` on the new values, a parent
+    in another list or the task itself, and a call that names no field. After the GET and
+    before any write: everything :func:`_read_for_change` refuses, the time checks on the
+    merged state and a parent that is unknown in the list or a descendant of the task.
+
+    Without a difference to the stored task nothing is written (``changed`` empty);
+    otherwise exactly one PUT with ``If-Match`` through the line editor, which keeps every
+    untouched line and brings LAST-MODIFIED and DTSTAMP to the same UTC second (ENTSCHEID
+    pflegefelder_entfernen). A changed description drops the HTML version (``X-ALT-DESC``,
+    ``ALTREP``) and the answer says so (D-33-13). The answer names the fields, never a URI
+    or an owner; ``etag`` comes from the PUT alone.
+    """
+    list_key, object_name = _task_key(task_id)
+    wanted_etag = dav.normalize_etag(etag)
+    wanted = _wanted_fields(
+        summary=summary,
+        description=description,
+        due=due,
+        start=start,
+        priority=priority,
+        tags=tags,
+        parent=parent,
+    )
+    if wanted.get("parent") is not None:
+        parent_key, parent_object = _parse_parent(wanted["parent"])
+        if parent_key != list_key:
+            raise _refused(
+                "The parent task lives in another list.",
+                "Pick a parent from the list of the task; an empty parent only detaches it.",
+            )
+        if parent_object == object_name:
+            raise _refused("A task cannot be its own parent.", _OTHER_PARENT_HINT)
+    if wanted.get("due") is not None and wanted.get("start") is not None:
+        _check_times(wanted["due"], wanted["start"], None)
+
+    loaded = await _read_for_change(clients, task_id, list_key, object_name, wanted_etag)
+    _check_merged_times(wanted, loaded.todo, loaded.facts, loaded.own_id)
+    values = dict(wanted)
+    if wanted.get("parent") is not None:
+        values["parent"] = await _parent_of_update(clients, loaded, wanted["parent"])
+
+    before = _crlf(loaded.text)
+    (stored,) = IcsCalendar.from_ical(before).walk("VTODO")
+    changed = [
+        name for name, value in values.items() if _differs(name, value, stored, loaded.facts)
+    ]
+    result: dict[str, Any] = {
+        "id": loaded.own_id,
+        "list": _list_info(loaded.task_list),
+        "changed": changed,
+    }
+    if not changed:
+        return result
+
+    now = datetime.now(UTC).replace(microsecond=0)
+    set_fields: dict[str, Any] = {}
+    drop_fields: list[str] = []
+    for name in changed:
+        if values[name] is None:
+            drop_fields.append(_UPDATE_FIELDS[name])
+        else:
+            set_fields[_UPDATE_FIELDS[name]] = values[name]
+    set_fields.update({"LAST-MODIFIED": now, "DTSTAMP": now})
+    html_removed = False
+    if "description" in changed:
+        old = stored.get("DESCRIPTION")
+        altrep = old is not None and any(str(key).upper() == "ALTREP" for key in old.params)
+        if "X-ALT-DESC" in loaded.facts.fields:
+            drop_fields.append("X-ALT-DESC")
+        html_removed = altrep or "X-ALT-DESC" in loaded.facts.fields
+
+    expected: dict[str, Any] = dict(set_fields)
+    expected.update(dict.fromkeys(drop_fields))
+    try:
+        after = ics_edit.apply(before, set_fields=set_fields, drop_fields=drop_fields)
+        ics_edit.verify(before, after, expected)
+    except ics_edit.EditRefused as exc:
+        raise _cannot_change(loaded.own_id, str(exc)) from None
+    new_etag = await tasks_client.put_existing_todo(
+        clients.client,
+        clients.creds,
+        loaded.task_list,
+        object_name,
+        after.encode("utf-8"),
+        wanted_etag,
+    )
+
+    removed = [name for name in changed if values[name] is None]
+    if removed:
+        result["removed"] = removed
+    if html_removed:
+        result["html_description_removed"] = True
+    if new_etag:
+        result["etag"] = new_etag
+    else:
         result["note"] = NEW_ETAG_NOTE
     return result

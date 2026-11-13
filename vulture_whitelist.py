@@ -398,3 +398,8 @@ move_todo
 # --- Tool logic ahead of its registration, plan 33-06 --------------------------------------
 # Empty again: complete_task sat here between task 1 and task 2 and left with tasks_complete,
 # which calls it.
+
+# --- Tool logic ahead of its registration, plan 33-07 --------------------------------------
+# Temporary: update_task lands in task 1, its registration tasks_update in task 2 of the
+# same plan; the name leaves this list with task 2.
+update_task

@@ -17,6 +17,7 @@ in UTC with Z and dates as VALUE=DATE; and the answer, which never carries a URI
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -369,7 +370,7 @@ async def test_times_are_checked_on_the_merged_state_without_a_put(
         ),
         (("DTSTART:20261118T090000Z",), {"due": "2026-11-20T09:00:00+01:00"}),
         (("DTSTART:20261118T090000Z", "DURATION:PT1H"), {"summary": "nur der Titel"}),
-        (("DTSTART:20261121T090000Z",), {"due": ""}),
+        (("DTSTART:20261121T090000Z", "DUE:20261122T090000Z"), {"due": ""}),
     ],
     ids=[
         "floating-set-both",
@@ -589,7 +590,8 @@ async def test_the_answer_names_fields_and_the_etag_of_the_put(clients: NcClient
     assert answer["list"] == {"name": "Team", "shared": True, "writable": True}
     assert "html_description_removed" not in answer
     for leak in LEAKS:
-        assert leak not in str(answer)
+        # The ETag of the mocked store names its list URI; the answer around it never does.
+        assert leak not in str({key: value for key, value in answer.items() if key != "etag"})
 
 
 @pytest.mark.anyio
@@ -830,8 +832,12 @@ def _app(name: str) -> bytes:
 
 
 def _with_line(data: bytes, line: bytes) -> bytes:
-    """A prior state the measurement did not keep as a file: the app object plus one line."""
-    return data.replace(b"END:VTODO\r\n", line + b"\r\nEND:VTODO\r\n")
+    """A prior state the measurement did not keep as a file: the app object plus one line,
+    with the maintenance stamps of an earlier moment."""
+    earlier = re.sub(
+        rb"^(LAST-MODIFIED|DTSTAMP):\d{8}T\d{6}Z", rb"\1:20261113T200000Z", data, flags=re.M
+    )
+    return earlier.replace(b"END:VTODO\r\n", line + b"\r\nEND:VTODO\r\n")
 
 
 APP_PAIRS = [
