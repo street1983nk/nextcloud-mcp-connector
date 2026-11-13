@@ -16,6 +16,10 @@ This program asks a running Nextcloud instead:
 * whether navigation and the list of search providers mirror the state of the Tasks app (A3,
   D-32-10);
 * the link form for ``fetch`` and the link of the search provider ``tasks`` (A5, D-32-15).
+* plan 32-09: how the discovery tells an own list the account shares itself (candidates
+  ``oc:invite``, ``cs:invite``, ``DAV:share-access``, ``cs:publish-url``; step ``hinaus``,
+  D-32-18) and the form of the provider subline for a shared list (step ``subline``,
+  D-32-17), both printed as marks and counts only.
 
 Subcommands::
 
@@ -46,6 +50,7 @@ import asyncio
 import base64
 import importlib.util
 import math
+import os
 import re
 import secrets
 import sys
@@ -62,7 +67,7 @@ import httpx
 from lxml import etree
 
 from mcp_connector.nextcloud.clients import xml
-from mcp_connector.nextcloud.credentials import MODE_APPAPI, Credentials
+from mcp_connector.nextcloud.credentials import MODE_APPAPI, MODE_BASIC, Credentials
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SPIKE_FILE = REPO_ROOT / "scripts" / "tasks_spike.py"
@@ -99,6 +104,14 @@ NC_NS = "http://nextcloud.com/ns"
 OWNER_DISPLAYNAME = f"{{{NC_NS}}}owner-displayname"
 NO_TRASHBIN = {"X-NC-CalDAV-No-Trashbin": "1"}
 THROWAWAY_TAG = "35.0.2-apache"
+#: Plan 32-09: an own list of alice it shares itself, a list bob shares with alice.
+GAP_PREFIX = "p3209"
+LIST_OUT = f"{GAP_PREFIX}-aus"
+LIST_IN = f"{GAP_PREFIX}-rein"
+SUBLINE_TERM = f"{GAP_PREFIX}sub"
+PREFIXES = (PREFIX, GAP_PREFIX)
+#: The anonymised raw discoveries of plan 32-09 go here, never into the repository.
+SCRATCH_DIR = Path(os.environ.get("P3209_SCRATCH", ".")).resolve()
 
 TOTAL_TASKS = 2000
 DONE_TASKS = 1900
@@ -248,6 +261,97 @@ def owner_suffix_strip(displayname: str, owner_displayname: str) -> str | None:
         return None
     name = displayname[: -len(suffix)]
     return name if name.strip() else None
+
+
+#: The candidates of plan 32-09 (D-32-18) for "an own list the account shares itself".
+SHARE_CANDIDATES = (
+    f"{{{xml.OC}}}invite",
+    f"{{{xml.CS}}}invite",
+    f"{{{xml.DAV}}}share-access",
+    f"{{{xml.CS}}}publish-url",
+)
+#: Children of ``share-access`` that say "nobody else".
+_NOT_SHARED = frozenset({"not-shared"})
+
+
+@dataclass(frozen=True, slots=True)
+class ShareMark:
+    """One candidate of one collection: propstat status, filled or not, number of entries.
+
+    Never a href, a principal or a name: the entries are only counted.
+    """
+
+    status: str
+    filled: bool
+    entries: int
+
+
+def _share_entries(element: etree._Element) -> int:
+    local = etree.QName(element).localname
+    children = [child for child in element if isinstance(child.tag, str)]
+    if local == "invite":
+        return sum(1 for child in children if etree.QName(child).localname == "user")
+    if local == "share-access":
+        return sum(1 for child in children if etree.QName(child).localname not in _NOT_SHARED)
+    hrefs = [child for child in children if (child.text or "").strip()]
+    if hrefs:
+        return len(hrefs)
+    return 1 if (element.text or "").strip() else 0
+
+
+def share_state(response: etree._Element) -> dict[str, ShareMark]:
+    """Every candidate of ``SHARE_CANDIDATES`` in one ``DAV:response`` of a discovery."""
+    marks = {name: ShareMark("fehlt", False, 0) for name in SHARE_CANDIDATES}
+    for propstat in response.findall(f"{{{xml.DAV}}}propstat"):
+        status_line = propstat.findtext(f"{{{xml.DAV}}}status") or ""
+        code = next((part for part in status_line.split() if part.isdigit()), "")
+        for name in SHARE_CANDIDATES:
+            element = propstat.find(f"{{{xml.DAV}}}prop/{name}")
+            if element is None:
+                continue
+            if code.startswith("2"):
+                entries = _share_entries(element)
+                marks[name] = ShareMark("2xx", entries > 0, entries)
+            else:
+                marks[name] = ShareMark(code or "unklar", False, 0)
+    return marks
+
+
+def share_states(body: bytes) -> dict[str, dict[str, ShareMark]]:
+    """``uri -> share_state`` for every response of a discovery."""
+    root = xml.parse_root(body)
+    found: dict[str, dict[str, ShareMark]] = {}
+    for response in root.findall(f"{{{xml.DAV}}}response"):
+        path = urlsplit((response.findtext(f"{{{xml.DAV}}}href") or "").strip()).path
+        found[unquote(path.rstrip("/").rsplit("/", 1)[-1])] = share_state(response)
+    return found
+
+
+def share_line(instance: str, state: str, auth: str, prop: str, mark: ShareMark) -> str:
+    return (
+        f"HINAUS {instance} zustand={state} auth={auth} prop={prop} status={mark.status} "
+        f"belegt={yes_no(mark.filled)} eintraege={mark.entries}"
+    )
+
+
+def subline_form(subline: str, raw_display: str, owner: str) -> dict[str, bool]:
+    """Yes/no marks of one provider subline against the raw list name and the owner name.
+
+    ``bereinigt_moeglich``: the subline ends with `` (<raw name>)``, the raw name carries
+    exactly the owner suffix of D-32-14, and after the replacement the owner is gone.
+    """
+    ends = bool(raw_display) and subline.endswith(f" ({raw_display})")
+    has_owner = bool(owner.strip()) and owner.casefold() in subline.casefold()
+    stripped = owner_suffix_strip(raw_display, owner) if raw_display else None
+    possible = False
+    if ends and stripped is not None:
+        cleaned = f"{subline[: -len(f' ({raw_display})')]} ({stripped})"
+        possible = owner.casefold() not in cleaned.casefold()
+    return {
+        "endet_mit_rohname": ends,
+        "enthaelt_besitzer": has_owner,
+        "bereinigt_moeglich": possible,
+    }
 
 
 def derive_budget(max_seconds: float) -> int:
@@ -707,7 +811,7 @@ async def prefixed_lists(client: httpx.AsyncClient, creds: Credentials) -> list[
     )
     if result.status != 207:
         return []
-    return [entry for entry in spike.parse_home(result.body) if entry.uri.startswith(PREFIX)]
+    return [entry for entry in spike.parse_home(result.body) if entry.uri.startswith(PREFIXES)]
 
 
 async def purge_trash(client: httpx.AsyncClient, creds: Credentials) -> int:
@@ -728,7 +832,7 @@ async def purge_trash(client: httpx.AsyncClient, creds: Credentials) -> int:
     removed = 0
     for href, props in xml.parse_multistatus(listed.body):
         data = props.get(f"{{{xml.CAL}}}calendar-data", "")
-        if f"UID:{PREFIX}" not in spike.unfold(data):
+        if not any(f"UID:{p}" in spike.unfold(data) for p in PREFIXES):
             continue
         path = urlsplit(href).path
         gone = await spike.dav_request(
@@ -760,6 +864,16 @@ async def teardown(target: Target, env: Mapping[str, str]) -> None:
                 body=etree.tostring(unshare, xml_declaration=True, encoding="utf-8"),
             )
             note(f"RUECKBAU freigabe_entfernt liste={uri} status={result.status}")
+        alice = appapi_creds(env, target.base_url, target.alice)
+        for label, creds, owner, uri, body in (
+            ("freigabe_entfernt", alice, target.alice, LIST_OUT, _unshare_body(target.bob)),
+            ("link_entfernt", alice, target.alice, LIST_OUT, _publish_body(False)),
+            ("freigabe_entfernt", bob, target.bob, LIST_IN, _unshare_body(target.alice)),
+        ):
+            result = await spike.dav_request(
+                client, creds, "POST", list_url(target.base_url, owner, uri), body=body
+            )
+            note(f"RUECKBAU {label} liste={uri} status={result.status}")
         for user in (target.alice, target.bob):
             creds = appapi_creds(env, target.base_url, user)
             for entry in await prefixed_lists(client, creds):
@@ -1114,6 +1228,178 @@ async def appstate(target: Target, env: Mapping[str, str]) -> None:
     await record("wieder-an")
 
 
+# --- live: lists the account shares itself, and the subline (plan 32-09) ----------------------
+
+
+def basic_creds(env: Mapping[str, str], base: str, user: str, key: str) -> Credentials:
+    """The app password of a test account from the environment file, never printed."""
+    secret = env.get(key, "")
+    if not secret:
+        raise spike.RunFailed(f"the environment file names no {key}")
+    spike.remember_secret(key, secret)
+    return Credentials(base_url=base, user=user, secret=secret, mode=MODE_BASIC)
+
+
+def display_name(target: Target, user: str) -> str:
+    raw = spike._json_or_text(spike.occ(target.container, "user:info", user, "--output=json"))
+    if not isinstance(raw, dict):
+        raise spike.RunFailed(f"occ user:info {user} returned no JSON object")
+    return str(raw.get("display_name") or raw.get("displayname") or "")
+
+
+def _publish_body(publish: bool) -> bytes:
+    name = "publish-calendar" if publish else "unpublish-calendar"
+    root = etree.Element(f"{{{xml.CS}}}{name}", nsmap={"cs": xml.CS})
+    return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+
+def _unshare_body(user: str) -> bytes:
+    root = etree.Element(
+        f"{{{spike.OC_SHARE_NS}}}share", nsmap={"d": xml.DAV, "o": spike.OC_SHARE_NS}
+    )
+    entry = etree.SubElement(root, f"{{{spike.OC_SHARE_NS}}}remove")
+    etree.SubElement(entry, f"{{{xml.DAV}}}href").text = f"principal:principals/users/{user}"
+    return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+
+def anonymise(body: bytes, target: Target, bob_display: str) -> bytes:
+    """The discovery with every trace of the sharee replaced and every public token cut."""
+    text = body.decode("utf-8")
+    if bob_display:
+        text = text.replace(bob_display, "Sharee")
+    text = re.sub(rf"(?<![A-Za-z0-9]){re.escape(target.bob)}(?![A-Za-z0-9])", "sharee", text)
+    text = re.sub(r"public-calendars/[^<\"\s]+", "public-calendars/TOKEN", text)
+    return text.replace(target.base_url, "https://nextcloud.example").encode("utf-8")
+
+
+async def _discovery(client: httpx.AsyncClient, creds: Credentials) -> bytes:
+    result = await spike.dav_request(
+        client,
+        creds,
+        "PROPFIND",
+        home_url(creds.base_url, creds.user),
+        depth="1",
+        body=spike.propfind_body((*NAME_PROPS, *SHARE_CANDIDATES)),
+    )
+    if result.status != 207:
+        raise spike.RunFailed(f"the discovery answered {result.status}")
+    return result.body
+
+
+async def gap(target: Target, env: Mapping[str, str], steps: Sequence[str], run: str) -> None:
+    """Steps ``hinaus`` and ``subline``: only marks, counts and yes/no, never a name."""
+    base = target.base_url
+    alice = basic_creds(env, base, target.alice, "NC_MCP_TEST_APP_PASSWORD")
+    bob = basic_creds(env, base, target.bob, "NC_MCP_TEST_APP_PASSWORD2")
+    alice_aa = appapi_creds(env, base, target.alice)
+    bob_display = display_name(target, target.bob)
+    if bob_display and bob_display != target.bob:
+        spike.remember_secret("BOB_DISPLAY", bob_display)
+    out_url = list_url(base, target.alice, LIST_OUT)
+    in_url = list_url(base, target.bob, LIST_IN)
+    async with spike.new_client() as client:
+        await make_list(client, alice, LIST_OUT)
+        await make_list(client, bob, LIST_IN)
+        shared = await spike.dav_request(
+            client, bob, "POST", in_url, body=spike.share_body(target.alice, writable=True)
+        )
+        note(f"SETUP FREIGABE liste={LIST_IN} an=alice schreibrecht=ja status={shared.status}")
+
+        async def probe(state: str) -> None:
+            for auth, creds in (("basic", alice), ("appapi", alice_aa)):
+                body = await _discovery(client, creds)
+                marks = share_states(body)
+                own = marks.get(LIST_OUT)
+                if own is None:
+                    raise spike.RunFailed(f"{LIST_OUT} is missing in the discovery")
+                for prop in SHARE_CANDIDATES:
+                    note(share_line(target.name, state, auth, prop, own[prop]))
+                if state == "privat":
+                    inbound = [
+                        m for uri, m in marks.items() if uri.startswith(f"{LIST_IN}_shared_by_")
+                    ]
+                    for mark in inbound[:1]:
+                        for prop in SHARE_CANDIDATES:
+                            note(share_line(target.name, "hineingeteilt", auth, prop, mark[prop]))
+                    if not inbound:
+                        note(
+                            f"HINAUS {target.name} zustand=hineingeteilt auth={auth} vorhanden=nein"
+                        )
+                if auth == "basic" and state in ("an-bob-ro", "veroeffentlicht"):
+                    keep = SCRATCH_DIR / f"discovery-hinaus-{state}-{target.name}.xml"
+                    keep.write_bytes(anonymise(body, target, bob_display))
+                    note(f"ROHKOERPER zustand={state} anonymisiert bytes={keep.stat().st_size}")
+
+        async def post(creds: Credentials, url: str, body: bytes, label: str) -> None:
+            result = await spike.dav_request(client, creds, "POST", url, body=body)
+            note(f"SETUP {label} status={result.status}")
+
+        if "hinaus" in steps:
+            await probe("privat")
+            await post(
+                alice, out_url, spike.share_body(target.bob, writable=False), "FREIGABE an-bob-ro"
+            )
+            await probe("an-bob-ro")
+            await post(
+                alice, out_url, spike.share_body(target.bob, writable=True), "FREIGABE an-bob-rw"
+            )
+            await probe("an-bob-rw")
+            await post(alice, out_url, _unshare_body(target.bob), "FREIGABE zurueck")
+            await post(alice, out_url, _publish_body(True), "LINK veroeffentlicht")
+            await probe("veroeffentlicht")
+            await post(alice, out_url, _publish_body(False), "LINK zurueck")
+            await probe("zurueckgenommen")
+            note(f"HINAUS {target.name} zustand=gruppe entfaellt grund=nicht-freigegeben")
+
+        if "subline" in steps:
+            placed = {
+                "eigen": (alice, LIST_OUT, f"{GAP_PREFIX}-sub-eigen-{run}"),
+                "geteilt": (bob, LIST_IN, f"{GAP_PREFIX}-sub-geteilt-{run}"),
+            }
+            for case, (creds, uri, uid) in placed.items():
+                text = spike.simple_todo(uid, f"{SUBLINE_TERM} {case}", ["DUE:20261120T090000Z"])
+                status = await put_task(client, creds, uri, f"{uid}.ics", text)
+                note(f"SETUP PUT subline-aufgabe fall={case} status={status}")
+            body = await _discovery(client, alice)
+            raw_names = {e.uri: e.display for e in spike.parse_home(body)}
+            owners = owner_names(body)
+            in_uri = next((u for u in raw_names if u.startswith(f"{LIST_IN}_shared_by_")), "")
+            response = await client.get(
+                f"{base}/ocs/v2.php/search/providers/tasks/search",
+                params={"term": SUBLINE_TERM},
+                headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+                auth=alice.auth(),
+            )
+            try:
+                entries = response.json()["ocs"]["data"]["entries"]
+            except (ValueError, KeyError, TypeError):
+                entries = None
+            count = "unlesbar" if not isinstance(entries, list) else str(len(entries))
+            note(f"PROVIDER subline status={response.status_code} eintraege={count}")
+            for case in placed:
+                title = f"{SUBLINE_TERM} {case}"
+                entry = next(
+                    (e for e in entries or [] if isinstance(e, dict) and e.get("title") == title),
+                    None,
+                )
+                if entry is None:
+                    note(f"SUBLINE {target.name} liste={case} vorhanden=nein")
+                    continue
+                subline = str(entry.get("subline") or "")
+                raw = raw_names.get(in_uri if case == "geteilt" else LIST_OUT, "")
+                owner = (owners.get(in_uri) or "") if case == "geteilt" else bob_display
+                form = subline_form(subline, raw, owner or bob_display)
+                has_id = re.search(
+                    rf"(?<![A-Za-z0-9]){re.escape(target.bob)}(?![A-Za-z0-9])", subline
+                )
+                note(
+                    f"SUBLINE {target.name} liste={case} "
+                    + " ".join(f"{key}={yes_no(value)}" for key, value in form.items())
+                    + f" enthaelt_kennung={yes_no(has_id is not None)} leer={yes_no(not subline)}"
+                    + f" owner_displayname_gleich_anzeigename={yes_no(owner == bob_display)}"
+                )
+
+
 # --- live: the run -------------------------------------------------------------------------------
 
 
@@ -1206,6 +1492,8 @@ async def live(target: Target, env: Mapping[str, str], steps: Sequence[str]) -> 
             await home(target, env)
         if "appstate" in steps:
             await appstate(target, env)
+        if "hinaus" in steps or "subline" in steps:
+            await gap(target, env, steps, run)
     except Exception as failure:
         note(f"BLOCK FAILED | live {target.name} | {type(failure).__name__}: {str(failure)[:300]}")
         raise
