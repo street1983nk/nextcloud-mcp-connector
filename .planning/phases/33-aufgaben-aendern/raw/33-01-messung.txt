@@ -1,0 +1,2 @@
+BASIS 86358131af91c55d79d743048ceefccdefcf51a6
+FREIGABE zustand=option-a datum=2026-11-13 umfang=nc35+nc32 quelle=owner-antwort-checkpoint-33-01-task-3
