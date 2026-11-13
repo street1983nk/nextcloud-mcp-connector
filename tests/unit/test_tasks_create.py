@@ -20,6 +20,7 @@ import httpx
 import pytest
 import respx
 from icalendar import Calendar as IcsCalendar
+from lxml import etree
 
 from mcp_connector import ids
 from mcp_connector.errors import (
@@ -852,3 +853,129 @@ async def test_a_parent_in_an_own_list_shared_with_others_is_written_when_named(
         await tasks_tools.create_task(clients, summary="t", parent=parent, list_name=OWN)
     assert len(stores[OWN].puts) == 1
     assert f"RELATED-TO:{PARENT_UID}\r\n" in stores[OWN].body
+
+
+# --------------------------------------------------------------------------------------
+# Plan 32-10: D-32-18, E4 and D-32-16 for group shares, on the measured discovery of
+# Nextcloud 35 (tests/fixtures/caldav_home_group_share.xml). Regression tests.
+# --------------------------------------------------------------------------------------
+
+GROUP_OUT_RO, GROUP_OUT_RW, GROUP_PRIVATE = "p3210-aus-ro", "p3210-aus-rw", "p3210-privat"
+GROUP_IN_RW = "p3210-rein-rw_shared_by_sharee"
+GROUP_IN_RO = "p3210-rein-ro_shared_by_sharee"
+GROUP_LEAKS = ("testgroup", "sharee", "Sharee", "_shared_by_", "principal")
+
+
+def group_home(*keep: str) -> str:
+    """The measured discovery with the home and only the lists named in ``keep``."""
+    root = etree.fromstring(fixture("caldav_home_group_share.xml").encode("utf-8"))
+    for response in list(root.findall("{DAV:}response")):
+        href = (response.findtext("{DAV:}href") or "").rstrip("/")
+        uri = unquote(href.rsplit("/", 1)[-1])
+        if href != HOME_PATH.rstrip("/") and uri not in keep:
+            root.remove(response)
+    return etree.tostring(root, xml_declaration=True, encoding="utf-8").decode("utf-8")
+
+
+def group_stores(mock: respx.MockRouter, body: str, *uris: str) -> dict[str, Store]:
+    mock_discovery(mock, body)
+    stores: dict[str, Store] = {}
+    for uri in uris:
+        store = Store(uri)
+        mock.route(method="PUT", url__startswith=list_url(uri)).mock(side_effect=store.put)
+        mock.route(method="GET", url__startswith=list_url(uri)).mock(side_effect=store.get)
+        stores[uri] = store
+    return stores
+
+
+def assert_names_no_group(error: ToolError) -> None:
+    text = error.message + error.hint
+    for leak in GROUP_LEAKS:
+        assert leak not in text, leak
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("own", [GROUP_OUT_RO, GROUP_OUT_RW])
+async def test_the_only_own_list_shared_with_a_group_is_no_default_target(
+    clients: NcClients, own: str
+) -> None:
+    uris = (own, GROUP_IN_RW, GROUP_IN_RO)
+    with respx.mock(assert_all_called=False) as mock:
+        stores = group_stores(mock, group_home(*uris), *uris)
+        with pytest.raises(ToolError) as caught:
+            await tasks_tools.create_task(clients, summary="t")
+    assert caught.value.reason == REASON_GUARD_TRIPPED
+    assert "shared with others" in caught.value.message
+    assert "list=" in caught.value.hint
+    assert puts(stores) == 0
+    assert_names_no_group(caught.value)
+
+
+@pytest.mark.anyio
+async def test_an_own_list_after_the_group_share_is_taken_back_is_the_target_again(
+    clients: NcClients,
+) -> None:
+    uris = (GROUP_PRIVATE, GROUP_IN_RW, GROUP_IN_RO)
+    with respx.mock(assert_all_called=False) as mock:
+        stores = group_stores(mock, group_home(*uris), *uris)
+        result = await tasks_tools.create_task(clients, summary="t")
+    assert len(stores[GROUP_PRIVATE].puts) == 1
+    assert puts(stores) == 1
+    assert result["list"] == {"name": GROUP_PRIVATE, "shared": False, "writable": True}
+
+
+@pytest.mark.anyio
+async def test_a_list_shared_in_through_a_group_is_written_when_named(
+    clients: NcClients,
+) -> None:
+    uris = (GROUP_OUT_RO, GROUP_IN_RW, GROUP_IN_RO)
+    with respx.mock(assert_all_called=False) as mock:
+        stores = group_stores(mock, group_home(*uris), *uris)
+        result = await tasks_tools.create_task(clients, summary="t", list_name="p3210-rein-rw")
+    assert len(stores[GROUP_IN_RW].puts) == 1
+    assert puts(stores) == 1
+    assert result["list"] == {"name": "p3210-rein-rw", "shared": True, "writable": True}
+    assert "sharee" not in json.dumps(result).casefold()
+
+
+@pytest.mark.anyio
+async def test_a_parent_in_a_list_shared_in_through_a_group_does_not_name_it(
+    clients: NcClients,
+) -> None:
+    uris = (GROUP_PRIVATE, GROUP_IN_RW, GROUP_IN_RO)
+    with respx.mock(assert_all_called=False) as mock:
+        stores = group_stores(mock, group_home(*uris), *uris)
+        parent = with_parent(stores[GROUP_IN_RW])
+        with pytest.raises(ToolError) as caught:
+            await tasks_tools.create_task(clients, summary="t", parent=parent)
+    assert "list=" in caught.value.hint
+    assert puts(stores) == 0
+    assert_names_no_group(caught.value)
+
+
+@pytest.mark.anyio
+async def test_a_read_only_list_shared_in_through_a_group_is_refused_before_the_put(
+    clients: NcClients,
+) -> None:
+    uris = (GROUP_PRIVATE, GROUP_IN_RW, GROUP_IN_RO)
+    with respx.mock(assert_all_called=False) as mock:
+        stores = group_stores(mock, group_home(*uris), *uris)
+        with pytest.raises(ToolError) as caught:
+            await tasks_tools.create_task(clients, summary="t", list_name="p3210-rein-ro")
+    assert puts(stores) == 0
+    assert_names_no_group(caught.value)
+
+
+@pytest.mark.anyio
+async def test_the_hint_names_the_group_share_by_name_and_key_only(clients: NcClients) -> None:
+    """Without list and with the own list shared with a group, the writable lists are named:
+    the share into the account as ``<name> (shared, key <key>)``, never with its owner."""
+    uris = (GROUP_OUT_RW, GROUP_IN_RW, GROUP_IN_RO)
+    with respx.mock(assert_all_called=False) as mock:
+        stores = group_stores(mock, group_home(*uris), *uris)
+        with pytest.raises(ToolError) as caught:
+            await tasks_tools.create_task(clients, summary="t")
+    assert f"p3210-rein-rw (shared, key {ids.task_list_key(GROUP_IN_RW)})" in caught.value.hint
+    assert "p3210-rein-ro" not in caught.value.hint
+    assert puts(stores) == 0
+    assert_names_no_group(caught.value)

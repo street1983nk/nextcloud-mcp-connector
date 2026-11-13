@@ -850,3 +850,89 @@ def test_the_task_discovery_asks_for_invite_and_publish_url() -> None:
     asked = {str(element.tag) for element in body.iter() if isinstance(element.tag, str)}
     assert "{http://owncloud.org/ns}invite" in asked
     assert "{http://calendarserver.org/ns/}publish-url" in asked
+
+
+# --------------------------------------------------------------------------------------
+# Plan 32-10: group shares, out of the account and into it, measured on Nextcloud 35 and 32
+# (raw/32-10-messung.txt). Regression tests: the measurement showed the rules carry as built.
+# --------------------------------------------------------------------------------------
+
+GROUP_LEAKS = ("sharee", "testgroup", "_shared_by_", "principal")
+
+
+def group_home() -> dict[str, tasks.TaskList]:
+    return by_uri(
+        tasks.parse_task_home(fixture_bytes("caldav_home_group_share.xml"), home_path=HOME_PATH)
+    )
+
+
+@pytest.mark.parametrize("uri", ["p3210-aus-ro", "p3210-aus-rw"])
+def test_an_own_list_shared_with_a_group_is_shared_out(uri: str) -> None:
+    entry = group_home()[uri]
+    assert entry.shared_out is True
+    assert entry.shared is False
+    assert entry.writable is True
+    assert entry.key == uri
+
+
+def test_an_own_list_after_the_group_share_is_taken_back_is_not_shared_out() -> None:
+    entry = group_home()["p3210-privat"]
+    assert entry.shared_out is False
+    assert entry.shared is False
+
+
+def test_the_group_entry_of_the_invite_is_a_user_element_with_a_group_principal() -> None:
+    """The measured form: one ``oc:user`` whose href names ``principals/groups/``."""
+    root = etree.fromstring(fixture_bytes("caldav_home_group_share.xml"))
+    invites = [
+        invite
+        for invite in root.iter("{http://owncloud.org/ns}invite")
+        if any(isinstance(child.tag, str) for child in invite)
+    ]
+    assert len(invites) == 2
+    for invite in invites:
+        entries = [child for child in invite if isinstance(child.tag, str)]
+        assert [etree.QName(child).localname for child in entries] == ["user"]
+        assert "principals/groups/" in (entries[0].findtext("{DAV:}href") or "")
+
+
+def test_a_list_shared_into_the_account_through_a_group_with_write_access() -> None:
+    entry = group_home()["p3210-rein-rw_shared_by_sharee"]
+    assert entry.shared is True
+    assert entry.writable is True
+    assert entry.shared_out is False
+    assert entry.name == "p3210-rein-rw"
+    assert entry.owner_suffix == " (Sharee)"
+    assert entry.key != entry.uri
+
+
+def test_a_list_shared_into_the_account_through_a_group_read_only() -> None:
+    entry = group_home()["p3210-rein-ro_shared_by_sharee"]
+    assert entry.shared is True
+    assert entry.writable is False
+    assert entry.shared_out is False
+    assert entry.name == "p3210-rein-ro"
+
+
+def test_the_repr_of_the_group_lists_names_nobody() -> None:
+    for entry in group_home().values():
+        text = repr(entry).casefold()
+        for leak in GROUP_LEAKS:
+            assert leak not in text, (entry.key, leak)
+
+
+@pytest.mark.parametrize(
+    ("subline", "cleaned"),
+    [
+        ("(p3210-rein-rw (Sharee))", "(p3210-rein-rw)"),
+        ("Fällig am 04.12.2026 (p3210-rein-rw (Sharee))", "Fällig am 04.12.2026 (p3210-rein-rw)"),
+        ("Fällig am 04.12.2026", "Fällig am 04.12.2026"),
+    ],
+)
+def test_clean_subline_of_a_group_share_with_and_without_a_due_date(
+    subline: str, cleaned: str
+) -> None:
+    """The forms of 35 (raw name at the end, with and without DUE) and of 32 (due date only)."""
+    result = tasks.clean_subline(subline, group_home()["p3210-rein-rw_shared_by_sharee"])
+    assert result == cleaned
+    assert "sharee" not in (result or "").casefold()
