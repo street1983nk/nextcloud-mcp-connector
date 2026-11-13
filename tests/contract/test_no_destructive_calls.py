@@ -5,6 +5,14 @@ never delete, overwrite or re-share anything (TOOL-09). Without a gate that sent
 claim about today's code and says nothing about the next commit, which is exactly the
 threat this file answers (T-01-94).
 
+Since plan 33-03 the sentence is narrower, and this file is where it is exact: deleting,
+renaming and re-sharing stay forbidden everywhere; overwriting and relocating are allowed at
+exactly the named places, and only under a precondition. The overwriting PUT lives in
+``clients/tasks.put_existing_todo`` with ``If-Match`` (counted in ``EXPECTED_PUT_CALLS``),
+and a MOVE lives only in the chunk assembly of ``clients/dav.py`` and in
+``clients/tasks.move_todo``, each with ``Overwrite: F``, the second with ``If-Match`` as
+well (pinned by the syntax tree in ``_move_gate``).
+
 Two things make this test trustworthy rather than decorative:
 
 *   **Comments and docstrings are removed before counting.** ``clients/dav.py`` explains in
@@ -85,7 +93,7 @@ SRC = Path(__file__).resolve().parents[2] / "src" / "mcp_connector"
 # path forms are meant to exist. That list says it out loud, with the four the client builds.
 FORBIDDEN: dict[str, str] = {
     "DELETE": "no tool may delete anything",
-    "MOVE": "no tool may move or rename anything",
+    "MOVE": "no tool may rename anything, and a MOVE lives only in its two named places",
     "COPY": "no tool may duplicate anything server side",
     "PROPPATCH": "no tool may change properties of an existing object",
     "ocs/v2.php/apps/files_sharing": "no tool may create or change a share",
@@ -136,9 +144,10 @@ FORBIDDEN: dict[str, str] = {
     "mark via POST",
 }
 
-# The only MOVE in production is Nextcloud's internal chunk-assembly step. It carries
-# ``Overwrite: F`` and is therefore still create-only; user-facing move and rename tools
-# remain forbidden.
+# The two MOVEs in production, each exempt by file and exact line text only. The first is
+# Nextcloud's internal chunk-assembly step: it carries ``Overwrite: F`` and is therefore still
+# create-only. The second follows below. Renaming remains forbidden, and any other MOVE is
+# reported by the needle and by the syntax tree pin ``_move_gate``.
 CHUNK_ASSEMBLY_MOVE = "nextcloud/clients/dav.py"
 
 # The relocation of one task into another list of the same account (TMOD-08, plan 33-03).
@@ -802,6 +811,408 @@ def test_the_mkcol_gate_flags_each_planted_bypass() -> None:
     )
 
 
+# --- Plan 33-03: the overwriting PUT and the relocation of a task --------------------------
+#
+# Deleting and renaming stay forbidden everywhere. Overwriting and relocating are allowed at
+# exactly the named places below, and always under a precondition: the PUT of
+# ``clients/tasks.put_existing_todo`` with ``If-Match``, the relocation of
+# ``clients/tasks.move_todo`` with ``Overwrite: F`` and ``If-Match``. The needle gate above
+# exempts a line by file and text only, so a second ``"MOVE",`` line in the same file would
+# walk through it; the syntax tree pins below are what close that gap.
+
+#: Every MOVE call in the production code, by file and function. A third one, or one of
+#: these two in another function, is a review event.
+MOVE_HOMES = frozenset(
+    {
+        (CHUNK_ASSEMBLY_MOVE, "finish_chunked_upload"),
+        (TASK_MOVE, "move_todo"),
+    }
+)
+EXPECTED_MOVE_CALLS = 2  # chunk assembly + move_todo
+
+
+def _verb_literals(tree: ast.AST, verb: str) -> list[int]:
+    """The line of every string constant equal to ``verb`` in code; docstrings do not count."""
+    docstrings: set[int] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef):
+            continue
+        first = node.body[0] if node.body else None
+        if (
+            isinstance(first, ast.Expr)
+            and isinstance(first.value, ast.Constant)
+            and isinstance(first.value.value, str)
+        ):
+            docstrings.add(id(first.value))
+    return sorted(
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant) and node.value == verb and id(node) not in docstrings
+    )
+
+
+def _literal_headers(call: ast.Call) -> dict[str, ast.expr] | None:
+    """The literal headers dict of a call by constant key, or ``None`` when it is not one."""
+    headers = next((kw.value for kw in call.keywords if kw.arg == "headers"), None)
+    if not isinstance(headers, ast.Dict):
+        return None
+    found: dict[str, ast.expr] = {}
+    for key, value in zip(headers.keys, headers.values, strict=True):
+        if key is None:
+            return None  # ``**more`` inside the dict hides what the request carries
+        if isinstance(key, ast.Constant) and isinstance(key.value, str):
+            found[key.value] = value
+    return found
+
+
+def _functions(tree: ast.AST) -> dict[str, ast.FunctionDef | ast.AsyncFunctionDef]:
+    return {
+        node.name: node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef)
+    }
+
+
+def _calls_in(node: ast.AST) -> list[ast.Call]:
+    return [child for child in ast.walk(node) if isinstance(child, ast.Call)]
+
+
+def _move_findings(relative: str, tree: ast.AST) -> tuple[list[str], list[tuple[str, str]]]:
+    """Every MOVE call in one module that leaves its allowed form, plus where each one sits.
+
+    The allowed form is ``<client>.request("MOVE", ...)`` with spelled-out keywords and a
+    literal headers dict that carries ``"Overwrite": "F"``; in :data:`TASK_MOVE` it also
+    carries ``If-Match`` on a variable, never on a constant. The verb passed as ``method=``
+    is reported instead of counted, as in the MKCOL gate.
+    """
+    findings: list[str] = []
+    seen: list[tuple[str, str]] = []
+
+    class Walker(ast.NodeVisitor):
+        def __init__(self) -> None:
+            self.stack: list[str] = []
+
+        def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+            self._function(node)
+
+        def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+            self._function(node)
+
+        def _function(self, node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
+            self.stack.append(node.name)
+            self.generic_visit(node)
+            self.stack.pop()
+
+        def visit_Call(self, node: ast.Call) -> None:
+            self.generic_visit(node)
+            where = self.stack[-1] if self.stack else "<module>"
+            at = f"{relative}:{node.lineno} in {where}"
+            if any(
+                kw.arg == "method"
+                and isinstance(kw.value, ast.Constant)
+                and kw.value.value == "MOVE"
+                for kw in node.keywords
+            ):
+                findings.append(f"{at}: MOVE passed as keyword")
+                return
+            if not (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "request"
+                and node.args
+                and isinstance(node.args[0], ast.Constant)
+                and node.args[0].value == "MOVE"
+            ):
+                return
+            seen.append((relative, where))
+            if (relative, where) not in MOVE_HOMES:
+                findings.append(f"{at}: MOVE outside its two named places")
+            if any(kw.arg is None for kw in node.keywords):
+                findings.append(f"{at}: MOVE with unpacked keywords, which may hide a header")
+            headers = _literal_headers(node)
+            if headers is None:
+                findings.append(f"{at}: MOVE without a literal headers dict")
+                return
+            overwrite = headers.get("Overwrite")
+            if not (isinstance(overwrite, ast.Constant) and overwrite.value == "F"):
+                findings.append(f"{at}: MOVE without the literal header Overwrite: F")
+            if "Destination" not in headers:
+                findings.append(f"{at}: MOVE without a Destination header")
+            if relative == TASK_MOVE and not isinstance(headers.get("If-Match"), ast.Name):
+                findings.append(f"{at}: task MOVE without If-Match on a variable ETag")
+
+    Walker().visit(tree)
+    return findings, seen
+
+
+def _move_gate(sources: Iterable[tuple[str, ast.AST]]) -> list[str]:
+    """The whole MOVE pin over a set of modules, shared by the gate and its counter proofs."""
+    findings: list[str] = []
+    seen: list[tuple[str, str]] = []
+    homes = {relative for relative, _ in MOVE_HOMES}
+    for relative, tree in sources:
+        found, here = _move_findings(relative, tree)
+        findings.extend(found)
+        seen.extend(here)
+        literals = _verb_literals(tree, "MOVE")
+        if relative not in homes:
+            findings.extend(
+                f"{relative}:{line}: the literal MOVE outside its homes" for line in literals
+            )
+        elif len(literals) != len(here):
+            findings.append(
+                f"{relative} spells MOVE {len(literals)} times but sends it in {len(here)} "
+                "counted calls; a verb held in a variable walks past the count"
+            )
+    if sorted(seen) != sorted(MOVE_HOMES):
+        findings.append(
+            f"expected exactly one MOVE in each of {sorted(MOVE_HOMES)}, found {sorted(seen)}"
+        )
+    return findings
+
+
+def test_every_move_lives_in_its_two_named_places_with_its_guards() -> None:
+    """TMOD-08: two MOVE calls, chunk assembly and move_todo, each with Overwrite: F."""
+    assert len(MOVE_HOMES) == EXPECTED_MOVE_CALLS
+    findings = _move_gate(_parsed_sources())
+    assert findings == [], "MOVE outside its allowed form:\n" + "\n".join(findings)
+
+
+def _put_pin_findings(tree: ast.AST, function: str, *, create_only: bool) -> list[str]:
+    """The one PUT of ``function`` and its precondition, create-only or compare-and-swap.
+
+    Create-only: ``If-None-Match: *`` and no ``If-Match``. Compare-and-swap: ``If-Match`` on
+    the variable ``etag``, which the function first rebinds through ``dav.normalize_etag``,
+    and no ``If-None-Match``. Never both on one request.
+    """
+    node = _functions(tree).get(function)
+    if node is None:
+        return [f"{function}: not found"]
+    puts = [
+        call
+        for call in _calls_in(node)
+        if isinstance(call.func, ast.Attribute) and call.func.attr == "put"
+    ]
+    if len(puts) != 1:
+        return [f"{function}: {len(puts)} PUT calls, expected exactly one"]
+    headers = _literal_headers(puts[0])
+    if headers is None:
+        return [f"{function}: PUT without a literal headers dict"]
+    findings: list[str] = []
+    if "If-Match" in headers and "If-None-Match" in headers:
+        findings.append(f"{function}: PUT with If-Match and If-None-Match at once")
+    if create_only:
+        value = headers.get("If-None-Match")
+        if not (isinstance(value, ast.Constant) and value.value == "*"):
+            findings.append(f"{function}: create-only PUT without If-None-Match: *")
+        if "If-Match" in headers:
+            findings.append(f"{function}: create-only PUT with If-Match")
+        return findings
+    value = headers.get("If-Match")
+    if not (isinstance(value, ast.Name) and value.id == "etag"):
+        findings.append(f"{function}: compare-and-swap PUT without If-Match on the variable etag")
+    normalized = any(
+        isinstance(child, ast.Assign)
+        and [ast.unparse(target) for target in child.targets] == ["etag"]
+        and ast.unparse(child.value) == "dav.normalize_etag(etag)"
+        and child.lineno < puts[0].lineno
+        for child in ast.walk(node)
+    )
+    if not normalized:
+        findings.append(f"{function}: etag is not normalized before the PUT")
+    if "If-None-Match" in headers:
+        findings.append(f"{function}: compare-and-swap PUT with If-None-Match")
+    return findings
+
+
+def _parsed(relative: str) -> ast.Module:
+    path = SRC / relative
+    return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+
+def test_task_writes_keep_create_and_compare_and_swap_puts_distinct() -> None:
+    """TMOD-01: the create-only writer of caldav.py and the overwriting PUT of tasks.py."""
+    create = _put_pin_findings(
+        _parsed("nextcloud/clients/caldav.py"), "put_new_object", create_only=True
+    )
+    change = _put_pin_findings(_parsed(TASK_MOVE), "put_existing_todo", create_only=False)
+    assert create == [], create
+    assert change == [], change
+
+
+#: Planted relocations, each the whole content of :data:`TASK_MOVE` beside the real dav.py.
+_MOVE_FN = "async def move_todo(client, url, dest, etag):\n"
+_PLANTED_TASK_MOVES = {
+    "without Overwrite": _MOVE_FN
+    + '    await client.request("MOVE", url, headers={"Destination": dest, "If-Match": etag})\n',
+    "Overwrite T": _MOVE_FN + '    await client.request(\n        "MOVE",\n        url,\n'
+    '        headers={"Destination": dest, "Overwrite": "T", "If-Match": etag},\n    )\n',
+    "If-Match star": _MOVE_FN + '    await client.request(\n        "MOVE",\n        url,\n'
+    '        headers={"Destination": dest, "Overwrite": "F", "If-Match": "*"},\n    )\n',
+    "constant ETag": _MOVE_FN + '    await client.request(\n        "MOVE",\n        url,\n'
+    '        headers={"Destination": dest, "Overwrite": "F", "If-Match": \'"abc"\'},\n    )\n',
+    "without If-Match": _MOVE_FN + '    await client.request(\n        "MOVE",\n        url,\n'
+    '        headers={"Destination": dest, "Overwrite": "F"},\n    )\n',
+    "second MOVE in move_todo": _MOVE_FN
+    + '    await client.request(\n        "MOVE",\n        url,\n'
+    '        headers={"Destination": dest, "Overwrite": "F", "If-Match": etag},\n    )\n'
+    '    await client.request(\n        "MOVE",\n        url,\n'
+    '        headers={"Destination": dest, "Overwrite": "F", "If-Match": etag},\n    )\n',
+    "second MOVE in another function": _MOVE_FN
+    + '    await client.request(\n        "MOVE",\n        url,\n'
+    '        headers={"Destination": dest, "Overwrite": "F", "If-Match": etag},\n    )\n'
+    "async def relocate_again(client, url, dest, etag):\n"
+    '    await client.request(\n        "MOVE",\n        url,\n'
+    '        headers={"Destination": dest, "Overwrite": "F", "If-Match": etag},\n    )\n',
+    "method keyword": _MOVE_FN + '    await client.request(\n        method="MOVE",\n'
+    '        url=url,\n        headers={"Destination": dest, "Overwrite": "F", "If-Match": etag},'
+    "\n    )\n",
+    "unpacked keywords": _MOVE_FN + "    extra = {}\n"
+    '    await client.request(\n        "MOVE",\n        url,\n'
+    '        headers={"Destination": dest, "Overwrite": "F", "If-Match": etag},\n'
+    "        **extra,\n    )\n",
+    "unpacked headers": _MOVE_FN + "    more = {}\n"
+    '    await client.request(\n        "MOVE",\n        url,\n'
+    '        headers={"Destination": dest, "Overwrite": "F", "If-Match": etag, **more},\n    )\n',
+    "verb in a variable": _MOVE_FN + '    verb = "MOVE"\n'
+    '    await client.request(\n        "MOVE",\n        url,\n'
+    '        headers={"Destination": dest, "Overwrite": "F", "If-Match": etag},\n    )\n'
+    "    await client.request(verb, url)\n",
+}
+
+#: The form the real relocation has; the same check must leave it alone.
+_HONEST_TASK_MOVE = (
+    _MOVE_FN + '    """Relocate under "MOVE" semantics."""\n'
+    '    await client.request(\n        "MOVE",\n        url,\n'
+    '        headers={"Destination": dest, "Overwrite": "F", "If-Match": etag},\n    )\n'
+)
+
+#: A MOVE in a module that is no home, in the honest form otherwise.
+_PLANTED_FOREIGN_MOVE = (
+    "async def move_task(client, url, dest, etag):\n"
+    '    await client.request(\n        "MOVE",\n        url,\n'
+    '        headers={"Destination": dest, "Overwrite": "F", "If-Match": etag},\n    )\n'
+)
+
+
+def _with(**planted: str) -> list[tuple[str, ast.AST]]:
+    """The real modules, each named one replaced or added by its planted source.
+
+    Keys are module paths with ``/`` and ``.`` spelled ``__`` and ``_py``, so that a call
+    reads ``_with(nextcloud__clients__tasks_py=...)``.
+    """
+    replaced = {
+        key.replace("__", "/").removesuffix("_py") + ".py": src for key, src in planted.items()
+    }
+    sources: list[tuple[str, ast.AST]] = [
+        (name, tree) for name, tree in _parsed_sources() if name not in replaced
+    ]
+    sources.extend((name, ast.parse(src)) for name, src in replaced.items())
+    return sources
+
+
+@pytest.mark.parametrize("case", sorted(_PLANTED_TASK_MOVES))
+def test_the_move_gate_flags_each_planted_task_move(case: str) -> None:
+    """Counter proof through the gate's own check, never through the pattern it pins."""
+    findings = _move_gate(_with(nextcloud__clients__tasks_py=_PLANTED_TASK_MOVES[case]))
+    assert findings, f"the MOVE gate missed a planted bypass ({case})"
+
+
+def test_the_move_gate_flags_a_move_in_another_file_and_leaves_the_honest_form() -> None:
+    honest = _move_gate(_with(nextcloud__clients__tasks_py=_HONEST_TASK_MOVE))
+    assert honest == [], honest
+
+    foreign = _move_gate(
+        _with(nextcloud__clients__tasks_py=_HONEST_TASK_MOVE, tools__tasks_py=_PLANTED_FOREIGN_MOVE)
+    )
+    assert any("tools/tasks.py" in finding for finding in foreign), foreign
+
+    without = _move_gate(
+        _with(nextcloud__clients__tasks_py="async def move_todo(client):\n    return None\n")
+    )
+    assert without, "a missing task MOVE changes the count and must be reported"
+
+
+def test_the_text_gate_alone_would_let_a_second_task_move_line_through() -> None:
+    """Why the syntax tree pin exists: the needle exemption is per file and line text."""
+    planted = _PLANTED_TASK_MOVES["second MOVE in another function"]
+    lines = [(number, text) for number, text in enumerate(planted.splitlines(), start=1)]
+    assert _violations(TASK_MOVE, lines) == []
+    assert _move_gate(_with(nextcloud__clients__tasks_py=planted))
+
+
+#: Planted overwriting PUTs, each the whole of :data:`TASK_MOVE`; the pin must report each.
+_PUT_FN = "async def put_existing_todo(client, url, data, etag):\n"
+_PLANTED_TASK_PUTS = {
+    "If-Match star": _PUT_FN
+    + '    etag = dav.normalize_etag(etag)\n    await client.put(url, headers={"If-Match": "*"})\n',
+    "constant ETag": _PUT_FN
+    + "    etag = dav.normalize_etag(etag)\n"
+    + '    await client.put(url, headers={"If-Match": \'"abc"\'})\n',
+    "not normalized": _PUT_FN + '    await client.put(url, headers={"If-Match": etag})\n',
+    "both preconditions": _PUT_FN
+    + "    etag = dav.normalize_etag(etag)\n"
+    + '    await client.put(url, headers={"If-Match": etag, "If-None-Match": "*"})\n',
+    "two PUTs": _PUT_FN
+    + "    etag = dav.normalize_etag(etag)\n"
+    + '    await client.put(url, headers={"If-Match": etag})\n'
+    + '    await client.put(url, headers={"If-Match": etag})\n',
+}
+_HONEST_TASK_PUT = (
+    _PUT_FN
+    + '    etag = dav.normalize_etag(etag)\n    await client.put(url, headers={"If-Match": etag})\n'
+)
+
+
+@pytest.mark.parametrize("case", sorted(_PLANTED_TASK_PUTS))
+def test_the_put_pin_flags_each_planted_task_put(case: str) -> None:
+    tree = ast.parse(_PLANTED_TASK_PUTS[case])
+    assert _put_pin_findings(tree, "put_existing_todo", create_only=False), case
+
+
+def test_the_put_pin_leaves_the_honest_forms_and_flags_swapped_ones() -> None:
+    honest = ast.parse(_HONEST_TASK_PUT)
+    assert _put_pin_findings(honest, "put_existing_todo", create_only=False) == []
+    assert _put_pin_findings(honest, "put_existing_todo", create_only=True)
+
+    create = ast.parse(
+        'async def put_new_object(c, u):\n    await c.put(u, headers={"If-None-Match": "*"})\n'
+    )
+    assert _put_pin_findings(create, "put_new_object", create_only=True) == []
+    assert _put_pin_findings(create, "put_new_object", create_only=False)
+
+
+def test_the_put_count_gate_also_reports_an_overwriting_put_with_star() -> None:
+    """The planted If-Match: * fails the general precondition check as well."""
+    findings, seen = _unconditional_puts(TASK_MOVE, ast.parse(_PLANTED_TASK_PUTS["If-Match star"]))
+    assert seen == 1
+    assert findings
+
+
+def test_a_planted_eighth_put_changes_the_count() -> None:
+    """EXPECTED_PUT_CALLS is a review event: one more honest PUT is seven plus one."""
+    total = 0
+    for relative, tree in _with(tools__planted_py=_HONEST_TASK_PUT):
+        total += _unconditional_puts(relative, tree)[1]
+    assert total == EXPECTED_PUT_CALLS + 1
+
+
+def test_the_gate_would_notice_a_destructive_call_in_the_task_client() -> None:
+    """The counter proof of the dav.py test, for clients/tasks.py (plan 33-03).
+
+    The real module carries the one exempt relocation and must report nothing; an injected
+    DELETE must be reported through ``_violations``, the function of the real gate.
+    """
+    real = _code_lines(SRC / TASK_MOVE)
+    assert _violations(TASK_MOVE, real) == [], "clients/tasks.py must be clean first"
+    assert sum(1 for _, text in real if text.strip() == '"MOVE",') == 1
+    findings = _violations(TASK_MOVE, [*real, (10_000, '    await client.request("DELETE", url)')])
+    assert any("'DELETE'" in finding for finding in findings)
+    findings = _violations(TASK_MOVE, [*real, (10_001, '    await client.request("MOVE", url)')])
+    assert any("'MOVE'" in finding for finding in findings), (
+        "only the exact line text is exempt, a MOVE in any other spelling is reported"
+    )
+
+
 def _is_own_sql(relative: str, text: str) -> bool:
     """True for a statement against our own store file, false for anything else."""
     return relative in FILES_WITH_OWN_SQL and any(form in text for form in SQL_DELETE_FORMS)
@@ -838,8 +1249,9 @@ def test_the_gate_would_notice_a_destructive_call_in_real_code() -> None:
     The injected line runs through ``_violations`` like every other counter proof in this
     file: a string built with the word DELETE and then searched for the word DELETE would
     stay green even if the gate swallowed every line carrying it. The clean run over the
-    real module doubles as the counter proof for the MOVE exemption: dav.py carries the one
-    exempt chunk-assembly MOVE and must still report nothing.
+    real module doubles as the counter proof for the MOVE exemption: dav.py carries the
+    exempt chunk-assembly MOVE and must still report nothing. The task client has the same
+    proof in ``test_the_gate_would_notice_a_destructive_call_in_the_task_client``.
     """
     relative = "nextcloud/clients/dav.py"
     real = _code_lines(SRC / "nextcloud" / "clients" / "dav.py")
