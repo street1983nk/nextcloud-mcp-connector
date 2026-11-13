@@ -4,7 +4,10 @@
 **Subject:** `files_create_folder` measured against real Nextcloud under AppAPI impersonation
 **Status:** measured on Nextcloud 35.0.0 and on Nextcloud 32.0.15; one finding fixed during the
 run, one finding open, two statuses not reproducible. The open finding and the wording for
-`x.part` were settled and measured again the same day, see [Follow-up run](#follow-up-run)
+`x.part` were settled and measured again the same day, see [Follow-up run](#follow-up-run).
+On 2026-11-13 the tool ran through the installed app over the whole chain and against a group
+folder with ACL, see [Whole chain through the installed app](#whole-chain-through-the-installed-app)
+and [Group folder with ACL, measured with the tool](#group-folder-with-acl-measured-with-the-tool)
 
 Unit tests say what the code does with an answer. They cannot say which answer a real
 Nextcloud gives. This page records what was run against two running instances, the lower and
@@ -20,6 +23,10 @@ rather than believed. Every quoted line is copied from a raw protocol:
   [raw/nc32-nacharbeit.txt](../.planning/phases/31-ordner-anlegen/raw/nc32-nacharbeit.txt)
 - the test that wrote the lines:
   [tests/integration/test_files_create_folder_live.py](../tests/integration/test_files_create_folder_live.py)
+- the run through the installed app and the group folder, 2026-11-13:
+  [raw/nc35-kette.txt](../.planning/phases/31-ordner-anlegen/raw/nc35-kette.txt) and
+  [raw/nc35-gruppenordner.txt](../.planning/phases/31-ordner-anlegen/raw/nc35-gruppenordner.txt),
+  written with [scripts/folder_chain_evidence.py](../scripts/folder_chain_evidence.py)
 
 ## Instances
 
@@ -285,6 +292,12 @@ What this run adds is the tool on top of that status: the share without the crea
 above answers 403, and the tool turns it into "No permission to create a folder" with the
 reason `permission_denied`.
 
+**Added on 2026-11-13:** the group folder was built again after all, on the owner's decision
+of that day, and the tool itself ran against it over the whole chain: see
+[Group folder with ACL, measured with the tool](#group-folder-with-acl-measured-with-the-tool).
+The status of the preceding phase above stays the evidence for the bare MKCOL; the new section
+is the evidence for the tool.
+
 ## What the run found
 
 1. **A blocked name inside a chain was reported as a server error (fixed).** With `parents`
@@ -365,7 +378,10 @@ UNGEMESSEN mkcol-404 grund=the MKCOL below a parent that was just deleted answer
 - **Network failures inside a chain.** A timeout or a dropped connection while a folder
   request is on the wire is covered by unit tests only; it was not forced against an
   instance.
-- **Group folders, external storage.** Not rebuilt, see the section above.
+- **Group folders, external storage.** Not rebuilt, see the section above. The group folder
+  was measured with the tool afterwards, see
+  [Group folder with ACL, measured with the tool](#group-folder-with-acl-measured-with-the-tool);
+  the external storage was not.
 - **Versions between 32 and 35.** Not measured. That includes the answer for `x.part`,
   which the follow-up run measured on 32 and 35 only.
 - **The acceptance script as a whole.** It called the tool on Nextcloud 32 and both calls
@@ -472,4 +488,228 @@ prerequisite and no skipped step.
 POSTFACH vorher greenmail_laeuft=ja imap_inbox_nachrichten=0 uidnext=1 mail_app_abruf_nachricht_1_bis_6=HTTP 500
 POSTFACH nachher imap_inbox_nachrichten=6 uidnext=7 mail_app_listet=6 (ids 1 bis 6) mail_app_abruf_nachricht_1_bis_6=HTTP 200
 ABNAHME nc-mcp-exapp exit=0 werkzeuge=24 gerufen=24 zeilen_ok=34 fail=0 prereq=0 skip=0 nie_aufgerufen=keins
+```
+
+## Whole chain through the installed app
+
+Everything above calls the tool function of the working tree in a test process, or the tool
+over stdio with an app password. On 2026-11-13 the tool ran once the way a user reaches it:
+an MCP client, the reverse proxy of the instance, HaRP, the app container built from this
+repository, the tool, and Nextcloud under AppAPI impersonation. Raw protocol:
+[raw/nc35-kette.txt](../.planning/phases/31-ordner-anlegen/raw/nc35-kette.txt); the script
+that wrote the case lines:
+[scripts/folder_chain_evidence.py](../scripts/folder_chain_evidence.py).
+
+- **The client is the one the repository already has.** `scripts/oauth_flow_check.py` walks
+  the OAuth flow of the connector as alice (client registration, PKCE, sign in, consent, code
+  exchange) and then speaks MCP over Streamable HTTP with the MCP client of the SDK and the
+  bearer that flow returned, against `http://127.0.0.1:8082/exapps/mcp_connector/mcp`. No app
+  password and no app secret is a credential of a measured call.
+- **The app was brought to this state the way the repository provides.** The instance had
+  `mcp_connector` 0.3.2 registered, which does not know the tool. It was unregistered without
+  `--rm-data`, and `scripts/bootstrap_exapp.sh --nc35` built the image from the working tree,
+  pushed it into the loopback registry and registered it through HaRP. The version number in
+  `appinfo/info.xml` was not changed.
+- **Counter checks use another pattern than the tool**, as above: the file system of the
+  Nextcloud container, and a PROPFIND with the app password of the account for the id.
+- **The audit log was switched on for the run** (`occ app_api:app:config:set mcp_connector
+  audit_log --value yes`; it is off unless an administrator switches it on) and switched back
+  afterwards. Each line was read with `occ mcp_connector:audit:read`.
+
+Before and after the update:
+
+```text
+mcp_connector (MCP Connector): 0.3.2 [enabled]
+container=/nc_app_mcp_connector image=127.0.0.1:5000/mcp_connector:0.3.2 image_id=sha256:08e87ea24503afee1ec7edd89657451e8c243d664ec32edabceca75211a44457 created=2026-10-01T11:26:20.06248479Z netz=nc-mcp-nc35-net mounts=nc_app_mcp_connector_data:/nc_app_mcp_connector_data 
+WERKZEUGE nutzer=alice anzahl=22 files_create_folder=nein
+mcp_connector (MCP Connector): 0.7.2 [enabled]
+container=/nc_app_mcp_connector image=127.0.0.1:5000/mcp_connector:0.7.2 image_id=sha256:cf01fc50812e4e0c89c713a9cd6866ca0274942ef85ab9b23ba949977a4c21d0 created=2026-11-13T03:01:24.34086982Z status=running netz=nc-mcp-nc35-net mounts=nc_app_mcp_connector_data:/nc_app_mcp_connector_data 
+WERKZEUGE nutzer=alice anzahl=24 files_create_folder=ja
+```
+
+The data of the app survived the update. The volume stayed, the audit log held the same 621
+entries with an unbroken chain before and after, and a connection made before the update
+answered the tool list of the new app without a new sign in. `APP_SECRET` is the one the
+instance had before, because the bootstrap pins it.
+
+The calls, each with its audit line and the file system:
+
+| Case | What was asked | Answer of the tool | File system | Audit |
+|------|----------------|--------------------|-------------|-------|
+| frei | a path that is free | `created` true, id `file:23782`, equal to the `oc:fileid` of a PROPFIND with the app password | folder exists | one line, `ok`, parameter `path` |
+| vorhanden | the same path again | `created` false, the same id | unchanged | one line, `ok` |
+| kette | three missing folders with `parents` | `created_folders` lists all three, top down | all three exist | one line, `ok`, parameters `parents,path` |
+| kein-ki | a folder inside a folder tagged `kein-ki` | the sentence of a missing parent folder | the tagged folder exists, nothing inside it | one line, `rejected`, `unknown_id` |
+| kein-ki-kontrolle | the same call inside an untagged neighbour | `created` true | folder exists | one line, `ok` |
+| leerraum | a name that ends in a space | the refusal for whitespace at the edge of a name | neither the name nor the trimmed name | one line, `rejected` |
+
+```text
+KETTE frei nutzer=alice argumente={"path": "/kette31-d20e956d/frei"} fehler=nein | {"created": true, "id": "file:23782", "path": "/kette31-d20e956d/frei"}
+  AUDIT 623 - 2026-11-13T03:07:20Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 183 - path - -
+  DATEISYSTEM frei test -d '/var/www/html/data/alice/files/kette31-d20e956d/frei' = ja
+PROPFIND /kette31-d20e956d/frei auth=basic nutzer=alice status=207 fileid=23782 permissions=RGDNVCK
+KETTE vorhanden nutzer=alice argumente={"path": "/kette31-d20e956d/frei"} fehler=nein | {"created": false, "id": "file:23782", "path": "/kette31-d20e956d/frei"}
+  AUDIT 624 - 2026-11-13T03:07:27Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 132 - path - -
+  DATEISYSTEM vorhanden test -d '/var/www/html/data/alice/files/kette31-d20e956d/frei' = ja
+KETTE kette nutzer=alice argumente={"parents": true, "path": "/kette31-d20e956d/k/a/b"} fehler=nein | {"created": true, "created_folders": ["/kette31-d20e956d/k", "/kette31-d20e956d/k/a", "/kette31-d20e956d/k/a/b"], "id": "file:23785", "path": "/kette31-d20e956d/k/a/b"}
+  AUDIT 625 - 2026-11-13T03:07:46Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 487 - parents,path - -
+  DATEISYSTEM kette test -d '/var/www/html/data/alice/files/kette31-d20e956d/k' = ja
+  DATEISYSTEM kette test -d '/var/www/html/data/alice/files/kette31-d20e956d/k/a' = ja
+  DATEISYSTEM kette test -d '/var/www/html/data/alice/files/kette31-d20e956d/k/a/b' = ja
+PROPFIND /kette31-d20e956d/k/a/b auth=basic nutzer=alice status=207 fileid=23785 permissions=RGDNVCK
+KETTE kein-ki nutzer=alice argumente={"path": "/kette31-d20e956d/gesperrt/neu"} fehler=ja | Error executing tool files_create_folder: The parent folder /kette31-d20e956d/gesperrt of /kette31-d20e956d/gesperrt/neu does not exist. Hint: Create the missing folder first, in Nextcloud or with files_create_folder where that tool is offered (parents=true creates the whole chain), and check that no file stands in the path.
+  AUDIT 626 - 2026-11-13T03:07:54Z - u:alice - files_create_folder - OAuth flow check - - - rejected - unknown_id - 45 - path - -
+  DATEISYSTEM kein-ki test -d '/var/www/html/data/alice/files/kette31-d20e956d/gesperrt' = ja
+  DATEISYSTEM kein-ki test -d '/var/www/html/data/alice/files/kette31-d20e956d/gesperrt/neu' = nein
+KETTE kein-ki-kontrolle nutzer=alice argumente={"path": "/kette31-d20e956d/offen/neu"} fehler=nein | {"created": true, "id": "file:23786", "path": "/kette31-d20e956d/offen/neu"}
+  AUDIT 627 - 2026-11-13T03:08:02Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 137 - path - -
+  DATEISYSTEM kein-ki-kontrolle test -d '/var/www/html/data/alice/files/kette31-d20e956d/offen/neu' = ja
+KETTE leerraum nutzer=alice argumente={"path": "/kette31-d20e956d/ende-leer "} fehler=ja | Error executing tool files_create_folder: The folder name 'ende-leer ' in '/kette31-d20e956d/ende-leer ' starts or ends with whitespace. Hint: Remove the whitespace at the start and the end of every folder name and call again; nothing was created.
+  AUDIT 628 - 2026-11-13T03:08:09Z - u:alice - files_create_folder - OAuth flow check - - - rejected - unspecified - 0 - path - -
+  DATEISYSTEM leerraum test -d '/var/www/html/data/alice/files/kette31-d20e956d/ende-leer ' = nein
+  DATEISYSTEM leerraum test -d '/var/www/html/data/alice/files/kette31-d20e956d/ende-leer' = nein
+```
+
+An audit line carries the tool, the account (`u:alice`), the name the client registered
+under, the outcome, the fixed identifier of a refusal, the duration and the names of the
+parameters that were set. It carries no path and no other value: the line of the tagged
+folder and the line of the padded name do not show which folder or which name was asked for.
+
+The folders of the run were removed in the file system of the container, followed by
+`occ files:scan`, and the tag was deleted; the tool cannot delete. The account afterwards:
+
+```text
+BASELINE dateien_alice vorher=283 nachher=283 gleich=ja
+BASELINE papierkorb_alice vorher=0 nachher=0 gleich=ja
+BASELINE kontingent_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
+BASELINE tags vorher=[] nachher=[] gleich=ja
+BASELINE freigaben_alice vorher=3 nachher=3 gleich=ja
+BASELINE gruppen vorher={"admin":["admin"]} nachher={"admin":["admin"]} gleich=ja
+BASELINE gruppenordner_verzeichnisse vorher=0 nachher=0 gleich=ja
+```
+
+What this run does not show: the same chain on Nextcloud 32. The instance of the lower end
+runs the app as a local process (daemon `manual_install`), so there is no container built
+from an image to route through; its measurements stay the ones in the sections above.
+
+## Group folder with ACL, measured with the tool
+
+The tool was asked for because of group folders, and until this run the evidence for them was
+the bare status of the preceding phase. On 2026-11-13 the tool itself ran against a group
+folder with ACL rules, over the whole chain of the section above and on the same running
+instance (Nextcloud 35.0.0.10, `groupfolders` 23.0.1 installed from the app store for the run
+and removed afterwards). Raw protocol:
+[raw/nc35-gruppenordner.txt](../.planning/phases/31-ordner-anlegen/raw/nc35-gruppenordner.txt).
+
+The setup follows [spike-tasks.md, section 2.1](spike-tasks.md#21-aufbau), for alice instead
+of a throwaway account: a group `p3107grp` with alice, a group folder `p3107gf` for that group
+with read, write, share and delete, ACL switched on, and three subfolders created by alice.
+`rw` carries no rule. `ro` carries a rule against the group, and `rw/zu`, a folder inside the
+writable part, carries a rule against the account; both rules take write, create and delete.
+
+```text
+| ro    | group: p3107grp (p3107grp) | +read, -write, -create, -delete |
+| rw/zu | user: alice (alice)        | +read, -write, -create, -delete |
+PROPFIND /p3107gf/rw auth=basic nutzer=alice status=207 fileid=23791 permissions=RMGDNVCK
+PROPFIND /p3107gf/ro auth=basic nutzer=alice status=207 fileid=23792 permissions=RMG
+PROPFIND /p3107gf/rw/zu auth=basic nutzer=alice status=207 fileid=23793 permissions=RMG
+```
+
+| Case | What was asked | Answer of Nextcloud to the app | Answer of the tool | File system |
+|------|----------------|--------------------------------|--------------------|-------------|
+| rw-neu | a new folder in the writable part | MKCOL 201 | `created` true, the id equals the `oc:fileid` of a PROPFIND with the app password | folder exists |
+| rw-erneut | the same path again | MKCOL 405, PROPFIND 207 | `created` false, the same id | unchanged |
+| rw-kette | three missing folders in the writable part, with `parents` | three PROPFIND 404, PROPFIND 207, three MKCOL 201 | `created_folders` lists all three | all three exist |
+| ro-neu | a new folder in the read-only part | MKCOL 403 | "No permission to create a folder", reason `permission_denied` | nothing |
+| ro-kette | a chain whose first new folder lies in the read-only part | the count, then one MKCOL 403 | the same sentence for the first new folder, without the addition "Already created" | nothing |
+| rw-nach-ro-kette | a chain that starts in the writable part and runs through `rw/zu` | the count, then one MKCOL 403 | the same sentence for the first folder below `rw/zu` | nothing below `rw/zu` |
+| rw-nach-ro-ohne-parents | one folder below `rw/zu`, without `parents` | MKCOL 403 | the same sentence | nothing |
+
+```text
+GF rw-neu nutzer=alice argumente={"path": "/p3107gf/rw/neu"} fehler=nein | {"created": true, "id": "file:23794", "path": "/p3107gf/rw/neu"}
+  AUDIT 629 - 2026-11-13T03:10:50Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 144 - path - -
+  DATEISYSTEM rw-neu test -d '/var/www/html/data/__groupfolders/3/files/rw/neu' = ja
+PROPFIND /p3107gf/rw/neu auth=basic nutzer=alice status=207 fileid=23794 permissions=RMGDNVCK
+GF rw-erneut nutzer=alice argumente={"path": "/p3107gf/rw/neu"} fehler=nein | {"created": false, "id": "file:23794", "path": "/p3107gf/rw/neu"}
+  AUDIT 630 - 2026-11-13T03:10:59Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 138 - path - -
+  DATEISYSTEM rw-erneut test -d '/var/www/html/data/__groupfolders/3/files/rw/neu' = ja
+GF rw-kette nutzer=alice argumente={"parents": true, "path": "/p3107gf/rw/k/a/b"} fehler=nein | {"created": true, "created_folders": ["/p3107gf/rw/k", "/p3107gf/rw/k/a", "/p3107gf/rw/k/a/b"], "id": "file:23797", "path": "/p3107gf/rw/k/a/b"}
+  AUDIT 631 - 2026-11-13T03:11:09Z - u:alice - files_create_folder - OAuth flow check - - - ok - - - 529 - parents,path - -
+  DATEISYSTEM rw-kette test -d '/var/www/html/data/__groupfolders/3/files/rw/k' = ja
+  DATEISYSTEM rw-kette test -d '/var/www/html/data/__groupfolders/3/files/rw/k/a' = ja
+  DATEISYSTEM rw-kette test -d '/var/www/html/data/__groupfolders/3/files/rw/k/a/b' = ja
+PROPFIND /p3107gf/rw/k/a/b auth=basic nutzer=alice status=207 fileid=23797 permissions=RMGDNVCK
+GF ro-neu nutzer=alice argumente={"path": "/p3107gf/ro/neu"} fehler=ja | Error executing tool files_create_folder: No permission to create a folder at /p3107gf/ro/neu. Hint: The share, group folder or storage does not allow creating folders there; ask its owner for the create permission.
+  AUDIT 632 - 2026-11-13T03:11:18Z - u:alice - files_create_folder - OAuth flow check - - - rejected - permission_denied - 94 - path - -
+  DATEISYSTEM ro-neu test -d '/var/www/html/data/__groupfolders/3/files/ro/neu' = nein
+MKCOL /p3107gf/ro/neu-basic auth=basic nutzer=alice status=403 exception=Sabre\DAV\Exception\Forbidden
+  DATEISYSTEM ls -1A /var/www/html/data/__groupfolders/3/files/ro: []
+GF ro-kette nutzer=alice argumente={"parents": true, "path": "/p3107gf/ro/x/y"} fehler=ja | Error executing tool files_create_folder: No permission to create a folder at /p3107gf/ro/x. Hint: The share, group folder or storage does not allow creating folders there; ask its owner for the create permission.
+  AUDIT 633 - 2026-11-13T03:12:18Z - u:alice - files_create_folder - OAuth flow check - - - rejected - permission_denied - 382 - parents,path - -
+  DATEISYSTEM ro-kette test -d '/var/www/html/data/__groupfolders/3/files/ro/x' = nein
+  DATEISYSTEM ro-kette test -d '/var/www/html/data/__groupfolders/3/files/ro/x/y' = nein
+GF rw-nach-ro-kette nutzer=alice argumente={"parents": true, "path": "/p3107gf/rw/zu/x/y"} fehler=ja | Error executing tool files_create_folder: No permission to create a folder at /p3107gf/rw/zu/x. Hint: The share, group folder or storage does not allow creating folders there; ask its owner for the create permission.
+  AUDIT 634 - 2026-11-13T03:12:28Z - u:alice - files_create_folder - OAuth flow check - - - rejected - permission_denied - 223 - parents,path - -
+  DATEISYSTEM rw-nach-ro-kette test -d '/var/www/html/data/__groupfolders/3/files/rw/zu' = ja
+  DATEISYSTEM rw-nach-ro-kette test -d '/var/www/html/data/__groupfolders/3/files/rw/zu/x' = nein
+  DATEISYSTEM rw-nach-ro-kette test -d '/var/www/html/data/__groupfolders/3/files/rw/zu/x/y' = nein
+GF rw-nach-ro-ohne-parents nutzer=alice argumente={"path": "/p3107gf/rw/zu/x"} fehler=ja | Error executing tool files_create_folder: No permission to create a folder at /p3107gf/rw/zu/x. Hint: The share, group folder or storage does not allow creating folders there; ask its owner for the create permission.
+  AUDIT 635 - 2026-11-13T03:12:37Z - u:alice - files_create_folder - OAuth flow check - - - rejected - permission_denied - 86 - path - -
+  DATEISYSTEM rw-nach-ro-ohne-parents test -d '/var/www/html/data/__groupfolders/3/files/rw/zu/x' = nein
+MKCOL /p3107gf/rw/zu/x-basic auth=basic nutzer=alice status=403 exception=Sabre\DAV\Exception\Forbidden
+  DATEISYSTEM find /var/www/html/data/__groupfolders/3/files: [./ro ./rw ./rw/k ./rw/k/a ./rw/k/a/b ./rw/neu ./rw/zu ]
+```
+
+The statuses come from the access log of the Nextcloud container. The requests of the app
+carry its user agent, the counter checks with the app password carry the one of curl:
+
+```text
+  ZUGRIFFSLOG alice [13/Nov/2026:03:10:50 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/neu HTTP/1.1" 201 1360 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:10:59 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/neu HTTP/1.1" 405 1648 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:09 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/k HTTP/1.1" 201 1358 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:09 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/k/a HTTP/1.1" 201 1356 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:09 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/k/a/b HTTP/1.1" 201 1354 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:18 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/ro/neu HTTP/1.1" 403 1479 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:11:21 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/ro/neu-basic HTTP/1.1" 403 1479 "-" "curl/8.19.0"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:18 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/ro/x HTTP/1.1" 403 1475 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:28 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/zu/x HTTP/1.1" 403 1481 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:37 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/zu/x HTTP/1.1" 403 1479 "-" "nextcloud-mcp-connector/0.1"
+  ZUGRIFFSLOG alice [13/Nov/2026:03:12:41 +0000] "MKCOL /remote.php/dav/files/alice/p3107gf/rw/zu/x-basic HTTP/1.1" 403 1485 "-" "curl/8.19.0"
+```
+
+Three things follow for the tool:
+
+- **A group folder behaves like any other folder for it.** Creating, the answer for a folder
+  that exists and a chain work in the writable part, with the id from the `oc-fileid` answer.
+- **A rule that takes the create right ends in the sentence about permissions and nothing is
+  created**, for a rule against a group and for a rule against one account, and for a rule on
+  a folder inside a writable folder. The tool does not ask for the right beforehand; it reads
+  the refusal (decision D-31-05).
+- **With `parents`, nothing is left behind in front of a read-only folder.** The count finds
+  the read-only folder as the deepest one that exists, and the first MKCOL below it is the
+  one that is refused.
+
+One expectation of the plan could not be produced, and it is named here rather than left out:
+a chain that creates folders first and is refused afterwards with 403, so that the answer
+names what it created. A rule belongs to a folder that exists. If that folder is part of the
+chain, the first new folder below it is already refused, and a folder created in the same
+call was writable in the measured chain. The addition "Already created in this call and left
+in place" after a 403 in the middle of a chain therefore stays covered by unit tests only;
+the addition itself is measured above for a file in the way and for a refused name. The raw
+protocol records this under `UNGEMESSEN gf-teilabbruch`.
+
+The limits of this measurement: one instance, Nextcloud 35.0.0 with SQLite. The group folder
+was not repeated on Nextcloud 32, on purpose: decision D-31-07 asks for the group folder once.
+Rules against a team, the switch for no default permission and a rule that takes the read
+right were not measured. The group folder, the group and the app were removed afterwards and
+the account compared with its state before the plan:
+
+```text
+BASELINE dateien_alice vorher=283 nachher=283 gleich=ja
+BASELINE papierkorb_alice vorher=0 nachher=0 gleich=ja
+BASELINE kontingent_alice vorher=The setting does not exist for user "alice". nachher=The setting does not exist for user "alice". gleich=ja
+BASELINE tags vorher=[] nachher=[] gleich=ja
+BASELINE freigaben_alice vorher=3 nachher=3 gleich=ja
+BASELINE gruppen vorher={"admin":["admin"]} nachher={"admin":["admin"]} gleich=ja
+BASELINE gruppenordner_verzeichnisse vorher=0 nachher=0 gleich=ja
 ```
