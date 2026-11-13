@@ -120,7 +120,8 @@ missing app is answered in one sentence, never with an empty result.
   - `context`: `prepare_context`
   - `deck`: `deck_browse`, `deck_create_card`
   - `files`: `files_search`, `files_list`, `files_read`, `files_download`,
-    `files_read_as_markdown`, `files_upload`, `files_create_folder`
+    `files_read_as_markdown`, `files_upload`, `files_create_folder`, and `files_update`
+    (only when enabled)
   - `mail`: `mail_browse`
   - `notes`: `notes_search`, `notes_read`, `notes_create`
   - `search`: `unified_search`

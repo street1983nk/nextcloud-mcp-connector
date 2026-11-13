@@ -79,8 +79,10 @@ qu'un nom ou un niveau diverge.
 | `files_list` | read | Les enfants directs d'un dossier, avec taille et date de modification |
 | `files_read` | read | Le contenu d'un fichier |
 | `files_download` | read | Un fichier de toute taille en blocs de ressource intégrés et limités |
+| `files_read_as_markdown` | read | Un fichier DOCX, XLSX, PPTX ou PDF converti en Markdown, par tranches |
 | `files_upload` | create-only | Un fichier texte ou binaire en blocs Base64 ; un chemin existant est refusé, jamais écrasé |
 | `files_create_folder` | create-only | Un nouveau dossier, au besoin avec ses dossiers parents manquants (au plus 10 par appel) ; un dossier existant répond created false, rien n'est écrasé |
+| `files_update` | conditional-update | Remplace un fichier texte UTF-8 existant uniquement avec son ETag lu auparavant ; disponible seulement si l'admin active `NC_MCP_FILES_UPDATE` |
 | `calendar_list_events` | read | Les événements d'une plage de temps explicite, avec un fuseau horaire explicite |
 | `calendar_create_event` | create-only | Un nouvel événement ; les événements existants ne sont jamais modifiés |
 | `notes_search` | read | Des notes par titre et contenu, via le fournisseur de recherche de notes Nextcloud |
@@ -113,6 +115,42 @@ manquante reçoit une réponse en une phrase, jamais un résultat vide.
 ```json
 {"query":"budget","count":2,"results":[{"id":"file:4711","title":"Budget 2026.md","url":"https://cloud.example.org/index.php/f/4711","provider":"files","kind":"file"},{"id":"url:https://cloud.example.org/index.php/call/abc123","title":"Khaled","url":"https://cloud.example.org/index.php/call/abc123","provider":"talk-conversations","kind":"url","resolvable":false}]}
 ```
+
+## Désactiver des bundles d'outils
+
+- Variable : `NC_MCP_DISABLED_TOOLS`, noms de bundles séparés par des virgules, lue au
+  démarrage.
+- Où la définir : comme variable d'environnement de déploiement de l'ExApp, soit dans les
+  options de déploiement de la boîte de dialogue d'installation ou de mise à jour, soit en
+  ligne de commande :
+  `occ app_api:app:register mcp_connector --env "NC_MCP_DISABLED_TOOLS=mail,calendar"`
+  (désenregistrer d'abord sur une installation existante ; les connexions des utilisateurs
+  sont conservées, le conteneur est recréé). Le journal de démarrage nomme les bundles
+  désactivés.
+- Par défaut : non définie, tous les bundles sont actifs.
+- Exemple : `export NC_MCP_DISABLED_TOOLS=mail,calendar`, utile lorsqu'un second serveur MCP
+  propose déjà le courrier et l'agenda et qu'un modèle plus petit confond les deux.
+- Bundles et leurs outils :
+  - `calendar` : `calendar_list_events`, `calendar_create_event`
+  - `chatgpt` : `search`, `fetch`
+  - `contacts` : `contacts_search`
+  - `context` : `prepare_context`
+  - `deck` : `deck_browse`, `deck_create_card`
+  - `files` : `files_search`, `files_list`, `files_read`, `files_download`,
+    `files_read_as_markdown`, `files_upload`, `files_create_folder` et `files_update`
+    (seulement si activé)
+  - `mail` : `mail_browse`
+  - `notes` : `notes_search`, `notes_read`, `notes_create`
+  - `search` : `unified_search`
+  - `tables` : `tables_browse`, `tables_create_row`
+  - `talk` : `talk_browse`, `talk_send`
+- Un nom inconnu, ou tous les noms à la fois, arrête le serveur au démarrage avec un message
+  qui énumère les noms valides.
+- Ce n'est pas un contrôle d'accès : `search`, `fetch` et `prepare_context` atteignent toujours
+  le contenu d'un bundle désactivé. Pour tenir un contenu à l'écart de l'assistant, utilisez
+  les permissions Nextcloud, l'étiquette `kein-ki` ou `NC_MCP_FILES_ROOT`.
+- Les connecteurs ChatGPT attendent le bundle `chatgpt` (`search`, `fetch`).
+- L'ExApp déclare la variable et consigne au démarrage les bundles désactivés.
 
 ## Exclure des dossiers : l'étiquette kein-ki
 

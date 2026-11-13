@@ -130,6 +130,21 @@ def test_switching_bundles_off_keeps_their_logic_importable() -> None:
     )
 
 
+def test_the_optional_update_tool_goes_off_with_the_files_bundle() -> None:
+    """The READMEs list files_update under ``files`` with "only when enabled".
+
+    It is registered in ``reg_files`` behind ``NC_MCP_FILES_UPDATE``, so it is no member of
+    the frozen default surface above. Switched on, it has to appear (the positive control,
+    without it the second half would pass for a tool that never registers), and it has to
+    leave with the bundle it is documented in.
+    """
+    enabled = _tools(None, NC_MCP_FILES_UPDATE="true")
+    assert enabled == EXPECTED_TOOLS | {"files_update"}
+
+    without_files = _tools("files", NC_MCP_FILES_UPDATE="true")
+    assert without_files == EXPECTED_TOOLS - BUNDLE_TOOLS["files"]
+
+
 def test_an_unknown_name_stops_the_start() -> None:
     done = _run("nope")
     assert done.returncode != 0
