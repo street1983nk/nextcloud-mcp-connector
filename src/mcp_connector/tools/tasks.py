@@ -1135,6 +1135,8 @@ def chain_entries(
     Each entry holds the fields of :func:`_read_todo` plus ``id``, ``object_name``, ``etag``
     (as the server sent it in the same REPORT) and ``text`` (the stored iCalendar). An
     object that cannot be read or addressed is skipped and counted, like in tasks_search.
+    A text that is not UTF-8 gets ``text`` ``None`` instead of replacement characters, which
+    a write would store for good; :func:`check_chain` refuses such a descendant.
     """
     entries: list[dict[str, Any]] = []
     skipped = 0
@@ -1147,7 +1149,10 @@ def chain_entries(
         entries.append(entry)
         entry["object_name"] = item.object_name
         entry["etag"] = item.etag
-        entry["text"] = item.ics.decode("utf-8", errors="replace")
+        try:
+            entry["text"] = item.ics.decode("utf-8")
+        except UnicodeDecodeError:
+            entry["text"] = None
     return entries, skipped
 
 
@@ -1192,8 +1197,8 @@ def check_chain(task_list: tasks_client.TaskList, descendants: list[dict[str, An
 
     Refused: a read only list (descendants live in the list of the named task and share its
     permission), more than :data:`CHAIN_CAP` descendants, and a descendant that is
-    recurring, holds several VTODO or cannot be edited safely. So the frequent cases never
-    leave half a chain behind. Never sends a request.
+    recurring, holds several VTODO, is not UTF-8 or cannot be edited safely. So the frequent
+    cases never leave half a chain behind. Never sends a request.
     """
     if not task_list.writable:
         raise _refused(
@@ -1207,6 +1212,11 @@ def check_chain(task_list: tasks_client.TaskList, descendants: list[dict[str, An
             "Change some of the subtasks first, each with its own call, then try again.",
         )
     for entry in descendants:
+        if entry["text"] is None:
+            raise _refused(
+                f"The subtask {entry['id']} cannot be changed safely: its text is not UTF-8.",
+                "Nothing was changed. Fix that subtask in the Nextcloud Tasks app first.",
+            )
         try:
             facts = ics_edit.inspect(entry["text"])
         except ics_edit.EditRefused as exc:
