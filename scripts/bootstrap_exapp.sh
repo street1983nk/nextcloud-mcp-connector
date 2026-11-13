@@ -988,7 +988,17 @@ ensure_talk_room() {
 
 app_password() {
   local uid="$1" password="$2" raw token
-  raw="$(occ_pw "$password" user:auth-tokens:add "$uid" --password-from-env --name "$TOKEN_NAME")"
+  # The name option of user:auth-tokens:add exists from Nextcloud 33 on (default name
+  # there: cli); 32 refuses the call with "option does not exist". Detection from the help
+  # text instead of a version comparison, so on 33 to 35 the call stays exactly what it
+  # was (token mcp-exapp) and 32 gets the same call without a name
+  # (.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-01-bootstrap.txt).
+  local token_name_args=()
+  if occ user:auth-tokens:add --help 2>/dev/null | tr -d '\r' | grep -- '--name' >/dev/null; then
+    token_name_args=(--name "$TOKEN_NAME")
+  fi
+  raw="$(occ_pw "$password" user:auth-tokens:add "$uid" \
+    --password-from-env ${token_name_args[@]+"${token_name_args[@]}"})"
   # The command prints a label line and the token on the next line. The CR strip is the
   # Windows guard: Git Bash keeps the CR from the container output otherwise.
   token="$(printf '%s\n' "$raw" | tr -d '\r' | sed '/^[[:space:]]*$/d' | tail -n1 |
@@ -1284,10 +1294,14 @@ ensure_exapp_enabled() {
 # reached with --manual, because it registers a second daemon and a second app entry.
 register_manual_install() {
   local output
+  # The daemon host carries no port: AppAPI up to stable32 appends the port of the ExApp
+  # to the host (host.docker.internal:23001:23001, "Invalid host"), from stable33 on it
+  # cuts a port off. Without a port 32, 34 and 35 build the same heartbeat URL
+  # http://host.docker.internal:23001 (measured, raw/32-01-bootstrap.txt of phase 32).
   if ! occ app_api:daemon:list 2>/dev/null | grep "${MANUAL_DAEMON_NAME}" >/dev/null; then
     if ! output="$(occ app_api:daemon:register \
       "${MANUAL_DAEMON_NAME}" "Manual Install" manual-install http \
-      "host.docker.internal:${MANUAL_APP_PORT}" "${NC_DAEMON_URL}" 2>&1)"; then
+      "host.docker.internal" "${NC_DAEMON_URL}" 2>&1)"; then
       echo "ERROR: could not register the manual-install daemon:" >&2
       echo "${output}" >&2
       return 1
