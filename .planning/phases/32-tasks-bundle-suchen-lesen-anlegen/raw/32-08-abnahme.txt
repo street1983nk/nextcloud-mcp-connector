@@ -64,3 +64,54 @@ Unteraufgabe direkt: http://127.0.0.1:8082/index.php/apps/tasks/calendars/person
 Ohne Anmeldung: 303 auf /login?redirect_url=/index.php/apps/tasks/ (Login-Seite 200).
 Die Links der Werkzeuge tragen http://caddy (interne Adresse, Befund 3 aus 32-07); vom Host gilt 127.0.0.1:8082.
 nc35 läuft für Task 2 weiter (nc35-nc, nc35-harp, nc35-caddy, nc_app_mcp_connector).
+
+(5) Owner-Abnahme (Task 2)
+--------------------------
+Gemeinsam per Playwright, Owner meldete sich als alice an; Antwort des Owners: "abgenommen".
+ABNAHME owner=abgenommen datum=2026-11-13 | Tasks 0.18.1 auf nc35, alice, Liste personal: "p3208 Teilschritt" eingerückt unter "p3208 Projekt Abnahme"; "Beginnt am 18. November 2026" und "Fällig am 20. November 2026", ganztägig (kein Folgetag); Tags abnahme und p3208; "Priorität 3: hoch"; Screenshots außerhalb des Repos unter <scratch>/abnahme/ (hell-1440, hell-1024, hell-390, dunkel-1440, dunkel-1024, dunkel-390 .png)
+
+(6) Rückbau
+-----------
+$ dav.py trash   (Scratchpad; REPORT calendar-query auf trashbin/objects/, PROPFIND trashbin/; App-Passwort von alice)
+HARNESS REPORT trashbin/objects/ nutzer=alice status=207
+HARNESS PROPFIND trashbin/ nutzer=alice status=207 weitere=0
+PAPIERKORB konto=alice eintraege=0
+$ dav.py delete <unteraufgabe> <elternaufgabe>; h.py baseline; dav.py trash --purge; dav.py trash; h.py baseline
+HARNESS DELETE personal/280e2532-3c76-4367-8e47-45d91f602ea5.ics nutzer=alice status=204 no_trashbin=1 danach=404
+HARNESS DELETE personal/25f505ce-7330-41d7-91eb-999f753c539e.ics nutzer=alice status=204 no_trashbin=1 danach=404
+BASELINE nc35 konto=alice calendars=1 objekte=33 geloescht=2 shares=0 abos=0 phase=geloescht
+HARNESS REPORT trashbin/objects/ nutzer=alice status=207
+HARNESS PROPFIND trashbin/ nutzer=alice status=207 weitere=0
+PAPIERKORB konto=alice eintraege=2
+  eintrag 2246.ics
+HARNESS DELETE trashbin-eintrag nutzer=alice status=204
+  eintrag 2247.ics
+HARNESS DELETE trashbin-eintrag nutzer=alice status=204
+HARNESS REPORT trashbin/objects/ nutzer=alice status=207
+HARNESS PROPFIND trashbin/ nutzer=alice status=207 weitere=0
+PAPIERKORB konto=alice eintraege=0
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE-VERGLEICH nc35 konto=alice gleich=ja
+(Die Zwischenzeile geloescht=2 und die zwei Papierkorbeinträge sind die Positivkontrolle der Prüfung: No-Trashbin wirkt auf einzelne Objekte nicht, Befund 1 aus 32-07.)
+$ h.py restore   (restore_tasks_app aus scripts/tasks_measure.py, Zielzustand keine)
+occ app:remove tasks -> Disabled app 'tasks' (uninstall steps executed). Removed app 'tasks' (version 0.18.1).
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+RUECKBAU nc35 tasksapp=wie-vorher vorher=keine nachher=keine
+$ occ app:list --output=json | grep tasks
+tasks nicht in app:list
+TASKSAPP nc35 nachher=keine
+
+(7) Stopp
+---------
+$ docker stop nc_app_mcp_connector
+nc_app_mcp_connector
+# tasks_measure.py stop 2026-11-13T15:29:16Z
+
+== stop nc35 ==
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
+$ docker ps --filter name=nc35-
+(leer)
