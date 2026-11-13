@@ -28,8 +28,21 @@ from typing import Any
 import pytest
 from mcp import Client
 from mcp.types import ToolAnnotations
+from optional_surface import (
+    OPTIONAL_TOOLS,
+    annotations_of,
+    surface_findings,
+    switched_on_surface,
+)
 
-from mcp_connector.server import CREATE_IDEMPOTENT, CREATE_ONLY, READ_ONLY, UPDATE_EXISTING, mcp
+from mcp_connector.server import (
+    CREATE_IDEMPOTENT,
+    CREATE_ONLY,
+    MODIFY_EXISTING,
+    READ_ONLY,
+    UPDATE_EXISTING,
+    mcp,
+)
 from mcp_connector.tools import mail as mail_tools
 
 README = Path(__file__).resolve().parents[2] / "README.md"
@@ -91,6 +104,14 @@ CREATE_TOOLS = {
 # is a set of its own and not a member of CREATE_TOOLS, because that set promises
 # "a second call is a second object", which would be a lie here.
 IDEMPOTENT_CREATE_TOOLS = {"files_create_folder"}
+
+# The tools that change an existing object in place (D-33-12): an overwrite of fields the
+# caller names, so destructive in the words of the MCP specification ("false" means "only
+# additive updates"), and idempotent, because the second identical call finds the target
+# state and changes nothing. Empty in plan 33-02; plans 33-06 to 33-08 enter tasks_complete,
+# tasks_update and tasks_move. Every member is optional, so the live registry this file
+# freezes never lists one: they are checked on the switched-on surface below.
+MODIFY_TOOLS: frozenset[str] = frozenset()
 
 # The documented exception to the schema diet: ChatGPT reads structured content (D-14).
 STRUCTURED_TOOLS = {"search", "fetch"}
@@ -768,6 +789,15 @@ def _check_annotations(name: str, annotations: ToolAnnotations | None) -> None:
         assert annotations.read_only_hint is False
         assert annotations.destructive_hint is True
         assert annotations.idempotent_hint is False
+    elif name in MODIFY_TOOLS:
+        assert annotations.read_only_hint is False, f"{name} writes and must say so"
+        assert annotations.destructive_hint is True, (
+            f"{name} overwrites fields of an existing object, which the MCP specification "
+            "calls destructive: false would promise only additive updates (D-33-12)"
+        )
+        assert annotations.idempotent_hint is True, (
+            f"a second identical {name} call finds the target state and changes nothing"
+        )
     elif name in IDEMPOTENT_CREATE_TOOLS:
         assert annotations.read_only_hint is False, f"{name} writes and must say so"
         assert annotations.destructive_hint is False, (
@@ -811,6 +841,89 @@ async def test_every_tool_carries_honest_annotations() -> None:
 
     for name, tool in sorted(tools.items()):
         _check_annotations(name, tool.annotations)
+
+
+def test_every_tool_of_the_switched_on_surface_carries_honest_annotations() -> None:
+    """Pitfall 5 of phase 33: the gate above reads the default registry and never saw an
+    optional tool. The same check over the surface with every switch on."""
+    surface = switched_on_surface()
+
+    assert surface_findings(surface, EXPECTED_TOOLS) == []
+    assert set(surface) == EXPECTED_TOOLS | OPTIONAL_TOOLS.keys()
+    assert OPTIONAL_TOOLS.keys() >= MODIFY_TOOLS, "a modifying tool always hangs on a switch"
+    assert not MODIFY_TOOLS & (CREATE_TOOLS | IDEMPOTENT_CREATE_TOOLS | {"files_update"}), (
+        "a tool belongs to one class only"
+    )
+
+    for name, entry in sorted(surface.items()):
+        _check_annotations(name, annotations_of(entry))
+
+
+def test_the_surface_check_reports_a_missing_and_an_unknown_tool() -> None:
+    """Counter proof of the check above, through the same function."""
+    standard = sorted(EXPECTED_TOOLS)
+
+    assert surface_findings(standard, EXPECTED_TOOLS) == [
+        f"optional tool missing with its switch on: {name}" for name in sorted(OPTIONAL_TOOLS)
+    ]
+    planted = [*standard, *OPTIONAL_TOOLS, "tasks_probe"]
+    assert surface_findings(planted, EXPECTED_TOOLS) == [
+        "registered but neither standard nor optional: tasks_probe"
+    ]
+
+
+def test_the_modify_class_carries_the_values_of_d_33_12() -> None:
+    """Literal values, not a comparison with a neighbour: the class is its own promise."""
+    assert MODIFY_EXISTING.read_only_hint is False
+    assert MODIFY_EXISTING.destructive_hint is True
+    assert MODIFY_EXISTING.idempotent_hint is True
+    assert MODIFY_EXISTING.open_world_hint is False
+
+
+def test_the_live_modify_class_passes_the_gate_for_a_modifying_tool(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Positive control: the real class is accepted once a name stands in MODIFY_TOOLS, and
+    refused while it does not (then the name falls into the read only branch)."""
+    with pytest.raises(AssertionError):
+        _check_annotations("tasks_probe", MODIFY_EXISTING)
+
+    monkeypatch.setattr(sys.modules[__name__], "MODIFY_TOOLS", frozenset({"tasks_probe"}))
+    _check_annotations("tasks_probe", MODIFY_EXISTING)
+
+
+@pytest.mark.parametrize(
+    "planted",
+    [
+        ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=False,
+            idempotent_hint=True,
+            open_world_hint=False,
+        ),
+        ToolAnnotations(
+            read_only_hint=False,
+            destructive_hint=True,
+            idempotent_hint=False,
+            open_world_hint=False,
+        ),
+        ToolAnnotations(
+            read_only_hint=True, destructive_hint=True, idempotent_hint=True, open_world_hint=False
+        ),
+        ToolAnnotations(
+            read_only_hint=False, destructive_hint=True, idempotent_hint=True, open_world_hint=True
+        ),
+    ],
+    ids=["not_destructive", "not_idempotent", "read_only", "open_world"],
+)
+def test_the_gate_refuses_a_planted_class_for_a_modifying_tool(
+    monkeypatch: pytest.MonkeyPatch, planted: ToolAnnotations
+) -> None:
+    """T-33-02-04: a modifying tool that claims another promise turns the gate red."""
+    monkeypatch.setattr(sys.modules[__name__], "MODIFY_TOOLS", frozenset({"tasks_probe"}))
+
+    with pytest.raises(AssertionError):
+        _check_annotations("tasks_probe", planted)
 
 
 def test_the_live_class_of_files_create_folder_passes_the_gate() -> None:
@@ -889,7 +1002,10 @@ async def test_the_readme_permission_table_matches_the_live_registry() -> None:
             continue
         documented[cells[0].strip("`")] = cells[1]
 
-    optional_tools = {"files_update"}
+    # Derived from the one list of optional tools, so a tool of plans 33-06 to 33-08 is
+    # expected in the README the day it enters that list. Its level (``modify``) enters this
+    # table and this test with plan 33-09.
+    optional_tools = set(OPTIONAL_TOOLS)
     assert set(documented) - optional_tools == set(tools), (
         "the README's always-available tools must match the default registry"
     )

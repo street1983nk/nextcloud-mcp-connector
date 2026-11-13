@@ -16,6 +16,12 @@ import subprocess
 import sys
 
 import pytest
+from optional_surface import (
+    OPTIONAL_TOOLS,
+    TASKS_UPDATE_SWITCH,
+    switched_on_surface,
+    tools_of_switch,
+)
 from test_tool_surface import EXPECTED_TOOLS
 
 from mcp_connector.server import bundle_names
@@ -145,6 +151,28 @@ def test_the_optional_update_tool_goes_off_with_the_files_bundle() -> None:
 
     without_files = _tools("files", NC_MCP_FILES_UPDATE="true")
     assert without_files == EXPECTED_TOOLS - BUNDLE_TOOLS["files"]
+
+
+def test_the_tasks_update_switch_adds_exactly_its_own_tools() -> None:
+    """D-33-01: switched on, the registry is the default plus the tools of this switch; the
+    files switch stays out of it, so the answer is about this switch alone."""
+    enabled = _tools(None, **{TASKS_UPDATE_SWITCH: "true"})
+    assert enabled == EXPECTED_TOOLS | tools_of_switch(TASKS_UPDATE_SWITCH)
+    assert "files_update" not in enabled
+
+
+def test_the_tasks_bundle_takes_its_optional_tools_with_it() -> None:
+    """With the bundle off and the switch on, the whole family is gone, optional tools too."""
+    without_tasks = _tools("tasks", **{TASKS_UPDATE_SWITCH: "true"})
+    assert without_tasks == EXPECTED_TOOLS - BUNDLE_TOOLS["tasks"]
+    assert not without_tasks & tools_of_switch(TASKS_UPDATE_SWITCH)
+
+
+def test_every_switch_on_adds_every_optional_tool_and_nothing_else() -> None:
+    """The surface the other gates measure, held against the bundles: every optional tool
+    is registered and none of them is a member of the frozen default surface."""
+    assert set(switched_on_surface()) == EXPECTED_TOOLS | OPTIONAL_TOOLS.keys()
+    assert not EXPECTED_TOOLS & OPTIONAL_TOOLS.keys()
 
 
 def test_an_unknown_name_stops_the_start() -> None:
