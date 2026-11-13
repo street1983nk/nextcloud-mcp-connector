@@ -120,7 +120,7 @@ Kein Milestone-Audit (wie v1.5 und v1.6): Aussagen aus den fünf Phase-Verifikat
 
 - [x] **Phase 30: Mess-Spike Aufgaben und Ordner** - Alles, was Recherche und Planung nur annehmen, wird gegen echte Nextcloud-Instanzen gemessen, bevor Produktcode entsteht; zuerst `MKCOL` unter AppAPI-Impersonation, mit Abbruchkriterien (completed 2026-11-12)
 - [x] **Phase 31: Ordner anlegen** - `files_create_folder` legt Ordner an, wahlweise mit fehlenden Elternordnern, hinter der ganzen v1.7-Kette aus Ausschluss, Sandbox, Paartest, Kanarie und Audit; allein releasefähig
-- [ ] **Phase 32: Tasks-Bundle suchen, lesen, anlegen** - `tasks_search`, `tasks_read` und `tasks_create` über CalDAV VTODO als zehnte Familie, samt `task:`-Id über `fetch`; ohne Phase 33 releasefähig
+- [x] **Phase 32: Tasks-Bundle suchen, lesen, anlegen** - `tasks_search`, `tasks_read` und `tasks_create` über CalDAV VTODO als zehnte Familie, samt `task:`-Id über `fetch`; ohne Phase 33 releasefähig (completed 2026-11-13)
 - [ ] **Phase 33: Aufgaben ändern** - Abhaken, Wiederöffnen, Felder ändern und Verschieben einer einzelnen Aufgabe, nur mit gelesener ETag; kein Löschen (Owner, 12.11.2026); jeder Teil abtrennbar
 - [ ] **Phase 34: Doku, Store, Release 0.8.0** - Doku und Store-Text in drei Sprachen sagen den Endstand samt präzisierter Schreibzusage, Release 0.8.0 steht mit Owner-Freigabe im Store
 
@@ -208,7 +208,7 @@ Plans:
 - [x] 32-06-PLAN.md: TASK-09, Provider `tasks`, `fetch` über `tasks_read`, Link nur auf die Startseite bei geteilten Listen, Satz in `docs/hardening*.md` (TASK-07, TASK-09; D-32-06, D-32-15)
 - [x] 32-05b-PLAN.md: Kanarie, Abnahmeskript, Live-Test mit Schalter, CI mit und ohne Tasks-App (TASK-01 bis TASK-03, TASK-05 bis TASK-07, TASK-09; D-32-11)
 - [x] 32-07-PLAN.md: Live-Beweis auf Nextcloud 35 und 32, je ohne und mit Tasks-App, `docs/tasks-evidence.md` (TASK-01 bis TASK-07, TASK-09; D-32-11, D-32-12)
-- [ ] 32-08-PLAN.md: gemeinsame Abnahme in der Tasks-App per Playwright, Owner-Checkpoint zum Push, CI-Lauf beider Beine (TASK-05, TASK-07; D-32-11, D-32-13)
+- [x] 32-08-PLAN.md: gemeinsame Abnahme in der Tasks-App per Playwright, Owner-Checkpoint zum Push, CI-Lauf beider Beine (TASK-05, TASK-07; D-32-11, D-32-13)
 
 **Abtrennbar**: TASK-09 (`task:`-Id über `fetch` und Provider) ist ein eigener Plan und nur per Owner-Entscheid verschiebbar
 
@@ -285,7 +285,7 @@ Plans:
 | 29. Prüfkommando und Doku | v1.7 | 9/9 | Complete    | 2026-10-01 |
 | 30. Mess-Spike Aufgaben und Ordner | v1.8 | 5/5 | Complete    | 2026-11-12 |
 | 31. Ordner anlegen | v1.8 | 0/6 | Planned | - |
-| 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 9/10 | In Progress|  |
+| 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 10/10 | Complete   | 2026-11-13 |
 | 33. Aufgaben ändern | v1.8 | 0/TBD | Not started | - |
 | 34. Doku, Store, Release 0.8.0 | v1.8 | 0/TBD | Not started | - |
 
