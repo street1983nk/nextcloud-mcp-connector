@@ -777,6 +777,16 @@ def test_clean_subline_removes_an_owner_name_with_brackets_of_its_own() -> None:
     assert cleaned == "Due soon (Team-Aufgaben)"
 
 
+def test_clean_subline_replaces_a_subline_that_is_only_the_raw_name() -> None:
+    """Measured live on Nextcloud 35 (plan 32-09): a task without a due date has the bare
+    ``(<display name of the list>)`` as its subline, without a leading space."""
+    assert tasks.clean_subline(f"({TEAM_DISPLAY})", team_list()) == "(Team-Aufgaben)"
+
+
+def test_clean_subline_drops_a_bare_raw_name_with_text_in_front_and_no_space() -> None:
+    assert tasks.clean_subline(f"Due({TEAM_DISPLAY})", team_list()) is None
+
+
 def test_clean_subline_never_touches_an_own_list() -> None:
     entry = parse(collection("mine", displayname="Mine", owner="alice"))[0]
     assert tasks.clean_subline("Due soon (Mine)", entry) is None
