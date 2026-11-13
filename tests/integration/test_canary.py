@@ -13,7 +13,7 @@ Four rules make a green run mean something:
 *   **The marker is never an argument (D-28-06).** Every argument set is asserted free of the
     marker before its call, so a marker in an answer can only come from the instance.
 *   **The registry is the plan.** ``set(PLAN) == registry`` against ``list_tools()``, and the
-    output says ``KANARIE <mode> geprüft <n> von <registry>`` with ``n == 24``.
+    output says ``KANARIE <mode> geprüft <n> von <registry>`` with ``n == 27``.
 *   **The control marker must show.** The untagged control file and note carry a second
     marker; in the normal state every reader answer that has to show them must show it, or an
     empty index or a wrong container would end in a green canary (T-28-101).
@@ -21,6 +21,12 @@ Four rules make a green run mean something:
     no ``next`` comes; ``unified_search`` has no cursor input, so its provider ``cursors`` are
     scanned and logged per provider with the hit count, and the count must stay below the
     limit, which means every hit was on the first page (A-27-04 / T-27-25).
+
+The three task tools (TASK-07) read and write the task list of the world, a second collection
+that takes VTODO only. Its task carries the control marker, so ``tasks_search``, ``tasks_read``
+and ``fetch`` of its id must show it. The Deck card of the world carries a marker of its own
+in its description; Deck shows the card as a VTODO, and no answer of the three task tools may
+carry that marker (``DECK`` lines), with the positive control in the world's build proof.
 
 The outage runs through ``respx`` with ``pass_through`` for every other request, never through
 ``occ app:disable``, which does not produce an outage (phase 25, K1).
@@ -60,7 +66,7 @@ from mcp_connector.tools import withhold
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
 RAW = cw.RAW_DIR / "28-10-canary.txt"
-EXPECTED_TOOLS = 24
+EXPECTED_TOOLS = 27
 MAX_PAGES = 50
 COMMAND = (
     "PYTHONUTF8=1 .venv/Scripts/python.exe -m pytest tests/integration/test_canary.py "
@@ -83,7 +89,11 @@ WRITE_KINDS: dict[str, str] = {
     "tables_create_row": "row",
     "notes_create": "note",
     "talk_send": "message",
+    "tasks_create": "task",
 }
+
+#: The tools of the tasks bundle: none of their answers may carry the Deck marker (E9).
+TASK_TOOLS = ("tasks_search", "tasks_read", "tasks_create")
 
 #: The write tools that aim at a tagged target and therefore have to refuse.
 MUST_REFUSE = ("files_upload", "files_create_folder", "notes_create", "talk_send")
@@ -193,6 +203,7 @@ def plan(world: cw.World) -> dict[str, list[dict[str, Any]]]:
             {"id": f"table:{world.table_id}"},
             {"id": card},
             {"id": event},
+            {"id": world.task_id},
         ],
         "calendar_list_events": [
             {
@@ -227,13 +238,26 @@ def plan(world: cw.World) -> dict[str, list[dict[str, Any]]]:
         # neutral write that needs no file reference at all.
         "tables_create_row": [{"table_id": world.table_id, "values": json.dumps({"Verweis": ""})}],
         "mail_browse": [{"level": "accounts"}],
+        # The stem is the search word and the title of the new task, never the marker
+        # (D-28-06). The list is named, because the account has more than one own list.
+        "tasks_search": [{"query": world.stamm}, {"query": world.stamm, "status": "all"}],
+        "tasks_read": [
+            {"task_id": world.task_id},
+            # The Deck card as a task id: refused before any request, like an unknown id.
+            {"task_id": f"task:{world.deck_calendar_uri}:card-{world.card_id}.ics"},
+        ],
+        "tasks_create": [{"summary": f"{world.stamm}-neu", "list": world.task_list_name}],
     }
 
 
 def control_expected(world: cw.World, tool: str, args: dict[str, Any]) -> bool:
     """Whether this reader call must show the control marker in the normal state."""
-    if tool in ("files_search", "notes_search", "unified_search", "search"):
+    if tool in ("files_search", "notes_search", "unified_search", "search", "tasks_search"):
         return True
+    if tool == "tasks_read":
+        return args.get("task_id") == world.task_id
+    if tool == "fetch":
+        return args.get("id") == world.task_id
     if tool == "files_list":
         return args.get("path") == world.root
     if tool == "files_read":
@@ -307,6 +331,16 @@ async def call_and_scan(
             not found,
             " | ".join(found) if found else f"is_error={result.is_error} {every[-1][:120]}",
         )
+        if tool in TASK_TOOLS:
+            deck = [around(s, world.deck_marker) for s in scanned if world.deck_marker in s]
+            cw.check(
+                RAW,
+                "DECK",
+                tool,
+                f"{case} seite {index}",
+                not deck,
+                " | ".join(deck) if deck else f"deck-marker fehlt, is_error={result.is_error}",
+            )
     booked = [book_write(world, tool, result) for result in pages]
     log(
         f"AUFRUF {mode} {tool} {args_short(args)} seiten={len(pages)} "
@@ -443,6 +477,9 @@ async def test_no_tool_answer_carries_the_marker_normal(monkeypatch: pytest.Monk
     header(env, "normal")
     with cw.canary_world(env, raw=RAW) as world:
         log(f"# stamm={world.stamm} marker={world.marker} kontroll-marker={world.control_marker}")
+        log(f"# deck-marker={world.deck_marker} aufgabe={world.task_id}")
+        for part in ("aufgaben", "deck-marker"):
+            log(f"WELT {part}: {world.proof[part]}")
         cw.mcp_env(monkeypatch, env)
         cw.fresh_guard()
         result = await sweep(world, "normal")

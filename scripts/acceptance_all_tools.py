@@ -53,6 +53,10 @@ An account list that comes back empty is a success with zero accounts, so the ru
 walks on; the same holds one level deeper for an account without a single mailbox. Nothing is
 written in this family at all: there is no ``mail_send`` to call, by design.
 
+Tasks are created without naming a list (the test account has one own task list), found by
+their id with ``tasks_search``, and read twice, with ``tasks_read`` and with ``fetch``; the two
+readers have to agree on id, title and status.
+
 ``fetch`` is called once per id kind that needs an object of this instance, and every one of
 those ids comes out of a read of the same run: a ``fetch("mail:<number>")`` on a guessed number
 would be a request about somebody's mail, and ``message:`` and ``table:`` are no different. A
@@ -290,6 +294,9 @@ async def run(client: Client, report: Report) -> set[str]:
         },
     )
 
+    # --- tasks ------------------------------------------------------------------------
+    await _tasks(client, report, marker)
+
     # --- notes ------------------------------------------------------------------------
     created = loads(
         await call(
@@ -428,6 +435,70 @@ async def run(client: Client, report: Report) -> set[str]:
             report.add("fetch", "SKIP", reason)
 
     return set(names)
+
+
+#: Part of the refusal of ``tasks_create`` without ``list`` when the account has more than one
+#: own task list to write to. On the test instance that is a broken prerequisite of this run.
+TASKS_MORE_THAN_ONE = "more than one task list"
+
+
+async def _tasks(client: Client, report: Report, marker: str) -> None:
+    """Create a task, find it by its id, read it with ``tasks_read`` and ``fetch``, compare.
+
+    ``tasks_create`` names no list on purpose: the account of the test instance holds exactly
+    one own task list (``personal``), and that is the one case in which the tool picks the
+    target itself (E4). A refusal with "more than one" therefore fails with that sentence
+    instead of hiding behind a list name. The hit is matched by id, never by position, and
+    the two readers have to describe the same task: same title, same status.
+    """
+    summary = f"Abnahme {marker}"
+    try:
+        result = await client.call_tool("tasks_create", {"summary": summary})
+    # Broad on purpose, as in call(): one broken tool must land in the matrix.
+    except Exception as exc:
+        report.add("tasks_create", "FAIL", f"{type(exc).__name__}: {exc}")
+        result = None
+    text = text_of(result) if result is not None else ""
+    if result is not None and result.is_error:
+        if TASKS_MORE_THAN_ONE in text:
+            report.add(
+                "tasks_create",
+                "FAIL",
+                f"the test account should hold one own task list and holds more: {text}",
+            )
+        else:
+            report.add("tasks_create", "FAIL", text)
+    elif result is not None:
+        report.add("tasks_create", "OK", text)
+    task_id = str(loads(text).get("id") or "") if result is not None and not result.is_error else ""
+    if not task_id:
+        for tool in ("tasks_search", "tasks_read"):
+            report.add(tool, "FAIL", "tasks_create returned no id to look for")
+        report.add("fetch", "FAIL", "tasks_create returned no task id to fetch")
+        return
+
+    found = loads(await call(client, report, "tasks_search", {"query": marker}))
+    hits = [
+        hit
+        for hit in (found.get("tasks") or [])
+        if isinstance(hit, dict) and hit.get("id") == task_id
+    ]
+    if not hits:
+        report.add("tasks_search", "FAIL", f"the task created one second ago is no hit: {task_id}")
+
+    read = loads(await call(client, report, "tasks_read", {"task_id": task_id}))
+    fetched = loads(await call(client, report, "fetch", {"id": task_id}))
+    if not read or not fetched:
+        return
+    metadata = fetched.get("metadata") if isinstance(fetched.get("metadata"), dict) else {}
+    pairs = (
+        ("id", read.get("id"), fetched.get("id")),
+        ("summary", read.get("summary"), fetched.get("title")),
+        ("status", read.get("status"), (metadata or {}).get("status")),
+    )
+    differing = [f"{name} {left!r} != {right!r}" for name, left, right in pairs if left != right]
+    if differing:
+        report.add("fetch", "FAIL", f"tasks_read and fetch disagree: {'; '.join(differing)}")
 
 
 def _writable_tables(payload: dict[str, Any]) -> list[str]:

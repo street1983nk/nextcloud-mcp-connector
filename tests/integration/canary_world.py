@@ -43,12 +43,15 @@ from mcp.types import CallToolResult
 
 from mcp_connector import config, ids
 from mcp_connector.config import normalize_base_url
+from mcp_connector.errors import ToolError
 from mcp_connector.nextcloud import capabilities, exclusion
 from mcp_connector.nextcloud.clients import caldav as caldav_client
 from mcp_connector.nextcloud.clients import dav
 from mcp_connector.nextcloud.clients import deck as deck_client
 from mcp_connector.nextcloud.clients import systemtags as systemtags_client
 from mcp_connector.nextcloud.clients import tables as tables_client
+from mcp_connector.nextcloud.clients import tasks as tasks_client
+from mcp_connector.nextcloud.clients import xml as dav_xml
 from mcp_connector.nextcloud.credentials import Credentials
 from mcp_connector.server import mcp
 from mcp_connector.tools import talk as talk_tools
@@ -287,6 +290,39 @@ def untag(fileid: str) -> None:
 
 
 # --- harness --------------------------------------------------------------------------
+
+
+def task_list_body(name: str) -> bytes:
+    """A MKCALENDAR body for a list that takes VTODO only, as the Tasks app creates one.
+
+    Built with lxml after ``mkcalendar_body`` of ``scripts/tasks_spike.py``, so a name is
+    escaped instead of pasted into the document.
+    """
+    root = etree.Element(f"{{{dav_xml.CAL}}}mkcalendar", nsmap={"d": dav_xml.DAV, "c": dav_xml.CAL})
+    prop = etree.SubElement(
+        etree.SubElement(root, f"{{{dav_xml.DAV}}}set"), f"{{{dav_xml.DAV}}}prop"
+    )
+    etree.SubElement(prop, f"{{{dav_xml.DAV}}}displayname").text = name
+    comps = etree.SubElement(prop, f"{{{dav_xml.CAL}}}supported-calendar-component-set")
+    etree.SubElement(comps, f"{{{dav_xml.CAL}}}comp", name="VTODO")
+    return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+
+def todo_ics(uid: str, summary: str, extra: tuple[str, ...] = ()) -> bytes:
+    """One VTODO the way the Tasks app writes a plain one; ``extra`` lines go in as they are."""
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//nc-mcp-connector//harness 32//EN",
+        "BEGIN:VTODO",
+        f"UID:{uid}",
+        "DTSTAMP:20261113T080000Z",
+        f"SUMMARY:{summary}",
+        *extra,
+        "END:VTODO",
+        "END:VCALENDAR",
+    ]
+    return ("\r\n".join(_fold(line) for line in lines) + "\r\n").encode("utf-8")
 
 
 class Harness:
@@ -556,6 +592,64 @@ class Harness:
     def delete_calendar_url(self, url: str) -> int:
         return self.request("DELETE", url, headers=_NO_CAL_TRASH).status_code
 
+    # Tasks: a second collection of the world, VTODO only (TASK-07). The event calendar above
+    # stays as it is, so the calendar bundle sees the world it always saw (TASK-01).
+
+    def calendar_home(self) -> str:
+        return f"{self.base_url}{caldav_client.DAV_CALENDARS_PREFIX}{quote(self.user, safe='')}/"
+
+    def mk_task_list(self, calendar_uri: str, name: str) -> int:
+        return self.request(
+            "MKCALENDAR",
+            self.calendar_url(calendar_uri),
+            headers={"Content-Type": "application/xml"},
+            content=task_list_body(name),
+        ).status_code
+
+    def home_raw(self) -> httpx.Response:
+        """The calendar home as the task discovery asks for it, with the app password."""
+        return self.request(
+            "PROPFIND",
+            self.calendar_home(),
+            headers={"Depth": "1", "Content-Type": "application/xml"},
+            content=tasks_client.build_task_discovery_body(),
+        )
+
+    def task_lists(self) -> list[tasks_client.TaskList]:
+        """The task lists of the account, read with the parser of the bundle."""
+        response = self.home_raw()
+        assert response.status_code == 207, f"PROPFIND calendar home: {response.status_code}"
+        home_path = httpx.URL(self.calendar_home()).path
+        return tasks_client.parse_task_home(response.content, home_path=home_path)
+
+    def home_components(self) -> dict[str, set[str]]:
+        """``uri -> component names`` of every collection of the calendar home, Deck included."""
+        response = self.home_raw()
+        if response.status_code != 207:
+            return {}
+        found: dict[str, set[str]] = {}
+        for entry in etree.fromstring(response.content).iter(f"{_DAV}response"):
+            href = (entry.findtext(f"{_DAV}href") or "").rstrip("/")
+            uri = href.rsplit("/", 1)[-1]
+            comps = {
+                str(comp.get("name") or "")
+                for comp in entry.iter(f"{{{dav_xml.CAL}}}comp")
+                if comp.get("name")
+            }
+            if uri:
+                found[uri] = comps
+        return found
+
+    def task_url(self, list_key: str, object_name: str) -> str:
+        """The URL of one task, its list found by key in the discovery of the account.
+
+        Never built from the account id of anybody: the key of a shared list is a hash, and
+        only the discovery knows which URI it stands for.
+        """
+        matches = [entry for entry in self.task_lists() if entry.key == list_key]
+        assert len(matches) == 1, f"the key {list_key!r} names {len(matches)} task lists"
+        return f"{self.calendar_url(matches[0].uri)}{quote(object_name, safe='')}"
+
     def status_of(self, url: str) -> int:
         return self.request(
             "PROPFIND",
@@ -771,7 +865,7 @@ def run_id() -> tuple[str, str]:
 # --- the canary world (plan 28-07) ------------------------------------------------------
 
 #: What a write tool of the canary may leave behind, see :meth:`World.register_tool_write`.
-WRITE_KINDS = ("event", "card", "row", "note", "message")
+WRITE_KINDS = ("event", "card", "row", "note", "message", "task")
 
 
 def _fold(line: str) -> str:
@@ -798,6 +892,14 @@ class World:
     untagged file and note, so an empty index or a wrong container shows up as a missing
     control hit instead of a green canary.
 
+    Tasks (TASK-07) live in a second collection, ``<stem>-aufgaben``, named ``<stem>`` and
+    taking VTODO only; the event calendar keeps its VEVENT set. Its one task carries the
+    control marker in its title, so a tasks reader that sees nothing shows up as a missing
+    control hit. The Deck card carries a marker of its own in its description,
+    :attr:`deck_marker`, never :attr:`marker` (pitfall 9): Deck shows that card as a VTODO
+    of a calendar ``app-generated--deck--board-<id>``, and no answer of the three task tools
+    may carry it.
+
     The instance is frozen; the three collections at the end are mutable on purpose:
     ``proof`` carries the raw values of the build proof, ``writes_ledger`` what a write tool
     created, and ``cleanup_lines`` the read back cleanup after the block.
@@ -809,6 +911,7 @@ class World:
     control_marker: str
     env: LiveEnv
     harness: Harness
+    deck_marker: str = ""
     notes_root: str = "/Notes"
     fileids: dict[str, str] = dataclasses.field(default_factory=dict)
     note_id: str = ""
@@ -825,6 +928,8 @@ class World:
     stack_id: str = ""
     card_id: str = ""
     deck_attachment: str = ""
+    task_list_uri: str = ""
+    task_object: str = ""
     tag_id: str = ""
     proof: dict[str, str] = dataclasses.field(default_factory=dict)
     writes_ledger: list[str] = dataclasses.field(default_factory=list)
@@ -893,6 +998,28 @@ class World:
     def calendar_url(self) -> str:
         return self.harness.calendar_url(self.calendar_uri or self.stamm)
 
+    @property
+    def task_list_name(self) -> str:
+        """The display name of the task list: the stem, a word every search of the run uses."""
+        return self.stamm
+
+    @property
+    def task_list_url(self) -> str:
+        return self.harness.calendar_url(self.task_list_uri or f"{self.stamm}-aufgaben")
+
+    @property
+    def task_summary(self) -> str:
+        return f"{self.stamm}-kontrolle-{self.control_marker}"
+
+    @property
+    def task_id(self) -> str:
+        return ids.encode_task(ids.task_list_key(self.task_list_uri), self.task_object)
+
+    @property
+    def deck_calendar_uri(self) -> str:
+        """The calendar Deck shows the board of the world as (measured in plan 30-04)."""
+        return f"{tasks_client.DECK_PREFIX}deck--board-{self.board_id}"
+
     def link_cell(self, name: str, fileid: str) -> str:
         """A Tables link cell in the form plan 28-01 measured (finding A1)."""
         return json.dumps(
@@ -904,8 +1031,8 @@ class World:
         """Book one thing a write tool created, so the cleanup removes and reads it back.
 
         ``kind`` is one of :data:`WRITE_KINDS`; ``ident`` is the id the tool answered
-        (``event:<cal>:<object>``, ``card:<b>:<s>:<c>``, a row id, ``note:<id>`` or
-        ``message:<token>:<id>``).
+        (``event:<cal>:<object>``, ``card:<b>:<s>:<c>``, a row id, ``note:<id>``,
+        ``message:<token>:<id>`` or ``task:<list key>:<object>``).
         """
         if kind not in WRITE_KINDS:
             raise ValueError(f"unknown write kind {kind!r}, expected one of {WRITE_KINDS}")
@@ -989,13 +1116,33 @@ def _add_tool_write(cleanup: Cleanup, harness: Harness, entry: str) -> None:
             lambda: harness.delete_note(note_id),
             lambda: str(harness.note_status(note_id)),
         )
-    else:
+    elif kind == "task":
+        # The key goes through the discovery of the account, never through a guessed URI;
+        # resolved now, while the list still exists, so the read back can show its 404.
+        # A failure here must not end the cleanup of the world, so it becomes a residue line.
+        try:
+            assert len(parts) == 2, f"a task needs a list key and an object: {entry}"
+            task_url = harness.task_url(parts[0], parts[1])
+        except (AssertionError, httpx.HTTPError, ToolError) as exc:
+            failure = f"nicht aufgeloest {type(exc).__name__}: {short(str(exc), 120)}"
+            cleanup.add(f"tool {entry}", lambda: None, lambda: failure)
+            return
+        cleanup.add(
+            f"tool {entry}",
+            lambda: harness.delete_calendar_url(task_url),
+            lambda: str(harness.status_of(task_url)),
+        )
+    elif kind == "message":
         token, message_id = parts[0], parts[-1]
         cleanup.add(
             f"tool {entry}",
             lambda: harness.ocs_delete(f"{TALK_CHAT}/{token}/{message_id}"),
             lambda: _message_state(harness, token, message_id),
         )
+    else:
+        # Before 32-05b the last branch was silently "message"; a new kind without a branch
+        # of its own is now a residue line instead of a Talk cleanup of something else.
+        cleanup.add(f"tool {entry}", lambda: None, lambda: f"unbekannte art {kind}")
 
 
 def _event_ics(world: World, uid: str, tagged_fileid: str) -> bytes:
@@ -1217,6 +1364,48 @@ def _build_calendar(world: World, cleanup: Cleanup) -> str:
     return uid
 
 
+def _build_tasks(world: World, cleanup: Cleanup) -> tuple[str, str]:
+    """The task list of the world (VTODO only) with one task, removed without trash bin."""
+    harness = world.harness
+    uri = f"{world.stamm}-aufgaben"
+    url = harness.calendar_url(uri)
+    status = harness.mk_task_list(uri, world.task_list_name)
+    assert status == 201, f"MKCALENDAR {uri}: {status}"
+    cleanup.add(
+        f"aufgabenliste {uri}",
+        lambda: harness.delete_calendar_url(url),
+        lambda: str(harness.status_of(url)),
+    )
+    uid = f"{world.stamm}-{uuid.uuid4().hex[:8]}"
+    object_name = f"{uid}.ics"
+    response = harness.request(
+        "PUT",
+        f"{url}{object_name}",
+        headers={"Content-Type": "text/calendar; charset=utf-8", "If-None-Match": "*"},
+        content=todo_ics(uid, world.task_summary),
+    )
+    assert response.status_code == 201, f"PUT task: {response.status_code}"
+    read = harness.request("GET", f"{url}{object_name}")
+    unfolded = read.text.replace("\r\n ", "").replace("\n ", "")
+    assert read.status_code == 200, f"GET task: {read.status_code}"
+    assert f"SUMMARY:{world.task_summary}" in unfolded, "the task does not carry its title"
+    mine = [entry for entry in harness.task_lists() if entry.uri == uri]
+    assert len(mine) == 1, f"the task discovery shows {len(mine)} lists {uri}"
+    assert mine[0].own, f"{uri} is not an own list: {mine[0]}"
+    assert mine[0].writable, f"{uri} is not writable: {mine[0]}"
+    components = harness.home_components()
+    # TASK-01: the event calendar of the world keeps its VEVENT set; tasks are a second list.
+    assert components.get(uri) == {"VTODO"}, f"{uri}: {components.get(uri)}"
+    assert components.get(world.stamm) == {"VEVENT"}, (
+        f"{world.stamm}: {components.get(world.stamm)}"
+    )
+    world.proof["aufgaben"] = (
+        f"MKCALENDAR {status} {uri} (nur VTODO), PUT {response.status_code} GET "
+        f"{read.status_code} {object_name}; discovery: eigen, schreibbar, name={mine[0].name}"
+    )
+    return uri, object_name
+
+
 def _build_deck(world: World, cleanup: Cleanup) -> tuple[str, str, str, str]:
     harness = world.harness
     board_id = harness.deck_created("/boards", {"title": world.stamm, "color": "0082c9"})
@@ -1230,7 +1419,26 @@ def _build_deck(world: World, cleanup: Cleanup) -> tuple[str, str, str, str]:
     )
     card_id = harness.deck_created(
         f"/boards/{board_id}/stacks/{stack_id}/cards",
-        {"title": world.stamm, "type": "plain", "order": 999},
+        {
+            "title": world.stamm,
+            "type": "plain",
+            "order": 999,
+            "description": f"deck {world.stamm} {world.deck_marker}",
+        },
+    )
+    # Positive control of the Deck exclusion (TASK-07): the marker is really there, and the
+    # account really sees the board as a calendar with VTODO, so an answer of the task tools
+    # without the marker means the exclusion held and not that there was nothing to exclude.
+    card = harness.deck("GET", f"/boards/{board_id}/stacks/{stack_id}/cards/{card_id}")
+    description = str((card.json() or {}).get("description") or "") if card.is_success else ""
+    assert world.deck_marker in description, f"deck card without its marker: {card.status_code}"
+    deck_calendar = f"{tasks_client.DECK_PREFIX}deck--board-{board_id}"
+    components = harness.home_components().get(deck_calendar)
+    assert components is not None, f"{deck_calendar} is not in the calendar home"
+    assert "VTODO" in components, f"{deck_calendar} without VTODO: {sorted(components)}"
+    world.proof["deck-marker"] = (
+        f"GET karte {card.status_code} beschreibung mit deck-marker; PROPFIND kalender-home "
+        f"{deck_calendar} komponenten={','.join(sorted(components))}"
     )
     # A file attachment of Deck is a share of type 12 at the card, which is what the Deck
     # frontend creates when a file from Files is attached; a refusal is recorded, not fatal.
@@ -1289,6 +1497,7 @@ def canary_world(env: LiveEnv, raw: Path) -> Iterator[World]:
         control_marker=f"ck{uuid.uuid4().hex}",
         env=env,
         harness=harness,
+        deck_marker=f"dk{uuid.uuid4().hex}",
     )
     # Registered first, so it runs last: whatever the deletions above moved into the trash
     # bin is purged by the stem, which no foreign entry carries.
@@ -1306,6 +1515,7 @@ def canary_world(env: LiveEnv, raw: Path) -> Iterator[World]:
         talk_token, file_room_token = _build_talk(base, cleanup)
         table_id, column_id, row_ids = _build_table(base, cleanup)
         event_uid = _build_calendar(base, cleanup)
+        task_list_uri, task_object = _build_tasks(base, cleanup)
         board_id, stack_id, card_id, attachment = _build_deck(base, cleanup)
         tag_id = _tag_world(base, cleanup, created_notes)
         world = dataclasses.replace(
@@ -1324,6 +1534,8 @@ def canary_world(env: LiveEnv, raw: Path) -> Iterator[World]:
             stack_id=stack_id,
             card_id=card_id,
             deck_attachment=attachment,
+            task_list_uri=task_list_uri,
+            task_object=task_object,
             tag_id=tag_id,
         )
         yield world

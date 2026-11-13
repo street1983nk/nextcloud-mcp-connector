@@ -84,6 +84,16 @@ def _book_harness_writes(world: cw.World) -> list[str]:
     assert response.status_code == 201, f"PUT tool event: {response.status_code}"
     world.register_tool_write("event", f"event:{world.calendar_uri}:{uid}.ics")
 
+    task_uid = f"{stamm}-werkzeug-{uuid.uuid4().hex[:8]}"
+    response = harness.request(
+        "PUT",
+        f"{world.task_list_url}{task_uid}.ics",
+        headers={"Content-Type": "text/calendar; charset=utf-8", "If-None-Match": "*"},
+        content=cw.todo_ics(task_uid, f"{stamm}-werkzeug"),
+    )
+    assert response.status_code == 201, f"PUT tool task: {response.status_code}"
+    world.register_tool_write("task", f"task:{world.task_list_uri}:{task_uid}.ics")
+
     posted = harness.ocs_post(f"{cw.TALK_CHAT}/{world.talk_token}", {"message": stamm})
     message = harness.ocs_data(posted, "post chat message")
     world.register_tool_write("message", f"message:{world.talk_token}:{message['id']}")
