@@ -1,29 +1,50 @@
 ---
 phase: 32-tasks-bundle-suchen-lesen-anlegen
-verified: 2026-11-13T17:10:00Z
+verified: 2026-11-13T17:25:00Z
 status: human_needed
-score: 5/5 Erfolgskriterien verifiziert (9/9 Anforderungen TASK-01 bis TASK-09 gedeckt)
+score: 5/5 Erfolgskriterien verifiziert (9/9 Anforderungen TASK-01 bis TASK-09 gedeckt); Lücken W1 bis W5 geschlossen
 overrides_applied: 0
+re_verification:
+  previous_status: human_needed
+  previous_score: 5/5
+  gaps_closed:
+    - "W1 / D-32-17: subline und text von Treffern geteilter Aufgabenlisten in unified_search und search ohne Besitzer"
+    - "W2: fetch einer task:-Id trägt metadata.truncated und <feld>_floating samt Zeilenvermerk"
+    - "W3: Beschreibung von query nennt title, description, tags"
+    - "W4: Deckel 500, recurring und 403 stehen im Abschnitt 'Not reproducible or not measured' von docs/tasks-evidence.md"
+    - "W5 / D-32-18 streng: hinausgeteilte oder per Link veröffentlichte eigene Liste ist ohne list kein Schreibziel"
+  gaps_remaining: []
+  regressions: []
 human_verification:
-  - test: "Owner-Entscheid zur Untertitelzeile (subline) des Suchproviders tasks bei geteilten Listen"
-    expected: "Owner entscheidet, ob search und unified_search die subline eines Treffers aus einer hineingeteilten Aufgabenliste weiterreichen dürfen. Nextcloud 34 und 35 hängen dort laut docs/tasks-evidence.md den Listennamen samt Besitzer an; der Link desselben Treffers wird seit 32-06 auf die Startseite gekürzt (D-32-15), die subline nicht."
-    why_human: "D-32-06 begrenzt das Verbot auf Antworten des Bundles tasks; search und unified_search gehören zu anderen Bundles, das Verhalten bestand schon vor der Phase. Ob es trotzdem in Phase 32 oder später behoben wird, ist eine Produktentscheidung."
-  - test: "Owner bestätigt die Lesart von fremdsichtbar im Phasenziel"
-    expected: "Eine eigene Liste, die der Nutzer selbst an andere geteilt hat, gilt nach E4 als eigene Liste: tasks_create schreibt ohne list hinein, wenn sie die einzige eigene beschreibbare ist. Owner bestätigt das oder verlangt eine Erkennung hinausgeteilter Listen."
-    why_human: "Das Goal sagt ohne je in eine fremdsichtbare Liste zu schreiben, E4 und TASK-06 sprechen von eigenen und geteilten (hineingeteilten) Listen. Der Code folgt E4; die Discovery fragt keine Freigaben eigener Listen ab. Der Wortlaut lässt beide Lesarten zu."
-  - test: "fetch einer task:-Id mit langer Beschreibung oder schwebender Zeit"
-    expected: "Owner entscheidet, ob fetch den Kürzungsvermerk (description_truncated) und das Kennzeichen *_floating aus tasks_read weitergeben soll, wie fetch es für Datei, Mail, Tabelle und Talk mit metadata.truncated tut."
-    why_human: "Kein Erfolgskriterium verlangt die Flags in fetch, und die Zeit wird nicht zu UTC umgedeutet. Ob die stille Kürzung in fetch hinnehmbar ist, ist eine Qualitätsentscheidung."
+  - test: "Gruppenfreigaben messen (geplanter Messplan 32-10): eigene Liste an eine Gruppe teilen und eine Liste per Gruppe hineinteilen, auf Nextcloud 35 und 32"
+    expected: "oc:invite einer an eine Gruppe geteilten eigenen Liste enthält ein oc:user-Element (Gruppen-Principal), sodass _shares_itself True liefert und tasks_create ohne list ablehnt; eine per Gruppe hineingeteilte Liste trägt _shared_by_ in der URI, ihr Name und ihre subline bleiben ohne Besitzer"
+    why_human: "Bisher nicht gemessen (32-09-SUMMARY Grenzen, docs/tasks-evidence.md). Der Code zählt nur Kindelemente mit lokalem Namen 'user' in oc:invite (clients/tasks.py _shares_itself). Erscheint eine Gruppenfreigabe dort anders, gälte eine an eine Gruppe geteilte eigene Liste als privat, und D-32-18 wäre für diesen Fall verletzt. Braucht Docker und Owner-Freigabe für Zustandsänderungen."
+  - test: "Wiederkehrende Aufgabe und Deckel 500 live (geplanter Messplan 32-10)"
+    expected: "recurring: true als ein Treffer ohne Expansion; Blättern endet bei 500 Treffern mit ehrlicher Notiz"
+    why_human: "Beides bisher nur per Unit belegt (W4 dokumentiert es jetzt ehrlich). Hauptsitzung hat den Messplan dem Owner vorgeschlagen; Phase 32 wird erst danach abgehakt."
+  - test: "Security-Gate pip-audit rot auf 4b88a65 (Run 43471388436): opentelemetry-api 1.45.1, CVE-2026-126360, Fix 1.45.2"
+    expected: "Owner entscheidet über ein Lock-Update (opentelemetry-api auf 1.45.2, transitiv) vor Push/Release; danach Security scans grün"
+    why_human: "Keine Regression von Phase 32: uv.lock ist seit dcda6c8 (dort Security grün) unverändert, origin/main pinnt dieselbe Version. Neue Advisory zwischen den Läufen. Erfolgskriterium 5 verlangt aber alle Gates grün; ohne Lock-Update ist der Stand nicht releasefähig."
 ---
 
-# Phase 32: Tasks-Bundle suchen, lesen, anlegen, Verifikationsbericht
+# Phase 32: Tasks-Bundle suchen, lesen, anlegen, Verifikationsbericht (Re-Verifikation)
 
 **Phase Goal:** Ein Assistent kann Nextcloud-Aufgaben suchen, lesen und anlegen, als zehnte Familie `tasks`, ohne je in eine fremdsichtbare Liste zu schreiben, ohne Deck-Karten zu zeigen und ohne das Verhalten des Kalender-Bundles zu ändern; die Phase ist ohne Phase 33 releasefähig
-**Verified:** 2026-11-13T17:10:00Z
+**Verified:** 2026-11-13T17:25:00Z
 **Status:** human_needed
-**Re-verification:** Nein, erste Verifikation
+**Re-verification:** Ja, nach Gap-Closure-Plan 32-09 (Vorstand: human_needed, Befunde W1 bis W5)
 
-Geprüft im Worktree `tasks-080`, Branch `plan/v1.8-tasks-080`, HEAD `669748e`. Der CI-Stand `dcda6c8` unterscheidet sich von HEAD nur in `.planning/` und `docs/tasks-evidence.md` (`git diff --stat dcda6c8 HEAD`), kein Code.
+Geprüft im Worktree `tasks-080`, Branch `plan/v1.8-tasks-080`, HEAD `4b88a65`. Code-Änderungen von 32-09 gelesen per `git diff 669748e HEAD` (22 Dateien, davon fünf in `src/`).
+
+## Lücken der Vorverifikation
+
+| Lücke | Geschlossen | Beleg (Code, Test, live) |
+|-------|-------------|--------------------------|
+| W1 / D-32-17: subline mit Besitzer in `search`/`unified_search` | ja | `tools/search.py` `_normalise`: Treffer `kind == "task"` mit `_shared_by_` in der rohen `resourceUrl` (dieselbe Regel wie der Link nach D-32-15) gibt seine subline nicht direkt aus, sondern nach `held`; `_clean_task_sublines` macht eine Discovery je Aufruf, nur wenn etwas zurückgehalten ist, und setzt nur `clients/tasks.clean_subline(...)` ein; `None` oder fehlgeschlagene Discovery heißt: subline entfällt, Treffer bleibt (fail closed). `clean_subline` ersetzt das Ende ` (<Rohname>)` und die nackte Form `(<Rohname>)` (Fix 39c1be9) und verwirft jede Zeile, in der der Besitzer (casefold) oder `_shared_by_` noch steht. `chatgpt.search` nimmt `text` aus derselben subline (`chatgpt.py:228`). Unit: 10 Tests `test_clean_subline_*`, `test_a_shared_task_list_hit_keeps_its_subline_without_the_owner`, `test_a_failed_discovery_drops_only_the_subline_of_the_shared_hit`, `test_a_shared_hit_whose_list_is_not_in_the_discovery_loses_its_subline`, `test_the_text_of_a_shared_task_hit_never_names_the_owner`. Live (`raw/32-09-nc35.txt` Z. 112 bis 116): Positivkontrolle "raw subline names the owner", bereinigt `(p32live-ec5b284e-rw)` und `Fällig am 04.12.2026 (p32live-ec5b284e-rw)`, text gleich subline, ohne bob und ohne Marker; nc32 roh ohne Besitzer, unverändert |
+| W2: fetch ohne Kürzungsvermerk und Schwebe-Kennzeichen | ja | `chatgpt._fetch_task`: `metadata["truncated"]="true"` bei `description_truncated`, je Zeitfeld `<feld>_floating` in metadata und ` (floating, no time zone)` in der Zeile. Unit `test_a_cut_task_description_is_marked_truncated`, `test_a_short_task_description_carries_no_truncated_key`, `test_a_floating_task_time_is_marked_in_the_text_and_the_metadata`, `test_a_zoned_or_all_day_task_time_carries_no_floating_mark` (Positiv und Negativ) |
+| W3: `query`-Beschreibung nennt "list" | ja | `reg_tasks.py:23` "Words in title, description or tags; default: all"; Unit `test_the_query_parameter_names_title_description_and_tags_not_the_list`, `test_a_word_of_the_description_finds_a_task_and_the_list_name_does_not` |
+| W4: nicht gemessene Teile nur in der SUMMARY | ja | `docs/tasks-evidence.md` Abschnitt "Not reproducible or not measured" (ab Z. 620): Deckel 500 (Z. 642), `recurring` (Z. 647 mit beiden Unit-Testnamen), 403 gegen 404 (Z. 651 bis 656) |
+| W5 / D-32-18 streng: hinausgeteilte eigene Liste | ja | `clients/tasks.py`: Discovery fragt `oc:invite` und `cs:publish-url`; `_shares_itself` liefert True bei `oc:user` in `oc:invite`, bei belegter `publish-url` und wenn `oc:invite` nicht im 2xx-propstat steht (Punkt 6); für hineingeteilte Listen immer False. `tools/tasks._pick_target`: einzige eigene Liste hinausgeteilt, Fehler mit `list=`-Ausweg (Punkt 1); Elternliste hinausgeteilt, Fehler (Punkt 4); mehrere eigene bleiben "more than one" (Punkt 2); `list` genannt, wird geschrieben. Kein neues Ausgabefeld, `shared_out` und `owner_suffix` mit `repr=False`, außerhalb des Moduls nur in `_pick_target` gelesen; kein `asdict` in `tools/`. Messung `raw/32-09-messung.txt` Z. 286 bis 288 (ENTSCHEID-Zeilen, 32 und 35, App-Passwort und Impersonation). Unit: 8 Tests zu `shared_out`, 8 zur Zielwahl. Live auf 35 (`raw/32-09-nc35.txt` Z. 100 bis 110 und 205 bis 215) und 32: privat geschrieben (Positivkontrolle), geteilt an bob abgelehnt ohne PUT, mit `list` geschrieben, parent abgelehnt, öffentlicher Link abgelehnt, nach Rücknahme wieder geschrieben; Zähler vorher/nachher passend. Grenze: Gruppenfreigabe nicht gemessen (siehe unten) |
 
 ## Goal Achievement
 
@@ -31,132 +52,103 @@ Geprüft im Worktree `tasks-080`, Branch `plan/v1.8-tasks-080`, HEAD `669748e`. 
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | Konto ohne Aufgabenliste eigens getestet, Fixture und live gegen ein Konto mit nur `VEVENT`: `tasks_search` leer mit Hinweis, `tasks_create` Fehler mit Ausweg | VERIFIED | Code: `tools/tasks.py:268-270` gibt `{"tasks": [], "hint": NO_LIST_HINT}`, `:766-768` wirft `NO_LIST_MESSAGE` mit `NO_LIST_WAY_OUT`; `clients/tasks.py:175-176` behandelt 404 als E6. Unit: `test_an_account_without_a_task_list_gets_an_empty_list_and_a_hint`, `test_a_home_that_answers_404_is_the_same_empty_answer`, `test_an_account_without_a_task_list_gets_an_error_with_a_way_out`. Live: `docs/tasks-evidence.md` Zeilen `AUFGABE task-03-mit-anmeldung` (BASELINE calendars=2, beide nur VEVENT laut 32-02 `HOME ... nur_vevent=ja`) und `task-03-ohne-anmeldung` auf NC 35 und 32, je mit und ohne Tasks-App; CI-Job `exapp` (NC 34) |
-| 2 | Gegen echte Nextcloud mit Deck-Board und geteilter Liste: Standard nur offene, Fälligkeitsgrenze ohne undatierte, keine Deck-Karte, ausgefallene Liste als `degraded`, Termin-Werkzeuge byte-gleich | VERIFIED | Code: Statusfilter `tools/tasks.py:448-453`, `_due_within` gibt für fehlendes `DUE` False (`:469-471`), Deck vor allem anderen ausgeschlossen (`clients/tasks.py:259-260`, `tools/tasks.py:569-571`, `:911-913`), `degraded` je Liste (`:280-283`). Live: `AUFGABE suche-standard-und-faellig`, `deck` (Positivkontrolle Deck-Kalender mit VTODO in der Discovery, kein Treffer), `ausfall-liste` (degraded mit Listenname ohne Besitzer), `geteilt-namen`. Kalender: `git diff 32-BASE -- tests/unit/test_caldav_client.py tests/unit/test_calendar_tools.py tests/integration/test_calendar_roundtrip.py src/mcp_connector/tools/calendar.py` leer (Gegenprobe: derselbe Befehl auf `clients/caldav.py` zeigt 126 Zeilen); Byte-Pin von mir unabhängig nachgerechnet: `build_discovery_body` und `build_calendar_query` liefern auf dem Basis-Commit und auf HEAD dieselben sha256 (`d330153d...`, `2352e0a2...`); `put_event` behält Wortlaut und Rückgabeschlüssel (Diff gelesen); Kette `KALENDER bytegleich=ja` 304/304 und 324/324 Bytes |
-| 3 | "fällig am 20." steht am 20. (`DUE;VALUE=DATE`), Start, Tags, Priorität, Eltern wie von der Tasks-App gelesen; ohne `list` nur bei genau einer eigenen Liste, sonst Fehler mit Namen; in geteilte Liste nichts ohne Nennung | VERIFIED | Code: Datum bleibt `date` (`_parse_task_time`, `_in_zone` lässt Daten unberührt), VTODO nur über icalendar (`_build_todo`), Zielwahl `_pick_target` (`tools/tasks.py:924-964`): genannte Liste gewinnt, sonst Elternliste nur wenn eigen (D-32-16, `:944-951`), sonst genau eine eigene beschreibbare, sonst Fehler mit echten Namen. Unit: 30 Tests in `test_tasks_create.py`, darunter `test_a_due_date_is_that_very_day`, `test_a_parent_in_a_shared_list_without_list_is_an_error`. Live: Kette `ROHOBJEKT due=DUE;VALUE=DATE:20261120`, `AUFGABE anlegen-mit-list` ("no 20261204 anywhere"), `ohne-list-zwei-listen`, `d-32-16` (kein PUT, Zähler gleich), `geteilt-ro-vorab`; Owner-Abnahme in der Tasks-App 0.18.1 (`raw/32-08-abnahme.txt`: eingerückt, "Fällig am 20. November 2026", ganztägig, Tags, "Priorität 3") |
-| 4 | `tasks_read` und `fetch` lösen dieselbe `task:`-Id; Treffer des Providers `tasks` führt auf diese Id; Zeitmatrix je als benannter Test; Fremdtext aus geteilter Liste gekappt und ohne Marker | VERIFIED | Code: `chatgpt._fetch_task` ruft `tasks_tools.read_task` (eine Auflösung), `provider_map.PROVIDER_KINDS["tasks"] = "task"` und `_tasks_target` mit `ids.task_list_key`. Unit: 15 benannte Matrixtests `test_matrix_{due,start,completed}_{all_day,zoned,utc,floating,without_a_date}` in `test_tasks_time_matrix.py`, `test_injection_corpus.py`, `test_description_cap_value`. Live: `fetch-gleich-read`, `provider-tasksapp-1` (Treffer-Id == gelesene Id), Kette `allgemeine-suche-mit-tasksapp` und `search` mit `task:`-Id. Einschränkung siehe Warnung W2 (fetch reicht Kürzungsvermerk und Schwebe-Kennzeichen nicht weiter) |
-| 5 | Registry 27 Werkzeuge in zehn Familien; `EXPECTED_PUT_CALLS` 6; Budget nach Hausregel neu verankert, kein Werkzeug über 1400 Bytes; Kanarie ruft die drei Werkzeuge; READMEs, `docs/`, drei Changelogs nachgezogen; alle Gates grün | VERIFIED | Selbst gelaufen: `check_tool_budget.py` "tools/list: 18747 bytes, 27 tools, budget 22000", größtes Werkzeug `files_upload` 1377, `tasks_create` 1364; Rechnung 18747 x 1,15 = 21560, auf 500 gerundet 22000 (Kommentar im Skript mit Messdatum). `EXPECTED_PUT_CALLS = 6` in `tests/contract/test_no_destructive_calls.py:480`; im Code genau ein CalDAV-`PUT` (`caldav.py:408`, `put_new_object`), `tasks_create` nutzt ihn. `test_tool_surface.py` führt die drei Namen und `tasks_create` in `CREATE_TOOLS`. Kanarie: `test_canary.py:96` `TASK_TOOLS`, Live `KANARIE normal geprüft 27 von 27` (4 passed). READMEs de/en/fr "27 ... zehn/ten/dix", Changelogs je 2 Treffer `tasks_create`, `docs/hardening*.md` nennen Bundle `tasks`. CI 43453276557 auf `dcda6c8`: exapp, integration, canary-nc35, image, unit success; Security 43453276506 success (per `gh run view` bestätigt) |
+| 1 | Konto ohne Aufgabenliste (Fixture und live, nur `VEVENT`) | VERIFIED | Unverändert seit Vorverifikation; Tests in diesem Lauf grün; live in 32-09 erneut `21 passed` je Instanz |
+| 2 | Standard offen, Fälligkeit ohne undatierte, keine Deck-Karte, `degraded`, Termin-Werkzeuge byte-gleich | VERIFIED | `git diff --stat b40f7623 HEAD -- tests/unit/test_caldav_client.py tests/unit/test_calendar_tools.py tests/integration/test_calendar_roundtrip.py src/mcp_connector/tools/calendar.py` leer; Gegenprobe auf `clients/caldav.py` zeigt 126 Zeilen (Diff wirkt). `caldav.py`, `ids.py`, `provider_map.py`, `test_caldav_bytes_pin.py` in 32-09 unverändert (`git diff --stat 669748e HEAD` leer), Byte-Pin-Test im Lauf grün. Die geänderte Discovery ist `build_task_discovery_body`, ein eigener Körper, nicht der Kalenderkörper |
+| 3 | "fällig am 20." am 20., Felder wie Tasks-App, ohne `list` nur genau eine eigene Liste, nichts in fremdsichtbare Liste ohne Nennung | VERIFIED | Wie zuvor; dazu D-32-18 (W5) geschlossen. Offene Messung Gruppenfreigabe siehe Human Verification 1 |
+| 4 | `tasks_read`/`fetch` gleiche Id, Provider-Treffer, Zeitmatrix, Fremdtext gekappt ohne Marker | VERIFIED | Wie zuvor; W2 geschlossen, `text` weiter durch `marks.without_marks` |
+| 5 | 27 Werkzeuge, `EXPECTED_PUT_CALLS` 6, Budget, kein Werkzeug über 1400, Kanarie, Doku, alle Gates grün | VERIFIED (Code), Gate-Warnung | Selbst gelaufen: `tools/list: 18770 bytes, 27 tools, budget 22000`, größtes `tasks_create` 1380 (< `MAX_TOOL_BYTES = 1400`); `EXPECTED_PUT_CALLS = 6` (`test_no_destructive_calls.py:480`); alle lokalen Gates grün (unten). Rechnung mit neuem Wert: 18770 x 1,15 = 21585,5, auf 500 gerundet 22000, Budget bleibt richtig. CI 43471388563 auf 4b88a65: alle fünf Jobs success; Security scans rot durch neue Advisory (Human Verification 3) |
 
-**Score:** 5/5 Erfolgskriterien verifiziert
+**Score:** 5/5 Erfolgskriterien verifiziert; W1 bis W5 geschlossen
 
-### Required Artifacts
+### Required Artifacts (32-09)
 
-| Artifact | Expected | Status | Details |
-|----------|----------|--------|---------|
-| `src/mcp_connector/nextcloud/clients/tasks.py` | Discovery, VTODO-Abfragen, Wortlaut | VERIFIED | 451 Zeilen, eigene Discovery, Deck/Trash/Abos/Scheduling raus, Name ohne Besitzer, `writable` aus Discovery |
-| `src/mcp_connector/tools/tasks.py` | search, read, create | VERIFIED | 1078 Zeilen, substanziell, alle Eingaben vor dem ersten Request geprüft |
-| `src/mcp_connector/server/reg_tasks.py` | Registrierung, `@graceful`, Annotations | VERIFIED | READ_ONLY, READ_ONLY, CREATE_ONLY; kein Nutzerparameter |
-| `src/mcp_connector/nextcloud/clients/caldav.py` | generischer create-only-Schreiber, Kalender unverändert | VERIFIED | `put_new_object` + `WriteWording`; `EVENT_WORDING` wortgleich zum alten Text |
-| `src/mcp_connector/ids.py` | `task:`-Codec, neutraler Schlüssel | VERIFIED | `task_list_key` = `s` + 16 Hex von sha256 bei `_shared_by_` |
-| `src/mcp_connector/provider_map.py` / `tools/chatgpt.py` | TASK-09 | VERIFIED | Provider `tasks`, Startseitenlink bei geteilter Liste, `fetch` über `read_task` |
-| `tests/unit/test_caldav_bytes_pin.py` | Byte-Pin | VERIFIED | Hashes von mir auf dem Basis-Commit nachgerechnet, gleich |
-| `docs/tasks-evidence.md` | Beleg | VERIFIED | Rohzeilen aus `raw/32-02`, `32-07`, `32-08` |
+| Artifact | Status | Details |
+|----------|--------|---------|
+| `src/mcp_connector/nextcloud/clients/tasks.py` | VERIFIED | `owner_suffix`, `shared_out`, `_shares_itself`, `clean_subline`; nichts davon im repr |
+| `src/mcp_connector/tools/search.py` | VERIFIED | `held`, `_clean_task_sublines`, eine Discovery nur bei Bedarf |
+| `src/mcp_connector/tools/chatgpt.py` | VERIFIED | `truncated`, `<feld>_floating`, Zeilenvermerk |
+| `src/mcp_connector/tools/tasks.py` | VERIFIED | `_pick_target` mit zwei neuen Ablehnungen |
+| `src/mcp_connector/server/reg_tasks.py` | VERIFIED | `query`-Text, `list`- und Werkzeugtext "a list others can see" |
+| `tests/fixtures/caldav_home_shared_out.xml` | VERIFIED | genutzt von den `shared_out`-Tests |
+| `tests/integration/test_tasks_live.py` | VERIFIED | Fälle `d-32-17-*`, `d-32-18-*`, Läufe in `raw/32-09-nc35.txt`, `raw/32-09-nc32.txt` |
 
 ### Key Link Verification
 
 | From | To | Via | Status |
 |------|----|-----|--------|
-| `reg_tasks.py` | `tools/tasks.py` | `search_tasks`, `read_task`, `create_task` | WIRED |
-| `tools/tasks.create_task` | `caldav.put_new_object` | `If-None-Match: *`, `TASK_WORDING`, Label = Listenname | WIRED |
-| `chatgpt.fetch` | `tools/tasks.read_task` | `case "task"` | WIRED |
-| `search`/`unified_search` | `provider_map.extract_id` | `PROVIDER_KINDS["tasks"]` | WIRED (live: Treffer-Id `task:p3207-aufgaben:...`) |
-| `audit/allowlist.py` | drei Werkzeuge | Parameternamen, `summary`/`description` gesperrt | WIRED |
-
-### Data-Flow Trace (Level 4)
-
-| Artifact | Data | Source | Real Data | Status |
-|----------|------|--------|-----------|--------|
-| `tasks_search` | `tasks` | PROPFIND Discovery + REPORT je Liste | ja, live 207 mit Treffern | FLOWING |
-| `tasks_read` | Aufgabe + `subtasks` | GET + REPORT `RELATED-TO` | ja, live Unteraufgabe gelistet | FLOWING |
-| `tasks_create` | neues Objekt | PUT 201 + Rücklesen | ja, Rohobjekt per App-Passwort gelesen | FLOWING |
+| `search._normalise` | `_clean_task_sublines` | Liste `held`, Aufruf nach der Schleife in `unified_search` | WIRED |
+| `_clean_task_sublines` | `tasks_client.discover_task_lists`, `clean_subline` | `by_key[parts[0]]` aus der `task:`-Id | WIRED |
+| `chatgpt.search` | `unified_search` | `text = hit["subline"]` | WIRED |
+| `parse_task_home` | `TaskList.shared_out` | `_shares_itself(props)` nur für eigene Listen | WIRED |
+| `_pick_target` | `shared_out` | Parent-Zweig und Einzellisten-Zweig | WIRED |
+| `_fetch_task` | `read_task` | `description_truncated`, `<feld>_floating` | WIRED |
 
 ### Behavioral Spot-Checks (selbst gelaufen)
 
 | Behavior | Command | Result | Status |
 |----------|---------|--------|--------|
-| Unit + Contract | `uv run --no-sync pytest tests/unit tests/contract -o addopts="" -m "not integration and not matrix" -q --import-mode=importlib` | 6344 passed, 35 skipped | PASS |
-| Budget | `uv run --no-sync python scripts/check_tool_budget.py` | 18747 bytes, 27 tools, budget 22000, max 1377 | PASS |
-| ruff check / format | `ruff check .`, `ruff format --check .` | All checks passed; 392 files already formatted | PASS |
+| Unit + Contract, ohne Parallelisierung (freier RAM vorher 5,23 GB) | `uv run --no-sync pytest tests/unit tests/contract -o addopts="" -m "not integration and not matrix" -q --import-mode=importlib -p no:xdist` | 6399 passed, 35 skipped, Exit 0 (190 s) | PASS |
+| Budget | `uv run --no-sync python scripts/check_tool_budget.py` | 18770 bytes, 27 tools, budget 22000; `tasks_create` 1380, `files_upload` 1377 | PASS |
+| ruff | `ruff check .`, `ruff format --check .` | All checks passed; 392 files already formatted | PASS |
 | pyright | `PYRIGHT_PYTHON_FORCE_VERSION=latest uv run --no-sync pyright` | 0 errors, 0 warnings | PASS |
-| vulture | `uv run --no-sync vulture src scripts vulture_whitelist.py` | keine Ausgabe | PASS |
-| Byte-Pin unabhängig | Basis `b40f762` per `git archive` ins Scratchpad, sha256 der beiden Körper dort und auf HEAD | identisch | PASS |
-| fetch mit 5000-Byte-Beschreibung und schwebendem `DUE` | Wegwerftest im Scratchpad mit den Fixtures von `test_chatgpt_fetch.py` | `read_task`: `description_truncated=True`, `due_floating=True`; `fetch`: metadata ohne `truncated`, Zeile `Due: 2026-11-20T09:00:00` ohne Kennzeichen | Befund W2 |
+| vulture | `uv run --no-sync vulture src scripts vulture_whitelist.py` | keine Ausgabe, Exit 0 | PASS |
+| Kalender unverändert | Diff gegen 32-BASE `b40f7623` (vier Dateien) plus Gegenprobe | leer / 126 Zeilen | PASS |
 
-### Probe Execution
+### CI zu 4b88a65
 
-Keine Probe-Skripte deklariert; Live-Läufe sind Docker-gebunden (laut Auftrag kein Docker). Live-Belege stammen aus `raw/32-07-*.txt`, `raw/32-08-*.txt` und CI 43453276557 (Jobs per `gh run view` bestätigt, headSha `dcda6c8590a2...`).
+| Lauf | Ergebnis |
+|------|----------|
+| CI 43471388563 | success: unit, image, integration, canary-nc35, exapp (per `gh run view` bestätigt, headSha `4b88a656...`) |
+| Security scans 43471388436 | failure: Job "pip-audit over the locked set", `opentelemetry-api 1.45.1 CVE-2026-126360`, Fix 1.45.2. CodeQL und REUSE success. `uv.lock` seit `dcda6c8` (Security dort grün) unverändert, `origin/main` pinnt dieselbe Version: neue Advisory, keine Regression von 32-09 |
 
 ### Requirements Coverage
 
-| Requirement | Description (kurz) | Status | Evidence |
-|-------------|--------------------|--------|----------|
-| TASK-01 | Listen = VTODO-Kalender, Deck/Abos/Scheduling/Papierkorb nie; Kalender byte-gleich | SATISFIED | `_is_task_list`, leerer Diff der Kalendertests, Byte-Pin |
-| TASK-02 | Suche: offen/alle, Text, Fälligkeit, Sortierung, Cursor mit Deckel 500 und Notiz, degraded, recurring, Fremdobjekt übersprungen | SATISFIED | Unit; live nur Standard, Fälligkeit, degraded (Rest siehe Lücken) |
-| TASK-03 | Konto ohne Liste | SATISFIED | Kriterium 1 |
-| TASK-04 | read mit Feldern, Zeitmatrix, ATTACH nie, unbekannte Id | SATISFIED | 15 Matrixtests, `test_attach_appears_in_no_field` |
-| TASK-05 | create-only mit E7-Feldern, `DUE;VALUE=DATE`, Prüfungen vor dem Request, `confirmed` | SATISFIED | Kriterium 3, `test_a_failing_read_back_never_fails_the_write` |
-| TASK-06 | Schreibziel nie positionsabhängig | SATISFIED | `_pick_target`, live `d-32-16`, `geteilt-ro-vorab` |
-| TASK-07 | Bundle, Gates, Kanarie, Doku | SATISFIED | Kriterium 5 |
-| TASK-08 | Budget neu verankert | SATISFIED | 22000, Rechnung geprüft |
-| TASK-09 | `fetch` + Provider | SATISFIED | Kriterium 4 |
-
-Die neun Haken `[x]` in REQUIREMENTS.md sind durch Code und Tests gedeckt. Keine verwaisten Anforderungen: REQUIREMENTS.md ordnet Phase 32 genau TASK-01 bis TASK-09 zu.
+TASK-01 bis TASK-09 bleiben SATISFIED (Begründung wie in der Vorverifikation). 32-09 stärkt TASK-06 (fremdsichtbar streng nach D-32-18) und TASK-09 (fetch-Vermerke). Keine verwaisten Anforderungen.
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| `src/mcp_connector/server/reg_tasks.py` | 23 | Beschreibung von `query`: "Words in title, tags or list"; der Code (`tools/tasks.py:456-458`) sucht in Titel, Beschreibung und Tags, nicht im Listennamen | Warning (W3) | Modell kann eine Listensuche über `query` erwarten, die leer bleibt; Beschreibung fehlt im Text |
-| `src/mcp_connector/tools/chatgpt.py` | 538-582 | `_fetch_task` übernimmt weder `description_truncated` noch `*_floating` | Warning (W2) | gekappte Beschreibung kommt über `fetch` ohne Vermerk an |
+| `scripts/check_tool_budget.py` | 116 bis 120 | Messkommentar nennt noch 18747 Bytes und `tasks_create` 1364; gemessen jetzt 18770 und 1380 | Info | Budget 22000 bleibt nach der Hausregel richtig (21585,5 aufgerundet); nur die Begründungszahl ist veraltet, nachzuziehen bei der nächsten Neuverankerung (Phase 33, TMOD-05) |
 
-Keine `TBD`, `FIXME`, `XXX`, `TODO` oder `HACK` in den geänderten Dateien (Treffer nur auf `VTODO`).
+Keine `TBD`, `FIXME`, `XXX`, `TODO` oder `HACK` in den in 32-09 geänderten Quelldateien.
 
-### Ehrlich benannte Lücken (live nicht gemessen)
+### Nicht gemessen (offen, Messplan 32-10 vorgeschlagen)
 
-| Lücke | Wo benannt | Bewertung |
-|-------|-----------|-----------|
-| Deckel 500 beim Blättern | 32-07-SUMMARY.md Zeile 113 | nur Unit (`test_the_ceiling_stops_paging_with_an_honest_note`, `test_limit_policy_constants_are_the_measured_values`); Größe aus 32-02 gemessen (2000 Aufgaben, 1,5 MB, 0,113 s) |
-| `recurring` | 32-07-SUMMARY.md Zeile 113 | nur Unit (`test_rrule_or_rdate_marks_the_master_as_recurring`, `test_a_recurring_task_is_one_hit_without_expansion`) |
-| 403 statt 404 bei nur lesbarer Liste | 32-07-SUMMARY.md Zeile 113 | live antwortete der Server 404 (Harness-PUT); 403-Zweig nur Unit (`test_403_of_the_server_names_the_list_without_its_uri`); 404-Wortlaut behauptet nicht, die Liste fehle |
-| NC 35 ohne Tasks-App | `docs/tasks-evidence.md`, Abschnitt "Not reproducible" | nur aus 32-07; CI-Job `exapp` läuft auf NC 34.0.3 |
-
-Die ersten drei stehen nur in der SUMMARY, nicht im Abschnitt "Not reproducible or not measured" von `docs/tasks-evidence.md` (Warnung W4). Gemessen ist dagegen alles, was die fünf Erfolgskriterien wörtlich verlangen.
+| Punkt | Bedeutung |
+|-------|-----------|
+| Gruppenfreigaben in beide Richtungen | Für D-32-18 relevant: ob `oc:invite` Gruppen-Principals als `oc:user` zeigt. `_shares_itself` zählt nur Kinder mit lokalem Namen `user`; erscheint eine Gruppenfreigabe anders, gälte eine an eine Gruppe geteilte eigene Liste als privat. Ebenso offen: Name und subline einer per Gruppe hineingeteilten Liste. Steht als offen in `docs/tasks-evidence.md` und 32-09-SUMMARY (Grenzen) |
+| `recurring` live | nur Unit |
+| Deckel 500 live | nur Unit |
+| Besitzer mit Anzeigename ungleich Kennung | live war bobs Anzeigename gleich der Kennung (`raw/32-09-messung.txt` Nebenbefunde); Unit deckt den Fall über `owner-displayname` |
 
 ### Human Verification Required
 
-### 1. subline des Providers `tasks` bei geteilten Listen
+### 1. Gruppenfreigaben (Messplan 32-10)
 
-**Test:** Owner entscheidet, ob `search` (Feld `text`) und `unified_search` (Feld `subline`) die subline eines Treffers aus einer hineingeteilten Aufgabenliste weiterreichen dürfen.
-**Expected:** Entweder bewusst hingenommen (D-32-06 gilt nur für das Bundle `tasks`, Verhalten bestand vor der Phase) oder Folgeplan, der die subline für `kind == "task"` mit `_shared_by_`-Link verwirft oder säubert.
-**Why human:** `docs/tasks-evidence.md` Zeile 494 bis 496 nennt den Befund (Listenname samt Besitzer auf NC 34 und 35). Phase 32 hat den Link desselben Treffers bereinigt, die subline nicht; live nur für eine eigene Liste gesehen (`Due on Nov 20, 2026 (p3207-aufgaben)`).
+**Test:** Eigene Liste an eine Gruppe teilen sowie eine Liste per Gruppe hineinteilen, Discovery und `tasks_create` ohne `list` auf 35 und 32.
+**Expected:** Hinausgeteilt per Gruppe gilt als fremdsichtbar (Ablehnung ohne PUT); hineingeteilt per Gruppe ohne Besitzer in Name und subline.
+**Why human:** Docker und Owner-Freigabe nötig; bisher nicht gemessen.
 
-### 2. Lesart von "fremdsichtbar"
+### 2. recurring und Deckel 500 live (Messplan 32-10)
 
-**Test:** Owner bestätigt, dass eine selbst hinausgeteilte eigene Liste als eigene Liste nach E4 gilt.
-**Expected:** Bestätigung, oder Auftrag, hinausgeteilte Listen (etwa über `oc:invite`) wie geteilte zu behandeln.
-**Why human:** Goal und E4 lassen zwei Lesarten zu; der Code folgt E4 und TASK-06.
+**Test:** Wiederkehrende Aufgabe anlegen und suchen; mehr als 500 Aufgaben blättern.
+**Expected:** ein Treffer mit `recurring: true`; Ende bei 500 mit Notiz.
+**Why human:** Live-Instanz nötig.
 
-### 3. Flags in `fetch`
+### 3. pip-audit rot
 
-**Test:** `fetch` einer Aufgabe mit mehr als 4096 Bytes Beschreibung oder schwebender Fälligkeit.
-**Expected:** Owner entscheidet, ob `metadata.truncated` und ein Schwebe-Hinweis nachgezogen werden.
-**Why human:** Kein Kriterium verletzt (gekappt, ohne Marker, nicht zu UTC umgedeutet), aber anders als die übrigen fetch-Leser ohne Vermerk.
+**Test:** Lock-Update `opentelemetry-api` 1.45.1 auf 1.45.2 entscheiden.
+**Expected:** Security scans grün.
+**Why human:** Abhängigkeitsentscheid außerhalb des Phasencodes; betrifft auch `main`.
 
 ### Gaps Summary
 
-Keine Blocker. Alle fünf Erfolgskriterien sind am Code, an den Tests, an selbst gelaufenen Gates und an den Rohprotokollen belegt; der Kalender ist per leerem Diff und unabhängig nachgerechnetem Byte-Pin unverändert; `EXPECTED_PUT_CALLS` steht bei 6, 27 Werkzeuge, größtes 1377 Bytes. Kein Besitzername und kein `_shared_by_` in Antworten des Bundles `tasks` (Unit `test_shared_lists_named_by_owner_display_name_leak_nothing`, live Scan über 22 Antworten). Kein stilles Schreiben in geteilte Listen (D-32-16 im Code, Unit und live mit Zählern). Schwebende Zeiten bleiben schwebend und gekennzeichnet in `tasks_search` und `tasks_read`.
+Keine Blocker im Code der Phase. Alle fünf Lücken W1 bis W5 sind am Code, an Unit-Tests mit Positiv- und Negativfällen und an Live-Läufen auf 35 und 32 geschlossen. Keine Regression: Kalender-Diff leer, `caldav.py` und Byte-Pin in 32-09 unberührt, `EXPECTED_PUT_CALLS` 6, 27 Werkzeuge, größtes 1380 Bytes unter 1400, Budget 22000; kein Besitzername und kein `_shared_by_` in Antworten, Links oder subline (Unit und live); der Fix 39c1be9 deckt die subline ohne Fälligkeit und ist per RED-Test (e672187) und live belegt.
 
-Warnungen:
-
-- W1 (Owner-Entscheid): subline mit Besitzer in `search`/`unified_search` für Treffer geteilter Listen, außerhalb des Bundles, dokumentiert, nicht behoben.
-- W2: `fetch` verliert `description_truncated` und `*_floating` (Spot-Check bestätigt).
-- W3: Parameterbeschreibung von `query` nennt "list" statt "description".
-- W4: drei live nicht gemessene Teile (Deckel 500, `recurring`, 403) nur in 32-07-SUMMARY, nicht in `docs/tasks-evidence.md`.
-- W5 (Owner-Entscheid): Lesart "fremdsichtbar" gegen E4.
-
-Info: Zeile 31 der Fortschrittstabelle in ROADMAP.md steht noch auf `0/6 Planned`, obwohl Phase 31 abgeschlossen ist (nicht Gegenstand dieser Verifikation, nicht geändert).
+Status `human_needed`, nicht `passed`: Gruppenfreigaben sind für D-32-18 ungemessen, `recurring` und Deckel 500 nur Unit (Messplan 32-10 vorgeschlagen), Security-Gate auf 4b88a65 rot durch neue Advisory (der CI-Lauf selbst ist grün). Phase 32 wird auf Anweisung der Hauptsitzung erst nach 32-10 abgehakt; ROADMAP und STATE bleiben unverändert.
 
 ---
 
-_Verified: 2026-11-13T17:10:00Z_
+_Verified: 2026-11-13T17:25:00Z_
 _Verifier: Claude (gsd-verifier)_
