@@ -1,0 +1,66 @@
+Rohprotokoll Plan 32-08: Owner-Abnahme der Aufgabenansicht in der Tasks-App (nc35)
+==================================================================================
+Datum: 2026-11-13 (UTC). Strecke: compose.nc35.yml (nc35-nc, nc35-harp, nc35-caddy, nc_app_mcp_connector).
+Gemeinsame Freigabe aus raw/32-02-messung.txt: FREIGABE zustand=option-a datum=2026-11-13.
+Kette wie in 32-07: OAuth-Client, Caddy, HaRP, ExApp-Image dieses Branches (0.7.2, sha256:00a2e4b0...),
+Impersonation. Hilfsskript h.py im Scratchpad (nicht im Repo): BASELINE per PHP_BASELINE aus
+scripts/tasks_measure.py, per Pfad geladen. <scratch> steht für das Scratchpad; Token liegen nur dort.
+Jede Ausgabe vor der Übernahme mit `tasks_measure.py scan` gegen .env.nc35 und .env.exapp geprüft:
+Treffer nur auf den öffentlichen Kontonamen (NC_MCP_TEST_USER).
+
+(1) Start, Stand vorher
+-----------------------
+# tasks_measure.py up 2026-11-13T15:16:18Z
+
+== up nc35 ==
+RAM frei_host_gb=4.68 schwelle=4.0 ergebnis=ok
+(no running container)
+docker start nc35-nc -> nc35-nc
+docker start nc35-harp -> nc35-harp
+docker start nc35-caddy -> nc35-caddy
+nc35-nc: installed (attempt 1)
+$ docker start nc_app_mcp_connector
+nc_app_mcp_connector
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=vorher
+TASKSAPP nc35 vorher=keine
+$ occ app_api:app:list
+ExApps:
+mcp_connector (MCP Connector): 0.7.2 [enabled]
+
+(2) Tasks-App installieren, Neustart
+------------------------------------
+$ occ app:install tasks; docker restart nc35-nc
+tasks 0.18.1 installed
+tasks enabled
+nc35-nc
+"versionstring":"35.0.0"
+TASKSAPP nc35 abnahme=0.18.1
+
+(3) Anlegen über die Kette als alice
+------------------------------------
+$ tasks_chain_evidence.py connect --token-file <scratch>/tok.json
+VERBINDUNG nutzer=alice weg=oauth ergebnis=ok
+$ tasks_chain_evidence.py tools --token-file <scratch>/tok.json
+WERKZEUGE anzahl=27 tasks=ja familien=10
+$ tasks_chain_evidence.py call --case eltern --tool tasks_create --args '{"summary": "p3208 Projekt Abnahme"}'
+KETTE eltern werkzeug=tasks_create nutzer=alice argumente={"summary": "p3208 Projekt Abnahme"} fehler=nein | {"confirmed": true, "created": true, "id": "task:personal:25f505ce-7330-41d7-91eb-999f753c539e.ics", "list": {"name": "personal", "shared": false, "writable": true}, "summary": "p3208 Projekt Abnahme"}
+$ tasks_chain_evidence.py call --case unteraufgabe --tool tasks_create --args '{"summary": "p3208 Teilschritt", "parent": "task:personal:25f505ce-...", "due": "2026-11-20", "start": "2026-11-18", "tags": ["abnahme", "p3208"], "priority": 3}'
+KETTE unteraufgabe werkzeug=tasks_create nutzer=alice argumente={"due": "2026-11-20", "parent": "task:personal:25f505ce-7330-41d7-91eb-999f753c539e.ics", "priority": 3, "start": "2026-11-18", "summary": "p3208 Teilschritt", "tags": ["abnahme", "p3208"]} fehler=nein | {"confirmed": true, "created": true, "due": "2026-11-20", "id": "task:personal:280e2532-3c76-4367-8e47-45d91f602ea5.ics", "list": {"name": "personal", "shared": false, "writable": true}, "start": "2026-11-18", "summary": "p3208 Teilschritt"}
+$ tasks_chain_evidence.py call --case lesen-eltern --tool tasks_read
+KETTE lesen-eltern werkzeug=tasks_read nutzer=alice argumente={"task_id": "task:personal:25f505ce-7330-41d7-91eb-999f753c539e.ics"} fehler=nein | {"id": "task:personal:25f505ce-7330-41d7-91eb-999f753c539e.ics", "list": {"name": "personal", "shared": false, "writable": true}, "status": "open", "subtasks": [{"id": "task:personal:280e2532-3c76-4367-8e47-45d91f602ea5.ics", "status": "open", "summary": "p3208 Teilschritt"}], "summary": "p3208 Projekt Abnahme"}
+$ tasks_chain_evidence.py call --case lesen-unteraufgabe --tool tasks_read
+KETTE lesen-unteraufgabe werkzeug=tasks_read nutzer=alice argumente={"task_id": "task:personal:280e2532-3c76-4367-8e47-45d91f602ea5.ics"} fehler=nein | {"due": "2026-11-20", "id": "task:personal:280e2532-3c76-4367-8e47-45d91f602ea5.ics", "list": {"name": "personal", "shared": false, "writable": true}, "parent": {"id": "task:personal:25f505ce-7330-41d7-91eb-999f753c539e.ics", "summary": "p3208 Projekt Abnahme"}, "priority": 3, "start": "2026-11-18", "status": "open", "subtasks": [], "summary": "p3208 Teilschritt", "tags": ["abnahme", "p3208"]}
+BASELINE nc35 konto=alice calendars=1 objekte=33 geloescht=0 shares=0 abos=0 phase=angelegt
+
+Ohne list angelegt: alice hat genau eine eigene beschreibbare Liste (personal), der Connector
+wählt sie selbst (Erfolgskriterium 3). Rückbau in Task 2: beide Objekte in personal per DELETE
+mit X-NC-CalDAV-No-Trashbin: 1, danach Papierkorb per REPORT prüfen und leeren (Befund 1 aus 32-07),
+Ziel BASELINE objekte=31 geloescht=0; Tasks-App zurück auf keine.
+
+(4) Für die Abnahme (Task 2)
+----------------------------
+URL der Tasks-App für alice (vom Host, über nc35-caddy): http://127.0.0.1:8082/index.php/apps/tasks/
+Unteraufgabe direkt: http://127.0.0.1:8082/index.php/apps/tasks/calendars/personal/tasks/280e2532-3c76-4367-8e47-45d91f602ea5.ics
+Ohne Anmeldung: 303 auf /login?redirect_url=/index.php/apps/tasks/ (Login-Seite 200).
+Die Links der Werkzeuge tragen http://caddy (interne Adresse, Befund 3 aus 32-07); vom Host gilt 127.0.0.1:8082.
+nc35 läuft für Task 2 weiter (nc35-nc, nc35-harp, nc35-caddy, nc_app_mcp_connector).
