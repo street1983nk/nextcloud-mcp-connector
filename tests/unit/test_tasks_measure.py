@@ -172,3 +172,113 @@ def test_navigation_lists_is_none_for_an_answer_that_says_nothing(payload: objec
 
 def test_navigation_lists_is_none_when_no_entry_is_an_object() -> None:
     assert measure.navigation_lists(["tasks", 1], "tasks") is None
+
+
+# --- share_state (plan 32-09, D-32-18) ---------------------------------------------------------
+
+_MS = (
+    '<?xml version="1.0"?>'
+    '<d:multistatus xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns" '
+    'xmlns:cs="http://calendarserver.org/ns/">{}</d:multistatus>'
+)
+_OC_INVITE = "{http://owncloud.org/ns}invite"
+_CS_INVITE = "{http://calendarserver.org/ns/}invite"
+_SHARE_ACCESS = "{DAV:}share-access"
+_PUBLISH_URL = "{http://calendarserver.org/ns/}publish-url"
+
+
+def _response(href: str, ok: str = "", missing: str = "") -> str:
+    found = f"<d:propstat><d:prop>{ok}</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>"
+    gone = (
+        f"<d:propstat><d:prop>{missing}</d:prop>"
+        "<d:status>HTTP/1.1 404 Not Found</d:status></d:propstat>"
+        if missing
+        else ""
+    )
+    return f"<d:response><d:href>{href}</d:href>{found}{gone}</d:response>"
+
+
+def test_share_state_counts_the_sharees_of_an_invite_without_returning_them() -> None:
+    ok = (
+        "<oc:invite><oc:user><d:href>principal:principals/users/sharee</d:href>"
+        "<oc:common-name>Sharee</oc:common-name><oc:access><oc:read-write/></oc:access>"
+        "</oc:user></oc:invite>"
+        "<d:share-access><d:shared-owner/></d:share-access>"
+    )
+    body = _MS.format(_response("/remote.php/dav/calendars/alice/p3209-aus/", ok)).encode()
+    marks = measure.share_states(body)["p3209-aus"]
+    assert marks[_OC_INVITE] == measure.ShareMark("2xx", True, 1)
+    assert marks[_SHARE_ACCESS] == measure.ShareMark("2xx", True, 1)
+    assert marks[_CS_INVITE] == measure.ShareMark("fehlt", False, 0)
+    assert "sharee" not in repr(marks).casefold()
+
+
+def test_share_state_reads_an_empty_invite_and_not_shared_as_empty() -> None:
+    ok = "<oc:invite/><d:share-access><d:not-shared/></d:share-access>"
+    body = _MS.format(_response("/remote.php/dav/calendars/alice/p3209-aus/", ok)).encode()
+    marks = measure.share_states(body)["p3209-aus"]
+    assert marks[_OC_INVITE] == measure.ShareMark("2xx", False, 0)
+    assert marks[_SHARE_ACCESS] == measure.ShareMark("2xx", False, 0)
+
+
+def test_share_state_names_a_404_propstat() -> None:
+    body = _MS.format(
+        _response("/remote.php/dav/calendars/alice/x/", "<oc:invite/>", "<cs:publish-url/>")
+    ).encode()
+    marks = measure.share_states(body)["x"]
+    assert marks[_PUBLISH_URL] == measure.ShareMark("404", False, 0)
+
+
+def test_share_state_counts_a_publish_url_by_its_href() -> None:
+    ok = "<cs:publish-url><d:href>https://example.org/dav/public-calendars/T0K3N</d:href></cs:publish-url>"
+    body = _MS.format(_response("/remote.php/dav/calendars/alice/x/", ok)).encode()
+    marks = measure.share_states(body)["x"]
+    assert marks[_PUBLISH_URL] == measure.ShareMark("2xx", True, 1)
+    assert "T0K3N" not in repr(marks)
+
+
+def test_share_line_is_only_marks_and_numbers() -> None:
+    line = measure.share_line(
+        "nc35", "an-bob-ro", "basic", _OC_INVITE, measure.ShareMark("2xx", True, 1)
+    )
+    assert line == (
+        "HINAUS nc35 zustand=an-bob-ro auth=basic prop={http://owncloud.org/ns}invite "
+        "status=2xx belegt=ja eintraege=1"
+    )
+
+
+# --- subline_form (plan 32-09, D-32-17) --------------------------------------------------------
+
+
+def test_subline_form_of_a_shared_list_on_35() -> None:
+    form = measure.subline_form(
+        "Due on Nov 20, 2026 (Team (Bob Example))", "Team (Bob Example)", "Bob Example"
+    )
+    assert form == {
+        "endet_mit_rohname": True,
+        "enthaelt_besitzer": True,
+        "bereinigt_moeglich": True,
+    }
+
+
+def test_subline_form_of_a_due_date_only_subline_on_32() -> None:
+    form = measure.subline_form("Due on Nov 20, 2026", "Team (Bob Example)", "Bob Example")
+    assert form == {
+        "endet_mit_rohname": False,
+        "enthaelt_besitzer": False,
+        "bereinigt_moeglich": False,
+    }
+
+
+def test_subline_form_of_an_own_list_never_offers_a_cleaning() -> None:
+    form = measure.subline_form("Due soon (p3209-eigen)", "p3209-eigen", "Bob Example")
+    assert form["endet_mit_rohname"] is True
+    assert form["enthaelt_besitzer"] is False
+    assert form["bereinigt_moeglich"] is False
+
+
+def test_subline_form_refuses_when_the_owner_stays_elsewhere() -> None:
+    form = measure.subline_form(
+        "Bob Example: due (Team (Bob Example))", "Team (Bob Example)", "Bob Example"
+    )
+    assert form["bereinigt_moeglich"] is False
