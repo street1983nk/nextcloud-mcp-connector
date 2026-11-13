@@ -21,7 +21,8 @@ PHP in the container, or the raw object read with the app password of its owner.
 Everything the run creates is named ``p32live-<stamp>`` and removed by the harness in the
 module teardown (32-RULES.md section 7): shares withdrawn, every list deleted with
 ``X-NC-CalDAV-No-Trashbin: 1``, the calendar trash bin of both accounts emptied of this run,
-the Deck board deleted, the two TASK-03 accounts deleted with ``occ user:delete``.
+the Deck board deleted, the two TASK-03 accounts and the account of D-32-18 (plan 32-09) deleted
+with ``occ user:delete``.
 ``BASELINE`` lines per account (``calendars``, ``calendarobjects`` with and without
 ``deleted_at``, ``calendarsubscriptions``, ``dav_shares``) before and after must be equal.
 
@@ -330,6 +331,8 @@ class Run:
     answers: list[str] = dataclasses.field(default_factory=list)
     created: dict[str, str] = dataclasses.field(default_factory=dict)
     accounts: list[str] = dataclasses.field(default_factory=list)
+    #: The harness of the account of D-32-18 with its one own list (plan 32-09).
+    harness_out: cw.Harness | None = None
 
     @property
     def alice(self) -> str:
@@ -366,6 +369,9 @@ TASKS = {
     "fremdro": ("ro", f"{P}-fremdro", ()),
 }
 FRESH, NEVER = f"{P}-frisch", f"{P}-nie"
+#: D-32-18 (plan 32-09): an account with exactly one own task list, which it shares itself.
+OUT_USER = f"p32live{STAMP}aus"
+OUT_LIST = f"{P}-aus"
 
 
 def _environment() -> dict[str, str]:
@@ -395,6 +401,13 @@ def share_body(user: str, *, writable: bool, remove: bool = False) -> bytes:
     etree.SubElement(entry, f"{{{dav_xml.DAV}}}href").text = f"principal:principals/users/{user}"
     if writable and not remove:
         etree.SubElement(entry, f"{{{OC_SHARE_NS}}}read-write")
+    return etree.tostring(root, xml_declaration=True, encoding="utf-8")
+
+
+def publish_body(*, publish: bool) -> bytes:
+    """Publish or unpublish a calendar by link, as ``scripts/tasks_measure.py``."""
+    name = "publish-calendar" if publish else "unpublish-calendar"
+    root = etree.Element(f"{{{dav_xml.CS}}}{name}", nsmap={"cs": dav_xml.CS})
     return etree.tostring(root, xml_declaration=True, encoding="utf-8")
 
 
@@ -490,12 +503,41 @@ def _teardown(run: Run) -> list[str]:
         lines.append(f"RUECKBAU deck board={run.board_id} {run.harness.board_state(run.board_id)}")
     for label, harness in (("alice", run.harness), ("bob", run.harness_bob)):
         lines.append(f"RUECKBAU papierkorb {label} entfernt={_purge_calendar_trash(harness)}")
-    for uid in (FRESH, NEVER):
+    if run.harness_out is not None:
+        lines.extend(_teardown_out(run, run.harness_out))
+    for uid in (FRESH, NEVER, OUT_USER):
         out = cw.occ("user:delete", uid, check_status=False)
         lines.append(f"RUECKBAU konto {uid} {'geloescht' if 'deleted' in out else 'nicht da'}")
     rest = [e.uri for e in run.harness.task_lists() if P in e.name or P in e.uri]
     rest += [e.uri for e in run.harness_bob.task_lists() if P in e.uri]
     lines.append(f"RUECKBAU reste listen_mit_kopf={len(rest)}")
+    return lines
+
+
+def _teardown_out(run: Run, harness: cw.Harness) -> list[str]:
+    """Share and link of the D-32-18 list withdrawn, list and trash bin emptied."""
+    lines: list[str] = []
+    url = harness.calendar_url(OUT_LIST)
+    xml_head = {"Content-Type": "application/xml; charset=utf-8"}
+    body = share_body(run.bob, writable=False, remove=True)
+    status = harness.request("POST", url, headers=xml_head, content=body).status_code
+    lines.append(f"RUECKBAU freigabe aus status={status}")
+    status = harness.request(
+        "POST", url, headers=xml_head, content=publish_body(publish=False)
+    ).status_code
+    lines.append(f"RUECKBAU link aus status={status}")
+    # The object deleted after the positive control lies in the trash bin; it is purged
+    # before the list goes, so the line shows it (deleting the list would take it as well).
+    purged = _purge_calendar_trash(harness)
+    lines.append(f"RUECKBAU papierkorb {OUT_USER} vor-liste entfernt={purged}")
+    status = harness.delete_calendar_url(url)
+    lines.append(
+        f"RUECKBAU liste aus delete={status} no_trashbin=1 danach={harness.status_of(url)}"
+    )
+    lines.append(f"RUECKBAU papierkorb {OUT_USER} entfernt={_purge_calendar_trash(harness)}")
+    rest = [e.uri for e in harness.task_lists() if P in e.uri]
+    lines.append(f"RUECKBAU reste {OUT_USER} listen_mit_kopf={len(rest)}")
+    harness.close()
     return lines
 
 
@@ -525,7 +567,7 @@ def run() -> Iterator[Run]:
     assert installed == state.expect_app, (
         f"{ENV_EXPECT_TASKS_APP}={env['expect_tasks_app']} but occ app:list says {state.app_state}"
     )
-    users = (state.alice, state.bob, FRESH, NEVER)
+    users = (state.alice, state.bob, FRESH, NEVER, OUT_USER)
     before = {user: baseline_of(user) for user in users}
     for user, value in before.items():
         record(f"BASELINE nc{state.version} konto={user} {value} phase=vorher")
@@ -1046,6 +1088,185 @@ async def test_the_search_provider_of_the_tasks_app(run: Run) -> None:
             created.get("created") is True and hinted == (APP_STATE_DETECTION != "keine"),
             f"tasks_create created={created.get('created')} hint={'ja' if hinted else 'nein'}",
         )
+
+
+# --- plan 32-09, D-32-18: an own list the account shares itself ---------------------------
+
+
+def _out_post(run: Run, body: bytes) -> int:
+    assert run.harness_out is not None
+    return run.harness_out.request(
+        "POST",
+        run.harness_out.calendar_url(OUT_LIST),
+        headers={"Content-Type": "application/xml; charset=utf-8"},
+        content=body,
+    ).status_code
+
+
+def _names_bob(run: Run, text: str) -> bool:
+    folded = text.casefold()
+    return any(name and name.casefold() in folded for name in (run.bob, run.bob_display))
+
+
+async def _out_refused(run: Run, label: str, **kwargs: Any) -> None:
+    """Without ``list`` the call is refused, the hook sees no PUT, the row count stays."""
+    before = list_objects(OUT_USER, OUT_LIST)
+    with Case(run, label, user=OUT_USER) as case:
+        async with measured(case) as clients:
+            exc = await refusal(
+                run, tasks_tools.create_task(clients, summary=f"{P}-{label}", **kwargs)
+            )
+        after = list_objects(OUT_USER, OUT_LIST)
+        text = f"{exc.message} {exc.hint}"
+        case.expect(exc.reason == REASON_GUARD_TRIPPED, told(exc))
+        case.expect("shared with others" in exc.message, "shared with others in the message")
+        case.expect("list=" in exc.hint, f"hint {exc.hint!r}")
+        case.expect(not methods(case.seen, "PUT"), "the hook saw no PUT")
+        case.expect(before == after, f"calendarobjects vorher={before} nachher={after}")
+        case.expect(not _names_bob(run, text), "neither the id nor the display name of bob")
+        case.expect("_shared_by_" not in text, "no share marker")
+
+
+async def _out_written(run: Run, label: str, **kwargs: Any) -> str:
+    before = list_objects(OUT_USER, OUT_LIST)
+    with Case(run, label, user=OUT_USER) as case:
+        async with measured(case) as clients:
+            answer = keep(
+                run,
+                await tasks_tools.create_task(clients, summary=f"{P}-{label}", **kwargs),
+            )
+        after = list_objects(OUT_USER, OUT_LIST)
+        assert run.harness_out is not None
+        _, (_, object_name) = ids.parse(str(answer["id"]))
+        got = run.harness_out.request(
+            "GET", f"{run.harness_out.calendar_url(OUT_LIST)}{quote(object_name, safe='')}"
+        )
+        case.expect(methods(case.seen, "PUT") == [201], f"PUT {methods(case.seen, 'PUT')}")
+        case.expect(after == before + 1, f"calendarobjects vorher={before} nachher={after}")
+        case.expect(
+            got.status_code == 200 and f"SUMMARY:{P}-{label}" in got.text,
+            f"raw object GET {got.status_code} with the password of the account",
+        )
+        case.expect(
+            answer.get("list") == {"name": OUT_LIST, "shared": False, "writable": True},
+            f"list {answer.get('list')}",
+        )
+    return str(answer["id"])
+
+
+async def test_d_32_18_an_own_list_shared_with_others_is_only_written_when_named(
+    run: Run,
+) -> None:
+    """The account of this case has exactly one own task list; it shares it itself."""
+    password = f"{secrets.token_urlsafe(18)}Aa1!"
+    record(f"SETUP d-32-18 occ user:add {add_account(OUT_USER, password)} konto={OUT_USER}")
+    run.accounts.append(OUT_USER)
+    run.harness_out = cw.Harness(cw.LiveEnv(run.env["base_url"], OUT_USER, password))
+    status = run.harness_out.mk_task_list(OUT_LIST, OUT_LIST)
+    record(f"SETUP d-32-18 MKCALENDAR liste={OUT_LIST} status={status}")
+    assert status == 201, f"MKCALENDAR {OUT_LIST}: {status}"
+
+    # Positive control: nobody else sees the list, so it is written without list.
+    first = await _out_written(run, "d-32-18-privat")
+    _, (_, object_name) = ids.parse(first)
+    gone = run.harness_out.request(
+        "DELETE", f"{run.harness_out.calendar_url(OUT_LIST)}{quote(object_name, safe='')}"
+    )
+    record(f"SETUP d-32-18 DELETE privat-objekt status={gone.status_code} (Papierkorb im Rueckbau)")
+
+    status = _out_post(run, share_body(run.bob, writable=False))
+    record(f"SETUP d-32-18 FREIGABE an-bob-ro status={status}")
+    assert status < 300, f"share: {status}"
+    await _out_refused(run, "d-32-18-geteilt")
+    parent = await _out_written(run, "d-32-18-mit-list", list_name=OUT_LIST)
+    await _out_refused(run, "d-32-18-parent", parent=parent)
+
+    status = _out_post(run, share_body(run.bob, writable=False, remove=True))
+    record(f"SETUP d-32-18 FREIGABE zurueck status={status}")
+    status = _out_post(run, publish_body(publish=True))
+    record(f"SETUP d-32-18 LINK veroeffentlicht status={status}")
+    assert status < 300, f"publish: {status}"
+    await _out_refused(run, "d-32-18-link")
+    status = _out_post(run, publish_body(publish=False))
+    record(f"SETUP d-32-18 LINK zurueck status={status}")
+    await _out_written(run, "d-32-18-zurueckgenommen")
+
+
+# --- plan 32-09, D-32-17: the subline of a provider hit from a shared list ----------------
+
+
+def _raw_provider_subline(run: Run, title: str) -> str | None:
+    """The subline the provider sends to alice, read with her app password (harness)."""
+    response = run.harness.request(
+        "GET",
+        f"{run.env['base_url']}/ocs/v2.php/search/providers/tasks/search",
+        params={"term": title},
+        headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+    )
+    entries = response.json()["ocs"]["data"]["entries"]
+    found = [entry for entry in entries if entry.get("title") == title]
+    return str(found[0].get("subline") or "") if found else None
+
+
+async def _connector_sublines(run: Run, case: Case, title: str) -> tuple[str | None, str | None]:
+    async with measured(case) as clients:
+        answer = keep(run, await search_tools.unified_search(clients, query=title))
+    hits = [h for h in answer.get("results") or [] if h.get("provider") == "tasks"]
+    async with measured(case) as clients:
+        found = await chatgpt_tools.search(clients, title)
+    run.answers.append(json.dumps(found, ensure_ascii=False))
+    texts = [h["text"] for h in found if h.get("title") == title]
+    sublines = [h.get("subline") for h in hits if h.get("title") == title]
+    return (sublines[0] if sublines else None), (texts[0] if texts else None)
+
+
+async def test_d_32_17_the_subline_of_a_shared_list_hit_names_nobody(run: Run) -> None:
+    if not run.expect_app:
+        record(
+            f"AUFGABE d-32-17-geteilt nc={run.version} nutzer={run.alice} status=keine "
+            "ergebnis=entfaellt | without the Tasks app the provider tasks does not exist"
+        )
+        return
+    title = TASKS["fremdrw"][1]
+    with Case(run, "d-32-17-geteilt") as case:
+        raw = _raw_provider_subline(run, title)
+        case.expect(raw is not None, "the provider finds the task of the rw share")
+        raw = raw or ""
+        raw_owner = _names_bob(run, raw)
+        case.note(f"roh_mit_besitzer={'ja' if raw_owner else 'nein'}")
+        major = int(run.version.split(".")[0])
+        if major >= 34:
+            case.expect(raw_owner, "positive control: the raw subline names the owner on 34+")
+        subline, text = await _connector_sublines(run, case, title)
+        case.note(
+            f"subline_vorhanden={'ja' if subline else 'nein'} text_gleich={text == (subline or '')}"
+        )
+        for label, value in (("subline", subline or ""), ("text", text or "")):
+            case.expect(not _names_bob(run, value), f"{label} without bob")
+            case.expect("_shared_by_" not in value, f"{label} without the share marker")
+        if raw_owner:
+            case.expect(
+                bool(subline) and str(subline).endswith(f" ({LISTS['rw'][2]})"),
+                "the subline ends with the list name without the owner",
+            )
+        else:
+            case.expect((subline or "") == raw, "without an owner the subline is the raw one")
+        case.expect(text == (subline or ""), "search text equals the subline")
+
+
+async def test_d_32_17_the_subline_of_an_own_list_hit_is_unchanged(run: Run) -> None:
+    if not run.expect_app:
+        record(
+            f"AUFGABE d-32-17-eigen nc={run.version} nutzer={run.alice} status=keine "
+            "ergebnis=entfaellt | without the Tasks app the provider tasks does not exist"
+        )
+        return
+    title = TASKS["faellig"][1]
+    with Case(run, "d-32-17-eigen") as case:
+        raw = _raw_provider_subline(run, title)
+        subline, text = await _connector_sublines(run, case, title)
+        case.expect(raw is not None and subline == (raw or None), "the subline is the raw one")
+        case.expect(text == (raw or ""), "search text equals the raw subline")
 
 
 # --- last: nobody else's name in any answer (D-32-06, D-32-14) ---------------------------
