@@ -1,5 +1,7 @@
 # Phase 33: Aufgaben ändern - Pattern Map
 
+> **Hinweis zur Planzählung (13.11.2026, nach der Planprüfung):** Diese Karte nutzt den Planschnitt aus 33-RESEARCH.md. Die endgültigen Pläne heißen anders: 33-01 (Recherche) entspricht jetzt 33-01, 33-01b und 33-01c (Messprogramm und Freigabe, Browser-Sitzung, Kettenmessung); 33-02 (Recherche, Unterbau) ist aufgeteilt in 33-02 (Schalter, Annotationsklasse, Gates), 33-03 (Schreibschiene, Destruktiv-Gate), 33-04 (`ics_edit`) und 33-05 (Kettenlogik); 33-03 `tasks_complete` ist jetzt 33-06; 33-04 `tasks_update` ist 33-07; 33-05 `tasks_move` ist 33-08; 33-06 Abschluss ist 33-09; 33-07 Live-Beweis ist 33-10. Die Zeilenangaben bleiben gültig.
+
 **Mapped:** 2026-11-13
 **Files analyzed:** 46 (neu oder geändert, Sprachvarianten als eine Zeile gezählt)
 **Analogs found:** 43 / 46 (ohne echtes Vorbild: Editor auf logischen Zeilen `tools/ics_edit.py`, Kettenlogik über Nachfahren in Nachordnung, Gate-Begriff "optionale Werkzeuge" in Audit und Klassen)

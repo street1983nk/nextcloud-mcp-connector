@@ -1,6 +1,6 @@
 # Phase 33: Rahmen für alle Pläne (verbindlich)
 
-Jeder Plan 33-01 bis 33-10 bindet diese Datei im `<context>` ein. Sie gilt für jeden Task, auch wenn der Task sie nicht wiederholt. Bei Widerspruch zwischen einem Plan und dieser Datei gilt die strengere Regel; im Zweifel anhalten und den Owner fragen. Vorlage ist `.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/32-RULES.md`; neu sind Abschnitt 5 (fremde Container, Parallelsitzung), der feste Schalter `-p no:xdist` und die Abbruchregeln in Abschnitt 10.
+Jeder Plan (33-01, 33-01b, 33-01c, 33-02 bis 33-10) bindet diese Datei im `<context>` ein. Sie gilt für jeden Task, auch wenn der Task sie nicht wiederholt. Bei Widerspruch zwischen einem Plan und dieser Datei gilt die strengere Regel; im Zweifel anhalten und den Owner fragen. Vorlage ist `.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/32-RULES.md`; neu sind Abschnitt 5 (fremde Container, Parallelsitzung), der feste Schalter `-p no:xdist` und die Abbruchregeln in Abschnitt 10.
 
 ## 1. Arbeitsort und Werkzeuge
 
@@ -46,7 +46,7 @@ Am Ende jedes Plans und vor jedem Commit nach Abschnitt 2, alle Exit 0, Zahlen (
 
 ## 6. Owner-Freigaben für Zustandsänderungen
 
-- Zustandsänderungen auf nc35 und auf der 32er Strecke (Installation oder Entfernung der Tasks-App, Testkonten, Freigaben, Aufgabenlisten, Ketten und Serien von Testaufgaben, Deck-Board, Admin-Schalter `tasks_update` der ExApp, unregister/register der ExApp) nur nach einer Owner-Freigabezeile im Rohprotokoll. Die gemeinsame Vorab-Freigabe steht in 33-01 Task 3 (`FREIGABE zustand=<option>`), sie gilt für 33-01 und 33-10. Eigene Checkpoints: 33-01 Task 8 (Owner-Fragen bei Abweichungen), 33-10 Task 2 (Neuregistrierung der ExApp auf nc35 mit eingeschaltetem Schalter), 33-10 Task 6 (Push-Frage).
+- Zustandsänderungen auf nc35 und auf der 32er Strecke (Installation oder Entfernung der Tasks-App, Testkonten, Freigaben, Aufgabenlisten, Ketten und Serien von Testaufgaben, Deck-Board, Admin-Schalter `tasks_update` der ExApp, unregister/register der ExApp) nur nach einer Owner-Freigabezeile im Rohprotokoll. Die gemeinsame Vorab-Freigabe steht in 33-01 Task 3 (`FREIGABE zustand=<option>`), sie gilt für 33-01b, 33-01c und 33-10. Eigene Checkpoints: 33-01b Task 1 (Stopp, wenn die installierte Tasks-App nicht 0.18.1 ist), 33-01c Task 4 (Owner-Fragen bei Abweichungen), 33-10 Task 2 (Neuregistrierung der ExApp auf nc35 mit eingeschaltetem Schalter), 33-10 Task 6 (Push-Frage).
 - Wegwerf-Instanzen brauchen keine Freigabe.
 
 ## 7. Rückbau und Baseline
@@ -73,10 +73,21 @@ Am Ende jedes Plans und vor jedem Commit nach Abschnitt 2, alle Exit 0, Zahlen (
 
 Anhalten, nichts committen, was den Befund verdeckt, und den Owner fragen, wenn:
 
-- ein Messwert einer Owner-Entscheidung widerspricht (D-33-05, D-33-07, D-33-10, D-33-14; Auslöser stehen in 33-01 Task 8),
+- ein Messwert einer Owner-Entscheidung widerspricht (D-33-05, D-33-07, D-33-10, D-33-14; Auslöser stehen in 33-01c Task 4),
 - ein Werkzeugschema nach der Titel- und Beschreibungsdiät über 1400 Bytes liegt (die Decke wird nie angehoben),
 - das Budget aus dem Endstand eine Hausregel verletzen würde oder eine Zählstelle (`EXPECTED_PUT_CALLS`, `MOVE`-Zahl) anders als geplant ausfällt,
 - BASELINE vorher und nachher nicht gleich ist oder ein Rückbau scheitert,
 - ein Objekt, das unverändert bleiben soll, einen anderen sha256 hat,
 - ein fremder Container das Docker-Gate dauerhaft blockiert,
 - ein Gate nur durch Lockern einer Prüfung grün würde.
+
+## 11. Abtrennbare Teile und Rückbau im Code
+
+- Ein Werkzeugplan (33-06 `tasks_complete`, 33-07 `tasks_update`, 33-08 `tasks_move`) fällt nur per Owner-Entscheid heraus. Die Entscheidung steht als Zeile `DROP <plan> grund=owner datum=<YYYY-MM-DD>` in `.planning/phases/33-aufgaben-aendern/raw/33-drop.txt`; der Plan wird dann nicht ausgeführt und bekommt keine SUMMARY.
+- Folgeregel für 33-09 und 33-10: fehlt `33-06-SUMMARY.md`, `33-07-SUMMARY.md` oder `33-08-SUMMARY.md`, gilt der Teil als per Owner-Entscheid entfallen, aber nur, wenn `raw/33-drop.txt` die passende DROP-Zeile trägt; fehlt die Zeile, anhalten und fragen (ein vergessener Plan ist kein Entscheid). Entfallene Werkzeuge erscheinen nirgends, auch nicht als Platzhalter.
+- Rückbau, ausgeführt als eigener Schritt direkt nach dem letzten gebauten Werkzeugplan (vor 33-09), testgetrieben und mit eigenem Commit `refactor(33): remove the unused <teil> after owner decision`:
+  - `tasks_move` entfallen: `move_todo` aus `nextcloud/clients/tasks.py` entfernen, `TASK_MOVE`, den Ausnahmezweig in `_violations`, den MOVE-AST-Pin und seine Gegenproben aus `tests/contract/test_no_destructive_calls.py` entfernen, die erwartete Gesamtzahl der MOVE-Aufrufe auf 1 (nur Chunk-Montage) zurück, den vulture-Eintrag von `move_todo` entfernen, Gate-Texte wieder "user-facing move and rename tools remain forbidden". Verify: `! grep -q "def move_todo" src/mcp_connector/nextcloud/clients/tasks.py && ! grep -q "TASK_MOVE" tests/contract/test_no_destructive_calls.py && test "$(grep -rc '"MOVE",' src | awk -F: '{s+=$2} END {print s}')" = 1` plus volle Gates.
+  - `tasks_complete` UND `tasks_update` entfallen: `put_existing_todo` und `tools/ics_edit.py` samt `tests/unit/test_ics_edit.py` entfernen, sofern `tasks_move` sie nicht nutzt (er nutzt sie nicht), `EXPECTED_PUT_CALLS` auf 6 zurück, den Pin create-only gegen compare-and-swap für Aufgaben entfernen, vulture-Einträge entfernen. Verify: `grep -q "EXPECTED_PUT_CALLS = 6" tests/contract/test_no_destructive_calls.py && ! grep -q "def put_existing_todo" src/mcp_connector/nextcloud/clients/tasks.py` plus volle Gates.
+  - Nur einer von `tasks_complete` oder `tasks_update` entfallen: kein Rückbau der Schreibschiene (der andere nutzt sie); nur dessen Einträge in OPTIONAL_TOOLS, MODIFY_TOOLS, SWITCHED_TOOLS, Allowlist und Klassen fehlen, weil sein Plan sie nie gesetzt hat.
+  - Alle drei entfallen: zusätzlich Schalter-Kette aus 33-02 nur nach eigener Owner-Frage entfernen (D-33-02: der Schalter bleibt sonst, ab Werk aus, ohne Werkzeuge).
+- Budget: jeder Werkzeugplan verankert das Budget nach der Hausregel neu (Messung mit allen Schaltern an plus 15 Prozent, auf die nächsten 500 aufgerundet), 33-09 verankert endgültig aus dem Endstand. Ein Rückbau misst und verankert ebenfalls neu.

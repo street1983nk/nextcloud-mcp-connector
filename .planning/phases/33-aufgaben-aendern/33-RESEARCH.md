@@ -468,7 +468,17 @@ new_text = ics_edit.apply(old_text, set_=changes, drop=())
 | A3 | Die Zeitreihe einer Kette von 50 `PUT` bleibt im Bereich weniger Sekunden | F10 | mittel: Obergrenze wäre zu senken (Messung M-3 entscheidet) |
 | A4 | Die Wortlaute der MCP-Spezifikation 2026-07-28 zu `destructiveHint` gleichen denen von 2025-06-18 | Kernbefund 4 | gering: Frage an den Owner bleibt dieselbe |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+Alle fünf Fragen sind entschieden oder an eine Messung mit Owner-Frage gebunden (Stand 13.11.2026):
+
+- Frage 1: RESOLVED durch D-33-12 (`destructive_hint=True`, `idempotent_hint=True`, TMOD-05 nachgezogen), umgesetzt in 33-02.
+- Frage 2: RESOLVED durch D-33-13 (`X-ALT-DESC` und `ALTREP` werden bei geänderter Beschreibung entfernt, die Antwort sagt es), umgesetzt in 33-04 und 33-07.
+- Frage 3: RESOLVED durch D-33-14. Die Empfehlung dieser Recherche ("`completed=false` auf `cancelled` als Zielzustand ohne PUT") ist überholt: direkt aufgerufen darf `tasks_complete` eine abgebrochene Aufgabe abhaken und wieder öffnen; abgebrochene Nachfahren bleiben beim Abhaken der Elternaufgabe unberührt. Gemessen in 33-01b, Owner-Frage bei Abweichung in 33-01c Task 4, umgesetzt in 33-06.
+- Frage 4: RESOLVED als Messung M-1 in 33-01b mit Owner-Frage in 33-01c Task 4 (D-33-05, D-33-06).
+- Frage 5: RESOLVED als Messung M-2 in 33-01b, Form als ENTSCHEID-Zeilen, Owner-Frage für Priorität und Tags in 33-01c Task 4 (D-33-07).
+
+Ursprünglicher Wortlaut der Fragen:
 
 1. **Annotation von `tasks_update` (und `tasks_complete`, `tasks_move`): "nicht destruktiv" laut TMOD-05 oder `destructiveHint=true` laut MCP-Wortlaut?**
    - What we know: Spezifikation: false heißt "only additive updates"; `files_update` ist im Repo `destructive_hint=True`. Abhaken ist umkehrbar, Ändern überschreibt alte Werte, Verschieben ändert den Ort.
