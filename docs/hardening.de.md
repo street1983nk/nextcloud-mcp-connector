@@ -57,10 +57,12 @@ Klasse von Datenabfluss endet an der Instanzgrenze.
 `NC_MCP_DISABLED_TOOLS` versteckt Werkzeuge, damit Clients mit kleinen
 Modellen oder harten Werkzeuglimits weniger davon sehen. Es ist **keine
 Zugriffskontrolle**: `search`, `fetch` und `prepare_context` erreichen die
-Inhalte eines abgeschalteten Bündels weiterhin. Die Grenze sind und bleiben
-die Abschnitte 1, 2 und 3. Das steht auch im README und wird hier bewusst
-wiederholt, weil es die verführerischste Fehllesart der Konfiguration dieses
-Servers ist.
+Inhalte eines abgeschalteten Bündels weiterhin. Das gilt auch für das Bündel
+`tasks`: ist `tasks` abgeschaltet, liest `fetch` weiterhin eine `task:`-ID,
+und `search` findet Aufgaben weiterhin über den Suchprovider von Nextcloud.
+Die Grenze sind und bleiben die Abschnitte 1, 2 und 3. Das steht auch im
+README und wird hier bewusst wiederholt, weil es die verführerischste
+Fehllesart der Konfiguration dieses Servers ist.
 
 ## 6. Prompt Injection: der ehrliche Rest
 

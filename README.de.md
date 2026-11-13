@@ -99,7 +99,7 @@ abweicht.
 | `unified_search` | read | Die Unified Search von Nextcloud über alle Provider, rechtegeprüft |
 | `prepare_context` | read | Dateien, Notizen, Karten, die nächste Terminwoche, wartende Talk-Gespräche und ungelesene Mails in einem Aufruf |
 | `search` | read | OpenAI-kompatibler Sucheinstieg, delegiert an die Unified Search |
-| `fetch` | read | OpenAI-kompatibler Abruf, löst eine ID zu Datei, Notiz, Karte, Termin, Mail, Talk-Nachricht oder Tabelle auf |
+| `fetch` | read | OpenAI-kompatibler Abruf, löst eine ID zu Datei, Notiz, Karte, Termin, Mail, Talk-Nachricht, Tabelle oder Aufgabe auf |
 
 `search` und `fetch` gibt es, weil das ChatGPT-Connector-Profil genau diese zwei Namen und
 Schemata verlangt. Sie sind dünne Hüllen um die Tools darüber, keine zweite Implementierung.

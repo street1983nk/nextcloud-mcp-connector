@@ -90,7 +90,7 @@ the live registry and fails if a name or a level disagrees with it.
 | `unified_search` | read | The Nextcloud unified search across providers, permission aware |
 | `prepare_context` | read | Files, notes, cards, the next week of events, waiting Talk conversations and unread mail counts in one call |
 | `search` | read | OpenAI compatible search entry point, delegates to unified search |
-| `fetch` | read | OpenAI compatible fetch, resolves an id to a file, note, card, event, mail, Talk message or table |
+| `fetch` | read | OpenAI compatible fetch, resolves an id to a file, note, card, event, mail, Talk message, table or task |
 
 `search` and `fetch` exist because the ChatGPT connector profile requires exactly these two
 names and schemas. They are thin wrappers over the tools above, not a second implementation.

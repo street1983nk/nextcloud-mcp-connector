@@ -57,10 +57,12 @@ classe d'exfiltration s'arrête à la frontière de l'instance.
 `NC_MCP_DISABLED_TOOLS` masque des outils pour que les clients aux petits
 modèles ou aux limites d'outils strictes en voient moins. Ce n'est **pas un
 contrôle d'accès** : `search`, `fetch` et `prepare_context` atteignent
-toujours le contenu d'un bundle désactivé. La limite est et reste celle des
-sections 1, 2 et 3. C'est écrit aussi dans le README, et répété ici à
-dessein, car c'est la lecture erronée la plus tentante de la configuration
-de ce serveur.
+toujours le contenu d'un bundle désactivé. Cela vaut aussi pour le bundle
+`tasks` : avec `tasks` désactivé, `fetch` lit toujours un id `task:` et
+`search` trouve toujours les tâches via le fournisseur de recherche de
+Nextcloud. La limite est et reste celle des sections 1, 2 et 3. C'est écrit
+aussi dans le README, et répété ici à dessein, car c'est la lecture erronée
+la plus tentante de la configuration de ce serveur.
 
 ## 6. Injection de prompt : le reste honnête
 

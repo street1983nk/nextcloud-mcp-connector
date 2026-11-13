@@ -54,9 +54,11 @@ whole class of exfiltration ends at the instance boundary.
 `NC_MCP_DISABLED_TOOLS` hides tools so that clients with small models or hard
 tool limits see fewer of them. It is **not an access control**: `search`,
 `fetch` and `prepare_context` still reach the content of a switched-off
-bundle. The boundary is and stays section 1, 2 and 3. This is stated in the
-README as well, and it is worth repeating because it is the single most
-tempting misreading of this server's configuration.
+bundle. This includes the `tasks` bundle: with `tasks` switched off, `fetch`
+still reads a `task:` id and `search` still finds tasks through the Nextcloud
+search provider. The boundary is and stays section 1, 2 and 3. This is
+stated in the README as well, and it is worth repeating because it is the
+single most tempting misreading of this server's configuration.
 
 ## 6. Prompt injection: the honest remainder
 

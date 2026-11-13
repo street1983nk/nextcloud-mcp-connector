@@ -44,6 +44,9 @@ dans [CHANGELOG.md](CHANGELOG.md).
 - `tasks_create` ne fait que créer : sans `list` seulement s'il existe exactement une liste
   propre, jamais en silence dans une liste partagée et jamais dans un agenda Deck.
 - Une échéance sans heure reste exactement sur ce jour.
+- `fetch` lit les ids `task:`, et un résultat du fournisseur de recherche Nextcloud `tasks`
+  mène au même id ; pour une tâche d'une liste partagée, `fetch` ne renvoie que vers la
+  page d'accueil de l'app Tasks.
 - Mesuré sur Nextcloud 32 et 35 sous impersonation AppAPI, voir
   `docs/tasks-evidence.md`.
 

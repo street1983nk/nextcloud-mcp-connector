@@ -43,6 +43,9 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
 - `tasks_create` legt nur an: ohne `list` nur, wenn es genau eine eigene Liste gibt, nie
   still in eine geteilte Liste und nie in einen Deck-Kalender.
 - Eine Fälligkeit ohne Uhrzeit bleibt auf genau diesem Tag.
+- `fetch` liest `task:`-IDs, und ein Treffer des Nextcloud-Suchproviders `tasks` führt
+  auf dieselbe ID; für eine Aufgabe aus einer geteilten Liste verlinkt `fetch` nur die
+  Startseite der Tasks-App.
 - Gemessen auf Nextcloud 32 und 35 unter AppAPI-Impersonation, siehe
   `docs/tasks-evidence.md`.
 

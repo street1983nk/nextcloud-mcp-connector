@@ -102,7 +102,7 @@ qu'un nom ou un niveau diverge.
 | `unified_search` | read | La recherche unifiée de Nextcloud à travers les fournisseurs, en respectant les permissions |
 | `prepare_context` | read | Fichiers, notes, cartes, la semaine d'événements à venir, les conversations Talk en attente et les courriels non lus en un appel |
 | `search` | read | Point d'entrée de recherche compatible OpenAI, délègue à la recherche unifiée |
-| `fetch` | read | Récupération compatible OpenAI, résout un id vers un fichier, une note, une carte, un événement, un courriel, un message Talk ou un tableau |
+| `fetch` | read | Récupération compatible OpenAI, résout un id vers un fichier, une note, une carte, un événement, un courriel, un message Talk, un tableau ou une tâche |
 
 `search` et `fetch` existent parce que le profil de connecteur ChatGPT exige exactement ces
 deux noms et schémas. Ce sont de fines enveloppes autour des outils ci-dessus, pas une seconde

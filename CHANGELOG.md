@@ -40,6 +40,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `tasks_create` is create-only: without `list` only when there is exactly one own list,
   never silently into a shared list and never into a Deck calendar.
 - A due date without a time stays on exactly that day.
+- `fetch` reads `task:` ids, and a hit of the Nextcloud search provider `tasks` resolves
+  to the same id; for a task from a shared list, `fetch` links only the start page of the
+  Tasks app.
 - Measured on Nextcloud 32 and 35 under AppAPI impersonation, see
   `docs/tasks-evidence.md`.
 
