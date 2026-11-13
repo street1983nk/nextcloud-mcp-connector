@@ -204,7 +204,7 @@ Plans:
 - [x] 32-03-PLAN.md: Client-Schicht mit Byte-Pin der Kalenderkörper, create-only-Schreiber, `task:`-Codec mit Listenschlüssel, `clients/tasks.py` (TASK-01, TASK-03, TASK-06, TASK-07; D-32-05, D-32-06, D-32-14)
 - [x] 32-04-PLAN.md: `tools/tasks.py` lesend, Zeitmatrix als benannte Tests, `tasks_search` und `tasks_read` mit Unteraufgaben (TASK-01 bis TASK-04; D-32-01 bis D-32-09)
 - [x] 32-04b-PLAN.md: `tasks_create` mit E4 und D-32-16, Rücklesen, Erkennung der Tasks-App, Injektionskorpus (TASK-03, TASK-05 bis TASK-07; D-32-10, D-32-16)
-- [ ] 32-05-PLAN.md: Registrierung `reg_tasks.py`, Oberflächen-Gates mit 27 Werkzeugen, Budget neu verankert, READMEs, `info.xml`, drei CHANGELOGs (TASK-07, TASK-08)
+- [x] 32-05-PLAN.md: Registrierung `reg_tasks.py`, Oberflächen-Gates mit 27 Werkzeugen, Budget neu verankert, READMEs, `info.xml`, drei CHANGELOGs (TASK-07, TASK-08)
 - [ ] 32-06-PLAN.md: TASK-09, Provider `tasks`, `fetch` über `tasks_read`, Link nur auf die Startseite bei geteilten Listen, Satz in `docs/hardening*.md` (TASK-07, TASK-09; D-32-06, D-32-15)
 - [ ] 32-05b-PLAN.md: Kanarie, Abnahmeskript, Live-Test mit Schalter, CI mit und ohne Tasks-App (TASK-01 bis TASK-03, TASK-05 bis TASK-07, TASK-09; D-32-11)
 - [ ] 32-07-PLAN.md: Live-Beweis auf Nextcloud 35 und 32, je ohne und mit Tasks-App, `docs/tasks-evidence.md` (TASK-01 bis TASK-07, TASK-09; D-32-11, D-32-12)
@@ -285,7 +285,7 @@ Plans:
 | 29. Prüfkommando und Doku | v1.7 | 9/9 | Complete    | 2026-10-01 |
 | 30. Mess-Spike Aufgaben und Ordner | v1.8 | 5/5 | Complete    | 2026-11-12 |
 | 31. Ordner anlegen | v1.8 | 0/6 | Planned | - |
-| 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 5/10 | In Progress|  |
+| 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 6/10 | In Progress|  |
 | 33. Aufgaben ändern | v1.8 | 0/TBD | Not started | - |
 | 34. Doku, Store, Release 0.8.0 | v1.8 | 0/TBD | Not started | - |
 

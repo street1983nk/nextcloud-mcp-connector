@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: executing
-stopped_at: 32-04b abgeschlossen (tasks_create mit Zielwahl E4/D-32-16, Rücklesen, kein Tasks-App-Hinweis, Korpus); kein Docker; lokale Commits nicht gepusht
-last_updated: "2026-11-13T13:41:25.019Z"
-last_activity: "2026-11-13, 32-04b ausgeführt: Abwesenheit des Tasks-App-Hinweises belegt (54ad9dc, erkennung=keine, Owner-Bestätigung 13.11.), create_task mit E4 und D-32-16 (6f4cd33, a2d51f6), Injektionskorpus für geteilte Listen (e18b0fa); Gates 6304 passed, 35 skipped; als Nächstes 32-05"
+stopped_at: 32-05 abgeschlossen (reg_tasks.py, Gates mit 27 Werkzeugen, Budget 22000, READMEs, CHANGELOGs); kein Docker; lokale Commits nicht gepusht
+last_updated: "2026-11-13T13:54:05.200Z"
+last_activity: "2026-11-13, 32-05 ausgeführt: tasks-Bundle registriert, Oberflächen-Gates auf 27 Werkzeuge, Budget 22000 aus 18747 Bytes, READMEs, info.xml, Beleg-Verweis (58f211d), drei CHANGELOGs (4573981); Gates 6305 passed, 35 skipped; als Nächstes 32-06"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 24
-  completed_plans: 19
-  percent: 48
+  completed_plans: 20
+  percent: 50
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 ## Current Position
 
 Phase: 32 von 30 bis 34 (Tasks-Bundle suchen, lesen, anlegen), geplant und geprüft (10 Pläne, Plan-Check PASS nach einer Revision), Ausführung vom Owner freigegeben (2026-11-13, "Go"); Phase 31 abgeschlossen und verifiziert
-Plan: 32-04b fertig (5 von 10): create_task (Prüfungen vor jedem Request, Zielwahl: list gewinnt, sonst Liste einer eigenen Elternaufgabe, sonst genau eine eigene beschreibbare Liste; parent in geteilter Liste ohne list ist ein Fehler nach D-32-16; nur lesbare Liste vor dem Request abgelehnt; VTODO über icalendar, create-only über put_new_object mit TASK_WORDING, Rücklesen mit UID-Vergleich); D-32-10 ohne Hinweis (erkennung=keine, Owner-Bestätigung 13.11.2026); vorübergehende vulture-Einträge search_tasks, read_task, create_task bis 32-05; als Nächstes 32-05
+Plan: 32-05 fertig (6 von 10): reg_tasks.py mit tasks_search, tasks_read (READ_ONLY) und tasks_create (CREATE_ONLY), Bundle tasks; tasks_create 1364 Bytes (Prototyp 1417), BUDGET_BYTES 22000 nach der Hausregel aus 18747 Bytes; Allowlist, UNAFFECTED (13, 4, 10), CREATE_TOOLS sieben, EXPECTED_PUT_CALLS sechs; vorübergehende vulture-Einträge aufgelöst; READMEs dreisprachig, info.xml, CHANGELOGs; als Nächstes 32-06
 Status: Phase 31 abgeschlossen (2026-11-13); Draft-PR 48 gegen main ist offen, CI auf 30e2134 vollständig grün; die Commits nach 30e2134 (Verifikation, 31-07, Abschluss) sind lokal und warten auf eine Push-Freigabe des Owners; auf der Testinstanz nc35 ist die ExApp jetzt 0.7.2 aus diesem Stand registriert (Rückweg im 31-07-SUMMARY.md), die Datei .env.nc35 liegt im Worktree (gitignored); offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13)
-Last activity: 2026-11-13, 32-04b ausgeführt: Abwesenheit des Tasks-App-Hinweises belegt (54ad9dc, erkennung=keine, Owner-Bestätigung 13.11.), create_task mit E4 und D-32-16 (6f4cd33, a2d51f6), Injektionskorpus für geteilte Listen (e18b0fa); Gates 6304 passed, 35 skipped; als Nächstes 32-05
+Last activity: 2026-11-13, 32-05 ausgeführt: tasks-Bundle registriert, Oberflächen-Gates auf 27 Werkzeuge, Budget 22000 aus 18747 Bytes, READMEs, info.xml, Beleg-Verweis (58f211d), drei CHANGELOGs (4573981); Gates 6305 passed, 35 skipped; als Nächstes 32-06
 
 ## Performance Metrics
 
@@ -831,6 +831,8 @@ Recent decisions affecting current work:
 - [Phase 32]: 32-04: zweiter REPORT im Modus open teilt das Budget der Liste; ein Objekt ohne VTODO ist in tasks_read eine unbekannte Id; Eingaben mit _shared_by_ werden in Meldungen nicht wiederholt
 - [Phase 32]: 32-04b: D-32-10 ohne Hinweis zur Tasks-App (erkennung=keine aus 32-02, Owner-Bestätigung 13.11.2026 "Ok"); capabilities.py unverändert
 - [Phase 32]: 32-04b: tasks_create ohne list nur bei genau einer eigenen beschreibbaren Liste, sonst Fehler mit allen beschreibbaren Listen (geteilte mit Schlüssel); Ziel wird vor dem GET der Elternaufgabe gewählt; Tags getrimmt
+- [Phase 32]: 32-05: tasks_create auf 1364 Bytes gekürzt (Prototyp 1417), MAX_TOOL_BYTES bleibt 1400; BUDGET_BYTES 22000 (18747 + 15 Prozent = 21560, nächste 500); Phase 33 verankert erneut (TMOD-05)
+- [Phase 32]: 32-05: Bundle tasks alphabetisch nach talk (bundle_names sortiert); TASK-02, TASK-04, TASK-05, TASK-06, TASK-08 abgehakt, TASK-03 und TASK-07 bleiben bis 32-05b/32-06/32-07 offen
 
 ### Pending Todos
 
@@ -902,10 +904,10 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 
 ## Session Continuity
 
-Last session: 2026-11-13T13:41:24.999Z
-Stopped at: 32-04b abgeschlossen (tasks_create mit Zielwahl E4/D-32-16, Rücklesen, kein Tasks-App-Hinweis, Korpus); kein Docker; lokale Commits nicht gepusht
-Nächster Schritt: 32-05 ausführen (reg_tasks.py, Oberflächen-Gates mit 27 Werkzeugen, Budget neu verankern; vulture-Einträge search_tasks, read_task, create_task gehen mit der Registrierung)
-Resume file: .planning/phases/32-tasks-bundle-suchen-lesen-anlegen/32-05-PLAN.md
+Last session: 2026-11-13T13:54:05.180Z
+Stopped at: 32-05 abgeschlossen (reg_tasks.py, Gates mit 27 Werkzeugen, Budget 22000, READMEs, CHANGELOGs); kein Docker; lokale Commits nicht gepusht
+Nächster Schritt: 32-06 ausführen (TASK-09: Provider tasks, fetch über tasks_read, Satz in docs/hardening*.md; README-fetch-Zeile und CHANGELOGs gleichlaufend in drei Sprachen nachziehen)
+Resume file: .planning/phases/32-tasks-bundle-suchen-lesen-anlegen/32-06-PLAN.md
 
 ## Operator Next Steps
 
