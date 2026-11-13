@@ -6,6 +6,16 @@ this module has a discovery of its own, with its own PROPFIND body, its own read
 Multi-Status and its own status check, and only calls the URL builders and the one
 create-only writer of ``caldav.py`` instead of extending anything there.
 
+**The two writers of an existing task (plan 33-03).** Changing a task and relocating it to
+another list are written here and not in ``caldav.py``, which stays untouched (TASK-01,
+``tests/unit/test_caldav_bytes_pin.py``). :func:`put_existing_todo` is the one overwriting
+PUT of this module and always carries ``If-Match`` with one strong ETag;
+:func:`move_todo` is the one relocation and always carries ``Overwrite: F`` and
+``If-Match``. Both check the ETag through ``dav.normalize_etag`` before any request, send
+exactly one request, never try a second time and never wrap the write in a timeout of their
+own: a write that arrived must not be reported as one that did not (pitfall 4). Their
+messages name lists by name only. Deleting and renaming stay out of this module entirely.
+
 **What a task list is.** A collection of the calendar home that has the resourcetype
 ``calendar`` and ``VTODO`` in its component set. Excluded before that, in this order: Deck
 calendars (URI prefix ``app-generated--``; their type and components look exactly like a task
@@ -48,11 +58,13 @@ from ... import config, ids
 from ...errors import (
     REASON_GUARD_TRIPPED,
     REASON_PERMISSION_DENIED,
+    REASON_TIMEOUT,
     REASON_UNKNOWN_ID,
+    ConflictError,
     ToolError,
 )
 from ..credentials import Credentials
-from . import caldav, xml
+from . import caldav, dav, xml
 
 #: The namespace of ``owner-displayname`` and of the trash bin and deleted calendar types.
 #: Not ``xml.NC``: that one is ``http://nextcloud.org/ns``, and the sharing plugin of the
@@ -496,6 +508,187 @@ async def get_todo(
         ics=response.content,
         etag=response.headers.get("etag", "").strip(),
     )
+
+
+#: The hint after every answer that leaves the stored state unknown or stale: the one way
+#: forward is a new read, which also brings the ETag the next attempt needs.
+_READ_AGAIN = (
+    "Nothing was retried: read the task again with tasks_read and decide with its new etag."
+)
+
+
+async def put_existing_todo(
+    client: httpx.AsyncClient,
+    creds: Credentials,
+    task_list: TaskList,
+    object_name: str,
+    ics_bytes: bytes,
+    etag: str,
+) -> str:
+    """Replace one task object, only while its ETag still matches ``etag`` (D-33-03).
+
+    ``etag`` goes through ``dav.normalize_etag`` before anything leaves this process, so the
+    request always carries one strong validator and never ``*``, a weak one, a list or
+    nothing. One request and no second attempt, whatever the answer. The return value is the
+    new ETag from the ``etag`` header, or empty: SabreDAV drops it when it stored a text
+    other than the one it got (measured in plan 33-01c), and the caller then reads again
+    instead of guessing.
+    """
+    etag = dav.normalize_etag(etag)
+    label = f"the task {object_name} in the list {task_list.name}"
+    try:
+        response = await client.put(
+            caldav.object_url(creds, task_list.uri, object_name),
+            content=ics_bytes,
+            headers={
+                "If-Match": etag,
+                "Content-Type": "text/calendar; charset=utf-8",
+            },
+            auth=creds.auth(),
+        )
+    except httpx.TimeoutException:
+        raise _unknown_outcome(label) from None
+    _check_change(response, label)
+    return response.headers.get("etag", "").strip()
+
+
+async def move_todo(
+    client: httpx.AsyncClient,
+    creds: Credentials,
+    source: TaskList,
+    target: TaskList,
+    object_name: str,
+    etag: str,
+) -> None:
+    """Relocate one task object into another list under the same name, never replacing one.
+
+    ``Overwrite: F`` keeps an object of the same name in the target list untouched and
+    ``If-Match`` keeps a task that changed since the read where it is. Only 201 proves a
+    relocation to a free name; a 204 would mean the server replaced an object in spite of
+    ``Overwrite: F`` and is reported loudly, never as success. One request, no second
+    attempt.
+    """
+    etag = dav.normalize_etag(etag)
+    label = f"the task {object_name} from the list {source.name} to the list {target.name}"
+    try:
+        response = await client.request(
+            "MOVE",
+            caldav.object_url(creds, source.uri, object_name),
+            headers={
+                "Destination": caldav.object_url(creds, target.uri, object_name),
+                "Overwrite": "F",
+                "If-Match": etag,
+            },
+            auth=creds.auth(),
+        )
+    except httpx.TimeoutException:
+        raise _unknown_outcome(label) from None
+    _check_relocation(response, label)
+
+
+def _unknown_outcome(label: str) -> ToolError:
+    """A write without an answer may have arrived; only a new read can tell (pitfall 4)."""
+    return ToolError(
+        message=f"Outcome unknown: Nextcloud did not answer in time for {label}.",
+        hint=_READ_AGAIN,
+        reason=REASON_TIMEOUT,
+    )
+
+
+def _not_writable(label: str) -> ToolError:
+    """404 after a successful read: a read only share answers a write exactly like this."""
+    return ToolError(
+        message=f"Nextcloud answered 404 for {label}: not found or no write permission.",
+        hint=(
+            "A read only share answers a write with 404 as well. Call tasks_search once to "
+            "see which lists are writable, then read the task again with tasks_read."
+        ),
+        reason=REASON_UNKNOWN_ID,
+    )
+
+
+def _check_write_tail(response: httpx.Response, label: str) -> None:
+    """The statuses both writers answer alike: redirect, 401, 429, 5xx, anything else."""
+    status = response.status_code
+    if 300 <= status < 400 or status in (401, 429):
+        _check(response, label)
+    if status >= 500:
+        raise ToolError(
+            message=(
+                f"Nextcloud reported a server error ({status}) for {label}; the outcome is "
+                "not known."
+            ),
+            hint=_READ_AGAIN,
+        )
+    raise ToolError(
+        message=f"Nextcloud answered {label} with an unexpected status {status}.",
+        hint=_READ_AGAIN,
+    )
+
+
+def _check_change(response: httpx.Response, label: str) -> None:
+    """The answer to the overwriting PUT. No retry, ever; only 200 and 204 are a change."""
+    status = response.status_code
+    if status in (200, 204):
+        return
+    if status == 412:
+        raise ConflictError(
+            message=f"Nextcloud refused changing {label}: it changed since it was read (412).",
+            hint=_READ_AGAIN,
+        )
+    if status == 404:
+        raise _not_writable(label)
+    if status == 403:
+        raise ToolError(
+            message=f"No permission to change {label}.",
+            hint="Ask the owner of that task list for write permission in Nextcloud.",
+            reason=REASON_PERMISSION_DENIED,
+        )
+    _check_write_tail(response, label)
+
+
+def _check_relocation(response: httpx.Response, label: str) -> None:
+    """The answer to the relocation. Only 201 is a success, a 204 replaced something."""
+    status = response.status_code
+    if status == 201:
+        return
+    if status == 204:
+        raise ToolError(
+            message=(
+                f"Nextcloud reports that relocating {label} replaced an existing object "
+                "(status 204)."
+            ),
+            hint=(
+                "This server sends Overwrite: F and expects a refusal instead. Report this "
+                "instance: it does not honour the header. Read both lists again with "
+                "tasks_search."
+            ),
+        )
+    if status == 409:
+        raise ConflictError(
+            message=(
+                f"Nextcloud refused relocating {label}: the target list already holds a task "
+                "with the same UID (409)."
+            ),
+            hint="Nothing was relocated. Read the target list with tasks_search first.",
+        )
+    if status == 412:
+        raise ConflictError(
+            message=(
+                f"Nextcloud refused relocating {label}: the task changed since it was read or "
+                "the target name is already taken (412)."
+            ),
+            hint=_READ_AGAIN,
+        )
+    if status == 404:
+        raise _not_writable(label)
+    if status == 403:
+        raise ToolError(
+            message=f"No permission for relocating {label}.",
+            hint="Both lists need write permission; tasks_search shows which lists are writable.",
+            reason=REASON_PERMISSION_DENIED,
+        )
+    _check_write_tail(response, label)
 
 
 def _check(response: httpx.Response, what: str) -> None:

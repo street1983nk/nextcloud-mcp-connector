@@ -141,6 +141,10 @@ FORBIDDEN: dict[str, str] = {
 # remain forbidden.
 CHUNK_ASSEMBLY_MOVE = "nextcloud/clients/dav.py"
 
+# The relocation of one task into another list of the same account (TMOD-08, plan 33-03).
+# It carries ``Overwrite: F`` and ``If-Match`` and is pinned by the syntax tree below.
+TASK_MOVE = "nextcloud/clients/tasks.py"
+
 #: The five needles above that name a Tables route, with a line that would carry them into
 #: the code. They stay next to the counter proof rather than next to the dictionary,
 #: because their only job is to prove that each needle can still be hit. Every line is
@@ -421,7 +425,11 @@ def _violations(relative: str, lines: Iterable[tuple[int, str]]) -> list[str]:
         for needle, why in FORBIDDEN.items():
             if needle not in text:
                 continue
-            if needle == "MOVE" and relative == CHUNK_ASSEMBLY_MOVE and text.strip() == '"MOVE",':
+            if (
+                needle == "MOVE"
+                and relative in (CHUNK_ASSEMBLY_MOVE, TASK_MOVE)
+                and text.strip() == '"MOVE",'
+            ):
                 continue
             if needle == "DELETE" and _is_own_sql(relative, text):
                 continue
@@ -476,8 +484,11 @@ UNCONDITIONAL_PUTS = {
 }
 
 #: Every PUT call in the production code, counted. A new PUT that this gate somehow does
-#: not flag still changes the count, so it cannot slip in silently.
-EXPECTED_PUT_CALLS = 6
+#: not flag still changes the count, so it cannot slip in silently. Seven since plan 33-03:
+#: the one overwriting PUT of ``clients/tasks.put_existing_todo`` (TMOD-01, D-33-03), which
+#: always carries ``If-Match`` on a normalized strong ETag and is pinned below against the
+#: create-only writer of ``caldav.py``. It has no entry in ``UNCONDITIONAL_PUTS``.
+EXPECTED_PUT_CALLS = 7
 
 
 def _usable_precondition(call: ast.Call) -> bool:

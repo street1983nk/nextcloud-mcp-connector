@@ -87,9 +87,10 @@ EXPECTED_TOOLS = {
 
 # The create-only paths. files_update is separately gated and uses conditional overwrite.
 # Mail added one tool and not one write path. The tasks bundle of phase 32 adds one: the
-# create-only tools are seven; EXPECTED_PUT_CALLS stays six because tasks_create writes
-# through the one generic CalDAV writer. Two different sixes stood here before, and only the
-# number of tools moved: the count of PUT call sites in the source did not.
+# create-only tools are seven; tasks_create added no PUT because it writes through the one
+# generic CalDAV writer. Two different sixes stood here before, and only the number of tools
+# moved: the count of PUT call sites in the source did not. EXPECTED_PUT_CALLS is seven since
+# plan 33-03, and the seventh is the overwriting PUT of clients/tasks.py, not a create.
 CREATE_TOOLS = {
     "files_upload",
     "calendar_create_event",

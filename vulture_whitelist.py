@@ -383,3 +383,10 @@ background
 # and the name leaves this list with that plan; until then the unit tests and the ExApp start
 # test in a fresh interpreter (tests/unit/test_exapp_tasks_update_switch.py) call it.
 tasks_update_enabled
+
+# --- The two conditional writers of the tasks bundle, plan 33-03 ----------------------------
+# Temporary: the client layer lands before the tools that call it. used by
+# tasks_complete/tasks_update (33-06/33-07) and tasks_move (33-08); each name leaves this
+# list with the first plan that calls it.
+put_existing_todo
+move_todo
