@@ -114,10 +114,11 @@ from mcp_connector.server import mcp
 #               against the number that needs it, once, at the end.
 #
 #   Measurement 2026-11-13, all 27 curated tools registered (tasks_search, tasks_read,
-#               tasks_create of TASK-07): 18747 bytes. The three tools are 863, 295 and
-#               1364 bytes; tasks_create was cut from the 1417 of its prototype to fit the
+#               tasks_create of TASK-07), measured again after plan 32-09 (D-32-18 texts)
+#               and confirmed in plan 32-10: 18770 bytes. The three tools are 870, 295 and
+#               1380 bytes; tasks_create was cut from the 1417 of its prototype to fit the
 #               per tool ceiling, which stays where it is.
-#   Budget      18747 + 15 percent = 21560, rounded up to the next 500 = 22000 bytes,
+#   Budget      18770 + 15 percent = 21585.5, rounded up to the next 500 = 22000 bytes,
 #               re-anchored at 22000 by the house rule (E1, TASK-08); phase 33 re-anchors
 #               for its own tools (TMOD-05).
 BUDGET_BYTES = 22_000

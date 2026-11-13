@@ -617,6 +617,189 @@ On both instances every baseline was equal before and after, the calendar trash 
 account was emptied of the run (the one entry of the test account is the object deleted after
 the positive control), the test account was deleted and the Tasks app was removed again.
 
+## Gap closure 32-10 on Nextcloud 35 and 32
+
+Plan 32-10 answered the open points of the re-verification of phase 32: a list shared with a
+group (out of the account and into it), a recurring task live, the cap of 500 live with the
+budget of one list, and an owner whose display name differs from the account id. First
+measured with `scripts/tasks_measure.py` (steps `gruppe`, `wieder`, `deckel`, [raw/32-10-messung.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-10-messung.txt)), then
+proven with `tests/integration/test_tasks_live.py` on Nextcloud 35.0.0 and 32.0.15, each
+without and with the Tasks app 0.18.1, one instance at a time, at function level under AppAPI
+impersonation, a baseline before and after for every account ([raw/32-10-nc35.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-10-nc35.txt), [raw/32-10-nc32.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-10-nc32.txt)). Every run
+used a test group `p32live<stamp>grp` with bob and alice as members; it did not exist before
+and was deleted after every run.
+
+```
+34 passed in 71.06s (0:01:11)
+34 passed in 86.41s (0:01:26)
+34 passed in 71.00s (0:01:11)
+34 passed in 78.61s (0:01:18)
+```
+
+### Group shares (D-32-18, D-32-14, D-32-15, D-32-17, E4)
+
+The measurement: on both instances, under the app password and under impersonation,
+`oc:invite` of an own list shared with a group holds exactly one `oc:user` entry whose href
+names `principals/groups/`. The unchanged `parse_task_home` marks it `shared_out` for read only
+and read-write and clears the mark once the share is taken back. A list bob shared with a
+group that holds alice looks to alice like a share with a person: `_shared_by_` in the URI,
+`oc:read-only` in the 2xx propstat, `owner-displayname` equal to the display name of bob. No
+code changed for groups; the measured discovery is pinned as
+`tests/fixtures/caldav_home_group_share.xml`, with regression tests such as
+`test_an_own_list_shared_with_a_group_is_shared_out` and
+`test_the_only_own_list_shared_with_a_group_is_no_default_target`.
+
+```
+GRUPPE nc35 name=p3210grp vorhanden=nein shares=0 phase=vorher
+GRUPPE-HINAUS nc35 zustand=privat auth=appapi invite_status=2xx eintraege=0 kinder=keine principal_art=keine shared_out=nein
+GRUPPE-HINAUS nc35 zustand=an-gruppe-ro auth=appapi invite_status=2xx eintraege=1 kinder=user principal_art=groups shared_out=ja
+GRUPPE-HINAUS nc35 zustand=an-gruppe-rw auth=appapi invite_status=2xx eintraege=1 kinder=user principal_art=groups shared_out=ja
+GRUPPE-HINAUS nc35 zustand=zurueckgenommen auth=appapi invite_status=2xx eintraege=0 kinder=keine principal_art=keine shared_out=nein
+GRUPPE-HINAUS nc32 zustand=an-gruppe-ro auth=appapi invite_status=2xx eintraege=1 kinder=user principal_art=groups shared_out=ja
+GRUPPE-HINAUS nc32 zustand=an-gruppe-rw auth=appapi invite_status=2xx eintraege=1 kinder=user principal_art=groups shared_out=ja
+GRUPPE-SELBST nc35 zustand=an-gruppe-ro auth=appapi eigene_liste_doppelt=nein
+GRUPPE-REIN nc35 liste=rw auth=appapi sichtbar=ja eintraege=1 uri_mit_marker=ja read_only_2xx=ja owner_displayname_passt=ja shared=ja writable=ja name_ohne_besitzer=ja
+GRUPPE-REIN nc35 liste=ro auth=appapi sichtbar=ja eintraege=1 uri_mit_marker=ja read_only_2xx=ja owner_displayname_passt=ja shared=ja writable=nein name_ohne_besitzer=ja
+GRUPPE-REIN nc32 liste=rw auth=appapi sichtbar=ja eintraege=1 uri_mit_marker=ja read_only_2xx=ja owner_displayname_passt=ja shared=ja writable=ja name_ohne_besitzer=ja
+GRUPPE-REIN nc32 liste=ro auth=appapi sichtbar=ja eintraege=1 uri_mit_marker=ja read_only_2xx=ja owner_displayname_passt=ja shared=ja writable=nein name_ohne_besitzer=ja
+GRUPPE-SUBLINE nc35 liste=rw faellig=nein endet_mit_rohname=ja enthaelt_besitzer=ja clean_subline=bereinigt clean_subline_ohne_besitzer=ja
+GRUPPE-SUBLINE nc35 liste=rw faellig=ja endet_mit_rohname=ja enthaelt_besitzer=ja clean_subline=bereinigt clean_subline_ohne_besitzer=ja
+GRUPPE-SUBLINE nc32 liste=rw faellig=nein endet_mit_rohname=nein enthaelt_besitzer=nein clean_subline=unveraendert clean_subline_ohne_besitzer=ja
+GRUPPE-SUBLINE nc32 liste=rw faellig=ja endet_mit_rohname=nein enthaelt_besitzer=nein clean_subline=unveraendert clean_subline_ohne_besitzer=ja
+GRUPPE nc35 name=p3210grp vorhanden=nein shares=0 phase=nachher
+GRUPPE nc32 name=p3210grp vorhanden=nein shares=0 phase=nachher
+ENTSCHEID gruppe_hinaus=erkannt (Begründung: auf nc35 und nc32, unter App-Passwort und Impersonation gleich, trägt oc:invite einer an die Gruppe geteilten eigenen Liste genau ein Kind-Element mit dem lokalen Namen user und einem href auf principals/groups/; die unveränderte parse_task_home liefert für an-gruppe-ro und an-gruppe-rw shared_out=ja, für privat und zurueckgenommen nein; _shares_itself bleibt unverändert)
+ENTSCHEID gruppe_rein=geteilt-erkannt (Begründung: auf nc35 und nc32 trägt die per Gruppe hineingeteilte Liste den Marker _shared_by_ in der URI und oc:read-only im 2xx-propstat; parse_task_home liefert shared=ja, writable=ja für rw und nein für ro, den Namen ohne Besitzer; owner-displayname passt zum Anzeigenamen von bob)
+ENTSCHEID gruppe_subline=bereinigt (Begründung: auf nc35 enthält die rohe subline aller vier Aufgaben den Besitzer, clean_subline ersetzt ihn mit und ohne DUE; auf nc32 enthält sie ihn nicht und bleibt unverändert; in keinem Fall bleibt der Besitzer stehen)
+```
+
+Live on Nextcloud 35 with the Tasks app. The account of D-32-18 shares its only own list with
+the group (it is no member itself): without `list` nothing is written, also not for a `parent`
+there; taken back, it is written again. As alice, the two group shares of bob carry their name
+without the owner and the right `writable`; they are written only when named, the read only
+one is refused before any `PUT`, a `parent` there is no naming, `fetch` links the start page of
+the Tasks app only, and the provider subline loses the owner with and without a due date:
+
+```
+AUFGABE d-32-18-gruppe-privat nc=35.0.0.10 nutzer=p32live5f3e61c4aus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=2 nachher=3; raw object GET 200 with the password of the account; list {'name': 'p32live-5f3e61c4-aus', 'shared': False, 'writable': True}
+AUFGABE d-32-18-gruppe-ro nc=35.0.0.10 nutzer=p32live5f3e61c4aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-5f3e61c4-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-5f3e61c4-aus.'; the hook saw no PUT; calendarobjects vorher=3 nachher=3; neither the id nor the display name of bob; no share marker; no group id
+AUFGABE d-32-18-gruppe-rw nc=35.0.0.10 nutzer=p32live5f3e61c4aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-5f3e61c4-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-5f3e61c4-aus.'; the hook saw no PUT; calendarobjects vorher=3 nachher=3; neither the id nor the display name of bob; no share marker; no group id
+AUFGABE d-32-18-gruppe-parent nc=35.0.0.10 nutzer=p32live5f3e61c4aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message='The parent task lives in a list that is shared with others, and such a list is only written to when it is named.'; shared with others in the message; hint "To create the subtask there, name that list with list='p32live-5f3e61c4-aus'."; the hook saw no PUT; calendarobjects vorher=3 nachher=3; neither the id nor the display name of bob; no share marker; no group id
+AUFGABE d-32-18-gruppe-zurueck nc=35.0.0.10 nutzer=p32live5f3e61c4aus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=3 nachher=4; raw object GET 200 with the password of the account; list {'name': 'p32live-5f3e61c4-aus', 'shared': False, 'writable': True}
+AUFGABE gruppe-rein-flags nc=35.0.0.10 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | roher displayname mit zusatz in der discovery: 2 von 2; positive control: the server adds the owner to both; grw: {'name': 'p32live-5f3e61c4-grw', 'shared': True, 'writable': True}; gro: {'name': 'p32live-5f3e61c4-gro', 'shared': True, 'writable': False}; the task of grw is a hit; the task of gro is a hit; no group id in the answer
+AUFGABE gruppe-rein-ohne-list nc=35.0.0.10 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=unspecified message='This account has more than one task list to write to, so list has to be named.'; hint offers the rw group share: 'Name the list with list=<name>. Writable task lists: p32live-5f3e61c4-a, p32live-5f3e61c4-b, p32live-5f3e61c4-grw (shared, key s6c34d4418e76d6a3), p32live-5f3e61c4-rw (shared, key scf5c72498ae63223), personal.'; the read only group share is not offered; the hook saw no PUT; calendarobjects vorher={'grw': 2, 'gro': 1} nachher={'grw': 2, 'gro': 1}; neither the id nor the display name of bob; no group, no marker
+AUFGABE gruppe-rein-rw-mit-list nc=35.0.0.10 nutzer=alice status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | the id carries the hashed key: True; GET by the owner 200; calendarobjects vorher=2 nachher=3; PUT [201]; list {'name': 'p32live-5f3e61c4-grw', 'shared': True, 'writable': True}
+AUFGABE gruppe-rein-ro-vorab nc=35.0.0.10 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The task list 'p32live-5f3e61c4-gro' is read only for this account."; The task list 'p32live-5f3e61c4-gro' is read only for this account.; the hook saw no PUT; calendarobjects vorher=1 nachher=1; no group id
+AUFGABE gruppe-rein-parent nc=35.0.0.10 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message='The parent task lives in a shared list, and a shared list is only written to when it is named.'; hint "To create the subtask there, name that list with list='p32live-5f3e61c4-grw'."; no PUT; calendarobjects vorher=3 nachher=3
+AUFGABE gruppe-rein-fetch nc=35.0.0.10 nutzer=alice status=PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | url='/index.php/apps/tasks/'; the link is the start page of the Tasks app; no owner in the link; metadata shared=true; title p32live-5f3e61c4-gruppeohne
+AUFGABE d-32-17-gruppe nc=35.0.0.10 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207 ergebnis=ok | the provider finds the task of the grw share; roh_mit_besitzer=ja; positive control: the raw subline names the owner on 34+; subline_vorhanden=ja text_gleich=True; subline without bob; subline without the share marker; text without bob; text without the share marker; bereinigt='(p32live-5f3e61c4-grw)'; the subline ends with the list name without the owner; search text equals the subline
+AUFGABE d-32-17-gruppe-faellig nc=35.0.0.10 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207 ergebnis=ok | the provider finds the task of the grw share; roh_mit_besitzer=ja; positive control: the raw subline names the owner on 34+; subline_vorhanden=ja text_gleich=True; subline without bob; subline without the share marker; text without bob; text without the share marker; bereinigt='Fällig am 04.12.2026 (p32live-5f3e61c4-grw)'; the subline ends with the list name without the owner; search text equals the subline
+GRUPPE nc35.0.0.10 name=p32live5f3e61c4grp vorhanden=nein shares=0 phase=nachher
+```
+
+Nextcloud 32 with the Tasks app (its subline carries no owner and passes as delivered):
+
+```
+AUFGABE d-32-18-gruppe-ro nc=32.0.15.1 nutzer=p32livec408b127aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-c408b127-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-c408b127-aus.'; the hook saw no PUT; calendarobjects vorher=3 nachher=3; neither the id nor the display name of bob; no share marker; no group id
+AUFGABE d-32-18-gruppe-rw nc=32.0.15.1 nutzer=p32livec408b127aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-c408b127-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-c408b127-aus.'; the hook saw no PUT; calendarobjects vorher=3 nachher=3; neither the id nor the display name of bob; no share marker; no group id
+AUFGABE gruppe-rein-flags nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | roher displayname mit zusatz in der discovery: 2 von 2; positive control: the server adds the owner to both; grw: {'name': 'p32live-c408b127-grw', 'shared': True, 'writable': True}; gro: {'name': 'p32live-c408b127-gro', 'shared': True, 'writable': False}; the task of grw is a hit; the task of gro is a hit; no group id in the answer
+AUFGABE gruppe-rein-ro-vorab nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The task list 'p32live-c408b127-gro' is read only for this account."; The task list 'p32live-c408b127-gro' is read only for this account.; the hook saw no PUT; calendarobjects vorher=1 nachher=1; no group id
+AUFGABE d-32-17-gruppe nc=32.0.15.1 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:500,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200 ergebnis=ok | the provider finds the task of the grw share; roh_mit_besitzer=nein; subline_vorhanden=nein text_gleich=True; subline without bob; subline without the share marker; text without bob; text without the share marker; without an owner the subline is the raw one; search text equals the subline
+AUFGABE d-32-17-gruppe-faellig nc=32.0.15.1 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:500,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207 ergebnis=ok | the provider finds the task of the grw share; roh_mit_besitzer=nein; subline_vorhanden=ja text_gleich=True; subline without bob; subline without the share marker; text without bob; text without the share marker; without an owner the subline is the raw one; search text equals the subline
+GRUPPE nc32.0.15.1 name=p32livec408b127grp vorhanden=nein shares=0 phase=nachher
+```
+
+### Recurring tasks (TASK-02)
+
+Three forms in one own list, built from the form the Tasks app writes (`DUE` and
+`RRULE:FREQ=DAILY` on the master): unchanged (`app`), with a completed override of the second
+occurrence in the same object (`instanz-erledigt`), and with the master completed
+(`master-erledigt`). The server prefilter keeps an object as long as one of its VTODOs has no
+`COMPLETED`, so the first two stay open; each form is one hit without expansion with
+`recurring: true`, and the status is the one of the master. Regression tests:
+`test_a_recurring_task_with_a_completed_instance_stays_one_open_hit` and
+`test_a_recurring_task_with_a_completed_master_is_one_completed_hit`.
+
+```
+WIEDER nc35 form=app filter_offen=ja treffer_offen=1 treffer_erledigt=0 treffer_alle=1 recurring=ja status=open lesen_recurring=ja lesen_status=open
+WIEDER nc35 form=instanz-erledigt filter_offen=ja treffer_offen=1 treffer_erledigt=0 treffer_alle=1 recurring=ja status=open lesen_recurring=ja lesen_status=open
+WIEDER nc35 form=master-erledigt filter_offen=nein treffer_offen=0 treffer_erledigt=1 treffer_alle=1 recurring=ja status=completed lesen_recurring=ja lesen_status=completed
+WIEDER nc32 form=app filter_offen=ja treffer_offen=1 treffer_erledigt=0 treffer_alle=1 recurring=ja status=open lesen_recurring=ja lesen_status=open
+WIEDER nc32 form=instanz-erledigt filter_offen=ja treffer_offen=1 treffer_erledigt=0 treffer_alle=1 recurring=ja status=open lesen_recurring=ja lesen_status=open
+WIEDER nc32 form=master-erledigt filter_offen=nein treffer_offen=0 treffer_erledigt=1 treffer_alle=1 recurring=ja status=completed lesen_recurring=ja lesen_status=completed
+ENTSCHEID wiederkehrend=wie-erwartet (Begründung: auf nc35 und nc32 gleich: app und instanz-erledigt passieren den Vorfilter des Servers und sind je ein Treffer in open und all, keiner in completed, Status open, recurring=ja, tasks_read recurring=ja; master-erledigt fällt aus dem Vorfilter, ist keiner in open und je einer in completed und all, Status completed, recurring=ja)
+```
+
+Live, Nextcloud 35 with and Nextcloud 32 without the Tasks app:
+
+```
+AUFGABE wiederkehrend-app nc=35.0.0.10 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | treffer_open=1 treffer_completed=0 treffer_all=1; open: 1; done: 0; all: one hit without expansion, 1; the hit is the object of the harness; recurring True; status open; lesen status=open recurring=True; tasks_read recurring=true; tasks_read status open; the master and not the override; DUE as written 2026-11-20T13:00:00+00:00
+AUFGABE wiederkehrend-instanz-erledigt nc=35.0.0.10 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | treffer_open=1 treffer_completed=0 treffer_all=1; open: 1; done: 0; all: one hit without expansion, 1; the hit is the object of the harness; recurring True; status open; lesen status=open recurring=True; tasks_read recurring=true; tasks_read status open; the master and not the override; DUE as written 2026-11-20T13:00:00+00:00
+AUFGABE wiederkehrend-master-erledigt nc=35.0.0.10 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | treffer_open=0 treffer_completed=1 treffer_all=1; open: 0; done: 1; all: one hit without expansion, 1; the hit is the object of the harness; recurring True; status completed; lesen status=completed recurring=True; tasks_read recurring=true; tasks_read status completed; the master and not the override; DUE as written 2026-11-20T13:00:00+00:00
+AUFGABE wiederkehrend-app nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | treffer_open=1 treffer_completed=0 treffer_all=1; open: 1; done: 0; all: one hit without expansion, 1; the hit is the object of the harness; recurring True; status open; lesen status=open recurring=True; tasks_read recurring=true; tasks_read status open; the master and not the override; DUE as written 2026-11-20T13:00:00+00:00
+AUFGABE wiederkehrend-instanz-erledigt nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | treffer_open=1 treffer_completed=0 treffer_all=1; open: 1; done: 0; all: one hit without expansion, 1; the hit is the object of the harness; recurring True; status open; lesen status=open recurring=True; tasks_read recurring=true; tasks_read status open; the master and not the override; DUE as written 2026-11-20T13:00:00+00:00
+AUFGABE wiederkehrend-master-erledigt nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | treffer_open=0 treffer_completed=1 treffer_all=1; open: 0; done: 1; all: one hit without expansion, 1; the hit is the object of the harness; recurring True; status completed; lesen status=completed recurring=True; tasks_read recurring=true; tasks_read status completed; the master and not the override; DUE as written 2026-11-20T13:00:00+00:00
+```
+
+How the Tasks app itself checks off one occurrence needs a browser and was not measured.
+
+### Cap of 500 and the budget per list
+
+One own list with 600, then 2000 open tasks. The cap held: 20 pages of 25, 500 distinct hits,
+the last page `truncated` with the note and without `next`. The budget did not: with 2000
+open tasks a whole call (discovery, `REPORT` and parsing) took up to 0.831 s, and on
+Nextcloud 35 the budget of 1 s cut the first page off, so the call was refused. The rule of
+plan 32-02, `max(1, ceil(2 * max))`, gives 2 s. RED first
+(`test_limit_policy_constants_are_the_measured_values` expecting 2, commit ed22627), then
+`PER_LIST_TIMEOUT = 2.0` with its measuring line (commit 0f98fd4). The calls of the measurement
+ran with a budget of 60 s, so the budget could not cut them short; the walk through the pages
+ran with the budget of the product.
+
+```
+AUFBAU nc35 aufgaben=2000 neu=1400 erledigt=0 mit_faelligkeit=1000 dauer_s=63 gleichzeitig=1 wiederholte_put=0 GEGENPROBE datenbank_zeilen=2000 gleich=ja
+KOSTEN deckel-report aufgaben=600 impersonation=ja status=207 median_ms=70 max_ms=84 min_ms=67 p95_zweitgroesster_ms=79 bytes=424754 treffer=600 (n=15)
+KOSTEN deckel-aufruf aufgaben=600 median_ms=265 max_ms=277 beantwortet=ja budget_waehrend_messung_s=60 (n=10)
+KOSTEN deckel-report aufgaben=2000 impersonation=ja status=207 median_ms=177 max_ms=220 min_ms=166 p95_zweitgroesster_ms=208 bytes=1415254 treffer=2000 (n=15)
+KOSTEN deckel-aufruf aufgaben=2000 median_ms=754 max_ms=819 beantwortet=ja budget_waehrend_messung_s=60 (n=10)
+KOSTEN deckel-report aufgaben=600 impersonation=ja status=207 median_ms=68 max_ms=77 min_ms=64 p95_zweitgroesster_ms=70 bytes=424754 treffer=600 (n=15)
+KOSTEN deckel-aufruf aufgaben=600 median_ms=250 max_ms=259 beantwortet=ja budget_waehrend_messung_s=60 (n=10)
+KOSTEN deckel-report aufgaben=2000 impersonation=ja status=207 median_ms=170 max_ms=176 min_ms=160 p95_zweitgroesster_ms=175 bytes=1415254 treffer=2000 (n=15)
+KOSTEN deckel-aufruf aufgaben=2000 median_ms=722 max_ms=831 beantwortet=ja budget_waehrend_messung_s=60 (n=10)
+DECKEL nc35 aufgaben=600 seiten=20 je_seite=25 treffer=500 eindeutig=500 letzte_note=ja letzte_next=nein note_gleich=ja degraded=nein max_seite_ms=310 median_seite_ms=270 budget_s=1
+DECKEL nc35 aufgaben=2000 seiten=0 je_seite=0 treffer=0 eindeutig=0 letzte_note=nein letzte_next=nein note_gleich=nein degraded=ja max_seite_ms=1056 median_seite_ms=1056 budget_s=1
+DECKEL nc32 aufgaben=600 seiten=20 je_seite=25 treffer=500 eindeutig=500 letzte_note=ja letzte_next=nein note_gleich=ja degraded=nein max_seite_ms=316 median_seite_ms=256 budget_s=1
+DECKEL nc32 aufgaben=2000 seiten=20 je_seite=25 treffer=500 eindeutig=500 letzte_note=ja letzte_next=nein note_gleich=ja degraded=nein max_seite_ms=814 median_seite_ms=707 budget_s=1
+MESSWERT per_list_timeout_s=2 max_s=0.819 quelle=nc35-impersonation
+MESSWERT per_list_timeout_s=2 max_s=0.831 quelle=nc32-impersonation
+ENTSCHEID deckel_budget=anheben-auf-2 (Begründung: größtes max von deckel-aufruf 0.831 s auf nc32 und 0.819 s auf nc35 bei 2000 offenen Aufgaben, Regel max(1,ceil(2*max)) ergibt 2; auf nc35 brach das bisherige Budget von 1 s den Deckel bei 2000 offenen Aufgaben live ab; max_s liegt unter der Abbruchgrenze von 5 s; der Deckel selbst hielt bei 600 auf beiden und bei 2000 auf nc32: 20 Seiten zu 25, 500 eindeutige Treffer, letzte Seite mit Notiz und ohne next)
+```
+
+Live with 520 open tasks in one list of bob, after the fix (budget 2 s), as bob under
+impersonation:
+
+```
+SETUP deckel-500 aufgaben=520 fehlgeschlagen=0 wiederholt=0 dauer_s=25 GEGENPROBE datenbank_zeilen=520 gleich=ja
+AUFGABE deckel-500 nc=35.0.0.10 nutzer=bob status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207 ergebnis=ok | seiten=20 je_seite=[25] treffer=500 eindeutig=500 letzte_truncated=True letzte_next=False max_seite_ms=203 median_seite_ms=193 budget_s=2; 20 pages, got 20; pages of 25: [25]; 500 distinct hits; last page truncated; no next on the last page; note 'result window capped at 500 tasks; narrow with query, list or due_by'; no degraded list
+AUFGABE deckel-500 nc=32.0.15.1 nutzer=bob status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207 ergebnis=ok | seiten=20 je_seite=[25] treffer=500 eindeutig=500 letzte_truncated=True letzte_next=False max_seite_ms=197 median_seite_ms=186 budget_s=2; 20 pages, got 20; pages of 25: [25]; 500 distinct hits; last page truncated; no next on the last page; note 'result window capped at 500 tasks; narrow with query, list or due_by'; no degraded list
+```
+
+### Owner with a display name other than the account id
+
+In the runs with the Tasks app the display name of bob was set to a name with an umlaut and
+brackets of its own (`occ user:setting <bob> settings display_name`, read back with
+`occ user:info`) and put back before the closing baseline; the runs without the Tasks app left
+it alone. The name rule of D-32-14 and `clean_subline` held with it, and the scan for the owner
+over every answer of the run found neither the id nor that name:
+
+```
+ANZEIGENAME bob gesetzt=ja zurueck=ja gleich_vorher=ja weg=occ
+AUFGABE keine-kennung nc=35.0.0.10 nutzer=alice status=keine ergebnis=ok | 62 answers scanned for the id and the display name of bob; answers kept: 62; found 0 of 2 names; no _shared_by_ in any answer
+ANZEIGENAME bob gesetzt=ja zurueck=ja gleich_vorher=ja weg=occ
+AUFGABE keine-kennung nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | 62 answers scanned for the id and the display name of bob; answers kept: 62; found 0 of 2 names; no _shared_by_ in any answer
+ANZEIGENAME bob gesetzt=nein zurueck=entfaellt gleich_vorher=ja
+```
+
+
 ## Not reproducible or not measured
 
 - Nextcloud 32 has no whole chain: the app runs there as a local process at the daemon
@@ -639,15 +822,17 @@ the positive control), the test account was deleted and the Tasks app was remove
   owner, or drop it (see [Gap closure 32-09](#gap-closure-32-09-on-nextcloud-35-and-32)).
 - Whether the router of the Tasks app opens the very task behind a link needs a browser and
   was not measured.
-- The cap of 500 results (`MAX_RESULTS = 500` in `src/mcp_connector/tools/tasks.py`) was
-  measured for its cost (see [Cap of the results](#cap-of-the-results)), but no live run paged
-  up to it. That paging stops there with an honest note rests on the unit tests
+- The cap of 500 results (`MAX_RESULTS = 500` in `src/mcp_connector/tools/tasks.py`) is now
+  measured live: plan 32-10 paged a list with 520 open tasks on both instances to the end (see
+  [Gap closure 32-10](#gap-closure-32-10-on-nextcloud-35-and-32)); the unit tests
   `test_the_ceiling_stops_paging_with_an_honest_note` and
-  `test_limit_policy_constants_are_the_measured_values`.
-- `recurring` was not met live: no live task carried an `RRULE` or `RDATE`. The mark and the
-  one hit without expansion rest on the unit tests
+  `test_limit_policy_constants_are_the_measured_values` stay. The series of 2000 open tasks
+  ran only in the measuring program, not in the live test.
+- `recurring` is now met live (plan 32-10, three forms, see
+  [Gap closure 32-10](#gap-closure-32-10-on-nextcloud-35-and-32)), beside the unit tests
   `test_rrule_or_rdate_marks_the_master_as_recurring` and
-  `test_a_recurring_task_is_one_hit_without_expansion`.
+  `test_a_recurring_task_is_one_hit_without_expansion`. What remains: how the Tasks app itself
+  checks off one occurrence needs a browser and was not measured.
 - 403 against 404 for a list that can only be read: live, the server answered a direct `PUT`
   of the harness into the read only share with 404 on both instances, for example
   `AUFGABE geteilt-ro-server nc=35.0.0.10 nutzer=alice status=keine ergebnis=ok | harness PUT with the app password of alice, not the connector; PUT 404; calendarobjects vorher=1 nachher=1`
@@ -657,3 +842,8 @@ the positive control), the test account was deleted and the Tasks app was remove
 - Limits of plan 32-09: no share with a group (not released by the owner), and no whole chain
   through the installed app; D-32-17 and D-32-18 are proven at function level under AppAPI
   impersonation, as in plan 32-07.
+- State after plan 32-10: shares with a group are measured and proven live in both directions;
+  still no whole chain through the installed app (function level under AppAPI impersonation);
+  Nextcloud 33 and 34 only through the source. The display name of bob differed from the
+  account id only in the two runs with the Tasks app; CI keeps the display name as it is and
+  does not build the series of 520 tasks (both switches are unset there).

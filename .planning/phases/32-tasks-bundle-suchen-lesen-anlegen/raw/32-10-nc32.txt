@@ -351,3 +351,11 @@ tasks_measure.py scan gegen .env.nc35 und .env.exapp des Worktrees und .env.nc35
 NC_MCP_TEST_USER und NC_MCP_TEST_USER2 (Kontonamen alice und bob, öffentlich); kein Treffer aus
 APP_SECRET, Passwörtern, App-Passwörtern oder HP_SHARED_KEY. Der gesetzte Anzeigename kommt in keiner
 Ausgabe vor (grep: 0 Treffer). Kein Abschnitt "warnings summary" (pytest mit -p no:warnings).
+
+Beleg-Abgleich (Task 5)
+-----------------------
+    Jede Zeile in den Codeblöcken des Abschnitts "Gap closure 32-10" von docs/tasks-evidence.md
+    per Zeichenvergleich in raw/32-10-messung.txt, raw/32-10-nc35.txt oder raw/32-10-nc32.txt gesucht;
+    jeder dort und im umgeschriebenen Punkt zu Deckel und recurring genannte Testname per "def <name>("
+    unter tests/ gesucht.
+ABGLEICH zeilen=83 fehlen=0 tests=8 fehlen=0
