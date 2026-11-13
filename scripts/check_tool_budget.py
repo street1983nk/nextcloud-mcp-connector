@@ -112,7 +112,15 @@ from mcp_connector.server import mcp
 #               below it. The 19000 above is the arithmetic of today and not a decision: the
 #               task tools of phase 32 move the measurement again, and a budget is lifted
 #               against the number that needs it, once, at the end.
-BUDGET_BYTES = 18_000
+#
+#   Measurement 2026-11-13, all 27 curated tools registered (tasks_search, tasks_read,
+#               tasks_create of TASK-07): 18747 bytes. The three tools are 863, 295 and
+#               1364 bytes; tasks_create was cut from the 1417 of its prototype to fit the
+#               per tool ceiling, which stays where it is.
+#   Budget      18747 + 15 percent = 21560, rounded up to the next 500 = 22000 bytes,
+#               re-anchored at 22000 by the house rule (E1, TASK-08); phase 33 re-anchors
+#               for its own tools (TMOD-05).
+BUDGET_BYTES = 22_000
 
 # The second claim, and the one that actually reports a regression. A total with headroom
 # says nothing about a single tool: today's outlier ``calendar_create_event`` sits at 1351

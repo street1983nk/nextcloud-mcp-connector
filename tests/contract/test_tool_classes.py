@@ -16,7 +16,8 @@ from mcp_connector.server import mcp
 
 # D-28-14: tables_browse became a reader, which gives 12 / 3 / 7. files_read_as_markdown
 # made it 13 / 3 / 7, and files_create_folder of FOLD-01 is the fourth writer: 13 / 4 / 7.
-TOTAL = 24
+# The tasks bundle of TASK-07 adds three tools that name no file: 13 / 4 / 10.
+TOTAL = 27
 
 
 async def _tools() -> dict[str, Tool]:
@@ -31,8 +32,8 @@ async def test_every_registered_tool_has_exactly_one_class_and_a_reason() -> Non
     findings = tool_classes.freeze_findings(names)
     assert findings == [], "\n".join(findings)
     assert len(names) == TOTAL, (
-        f"{len(names)} tools; the split 13/4/7 is D-28-14 plus files_read_as_markdown "
-        "plus files_create_folder"
+        f"{len(names)} tools; the split 13/4/10 is D-28-14 plus files_read_as_markdown "
+        "plus files_create_folder plus the three tools of the tasks bundle"
     )
 
 
@@ -101,7 +102,7 @@ async def test_readers_are_read_only_and_writers_are_not() -> None:
 
 
 def test_the_three_classes_add_up_to_the_frozen_surface() -> None:
-    """The frozen number is named once; a twenty-fifth tool must pass this door on purpose."""
+    """The frozen number is named once; a twenty-eighth tool must pass this door on purpose."""
     total = (
         len(tool_classes.FILE_READERS)
         + len(tool_classes.FILE_WRITERS)
@@ -112,4 +113,4 @@ def test_the_three_classes_add_up_to_the_frozen_surface() -> None:
         len(tool_classes.FILE_READERS),
         len(tool_classes.FILE_WRITERS),
         len(tool_classes.UNAFFECTED),
-    ) == (13, 4, 7)
+    ) == (13, 4, 10)

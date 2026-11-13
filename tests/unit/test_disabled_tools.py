@@ -23,6 +23,7 @@ KNOWN = (
     "search",
     "tables",
     "talk",
+    "tasks",
 )
 
 

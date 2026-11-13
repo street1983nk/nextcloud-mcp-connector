@@ -42,6 +42,7 @@ BUNDLE_TOOLS: dict[str, frozenset[str]] = {
     "search": frozenset({"unified_search"}),
     "tables": frozenset({"tables_browse", "tables_create_row"}),
     "talk": frozenset({"talk_browse", "talk_send"}),
+    "tasks": frozenset({"tasks_create", "tasks_read", "tasks_search"}),
 }
 
 _LIST_TOOLS = """
@@ -93,6 +94,7 @@ def test_the_bundle_names_are_frozen() -> None:
         "search",
         "tables",
         "talk",
+        "tasks",
     ]
 
 

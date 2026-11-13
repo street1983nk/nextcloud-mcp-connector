@@ -25,8 +25,8 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
 
 ## Ce qu'il sait faire
 
-- 24 outils répartis sur neuf familles d'applications : fichiers, agenda, notes, Deck,
-  contacts, Tables, Talk, Mail et la recherche à l'échelle du cloud
+- 27 outils répartis sur dix familles d'applications : fichiers, agenda, tâches (Tasks),
+  notes, Deck, contacts, Tables, Talk, Mail et la recherche à l'échelle du cloud
 - OAuth 2.1 conforme à la spécification d'autorisation MCP : enregistrement dynamique des
   clients, PKCE S256, jetons liés à leur audience, rotation des jetons de rafraîchissement
   avec détection de réutilisation et révocation immédiate. Claude.ai et ChatGPT reçoivent une
@@ -85,6 +85,9 @@ qu'un nom ou un niveau diverge.
 | `files_update` | conditional-update | Remplace un fichier texte UTF-8 existant uniquement avec son ETag lu auparavant ; disponible seulement si l'admin active `NC_MCP_FILES_UPDATE` |
 | `calendar_list_events` | read | Les événements d'une plage de temps explicite, avec un fuseau horaire explicite |
 | `calendar_create_event` | create-only | Un nouvel événement ; les événements existants ne sont jamais modifiés |
+| `tasks_search` | read | Par défaut les tâches ouvertes, des listes de tâches propres et partagées ; 25 par page |
+| `tasks_read` | read | Une tâche avec sa description (tronquée) et ses sous-tâches directes |
+| `tasks_create` | create-only | Une nouvelle tâche ; sans `list` seulement s'il existe exactement une liste propre, jamais dans une liste partagée sauf si elle est nommée |
 | `notes_search` | read | Des notes par titre et contenu, via le fournisseur de recherche de notes Nextcloud |
 | `notes_read` | read | Une note |
 | `notes_create` | create-only | Une nouvelle note ; les notes existantes ne sont jamais modifiées |
@@ -144,6 +147,7 @@ manquante reçoit une réponse en une phrase, jamais un résultat vide.
   - `search` : `unified_search`
   - `tables` : `tables_browse`, `tables_create_row`
   - `talk` : `talk_browse`, `talk_send`
+  - `tasks` : `tasks_search`, `tasks_read`, `tasks_create`
 - Un nom inconnu, ou tous les noms à la fois, arrête le serveur au démarrage avec un message
   qui énumère les noms valides.
 - Ce n'est pas un contrôle d'accès : `search`, `fetch` et `prepare_context` atteignent toujours

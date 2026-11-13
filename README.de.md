@@ -25,8 +25,8 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
 
 ## Was er kann
 
-- 24 Tools über neun App-Familien: Dateien, Kalender, Notizen, Deck, Kontakte, Tables, Talk,
-  Mail und die cloud-weite Suche
+- 27 Tools über zehn App-Familien: Dateien, Kalender, Aufgaben (Tasks), Notizen, Deck,
+  Kontakte, Tables, Talk, Mail und die cloud-weite Suche
 - OAuth 2.1 nach der MCP-Autorisierungsspezifikation: dynamische Client-Registrierung,
   PKCE S256, zielgebundene Token, Refresh-Rotation mit Wiederverwendungserkennung und
   sofortigem Entzug. Claude.ai und ChatGPT bekommen eine URL und sehen nie ein Passwort
@@ -82,6 +82,9 @@ abweicht.
 | `files_update` | conditional-update | Ersetzt eine bestehende UTF-8-Textdatei nur mit ihrem zuvor gelesenen ETag; nur verfügbar, wenn der Admin `NC_MCP_FILES_UPDATE` aktiviert |
 | `calendar_list_events` | read | Termine in einem expliziten Zeitraum, mit expliziter Zeitzone |
 | `calendar_create_event` | create-only | Ein neuer Termin; bestehende Termine werden nie geändert |
+| `tasks_search` | read | Standardmäßig offene Aufgaben, aus eigenen und geteilten Aufgabenlisten; 25 je Seite |
+| `tasks_read` | read | Eine Aufgabe mit ihrer Beschreibung (gekürzt) und ihren direkten Unteraufgaben |
+| `tasks_create` | create-only | Eine neue Aufgabe; ohne `list` nur, wenn es genau eine eigene Liste gibt, nie in eine geteilte Liste, außer sie wird genannt |
 | `notes_search` | read | Notizen nach Titel und Inhalt, über den Notes-Suchprovider von Nextcloud |
 | `notes_read` | read | Eine Notiz |
 | `notes_create` | create-only | Eine neue Notiz; bestehende Notizen werden nie geändert |
@@ -138,6 +141,7 @@ Satz beantwortet, nie mit einem leeren Ergebnis.
   - `search`: `unified_search`
   - `tables`: `tables_browse`, `tables_create_row`
   - `talk`: `talk_browse`, `talk_send`
+  - `tasks`: `tasks_search`, `tasks_read`, `tasks_create`
 - Ein unbekannter Name oder alle Namen auf einmal stoppen den Server beim Start mit einer
   Meldung, die die gültigen Namen auflistet.
 - Keine Zugriffskontrolle: `search`, `fetch` und `prepare_context` erreichen weiterhin die

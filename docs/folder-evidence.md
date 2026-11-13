@@ -9,6 +9,8 @@ On 2026-11-13 the tool ran through the installed app over the whole chain and ag
 folder with ACL, see [Whole chain through the installed app](#whole-chain-through-the-installed-app)
 and [Group folder with ACL, measured with the tool](#group-folder-with-acl-measured-with-the-tool)
 
+The number of tools is not held by this page; `tests/contract/test_tool_surface.py` holds it.
+
 Unit tests say what the code does with an answer. They cannot say which answer a real
 Nextcloud gives. This page records what was run against two running instances, the lower and
 the upper end of the supported version window, so the claims about the tool can be checked

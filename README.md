@@ -22,8 +22,8 @@ You bring the model, and no content leaves your server.
 
 ## What it does
 
-- 24 tools across nine app families: files, calendar, notes, Deck, contacts, Tables, Talk,
-  Mail and cloud wide search
+- 27 tools across ten app families: files, calendar, tasks, notes, Deck, contacts, Tables,
+  Talk, Mail and cloud wide search
 - OAuth 2.1 to the MCP authorization specification: dynamic client registration, PKCE S256,
   audience bound tokens, refresh rotation with reuse detection and immediate revocation.
   Claude.ai and ChatGPT are given one URL and never see a password or an app password
@@ -73,6 +73,9 @@ the live registry and fails if a name or a level disagrees with it.
 | `files_update` | conditional-update | Replaces an existing UTF-8 text file only with its previously read ETag; available only when the admin enables `NC_MCP_FILES_UPDATE` |
 | `calendar_list_events` | read | Events in an explicit time range, with an explicit time zone |
 | `calendar_create_event` | create-only | A new event; existing events are never changed |
+| `tasks_search` | read | Open tasks by default, from own and shared task lists; 25 per page |
+| `tasks_read` | read | One task with its description (capped) and its direct subtasks |
+| `tasks_create` | create-only | A new task; without list only when there is exactly one own list, never into a shared list unless it is named |
 | `notes_search` | read | Notes by title and content, via the Nextcloud notes search provider |
 | `notes_read` | read | One note |
 | `notes_create` | create-only | A new note; existing notes are never changed |
@@ -127,6 +130,7 @@ missing app is answered in one sentence, never with an empty result.
   - `search`: `unified_search`
   - `tables`: `tables_browse`, `tables_create_row`
   - `talk`: `talk_browse`, `talk_send`
+  - `tasks`: `tasks_search`, `tasks_read`, `tasks_create`
 - An unknown name, or every name at once, stops the server at start with a message that
   lists the valid names.
 - Not an access control: `search`, `fetch` and `prepare_context` still reach the content

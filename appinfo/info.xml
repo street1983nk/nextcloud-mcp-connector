@@ -570,7 +570,7 @@ Prérequis :
 			<variable>
 				<name>NC_MCP_DISABLED_TOOLS</name>
 				<display-name>Tool bundles to switch off</display-name>
-				<description>Comma separated tool bundle names, for example mail,calendar. Unset means every bundle is on. Valid names: calendar, chatgpt, contacts, context, deck, files, mail, notes, search, tables, talk. The tools of a named bundle are not offered to assistants, which helps smaller models that confuse similar tools of a second server. An unknown name, or every name at once, stops the app at start. This is not an access control: search, fetch and prepare_context still reach the content of a switched off bundle; use Nextcloud permissions, the kein-ki tag or NC_MCP_FILES_ROOT for that. The value is read when the app starts.</description>			</variable>
+				<description>Comma separated tool bundle names, for example mail,calendar. Unset means every bundle is on. Valid names: calendar, chatgpt, contacts, context, deck, files, mail, notes, search, tables, talk, tasks. The tools of a named bundle are not offered to assistants, which helps smaller models that confuse similar tools of a second server. An unknown name, or every name at once, stops the app at start. This is not an access control: search, fetch and prepare_context still reach the content of a switched off bundle; use Nextcloud permissions, the kein-ki tag or NC_MCP_FILES_ROOT for that. The value is read when the app starts.</description>			</variable>
 			<variable>
 				<name>NC_MCP_AUDIT_LOG</name>
 				<display-name>Keep a record of tool calls</display-name>

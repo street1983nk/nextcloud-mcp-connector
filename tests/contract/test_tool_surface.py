@@ -35,7 +35,7 @@ from mcp_connector.tools import mail as mail_tools
 README = Path(__file__).resolve().parents[2] / "README.md"
 DOCS = Path(__file__).resolve().parents[2] / "docs"
 
-# The curated set (D-03 to D-09). A set comparison, not a subset check: a twenty-fifth tool
+# The curated set (D-03 to D-09). A set comparison, not a subset check: a twenty-eighth tool
 # fails this file just as loudly as a missing one. Counter proof for the reviewer: adding
 # ``@mcp.tool`` for a ``files_delete`` anywhere under ``server/reg_*.py`` turns
 # ``test_the_curated_set_is_complete_and_only_the_chatgpt_profile_has_a_schema`` and
@@ -66,12 +66,16 @@ EXPECTED_TOOLS = {
     "mail_browse",
     "search",
     "fetch",
+    "tasks_search",
+    "tasks_read",
+    "tasks_create",
 }
 
 # The create-only paths. files_update is separately gated and uses conditional overwrite.
-# Mail adds
-# one tool and not one write path, so the number of ways this server can put something into
-# somebody's Nextcloud stays six while the number of pure reads grows to fifteen.
+# Mail added one tool and not one write path. The tasks bundle of phase 32 adds one: the
+# create-only tools are seven; EXPECTED_PUT_CALLS stays six because tasks_create writes
+# through the one generic CalDAV writer. Two different sixes stood here before, and only the
+# number of tools moved: the count of PUT call sites in the source did not.
 CREATE_TOOLS = {
     "files_upload",
     "calendar_create_event",
@@ -79,11 +83,12 @@ CREATE_TOOLS = {
     "deck_create_card",
     "tables_create_row",
     "talk_send",
+    "tasks_create",
 }
 
 # The one write that is a no-op the second time (E5, FOLD-03): the folder is there after the
 # first call, a second call with the same path answers created false and changes nothing. It
-# is a set of its own and not a seventh member of CREATE_TOOLS, because that set promises
+# is a set of its own and not a member of CREATE_TOOLS, because that set promises
 # "a second call is a second object", which would be a lie here.
 IDEMPOTENT_CREATE_TOOLS = {"files_create_folder"}
 
@@ -478,7 +483,7 @@ async def test_the_one_mail_tool_is_a_pure_read_with_an_enum_level_and_has_no_se
         f"{set(tools) & forbidden}"
     )
     assert not (CREATE_TOOLS & {name for name in tools if name.startswith("mail")}), (
-        "the Mail family contributes no write path; the six write tools are unchanged"
+        "the Mail family contributes no write path"
     )
 
 
@@ -565,12 +570,12 @@ async def test_prepare_context_is_listed_as_a_bundling_read() -> None:
 
 @pytest.mark.anyio
 async def test_the_curated_set_is_complete_and_only_the_chatgpt_profile_has_a_schema() -> None:
-    """The whole surface in one assertion: 24 tools, and the diet holds for 22 of them."""
+    """The whole surface in one assertion: 27 tools, and the diet holds for 25 of them."""
     async with Client(mcp, raise_exceptions=True) as client:
         tools = {tool.name: tool for tool in (await client.list_tools()).tools}
 
     assert set(tools) == EXPECTED_TOOLS
-    assert len(tools) == 24, "the curated set is twenty-four tools, no more and no fewer"
+    assert len(tools) == 27, "the curated set is twenty-seven tools, no more and no fewer"
 
     with_schema = {name for name, tool in tools.items() if tool.output_schema is not None}
     assert with_schema == STRUCTURED_TOOLS, (
@@ -786,18 +791,19 @@ def _check_annotations(name: str, annotations: ToolAnnotations | None) -> None:
 
 @pytest.mark.anyio
 async def test_every_tool_carries_honest_annotations() -> None:
-    """D-16 over the whole registry: six create-only tools and one idempotent create tool.
+    """D-16 over the whole registry: seven create-only tools and one idempotent create tool.
 
-    The write count is the number that did **not** move in phase 10, and the assertion below
-    says so by comparing against the frozen ``CREATE_TOOLS`` rather than against a literal:
-    Mail is a family with one tool, and that tool reads.
+    The write count did **not** move in phase 10 (Mail is a family with one tool, and that
+    tool reads) and moved by one in phase 32 (``tasks_create``). The assertion below compares
+    against the frozen ``CREATE_TOOLS`` as well as the literal, so either change is a decision
+    and not a drift.
     """
     async with Client(mcp, raise_exceptions=True) as client:
         tools = {tool.name: tool for tool in (await client.list_tools()).tools}
 
     assert set(tools) == EXPECTED_TOOLS, "the curated set is frozen (D-03 to D-09)"
     assert CREATE_TOOLS < EXPECTED_TOOLS, "every write tool must be part of the curated set"
-    assert len(CREATE_TOOLS) == 6, "the create-only paths stay six; a folder is not a seventh"
+    assert len(CREATE_TOOLS) == 7, "the create-only tools are seven; a folder is not an eighth"
     assert IDEMPOTENT_CREATE_TOOLS < EXPECTED_TOOLS, (
         "the idempotent create tool must be part of the curated set"
     )
@@ -854,7 +860,7 @@ async def test_no_input_schema_accepts_a_user_parameter() -> None:
     async with Client(mcp, raise_exceptions=True) as client:
         tools = {tool.name: tool for tool in (await client.list_tools()).tools}
 
-    assert set(tools) == EXPECTED_TOOLS, "the confused deputy check must cover all 24 schemas"
+    assert set(tools) == EXPECTED_TOOLS, "the confused deputy check must cover all 27 schemas"
 
     findings: list[str] = []
     for name, tool in sorted(tools.items()):

@@ -115,6 +115,18 @@ UNAFFECTED: dict[str, str] = {
         "Messages carry has_attachments only and the attachment list is dropped; mails are IMAP "
         "data, not Nextcloud files (tools/mail.py:459-507)."
     ),
+    "tasks_search": (
+        "Hits carry id, summary, status, times, priority, tags and the list name; ATTACH is "
+        "never read and the description stays out (tools/tasks.py:154-181, :505-520)."
+    ),
+    "tasks_read": (
+        "Answers one task and its subtasks; DESCRIPTION is capped foreign text, not a file, "
+        "and ATTACH is never read (tools/tasks.py:154-181, :603-641)."
+    ),
+    "tasks_create": (
+        "Answers id, summary, list, created, confirmed, due and start of its own task and "
+        "takes no file argument (tools/tasks.py:806-817)."
+    ),
 }
 
 # The shortest reason the freeze accepts: long enough that "n/a" or "safe" cannot pass.
