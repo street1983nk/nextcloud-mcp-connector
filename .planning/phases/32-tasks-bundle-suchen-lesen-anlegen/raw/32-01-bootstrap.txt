@@ -220,3 +220,117 @@ GESTOPPT nc-mcp-exapp volume_bleibt=ja
     von hier weder gestoppt noch wieder gestartet.
 BOOTSTRAP NC32 ergebnis=abgebrochen grund=app-unregister-verweigert-ohne-lokalen-prozess
     Geheimnisprüfung Task 5: einziger Treffer APP_ID (mcp_connector, öffentlich).
+
+== Task 5, zweiter Anlauf (Vorgabe des Orchestrators: Vorschlag 1, gedeckt durch FREIGABE option-a, kein --force) ==
+
+WIEDERHOLUNG grund=app-unregister-braucht-laufenden-lokalen-prozess
+    Der erste Anlauf oben endete mit BOOTSTRAP NC32 ergebnis=abgebrochen; der Zwischenzustand
+    war mcp_connector 9.9.9 [disabled] am alten Daemon-Eintrag. Zweiter Anlauf nur auf
+    Aufrufebene: lokaler Prozess zuerst, dann dieselben Schritte. Skript unverändert seit 201e1ad.
+RAM frei_host_gb=5.08 schwelle=4.0 ergebnis=ok (5329652, 5328876, 5327012 KiB; kein Container lief, Port 23001 frei)
+    $ docker compose -f compose.exapp.yml start        (exit=0, HP_SHARED_KEY wie oben aus nc-mcp-exapp-harp)
+RAM frei_host_gb=4.86 schwelle=4.0 ergebnis=ok (nach dem Start, 5100008, 5100840, 5097908 KiB)
+PROZESS lokal gestartet port=23001 heartbeat_vom_host=200 heartbeat_aus_nc={"status":"ok"} kommando=uv run --no-sync nc-mcp-exapp (im Worktree, PYTHONPATH=src)
+    Umgebung wie 31-05b: aus .env.exapp nur APP_ID, APP_SECRET, APP_VERSION (0.7.2, gleich
+    appinfo/info.xml, im Startskript geprüft), NC_MCP_URL, NC_MCP_PUBLIC_URL; dazu
+    NEXTCLOUD_URL gleich NC_MCP_URL, APP_PORT=23001, APP_HOST nicht gesetzt,
+    APP_PERSISTENT_STORAGE im Scratchpad außerhalb des Repos; kein HP_SHARED_KEY, kein
+    NC_MCP_APP_PASSWORD, kein NC_MCP_STATIC_BEARER. Kein Wert ausgegeben.
+    Ein erneutes Aktivieren der App war nicht nötig: das unregister lief direkt durch.
+    $ occ app_api:app:list        (vor dem zweiten Anlauf)
+    ExApps:
+    mcp_connector (MCP Connector): 9.9.9 [disabled]
+    $ occ app_api:app:unregister mcp_connector
+    ExApp mcp_connector successfully unregistered.
+    exit=0
+    $ occ app_api:daemon:unregister manual_install
+    Daemon config unregistered.
+    exit=0
+    $ occ app_api:daemon:list
+    Registered ExApp daemon configs:
+    +-----+-------------------+---------------------+----------------+----------+------------------+--------------+---------+------------------+-------------------------+
+    | Def | Name              | Display name        | Deploy ID      | Protocol | Host             | NC Url       | Is HaRP | HaRP FRP Address | HaRP Docker Socket Port |
+    +-----+-------------------+---------------------+----------------+----------+------------------+--------------+---------+------------------+-------------------------+
+    | *   | harp_proxy_docker | Harp Proxy (Docker) | docker-install | http     | appapi-harp:8780 | http://caddy | yes     | appapi-harp:8782 | 24000                   |
+    +-----+-------------------+---------------------+----------------+----------+------------------+--------------+---------+------------------+-------------------------+
+    $ occ app_api:app:list
+    ExApps:
+    $ NC_EXAPP_NEXTCLOUD_IMAGE=nextcloud:32.0.15-apache bash scripts/bootstrap_exapp.sh --manual
+    exit=0. Ausgabe gefiltert: Zeilen mit secret, password, passwort, token, key oder
+    schlüssel entfernt (49 Zeilen roh, 47 nach dem Filter; entfernt wurden die Zeile zum
+    Mail-Schlagwort und "app passwords: created for alice and bob").
+    == ExApp topology bootstrap ==
+    nextcloud: installed
+    app notes: enabled
+    app deck: enabled
+    app tables: enabled
+    app mail: enabled
+    app spreed: enabled
+    user alice: exists
+    user bob: exists
+    mail account alice: exists on greenmail:3143 (id 1)
+    test mails alice: delivered 6 over greenmail:3025
+    mail sync alice: account 1 synchronised
+    calendar alice/personal: present (attempt 1)
+    addressbook alice/contacts: already there
+    calendar bob/personal: present (attempt 1)
+    files home alice: initialised
+    files home bob: initialised
+    share folder /mcp-share-13f988b027: already there
+    file alice/mcp-share-13f988b027/mcp-shared-file-13f988b027.md: already there
+    file alice/mcp-private-13f988b027.md: already there
+    share auto accept: on (test instance)
+    read-only share /mcp-share-13f988b027 to bob: present (attempt 1)
+    talk conversation MCP-Talk-offen-Grüße-aus-Hamburg: exists (f7rgfwke)
+    talk conversation MCP-Talk-offen-Grüße-aus-Hamburg: readonly=0
+    talk conversation MCP-Talk-nurlesen-Straße-ohne-Ausgang: exists (fj9zjzp7)
+    talk conversation MCP-Talk-nurlesen-Straße-ohne-Ausgang: readonly=1
+    bruteforce protection: disabled (test instance)
+    rate limit protection: disabled (test instance)
+    app app_api: enabled
+    daemon harp_proxy_docker: exists
+    daemon manual_install: registered
+    exapp mcp_connector: registered against the local process on port 23001
+    wrote .env.exapp
+    
+    == verification ==
+    Registered ExApp daemon configs:
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    | Def | Name              | Display name        | Deploy ID      | Protocol | Host                 | NC Url       | Is HaRP | HaRP FRP Address | HaRP Docker Socket Port |
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    | *   | harp_proxy_docker | Harp Proxy (Docker) | docker-install | http     | appapi-harp:8780     | http://caddy | yes     | appapi-harp:8782 | 24000                   |
+    |     | manual_install    | Manual Install      | manual-install | http     | host.docker.internal | http://caddy | no      | (none)           | (none)                  |
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    ExApps:
+    mcp_connector (MCP Connector): 0.7.2 [enabled]
+    
+    Ready. The app answers under:
+      http://127.0.0.1:8081/exapps/mcp_connector/mcp
+    Anfragen von AppAPI an den lokalen Prozess (Zugriffslog, je eine Zeile davon vom Host
+    und aus dem Container durch die eigene Prüfung oben):
+      4 GET /heartbeat 200, 1 POST /init 200, 1 PUT /enabled?enabled=1 200
+    Der Daemon wurde vom Skript angelegt ("daemon manual_install: registered"), Host ohne
+    Port; die Registrierung mit --wait-finish lief über den Heartbeat
+    http://host.docker.internal:23001 ohne Handeingriff.
+    App-Passwörter: occ user:auth-tokens:list alice zeigt den neuen Eintrag mit dem
+    Standardnamen "cli" (2026-11-13T11:32:26Z); auf 32 ohne --name, wie erkannt.
+NACHHER daemon_manual=host.docker.internal app_version=0.7.2 registriert=ja aktiv=ja
+ENVDATEI ignoriert=ja
+    $ git check-ignore -v .env.exapp
+    .gitignore:6:.env.exapp	.env.exapp
+    APP_SECRET übernommen aus der vorhandenen .env.exapp (app_secret im Skript), kein neues.
+    Kontrollen per Einmalprogramm über uv run --no-sync python - mit set -a && . ./.env.exapp,
+    Credentials(mode=MODE_APPAPI, user=alice, aa_version=32.0.0); gedruckt nur Status und Kennung:
+KONTROLLE a status=200 id=alice
+KONTROLLE b status=401
+KONTROLLE c status=207
+    Lokalen Prozess beendet (taskkill PID 7784), Port 23001 danach frei (curl 000).
+    $ docker compose -f compose.exapp.yml stop        (exit=0)
+GESTOPPT nc-mcp-exapp volume_bleibt=ja
+    Volumes nc-mcp-exapp_nextcloud-exapp-data und nc-mcp-exapp_registry-exapp-data vorhanden;
+    danach läuft kein Container (der fremde gameworld-Proxy wurde von der Hauptsitzung
+    auf Anweisung des Owners gestoppt, kein Befund dieses Plans).
+    Geheimnisprüfung zweiter Anlauf: kein Treffer aus APP_SECRET, den Passwort-Variablen,
+    HP_SHARED_KEY oder dem Kopfnamen; Treffer nur auf öffentliche Konfigurationswerte
+    (URLs, APP_ID, APP_VERSION, Testkonten alice/bob, Namen der Testfreigabe und Talk-Räume).
+BOOTSTRAP NC32 ergebnis=bereit
