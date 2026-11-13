@@ -20,7 +20,7 @@ from . import CREATE_ONLY, READ_ONLY, compact, graceful, mcp
 @graceful
 async def tasks_search(
     query: Annotated[
-        str | None, Field(description="Words in title, tags or list; default: all")
+        str | None, Field(description="Words in title, description or tags; default: all")
     ] = None,
     status: Annotated[
         Literal["open", "completed", "all"], Field(description="Which tasks; default: open")

@@ -44,6 +44,8 @@ are load bearing:
   before any request, a subscription or an unknown list is an unknown id (E9, K2). Its link is
   the deep link into the Tasks app for an own list and the start page of the app for a shared
   one, because the deep link of a shared list carries the account id of the sharer (D-32-15).
+  A description ``tasks_read`` had to cut is marked ``truncated``, and a time without a zone
+  is named floating in its line and in the metadata, never read as UTC (W2 of plan 32-09).
 
 **No text of an answer carries a marker this server did not write.** ``text`` is one field
 for every kind, so the truncation note of a cut file and the content of a note, a card, a
@@ -175,6 +177,10 @@ _TASK_LINES: tuple[tuple[str, str], ...] = (
     ("priority", "Priority"),
     ("completed", "Completed"),
 )
+
+#: Added to the line of a task time that carries no zone, as ``tasks_read`` marks it with
+#: ``<field>_floating``: a floating time is a wall time and never UTC (W2 of plan 32-09).
+_FLOATING_NOTE = " (floating, no time zone)"
 
 #: A file id the batch lookup may take: ASCII digits, the same rule as the DAV layer.
 #: Anything else goes the single lookup and gets the error it always got there.
@@ -540,8 +546,11 @@ async def _fetch_task(clients: NcClients, task_id: str) -> dict[str, Any]:
 
     The reader does the whole resolution (discovery, Deck refusal, unknown id), so this
     function adds nothing but the shape: one line per field, the description last, the link
-    and four metadata values. No URI of a list reaches the answer: the reader never hands one
-    out, and the deep link is built only from the key of an own list, which is its URI.
+    and four metadata values. Two marks of the reader travel along (W2 of plan 32-09): a cut
+    description sets ``truncated``, and a time without a zone carries
+    ``(floating, no time zone)`` on its line and ``<field>_floating`` in the metadata. No
+    URI of a list reaches the answer: the reader never hands one out, and the deep link is
+    built only from the key of an own list, which is its URI.
     """
     task = await tasks_tools.read_task(clients, task_id=task_id)
     _, (list_key, object_name) = ids.parse(str(task["id"]))
@@ -553,7 +562,8 @@ async def _fetch_task(clients: NcClients, task_id: str) -> dict[str, Any]:
     lines = [summary or _NO_TASK_SUMMARY]
     for field, label in _TASK_LINES:
         if task.get(field) not in (None, ""):
-            lines.append(f"{label}: {task[field]}")
+            note = _FLOATING_NOTE if task.get(f"{field}_floating") else ""
+            lines.append(f"{label}: {task[field]}{note}")
     if task.get("tags"):
         lines.append(f"Tags: {', '.join(str(tag) for tag in task['tags'])}")
     lines.append(f"List: {list_name}")
@@ -567,17 +577,24 @@ async def _fetch_task(clients: NcClients, task_id: str) -> dict[str, Any]:
     else:
         url = f"{base}calendars/{quote(list_key, safe='')}/tasks/{quote(object_name, safe='')}"
 
+    metadata = {
+        "kind": "task",
+        "list": list_name,
+        "shared": "true" if shared else "false",
+        "status": str(task.get("status") or ""),
+    }
+    if task.get("description_truncated"):
+        metadata["truncated"] = "true"
+    for field, _ in _TASK_LINES:
+        if task.get(f"{field}_floating"):
+            metadata[f"{field}_floating"] = "true"
+
     return {
         "id": str(task["id"]),
         "title": summary or _NO_TASK_SUMMARY,
         "text": marks.without_marks("\n".join(lines)),
         "url": url,
-        "metadata": {
-            "kind": "task",
-            "list": list_name,
-            "shared": "true" if shared else "false",
-            "status": str(task.get("status") or ""),
-        },
+        "metadata": metadata,
     }
 
 
