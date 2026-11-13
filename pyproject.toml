@@ -63,8 +63,9 @@ markers = [
 # The integration directory carries one module that is not a test file,
 # `topology.py`, and the importlib mode above does not put a test's own directory on
 # the import path. This entry does, and only for that directory: the files there import
-# `topology` and nothing else of each other. tests/unit carries exactly one module that is
-# not a test file as well, `guard_routes.py`, the mock helpers of the kein-ki guard.
+# `topology` and nothing else of each other. tests/unit carries two modules that are not
+# test files: `guard_routes.py`, the mock helpers of the kein-ki guard, and `task_store.py`,
+# the mocked task list with ETags of the chain and the modifying task tools (phase 33).
 # tests/integration also carries `canary_world.py`, the harness of phase 28, next to
 # `topology.py`. tests/contract carries the data modules `tool_classes.py` and
 # `result_shapes.py`, which the canary and the pair tests import.
