@@ -75,8 +75,16 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
     suite must stay green without Docker. ``addopts`` already deselects the
     ``integration`` marker; this guard additionally turns an explicit
     ``-m integration`` run without ``NC_MCP_URL`` into skips instead of failures.
+
+    Not under ``NC_MCP_REQUIRE_LIVE=1`` (W3 of phase 31, plan 32-05b): a CI step that sets
+    it demands a live run, and a missing ``NC_MCP_URL`` there is a broken topology. The
+    tests then reach their own ``skip_or_fail`` and fail with the variable named, instead of
+    turning into green skips here. The name is spelled out because this module imports
+    nothing from the test helpers either.
     """
     if os.environ.get("NC_MCP_URL"):
+        return
+    if (os.environ.get("NC_MCP_REQUIRE_LIVE") or "").strip() == "1":
         return
     skip_integration = pytest.mark.skip(
         reason="NC_MCP_URL is not set: no test Nextcloud available (Docker engine off)"
