@@ -397,3 +397,11 @@ move_todo
 # the first plan that calls it. inspect is not listed: apply calls it.
 apply
 verify
+
+# --- The chain of descendants of the tasks bundle, plan 33-05 -------------------------------
+# Temporary: the chain lands before the tools that walk it; used by tasks_complete (33-06),
+# tasks_update for its descendant test (33-07) and tasks_move (33-08). Each name leaves this
+# list with the first plan that calls it.
+chain_entries
+descendants_post_order
+check_chain

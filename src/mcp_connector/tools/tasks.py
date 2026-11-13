@@ -37,7 +37,7 @@ from ..errors import REASON_GUARD_TRIPPED, REASON_UNKNOWN_ID, ToolError
 from ..nextcloud import NcClients
 from ..nextcloud.clients import caldav
 from ..nextcloud.clients import tasks as tasks_client
-from . import calendar, marks
+from . import calendar, ics_edit, marks
 
 #: One page of ``tasks_search`` (D-32-08). Fixed on purpose: no ``limit`` parameter, which
 #: saves schema bytes in every tool listing.
@@ -68,6 +68,15 @@ SEARCH_CAP_NOTE = f"result window capped at {MAX_RESULTS} tasks; narrow with que
 
 #: Cap of the subtask list of ``tasks_read``; above it the answer names the total.
 MAX_SUBTASKS = 50
+
+#: Most descendants (children, grandchildren, ...) one call changes along with the named
+#: task; above it the call is refused before the first write (D-33-10). Plan 33-01c measured
+#: whole chains of 50 on Nextcloud 35 and 32, PUT and relocation, depth 1 and 3: at most
+#: 3.688 s, budget 8 s against the limit of 30 s, so the value of D-33-10 stays.
+#: MESSWERT chain_cap=50 regel=derive_budget(max_gesamt_s)<=30 budget_s=8 quelle=nc35+nc32
+#: (D-33-10 bestätigt)
+#: (plan 33-01c, 2026-11-13, raw/33-01-messung.txt, regel derive_budget(max)<=30 s)
+CHAIN_CAP = 50
 
 #: Cap of the description of ``tasks_read`` in UTF-8 bytes, the cut is a field beside the
 #: text (pattern of the mail preview).
@@ -1100,3 +1109,104 @@ async def _confirm(
         return False
     todo = _read_todo(stored.ics)
     return todo is not None and todo["uid"] == uid
+
+
+# --- The chain of descendants (plan 33-05) -------------------------------------------------
+# Shared by completing and relocating a task with its subtasks (D-33-00b, D-33-00c, D-33-09):
+# one REPORT of the whole list, the descendants in post-order, a check before the first
+# write, then one write after the other, the named task last.
+
+
+def chain_entries(
+    task_list: tasks_client.TaskList, objects: list[tasks_client.TodoObject]
+) -> tuple[list[dict[str, Any]], int]:
+    """Every readable object of one list with what a chain needs, and the number skipped.
+
+    Each entry holds the fields of :func:`_read_todo` plus ``id``, ``object_name``, ``etag``
+    (as the server sent it in the same REPORT) and ``text`` (the stored iCalendar). An
+    object that cannot be read or addressed is skipped and counted, like in tasks_search.
+    """
+    entries: list[dict[str, Any]] = []
+    skipped = 0
+    for item in objects:
+        parsed, missed = _parse_objects(task_list, [item])
+        skipped += missed
+        if not parsed:
+            continue
+        entry = parsed[0]
+        entries.append(entry)
+        entry["object_name"] = item.object_name
+        entry["etag"] = item.etag
+        entry["text"] = item.ics.decode("utf-8", errors="replace")
+    return entries, skipped
+
+
+def descendants_post_order(root_uid: str, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Children, grandchildren, ... of the task with ``root_uid``, each exactly once.
+
+    An edge counts only with a ``RELATED-TO`` equal to the UID whose ``RELTYPE`` is missing
+    or ``PARENT`` (``_parents``); never "contains", never ``CHILD`` or ``SIBLING``. Depth
+    first in post-order, so every task comes after its whole subtree and the named task,
+    which is not in the result, can safely go last; siblings in the stable order of their
+    object names. A visited set keeps foreign cycles (also through the named task) and
+    double edges from repeating anything. Iterative, so depth costs no recursion.
+    """
+    children: dict[str, list[dict[str, Any]]] = {}
+    for entry in entries:
+        for parent in entry["parents"]:
+            children.setdefault(parent, []).append(entry)
+    for kids in children.values():
+        kids.sort(key=lambda entry: entry["object_name"])
+
+    order: list[dict[str, Any]] = []
+    seen = {root_uid}
+    stack: list[tuple[dict[str, Any] | None, Any]] = [(None, iter(children.get(root_uid, [])))]
+    while stack:
+        current, pending = stack[-1]
+        for kid in pending:
+            key = kid["uid"] or kid["id"]
+            if key in seen:
+                continue
+            seen.add(key)
+            stack.append((kid, iter(children.get(kid["uid"], []) if kid["uid"] else [])))
+            break
+        else:
+            stack.pop()
+            if current is not None:
+                order.append(current)
+    return order
+
+
+def check_chain(task_list: tasks_client.TaskList, descendants: list[dict[str, Any]]) -> None:
+    """Refuse a chain before its first write, on data already read (D-33-10, D-33-11).
+
+    Refused: a read only list (descendants live in the list of the named task and share its
+    permission), more than :data:`CHAIN_CAP` descendants, and a descendant that is
+    recurring, holds several VTODO or cannot be edited safely. So the frequent cases never
+    leave half a chain behind. Never sends a request.
+    """
+    if not task_list.writable:
+        raise _refused(
+            f"The task list {_list_name(task_list)} is read only.",
+            "Ask the owner of that task list for write permission in Nextcloud.",
+        )
+    if len(descendants) > CHAIN_CAP:
+        raise _refused(
+            f"The task has {len(descendants)} subtasks including their own subtasks; one call "
+            f"changes at most {CHAIN_CAP}.",
+            "Change some of the subtasks first, each with its own call, then try again.",
+        )
+    for entry in descendants:
+        try:
+            facts = ics_edit.inspect(entry["text"])
+        except ics_edit.EditRefused as exc:
+            raise _refused(
+                f"The subtask {entry['id']} cannot be changed safely: {exc}.",
+                "Nothing was changed. Fix that subtask in the Nextcloud Tasks app first.",
+            ) from None
+        if facts.recurring or entry.get("recurring"):
+            raise _refused(
+                f"The subtask {entry['id']} is a recurring task; this server does not change "
+                "recurring tasks.",
+                "Nothing was changed. Detach that subtask in the Nextcloud Tasks app first.",
+            )
