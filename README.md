@@ -75,7 +75,7 @@ the live registry and fails if a name or a level disagrees with it.
 | `calendar_create_event` | create-only | A new event; existing events are never changed |
 | `tasks_search` | read | Open tasks by default, from own and shared task lists; 25 per page |
 | `tasks_read` | read | One task with its description (capped) and its direct subtasks |
-| `tasks_create` | create-only | A new task; without list only when there is exactly one own list, never into a shared list unless it is named |
+| `tasks_create` | create-only | A new task; without list only when there is exactly one own list and nobody else can see it, never into a list others can see unless it is named |
 | `notes_search` | read | Notes by title and content, via the Nextcloud notes search provider |
 | `notes_read` | read | One note |
 | `notes_create` | create-only | A new note; existing notes are never changed |

@@ -40,14 +40,23 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
   Aufgaben; `status` nimmt open, completed oder all; 25 Treffer je Seite.
 - Eine geteilte Liste erscheint ohne Namen und ohne Kennung der Person, die sie geteilt hat.
 - `tasks_read` liefert eine Aufgabe mit ihren direkten Unteraufgaben.
-- `tasks_create` legt nur an: ohne `list` nur, wenn es genau eine eigene Liste gibt, nie
-  still in eine geteilte Liste und nie in einen Deck-Kalender.
+- `tasks_create` legt nur an: ohne `list` nur, wenn es genau eine eigene Liste gibt und
+  niemand sonst sie sieht, nie in eine Liste, die andere sehen, außer sie wird genannt
+  (eine mit dem Konto geteilte Liste oder eine eigene, die an andere geteilt oder per Link
+  veröffentlicht ist), und nie in einen Deck-Kalender.
 - Eine Fälligkeit ohne Uhrzeit bleibt auf genau diesem Tag.
 - `fetch` liest `task:`-IDs, und ein Treffer des Nextcloud-Suchproviders `tasks` führt
   auf dieselbe ID; für eine Aufgabe aus einer geteilten Liste verlinkt `fetch` nur die
-  Startseite der Tasks-App.
+  Startseite der Tasks-App. Wie `tasks_read` kennzeichnet `fetch` eine gekürzte
+  Beschreibung und eine Zeit ohne Zeitzone.
 - Gemessen auf Nextcloud 32 und 35 unter AppAPI-Impersonation, siehe
   `docs/tasks-evidence.md`.
+
+### Behoben
+
+- `unified_search` und `search` zeigen bei einem Treffer des Nextcloud-Suchproviders
+  `tasks` aus einer geteilten Aufgabenliste den Namen der Person, die sie geteilt hat,
+  nicht mehr; wo er sich nicht sicher entfernen lässt, fehlt die Zeile.
 
 ## [0.7.2] - 2026-11-06
 

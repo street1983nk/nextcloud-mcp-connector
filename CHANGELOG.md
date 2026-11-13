@@ -37,14 +37,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   takes open, completed or all; 25 hits per page.
 - A shared list is shown without the name or the id of the person who shared it.
 - `tasks_read` returns one task with its direct subtasks.
-- `tasks_create` is create-only: without `list` only when there is exactly one own list,
-  never silently into a shared list and never into a Deck calendar.
+- `tasks_create` is create-only: without `list` only when there is exactly one own list
+  and nobody else can see it, never into a list others can see unless it is named (a list
+  shared with the account, or an own list shared with others or published by link), and
+  never into a Deck calendar.
 - A due date without a time stays on exactly that day.
 - `fetch` reads `task:` ids, and a hit of the Nextcloud search provider `tasks` resolves
   to the same id; for a task from a shared list, `fetch` links only the start page of the
-  Tasks app.
+  Tasks app. Like `tasks_read`, `fetch` marks a cut description and a time without a zone.
 - Measured on Nextcloud 32 and 35 under AppAPI impersonation, see
   `docs/tasks-evidence.md`.
+
+### Fixed
+
+- `unified_search` and `search` no longer show the name of the person who shared a task
+  list in a hit of the Nextcloud search provider `tasks` from that list; where the name
+  cannot be removed safely, the line is left out.
 
 ## [0.7.2] - 2026-11-06
 

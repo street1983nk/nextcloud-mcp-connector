@@ -8,7 +8,9 @@ PostgreSQL) and under AppAPI impersonation on Nextcloud 35.0.0 and Nextcloud 32.
 value below is derived from these runs. Plan 32-07 then ran the built bundle live on both
 standing instances, each without and with the Tasks app 0.18.1, and on Nextcloud 35 over the
 whole chain through the installed app. Plan 32-08 added the owner acceptance of the task view in
-the Tasks app and one CI run of both cases.
+the Tasks app and one CI run of both cases. Plan 32-09 measured how an own list the account
+shares itself and the provider subline of a shared list look, and proved the gap closure live
+on both standing instances.
 
 Unit tests say what the code does with an answer. They cannot say which answer a real
 Nextcloud gives, how long it takes, or whether an assumption of the research holds. This page
@@ -32,6 +34,10 @@ rather than believed. Every quoted line is copied from the raw protocol:
   [raw/32-08-abnahme.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-08-abnahme.txt)
 - the CI run of plan 32-08:
   [raw/32-08-ci.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-08-ci.txt)
+- the measurement and the live runs of plan 32-09 (gap closure):
+  [raw/32-09-messung.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-09-messung.txt),
+  [raw/32-09-nc35.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-09-nc35.txt),
+  [raw/32-09-nc32.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-09-nc32.txt)
 
 The number of tools is not held by this page; `tests/contract/test_tool_surface.py` holds it.
 
@@ -160,6 +166,64 @@ carries the account id of the owner in the path (here replaced), which is why `f
 task in a shared list only to the start page of the app (D-32-15). Special characters in list
 and object name come back unencoded and still resolve with `provider_link_parts`.
 
+### Lists the account shares itself (D-32-18)
+
+Plan 32-09, before the build, on Nextcloud 35 and 32, each with the app password and under
+impersonation: one own task list, first private, then shared with the second test account read
+only and read write, then published by link, then withdrawn. Four candidate properties were
+asked for; the lines carry the state of the propstat and a count, never a name or an href.
+Raw protocol:
+[raw/32-09-messung.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-09-messung.txt).
+
+```
+HINAUS nc35 zustand=privat auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc35 zustand=an-bob-ro auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc35 zustand=an-bob-rw auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc35 zustand=veroeffentlicht auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc35 zustand=veroeffentlicht auth=appapi prop={http://calendarserver.org/ns/}publish-url status=2xx belegt=ja eintraege=1
+HINAUS nc35 zustand=zurueckgenommen auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc35 zustand=hineingeteilt auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc32 zustand=privat auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc32 zustand=an-bob-ro auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc32 zustand=an-bob-rw auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc32 zustand=veroeffentlicht auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=ja eintraege=1
+HINAUS nc32 zustand=veroeffentlicht auth=appapi prop={http://calendarserver.org/ns/}publish-url status=2xx belegt=ja eintraege=1
+HINAUS nc32 zustand=zurueckgenommen auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+HINAUS nc32 zustand=hineingeteilt auth=appapi prop={http://owncloud.org/ns}invite status=2xx belegt=nein eintraege=0
+```
+
+The same values stand under the app password. `cs:invite` and `DAV:share-access` answered 404
+in every state on both instances. The decisions:
+
+```
+ENTSCHEID erkennung_hinaus={http://owncloud.org/ns}invite (Begründung: auf nc35 und nc32, unter App-Passwort und Impersonation gleich, steht oc:invite in einem 2xx-propstat; leer mit eintraege=0 bei privat und zurueckgenommen, belegt mit eintraege=1 bei an-bob-ro und an-bob-rw; cs:invite und DAV:share-access tragen nicht, sie antworten immer 404; auf der hineingeteilten Liste ist oc:invite leer, die Regel gilt ohnehin nur für eigene Listen)
+ENTSCHEID erkennung_link={http://owncloud.org/ns}invite (Begründung: veroeffentlicht ist auf beiden Instanzen und unter beiden Anmeldearten in oc:invite belegt; cs:publish-url ist dort zusätzlich belegt und sonst 404, sie wird als zweites Merkmal mitgefragt: belegt eines von beiden, gilt die Liste als hinausgeteilt)
+ENTSCHEID punkt6=unlesbar-gilt-als-hinausgeteilt (Begründung: eine nicht geteilte eigene Liste meldet oc:invite auf 32 und 35 lesbar im 2xx-propstat; fehlt die Eigenschaft dort, gilt eine eigene Liste als hinausgeteilt)
+```
+
+A published list shows one entry in `oc:invite` even after the share with the second account
+was withdrawn: Nextcloud keeps the public link as an entry there. The entries are only counted
+by the bundle, never kept.
+
+### Subline of the provider for shared lists (D-32-17)
+
+The same run, with the Tasks app 0.18.1: one task with a due date in an own list and one in a
+list the second test account shares with the first; the search provider `tasks` asked with
+the app password of the first account.
+
+```
+SUBLINE nc35 liste=eigen endet_mit_rohname=ja enthaelt_besitzer=nein bereinigt_moeglich=nein enthaelt_kennung=nein leer=nein owner_displayname_gleich_anzeigename=ja
+SUBLINE nc35 liste=geteilt endet_mit_rohname=ja enthaelt_besitzer=ja bereinigt_moeglich=ja enthaelt_kennung=ja leer=nein owner_displayname_gleich_anzeigename=ja
+SUBLINE nc32 liste=eigen endet_mit_rohname=nein enthaelt_besitzer=nein bereinigt_moeglich=nein enthaelt_kennung=nein leer=nein owner_displayname_gleich_anzeigename=ja
+SUBLINE nc32 liste=geteilt endet_mit_rohname=nein enthaelt_besitzer=nein bereinigt_moeglich=nein enthaelt_kennung=nein leer=nein owner_displayname_gleich_anzeigename=ja
+ENTSCHEID sublineregel=ersetzen (Begründung: auf nc35 endet die subline der geteilten Liste mit dem Rohnamen samt Besitzerzusatz, der Zusatz passt zu owner-displayname und ist nach dem Ersetzen weg; auf nc32 endet die subline nicht mit dem Rohnamen und enthält den Besitzer nicht, sie bleibt nach der Regel wie geliefert; die eigene Liste enthält auf beiden keinen Besitzer. Die Form entspricht der Regel der Planung, kein Anhalten nötig)
+```
+
+The display name of the second test account equals its account id on both instances, so on
+Nextcloud 35 the raw subline also carries the id; after the replacement both are gone. The
+live run found one more form on Nextcloud 35, see
+[Gap closure 32-09](#gap-closure-32-09-on-nextcloud-35-and-32).
+
 ## Not measured
 
 - Nextcloud 33 and 34: only through the source, as in the spike of phase 30.
@@ -170,6 +234,10 @@ and object name come back unencoded and still resolve with `provider_link_parts`
   Nextcloud 32.
 - The time budgets come from loopback requests on one host; a real network adds latency, which
   the floor of 1 s absorbs as stated in the lines above.
+- Lists the account shares itself (plan 32-09): a share with a group was not measured, it was
+  not part of the owner release (`HINAUS ... zustand=gruppe entfaellt`), so whether a group
+  share shows in `oc:invite` is open. The subline was measured with a due date only; the form
+  without one came up in the live run.
 
 ## Nextcloud 35 without the Tasks app
 
@@ -476,6 +544,79 @@ No answer contradicted TASK-01 to TASK-07 or TASK-09; no product code was change
 - **A connection survives the image switch.** The OAuth connection made against the old image
   answered `tools/list` with 27 tools after the switch, without a new sign in.
 
+## Gap closure 32-09 on Nextcloud 35 and 32
+
+Plan 32-09 closed the warnings of the first verification of phase 32. Two of them changed
+behaviour and were proven live, at function level under AppAPI impersonation, with
+`tests/integration/test_tasks_live.py` on Nextcloud 35.0.0 and 32.0.15, each without and with
+the Tasks app 0.18.1, one instance at a time, a baseline before and after for every account:
+
+- **D-32-17:** `unified_search` and `search` give a hit of the provider `tasks` from a shared
+  list without the owner. The raw subline is read first with the app password (positive
+  control: on Nextcloud 35 it names the owner), then the same task through the connector.
+- **D-32-18:** an account with exactly one own task list. Private, `tasks_create` without
+  `list` writes there (positive control); shared with the second test account or published by
+  link, it refuses without a `PUT`, also for a `parent` in that list; named, it writes;
+  withdrawn, it writes again without `list`. "Nothing written" is checked with the rows of
+  `calendarobjects` read by PHP in the container.
+
+The live run found a second form of the subline on Nextcloud 35: a task without a due date
+has the bare `(<list name> (<owner>))`, with no leading space. The first run therefore dropped
+that subline (no name left the connector, but the line was lost); a unit test and a fix
+followed, and the case with a due date was added so both forms are proven. The raw protocols
+keep the earlier runs:
+[raw/32-09-nc35.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-09-nc35.txt),
+[raw/32-09-nc32.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-09-nc32.txt).
+
+Nextcloud 35 with the Tasks app:
+
+```
+AUFGABE d-32-17-geteilt nc=35.0.0.10 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207 ergebnis=ok | the provider finds the task of the rw share; roh_mit_besitzer=ja; positive control: the raw subline names the owner on 34+; subline_vorhanden=ja text_gleich=True; subline without bob; subline without the share marker; text without bob; text without the share marker; bereinigt='(p32live-ec5b284e-rw)'; the subline ends with the list name without the owner; search text equals the subline
+AUFGABE d-32-17-geteilt-faellig nc=35.0.0.10 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:500,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207 ergebnis=ok | the provider finds the task of the rw share; roh_mit_besitzer=ja; positive control: the raw subline names the owner on 34+; subline_vorhanden=ja text_gleich=True; subline without bob; subline without the share marker; text without bob; text without the share marker; bereinigt='Fällig am 04.12.2026 (p32live-ec5b284e-rw)'; the subline ends with the list name without the owner; search text equals the subline
+AUFGABE d-32-17-eigen nc=35.0.0.10 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200 ergebnis=ok | the subline is the raw one; search text equals the raw subline
+AUFGABE d-32-18-privat nc=35.0.0.10 nutzer=p32liveec5b284eaus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=0 nachher=1; raw object GET 200 with the password of the account; list {'name': 'p32live-ec5b284e-aus', 'shared': False, 'writable': True}
+AUFGABE d-32-18-geteilt nc=35.0.0.10 nutzer=p32liveec5b284eaus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-ec5b284e-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-ec5b284e-aus.'; the hook saw no PUT; calendarobjects vorher=0 nachher=0; neither the id nor the display name of bob; no share marker
+AUFGABE d-32-18-mit-list nc=35.0.0.10 nutzer=p32liveec5b284eaus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=0 nachher=1; raw object GET 200 with the password of the account; list {'name': 'p32live-ec5b284e-aus', 'shared': False, 'writable': True}
+AUFGABE d-32-18-parent nc=35.0.0.10 nutzer=p32liveec5b284eaus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message='The parent task lives in a list that is shared with others, and such a list is only written to when it is named.'; shared with others in the message; hint "To create the subtask there, name that list with list='p32live-ec5b284e-aus'."; the hook saw no PUT; calendarobjects vorher=1 nachher=1; neither the id nor the display name of bob; no share marker
+AUFGABE d-32-18-link nc=35.0.0.10 nutzer=p32liveec5b284eaus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-ec5b284e-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-ec5b284e-aus.'; the hook saw no PUT; calendarobjects vorher=1 nachher=1; neither the id nor the display name of bob; no share marker
+AUFGABE d-32-18-zurueckgenommen nc=35.0.0.10 nutzer=p32liveec5b284eaus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=1 nachher=2; raw object GET 200 with the password of the account; list {'name': 'p32live-ec5b284e-aus', 'shared': False, 'writable': True}
+AUFGABE keine-kennung nc=35.0.0.10 nutzer=alice status=keine ergebnis=ok | 35 answers scanned for the id and the display name of bob; answers kept: 35; found 0 of 2 names; no _shared_by_ in any answer
+BASELINE nc35.0.0.10 konto=p32liveec5b284eaus calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+```
+
+Nextcloud 35 without the Tasks app:
+
+```
+TASKSAPP erwartet=0 occ_app_list=keine passt=ja
+AUFGABE d-32-18-geteilt nc=35.0.0.10 nutzer=p32live3ac5b8a4aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-3ac5b8a4-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-3ac5b8a4-aus.'; the hook saw no PUT; calendarobjects vorher=0 nachher=0; neither the id nor the display name of bob; no share marker
+AUFGABE d-32-17-geteilt nc=35.0.0.10 nutzer=alice status=keine ergebnis=entfaellt | without the Tasks app the provider tasks does not exist
+21 passed in 30.24s
+```
+
+Nextcloud 32 with the Tasks app (its subline carries the due date only and no owner, so it
+passes as delivered):
+
+```
+AUFGABE d-32-17-geteilt nc=32.0.15.1 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200 ergebnis=ok | the provider finds the task of the rw share; roh_mit_besitzer=nein; subline_vorhanden=nein text_gleich=True; subline without bob; subline without the share marker; text without bob; text without the share marker; without an owner the subline is the raw one; search text equals the subline
+AUFGABE d-32-17-geteilt-faellig nc=32.0.15.1 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207 ergebnis=ok | the provider finds the task of the rw share; roh_mit_besitzer=nein; subline_vorhanden=ja text_gleich=True; subline without bob; subline without the share marker; text without bob; text without the share marker; without an owner the subline is the raw one; search text equals the subline
+AUFGABE d-32-17-eigen nc=32.0.15.1 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200 ergebnis=ok | the subline is the raw one; search text equals the raw subline
+AUFGABE d-32-18-geteilt nc=32.0.15.1 nutzer=p32live7c9842bfaus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-7c9842bf-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-7c9842bf-aus.'; the hook saw no PUT; calendarobjects vorher=0 nachher=0; neither the id nor the display name of bob; no share marker
+AUFGABE d-32-18-link nc=32.0.15.1 nutzer=p32live7c9842bfaus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-7c9842bf-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-7c9842bf-aus.'; the hook saw no PUT; calendarobjects vorher=1 nachher=1; neither the id nor the display name of bob; no share marker
+AUFGABE keine-kennung nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | 35 answers scanned for the id and the display name of bob; answers kept: 35; found 0 of 2 names; no _shared_by_ in any answer
+```
+
+Nextcloud 32 without the Tasks app:
+
+```
+TASKSAPP erwartet=0 occ_app_list=keine passt=ja
+AUFGABE d-32-18-geteilt nc=32.0.15.1 nutzer=p32livea4ff82e2aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-a4ff82e2-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-a4ff82e2-aus.'; the hook saw no PUT; calendarobjects vorher=0 nachher=0; neither the id nor the display name of bob; no share marker
+21 passed in 30.75s
+```
+
+On both instances every baseline was equal before and after, the calendar trash bin of every
+account was emptied of the run (the one entry of the test account is the object deleted after
+the positive control), the test account was deleted and the Tasks app was removed again.
+
 ## Not reproducible or not measured
 
 - Nextcloud 32 has no whole chain: the app runs there as a local process at the daemon
@@ -493,6 +634,26 @@ No answer contradicted TASK-01 to TASK-07 or TASK-09; no product code was change
   writes a second event.
 - Side finding of the research, not about this bundle: on Nextcloud 34 and 35 the search
   provider `tasks` appends the list name together with its owner to the subline of a hit of a
-  shared list. That concerns `unified_search`, which passes the subline on.
+  shared list. That concerns `unified_search`, which passes the subline on. **Settled by
+  D-32-17 in plan 32-09:** `unified_search` and `search` pass that subline on without the
+  owner, or drop it (see [Gap closure 32-09](#gap-closure-32-09-on-nextcloud-35-and-32)).
 - Whether the router of the Tasks app opens the very task behind a link needs a browser and
   was not measured.
+- The cap of 500 results (`MAX_RESULTS = 500` in `src/mcp_connector/tools/tasks.py`) was
+  measured for its cost (see [Cap of the results](#cap-of-the-results)), but no live run paged
+  up to it. That paging stops there with an honest note rests on the unit tests
+  `test_the_ceiling_stops_paging_with_an_honest_note` and
+  `test_limit_policy_constants_are_the_measured_values`.
+- `recurring` was not met live: no live task carried an `RRULE` or `RDATE`. The mark and the
+  one hit without expansion rest on the unit tests
+  `test_rrule_or_rdate_marks_the_master_as_recurring` and
+  `test_a_recurring_task_is_one_hit_without_expansion`.
+- 403 against 404 for a list that can only be read: live, the server answered a direct `PUT`
+  of the harness into the read only share with 404 on both instances, for example
+  `AUFGABE geteilt-ro-server nc=35.0.0.10 nutzer=alice status=keine ergebnis=ok | harness PUT with the app password of alice, not the connector; PUT 404; calendarobjects vorher=1 nachher=1`
+  from raw/32-07-nc35.txt. The bundle refuses before any `PUT` (`geteilt-ro-vorab`), so the
+  branch for a 403 of the server was never reached live; it rests on the unit test
+  `test_403_of_the_server_names_the_list_without_its_uri`.
+- Limits of plan 32-09: no share with a group (not released by the owner), and no whole chain
+  through the installed app; D-32-17 and D-32-18 are proven at function level under AppAPI
+  impersonation, as in plan 32-07.

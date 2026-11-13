@@ -84,7 +84,7 @@ abweicht.
 | `calendar_create_event` | create-only | Ein neuer Termin; bestehende Termine werden nie geändert |
 | `tasks_search` | read | Standardmäßig offene Aufgaben, aus eigenen und geteilten Aufgabenlisten; 25 je Seite |
 | `tasks_read` | read | Eine Aufgabe mit ihrer Beschreibung (gekürzt) und ihren direkten Unteraufgaben |
-| `tasks_create` | create-only | Eine neue Aufgabe; ohne `list` nur, wenn es genau eine eigene Liste gibt, nie in eine geteilte Liste, außer sie wird genannt |
+| `tasks_create` | create-only | Eine neue Aufgabe; ohne `list` nur, wenn es genau eine eigene Liste gibt und niemand sonst sie sieht, nie in eine Liste, die andere sehen, außer sie wird genannt |
 | `notes_search` | read | Notizen nach Titel und Inhalt, über den Notes-Suchprovider von Nextcloud |
 | `notes_read` | read | Eine Notiz |
 | `notes_create` | create-only | Eine neue Notiz; bestehende Notizen werden nie geändert |

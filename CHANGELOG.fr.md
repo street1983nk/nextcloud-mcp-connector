@@ -42,13 +42,22 @@ dans [CHANGELOG.md](CHANGELOG.md).
 - Une liste partagée apparaît sans le nom ni l'identifiant de la personne qui l'a partagée.
 - `tasks_read` renvoie une tâche avec ses sous-tâches directes.
 - `tasks_create` ne fait que créer : sans `list` seulement s'il existe exactement une liste
-  propre, jamais en silence dans une liste partagée et jamais dans un agenda Deck.
+  propre et que personne d'autre ne la voit, jamais dans une liste que d'autres voient sauf
+  si elle est nommée (une liste partagée avec le compte, ou une liste propre partagée avec
+  d'autres ou publiée par lien), et jamais dans un agenda Deck.
 - Une échéance sans heure reste exactement sur ce jour.
 - `fetch` lit les ids `task:`, et un résultat du fournisseur de recherche Nextcloud `tasks`
   mène au même id ; pour une tâche d'une liste partagée, `fetch` ne renvoie que vers la
-  page d'accueil de l'app Tasks.
+  page d'accueil de l'app Tasks. Comme `tasks_read`, `fetch` signale une description
+  tronquée et une heure sans fuseau horaire.
 - Mesuré sur Nextcloud 32 et 35 sous impersonation AppAPI, voir
   `docs/tasks-evidence.md`.
+
+### Corrigé
+
+- `unified_search` et `search` n'affichent plus le nom de la personne qui a partagé une
+  liste de tâches dans un résultat du fournisseur de recherche Nextcloud `tasks` issu de
+  cette liste ; là où ce nom ne peut pas être retiré sans risque, la ligne est omise.
 
 ## [0.7.2] - 2026-11-06
 

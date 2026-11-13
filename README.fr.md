@@ -87,7 +87,7 @@ qu'un nom ou un niveau diverge.
 | `calendar_create_event` | create-only | Un nouvel événement ; les événements existants ne sont jamais modifiés |
 | `tasks_search` | read | Par défaut les tâches ouvertes, des listes de tâches propres et partagées ; 25 par page |
 | `tasks_read` | read | Une tâche avec sa description (tronquée) et ses sous-tâches directes |
-| `tasks_create` | create-only | Une nouvelle tâche ; sans `list` seulement s'il existe exactement une liste propre, jamais dans une liste partagée sauf si elle est nommée |
+| `tasks_create` | create-only | Une nouvelle tâche ; sans `list` seulement s'il existe exactement une liste propre et que personne d'autre ne la voit, jamais dans une liste que d'autres voient sauf si elle est nommée |
 | `notes_search` | read | Des notes par titre et contenu, via le fournisseur de recherche de notes Nextcloud |
 | `notes_read` | read | Une note |
 | `notes_create` | create-only | Une nouvelle note ; les notes existantes ne sont jamais modifiées |
