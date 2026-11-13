@@ -419,6 +419,82 @@ def test_files_update_switch_reads_the_process_environment_when_no_mapping_is_gi
     assert config.files_update_enabled() is False
 
 
+# --- the switch that enables changing existing tasks (D-33-00d, D-33-01) ---------
+
+
+def test_the_tasks_update_switch_carries_the_expected_name() -> None:
+    assert config.ENV_TASKS_UPDATE == "NC_MCP_TASKS_UPDATE"
+
+
+@pytest.mark.parametrize("raw", sorted(config._TRUE_VALUES))
+def test_every_understood_on_spelling_enables_tasks_update(raw: str) -> None:
+    assert config.tasks_update_enabled({config.ENV_TASKS_UPDATE: raw}) is True
+
+
+@pytest.mark.parametrize("raw", sorted(config._FALSE_VALUES))
+def test_every_understood_off_spelling_disables_tasks_update(raw: str) -> None:
+    assert config.tasks_update_enabled({config.ENV_TASKS_UPDATE: raw}) is False
+
+
+@pytest.mark.parametrize("raw", ["ON", "True", "YES", "  on  ", "\tTRUE\n"])
+def test_tasks_update_switch_reads_on_spelling_without_regard_to_case_or_padding(
+    raw: str,
+) -> None:
+    assert config.tasks_update_enabled({config.ENV_TASKS_UPDATE: raw}) is True
+
+
+def test_without_the_tasks_update_variable_changing_tasks_is_disabled() -> None:
+    """D-33-01: the modifying task tools ship off."""
+    assert config.tasks_update_enabled({}) is False
+
+
+@pytest.mark.parametrize("blank", ["", "   ", "\t\n"])
+def test_a_blank_tasks_update_value_counts_as_disabled(blank: str) -> None:
+    assert config.tasks_update_enabled({config.ENV_TASKS_UPDATE: blank}) is False
+
+
+@pytest.mark.parametrize("raw", ["vielleicht", "maybe", "enabled", "2", "-1", "onoff"])
+def test_an_unrecognised_tasks_update_value_keeps_changing_disabled_and_says_so(
+    raw: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="mcp_connector.config"):
+        assert config.tasks_update_enabled({config.ENV_TASKS_UPDATE: raw}) is False
+
+    messages = " ".join(record.getMessage() for record in caplog.records)
+    assert config.ENV_TASKS_UPDATE in messages
+    assert raw not in messages.replace(config.ENV_TASKS_UPDATE, "")
+
+
+def test_tasks_update_switch_reads_the_process_environment_when_no_mapping_is_given(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(config.ENV_TASKS_UPDATE, config_values.SWITCH_ON)
+    assert config.tasks_update_enabled() is True
+
+    monkeypatch.setenv(config.ENV_TASKS_UPDATE, config_values.SWITCH_OFF)
+    assert config.tasks_update_enabled() is False
+
+    monkeypatch.delenv(config.ENV_TASKS_UPDATE)
+    assert config.tasks_update_enabled() is False
+
+
+@pytest.mark.parametrize(
+    ("files", "tasks"),
+    [("on", "off"), ("off", "on"), ("on", "on"), (None, "on"), ("on", None)],
+)
+def test_the_two_update_switches_never_read_each_other(
+    files: str | None, tasks: str | None
+) -> None:
+    env = {
+        name: value
+        for name, value in ((config.ENV_FILES_UPDATE, files), (config.ENV_TASKS_UPDATE, tasks))
+        if value is not None
+    }
+
+    assert config.files_update_enabled(env) is (files == "on")
+    assert config.tasks_update_enabled(env) is (tasks == "on")
+
+
 # --- the three variables of the audit log (D-09, D-14, AUDIT-03) ------------------
 
 

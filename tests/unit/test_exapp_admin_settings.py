@@ -163,6 +163,7 @@ async def test_the_eight_fields_are_the_eight_config_keys_in_order() -> None:
         "talk_send",
         "audit_log",
         "files_update",
+        "tasks_update",
     ]
     assert tuple(field["id"] for field in fields) == config_values.CONFIG_KEYS
     assert [field["type"] for field in fields] == [
@@ -171,6 +172,7 @@ async def test_the_eight_fields_are_the_eight_config_keys_in_order() -> None:
         "checkbox",
         "checkbox",
         "text",
+        "checkbox",
         "checkbox",
         "checkbox",
         "checkbox",
@@ -352,6 +354,34 @@ async def test_the_files_update_field_is_a_checkbox_that_ships_off() -> None:
     assert files_update["title"] == strings.ADMIN_FIELD_FILES_UPDATE_LABEL
     assert files_update["description"] == strings.ADMIN_FIELD_FILES_UPDATE_DESCRIPTION
     assert "sensitive" not in json.dumps(files_update).lower()
+
+
+@pytest.mark.anyio
+@respx.mock
+async def test_the_tasks_update_field_is_a_checkbox_that_ships_off() -> None:
+    """D-33-01: the switch of the modifying task tools is opt-in and ships disabled."""
+    route = respx.post(SETTINGS_URL).mock(return_value=httpx.Response(200, json={}))
+
+    await admin_settings.register_admin_form(env=ENV)
+
+    fields = json.loads(route.calls.last.request.content)["formScheme"]["fields"]
+    tasks_update = next(field for field in fields if field["id"] == "tasks_update")
+    assert tasks_update["type"] == "checkbox"
+    assert tasks_update["default"] is False
+    assert tasks_update["title"] == strings.ADMIN_FIELD_TASKS_UPDATE_LABEL
+    assert tasks_update["description"] == strings.ADMIN_FIELD_TASKS_UPDATE_DESCRIPTION
+    assert "sensitive" not in json.dumps(tasks_update).lower()
+
+
+def test_the_tasks_update_texts_are_the_ones_of_the_plan() -> None:
+    """D-33-01 fixes the English wording; the German and French ones go into the READMEs."""
+    assert strings.ADMIN_FIELD_TASKS_UPDATE_LABEL == "Allow changing existing tasks"
+    assert strings.ADMIN_FIELD_TASKS_UPDATE_DESCRIPTION == (
+        "Off by default. When on, assistants can complete, reopen, edit and move existing "
+        "tasks with tasks_complete, tasks_update and tasks_move, and only with the ETag "
+        "returned by tasks_read. A change takes effect after you disable and enable this app "
+        "again."
+    )
 
 
 @pytest.mark.anyio

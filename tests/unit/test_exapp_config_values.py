@@ -93,6 +93,7 @@ def test_the_seven_keys_are_the_field_ids_of_the_admin_form() -> None:
         "talk_send",
         "audit_log",
         "files_update",
+        "tasks_update",
     )
 
 
@@ -107,6 +108,7 @@ def test_every_key_maps_to_the_variable_the_existing_code_already_reads() -> Non
         "talk_send": config.ENV_TALK_SEND,
         "audit_log": config.ENV_AUDIT_LOG,
         "files_update": config.ENV_FILES_UPDATE,
+        "tasks_update": config.ENV_TASKS_UPDATE,
     }
     assert set(config_values.KEY_TO_ENV) == set(config_values.CONFIG_KEYS)
 
@@ -121,6 +123,12 @@ def test_the_audit_switch_is_validated_like_every_other_checkbox() -> None:
     overlay, so the deploy variable and then ``config.audit_log_enabled`` decide, and that
     last one says off."""
     assert "audit_log" in config_values.SWITCH_KEYS
+
+
+def test_the_tasks_update_switch_is_validated_like_every_other_checkbox() -> None:
+    """D-33-01: a refused value leaves the key out of the overlay, so the deploy variable and
+    then ``config.tasks_update_enabled`` decide, and that last one says off."""
+    assert "tasks_update" in config_values.SWITCH_KEYS
 
 
 def test_the_switch_spellings_are_the_ones_the_registry_understands() -> None:
@@ -160,6 +168,7 @@ async def test_one_request_asks_for_all_seven_keys() -> None:
             "talk_send",
             "audit_log",
             "files_update",
+            "tasks_update",
         ]
     }
     assert values == {"public_url": ADMIN_URL}

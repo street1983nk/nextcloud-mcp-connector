@@ -1183,6 +1183,9 @@ def deployed(
     # The same for the second key ``main`` writes back since issue #31.
     monkeypatch.setenv(config.ENV_FILES_UPDATE, "")
     monkeypatch.delenv(config.ENV_FILES_UPDATE)
+    # And the third one since phase 33 (D-33-00d).
+    monkeypatch.setenv(config.ENV_TASKS_UPDATE, "")
+    monkeypatch.delenv(config.ENV_TASKS_UPDATE)
 
     for name, value in (env or {}).items():
         monkeypatch.setenv(name, value)
@@ -1887,6 +1890,43 @@ def test_a_start_without_a_stored_files_update_switch_leaves_the_variable_alone(
     assert config.files_update_enabled() is False
 
 
+def test_a_stored_tasks_update_switch_wins_over_the_deploy_variable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, admin_config: AdminConfig
+) -> None:
+    """D-33-00d, the direction that matters for safety: an unticked box disarms the modifying
+    task tools even when the deploy environment armed them."""
+    admin_config.values["tasks_update"] = "0"
+
+    start(monkeypatch, tmp_path, env={config.ENV_TASKS_UPDATE: "on"})
+
+    assert os.environ[config.ENV_TASKS_UPDATE] == config_values.SWITCH_OFF
+    assert config.tasks_update_enabled() is False
+
+
+def test_a_stored_tasks_update_switch_of_on_reaches_the_process_environment(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, admin_config: AdminConfig
+) -> None:
+    """Deploy off, the box ticked in Nextcloud: the stored value decides."""
+    admin_config.values["tasks_update"] = "1"
+
+    start(monkeypatch, tmp_path, env={config.ENV_TASKS_UPDATE: "off"})
+
+    assert os.environ[config.ENV_TASKS_UPDATE] == config_values.SWITCH_ON
+    assert config.tasks_update_enabled() is True
+    # The other switch is not touched by this one.
+    assert config.files_update_enabled() is False
+
+
+def test_a_start_without_a_stored_tasks_update_switch_leaves_the_variable_alone(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Nothing stored and nothing deployed: no variable appears, and the tools stay off."""
+    start(monkeypatch, tmp_path)
+
+    assert config.ENV_TASKS_UPDATE not in os.environ
+    assert config.tasks_update_enabled() is False
+
+
 def test_the_entry_point_writes_exactly_the_named_keys_into_the_process_environment() -> None:
     """The exception of D-20 stays two named keys, and each keeps its reasoning.
 
@@ -1902,6 +1942,7 @@ def test_the_entry_point_writes_exactly_the_named_keys_into_the_process_environm
     assert writes == [
         "os.environ[config.ENV_TALK_SEND] =",
         "os.environ[config.ENV_FILES_UPDATE] =",
+        "os.environ[config.ENV_TASKS_UPDATE] =",
     ]
 
     lines = source.splitlines()
@@ -1918,6 +1959,7 @@ def test_the_write_happens_before_the_application_is_built() -> None:
 
     export = source.index("os.environ[config.ENV_TALK_SEND]")
     files_update = source.index("os.environ[config.ENV_FILES_UPDATE]")
+    tasks_update = source.index("os.environ[config.ENV_TASKS_UPDATE]")
     resolved = source.index("resolved, refused = _resolved_env()")
     built = source.index("build_exapp_app(resolved)")
     served = source.index("uvicorn.run(")
@@ -1926,6 +1968,9 @@ def test_the_write_happens_before_the_application_is_built() -> None:
     # Before the first build, because that build is the first import of ``.server`` and
     # therefore the moment files_update registers or not (issue #31).
     assert resolved < files_update < built
+    # The same moment for the modifying task tools (D-33-00d): ``reg_tasks`` reads the
+    # switch when ``.server`` is imported by that first build.
+    assert resolved < files_update < tasks_update < built
 
 
 @pytest.mark.anyio
