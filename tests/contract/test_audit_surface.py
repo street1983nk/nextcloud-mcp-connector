@@ -19,13 +19,25 @@ because that is the only place a registered tool still has its ``fn``; the bound
 so this is a source gate doing its job rather than a break of one.
 """
 
+from collections.abc import Mapping
 from typing import Any
 
 import pytest
 from mcp import Client
+from optional_surface import OPTIONAL_TOOLS, switched_on_surface
 
 from mcp_connector.audit.allowlist import FORBIDDEN_PARAMS, PARAM_ALLOWLIST
 from mcp_connector.server import mcp
+
+#: Optional tools that stand in no allowlist on purpose, each with its reason. The recorder
+#: gives a tool without an entry the empty set (``audit/record.py:105``), so the entry of such
+#: a call carries the tool name and no parameter name at all.
+OPTIONAL_WITHOUT_PARAMETER_RECORD: dict[str, str] = {
+    "files_update": (
+        "Phase 15 records no parameter names for files_update, and phase 33 does not change "
+        "that: its entry names the tool and the outcome only."
+    ),
+}
 
 
 def _argument_names(schema: dict[str, Any] | None) -> set[str]:
@@ -40,26 +52,75 @@ def _argument_names(schema: dict[str, Any] | None) -> set[str]:
     return set(properties) if isinstance(properties, dict) else set()
 
 
-async def _measured_surface() -> dict[str, set[str]]:
-    """Every registered tool with its argument names, taken over the wire like the gate."""
+async def _default_surface() -> dict[str, set[str]]:
+    """Every tool of the default registry with its argument names, taken over the wire."""
     async with Client(mcp, raise_exceptions=True) as client:
         tools = (await client.list_tools()).tools
     return {tool.name: _argument_names(tool.input_schema) for tool in tools}
 
 
-@pytest.mark.anyio
-async def test_every_registered_tool_has_an_allowlist_entry() -> None:
-    """A tool the allowlist never heard of would be recorded by nobody's decision."""
-    surface = await _measured_surface()
+def _measured_surface() -> dict[str, set[str]]:
+    """Every tool with every switch on (pitfall 5 of phase 33), with its argument names.
 
+    The default registry would leave an optional tool out, so an allowlist entry for it would
+    read as stale and a missing one would go unnoticed.
+    """
+    return {
+        name: _argument_names(entry["input_schema"])
+        for name, entry in switched_on_surface().items()
+    }
+
+
+def _allowlist_findings(
+    surface: Mapping[str, set[str]],
+    allowlist: Mapping[str, frozenset[str]],
+    exempt: Mapping[str, str],
+) -> list[str]:
+    """What separates the allowlist from the measured surface, in the printed form.
+
+    One function for the gate and its counter proofs, so the proof bites with these lines.
+    """
     findings = [
-        f"{name} has no allowlist entry" for name in sorted(surface) if name not in PARAM_ALLOWLIST
+        f"{name} has no allowlist entry"
+        for name in sorted(surface)
+        if name not in allowlist and name not in exempt
     ]
     findings += [
         f"{name} has an allowlist entry but is not registered"
-        for name in sorted(PARAM_ALLOWLIST)
+        for name in sorted(allowlist)
         if name not in surface
     ]
+    findings += [
+        f"{name} is exempt but is no optional tool"
+        for name in sorted(exempt)
+        if name not in OPTIONAL_TOOLS
+    ]
+    findings += [
+        f"{name} is exempt and has an allowlist entry"
+        for name in sorted(exempt)
+        if name in allowlist
+    ]
+    findings += [
+        f"{name} is exempt but is not registered" for name in sorted(exempt) if name not in surface
+    ]
+    return findings
+
+
+@pytest.mark.anyio
+async def test_the_switched_on_surface_covers_the_default_registry() -> None:
+    """The gates below read the switched-on surface; it must hold every default tool."""
+    default = await _default_surface()
+    measured = _measured_surface()
+
+    assert default.items() <= measured.items()
+    assert set(measured) - set(default) == set(OPTIONAL_TOOLS)
+
+
+def test_every_registered_tool_has_an_allowlist_entry() -> None:
+    """A tool the allowlist never heard of would be recorded by nobody's decision."""
+    findings = _allowlist_findings(
+        _measured_surface(), PARAM_ALLOWLIST, OPTIONAL_WITHOUT_PARAMETER_RECORD
+    )
 
     assert findings == [], (
         "the allowlist and the tool registry have to be the same set, or a new tool is "
@@ -67,10 +128,31 @@ async def test_every_registered_tool_has_an_allowlist_entry() -> None:
     )
 
 
-@pytest.mark.anyio
-async def test_no_allowlisted_name_is_absent_from_its_own_schema() -> None:
+def test_the_allowlist_gate_still_reports_a_stale_and_a_missing_entry() -> None:
+    """Counter proof through the same function: optional tools did not blunt the gate."""
+    surface = _measured_surface()
+    exempt = OPTIONAL_WITHOUT_PARAMETER_RECORD
+
+    planted = {**PARAM_ALLOWLIST, "tasks_probe": frozenset({"task_id"})}
+    assert _allowlist_findings(surface, planted, exempt) == [
+        "tasks_probe has an allowlist entry but is not registered"
+    ]
+
+    unlisted = {name: names for name, names in PARAM_ALLOWLIST.items() if name != "notes_read"}
+    assert _allowlist_findings(surface, unlisted, exempt) == ["notes_read has no allowlist entry"]
+
+    assert _allowlist_findings(surface, PARAM_ALLOWLIST, {}) == [
+        "files_update has no allowlist entry"
+    ]
+    assert _allowlist_findings(surface, PARAM_ALLOWLIST, {**exempt, "notes_read": "x"}) == [
+        "notes_read is exempt but is no optional tool",
+        "notes_read is exempt and has an allowlist entry",
+    ]
+
+
+def test_no_allowlisted_name_is_absent_from_its_own_schema() -> None:
     """T-18-02: a name that no longer exists points the recorder at a parameter nobody sends."""
-    surface = await _measured_surface()
+    surface = _measured_surface()
 
     findings: list[str] = []
     for name in sorted(PARAM_ALLOWLIST):
@@ -98,10 +180,9 @@ def test_no_allowlisted_name_is_on_the_block_list() -> None:
     )
 
 
-@pytest.mark.anyio
-async def test_the_block_list_names_parameters_that_really_exist() -> None:
+def test_the_block_list_names_parameters_that_really_exist() -> None:
     """A block list that matches nothing blocks nothing, and nobody would notice."""
-    surface = await _measured_surface()
+    surface = _measured_surface()
 
     matched = sorted(
         f"{name}.{parameter}"
@@ -147,6 +228,17 @@ def test_every_registered_tool_carries_the_recording_marker() -> None:
         "the marker has to come from the decorator: a function without it must not carry it, "
         "or the case above would pass for every function in this repository"
     )
+
+
+def test_every_tool_of_the_switched_on_surface_carries_the_recording_marker() -> None:
+    """The same proof for the optional tools, measured in the interpreter that registered
+    them (``optional_surface._MEASURE`` reads the marker off ``_tool_manager``)."""
+    surface = switched_on_surface()
+
+    findings = sorted(name for name, entry in surface.items() if entry["audited"] is not True)
+
+    assert findings == [], "an optional tool without @graceful: " + ", ".join(findings)
+    assert set(OPTIONAL_TOOLS) <= set(surface)
 
 
 def test_the_two_ways_to_the_tool_name_cannot_drift_apart() -> None:

@@ -11,6 +11,7 @@ import pytest
 import tool_classes
 from mcp import Client
 from mcp.types import Tool
+from optional_surface import OPTIONAL_TOOLS, switched_on_surface
 
 from mcp_connector.server import mcp
 
@@ -18,6 +19,11 @@ from mcp_connector.server import mcp
 # made it 13 / 3 / 7, and files_create_folder of FOLD-01 is the fourth writer: 13 / 4 / 7.
 # The tasks bundle of TASK-07 adds three tools that name no file: 13 / 4 / 10.
 TOTAL = 27
+
+# The same registry with every switch on: the default plus every optional tool. 28 in plan
+# 33-02 (files_update); plans 33-06 to 33-08 raise it with each tool behind
+# NC_MCP_TASKS_UPDATE.
+TOTAL_SWITCHED_ON = 28
 
 
 async def _tools() -> dict[str, Tool]:
@@ -29,12 +35,42 @@ async def _tools() -> dict[str, Tool]:
 async def test_every_registered_tool_has_exactly_one_class_and_a_reason() -> None:
     names = sorted(await _tools())
 
-    findings = tool_classes.freeze_findings(names)
+    findings = tool_classes.freeze_findings(names, switched_on=sorted(switched_on_surface()))
     assert findings == [], "\n".join(findings)
     assert len(names) == TOTAL, (
         f"{len(names)} tools; the split 13/4/10 is D-28-14 plus files_read_as_markdown "
         "plus files_create_folder plus the three tools of the tasks bundle"
     )
+
+
+@pytest.mark.anyio
+async def test_the_freeze_knows_the_switched_on_surface() -> None:
+    """An entry for an optional tool is not stale: it is registered once its switch is on."""
+    names = sorted(await _tools())
+    switched_on = sorted(switched_on_surface())
+
+    assert tool_classes.freeze_findings(names, switched_on=switched_on) == []
+    assert len(switched_on) == TOTAL_SWITCHED_ON
+    assert len(switched_on) == TOTAL + len(OPTIONAL_TOOLS)
+
+
+@pytest.mark.anyio
+async def test_an_entry_registered_nowhere_stays_stale_with_every_switch_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Counter proof: an entry for a tool that no switch registers is still reported, and an
+    entry for an optional tool is reported only when the switched-on names are left out."""
+    names = sorted(await _tools())
+    switched_on = sorted(switched_on_surface())
+    optional = sorted(OPTIONAL_TOOLS)[0]
+
+    monkeypatch.setitem(tool_classes.UNAFFECTED, "tasks_probe", "Answers nothing at all here.")
+    monkeypatch.setitem(tool_classes.UNAFFECTED, optional, "Answers its own path and an etag.")
+
+    assert tool_classes.freeze_findings(names, switched_on=switched_on) == ["stale: tasks_probe"]
+    assert tool_classes.freeze_findings(names) == [
+        f"stale: {name}" for name in sorted({"tasks_probe", optional})
+    ]
 
 
 @pytest.mark.anyio
@@ -48,7 +84,7 @@ async def test_a_probe_tool_without_entry_turns_the_freeze_red() -> None:
 
     names = set(await _tools())
     assert name not in names, "the probe leaked into the registry"
-    assert tool_classes.freeze_findings(names) == []
+    assert tool_classes.freeze_findings(names, switched_on=sorted(switched_on_surface())) == []
 
 
 @pytest.mark.anyio

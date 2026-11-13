@@ -30,6 +30,7 @@ from mcp import Client
 from mcp.types import ToolAnnotations
 from optional_surface import (
     OPTIONAL_TOOLS,
+    SWITCHES,
     annotations_of,
     surface_findings,
     switched_on_surface,
@@ -621,6 +622,34 @@ def _load_budget_gate() -> ModuleType:
     return module
 
 
+def test_the_byte_gate_measures_with_every_switch_on() -> None:
+    """Pitfall 6 of phase 33: the gate weighs the surface an administrator who ticked every box
+    gets, and keeps the default state as a control. Its switches are the ones of the gates."""
+    gate = _load_budget_gate()
+
+    assert set(gate.SWITCHES) == set(SWITCHES)
+    switched = {tool["name"] for tool in gate.measure(switched_on=True)["tools"]}
+    standard = {tool["name"] for tool in gate.measure(switched_on=False)["tools"]}
+
+    assert switched == EXPECTED_TOOLS | OPTIONAL_TOOLS.keys()
+    assert standard == EXPECTED_TOOLS
+
+
+def test_the_byte_gate_refuses_a_planted_size() -> None:
+    """Counter proof through the check the gate runs: one byte over a limit is a finding."""
+    gate = _load_budget_gate()
+    ceiling = gate.MAX_TOOL_BYTES
+    budget = gate.BUDGET_BYTES
+
+    assert gate.findings(budget, [(ceiling, "tasks_update"), (10, "files_read")]) == []
+    assert gate.findings(budget, [(ceiling + 1, "tasks_update"), (10, "files_read")]) == [
+        f"tasks_update is {ceiling + 1} bytes, above the per tool ceiling of {ceiling}"
+    ]
+    assert gate.findings(budget + 1, [(10, "files_read")]) == [
+        f"tools/list is {budget + 1} bytes and exceeds the token budget of {budget}"
+    ]
+
+
 @pytest.mark.anyio
 async def test_the_byte_gate_counts_exactly_as_many_tools_as_this_file_freezes() -> None:
     """T-11-50: a tool can be registered and frozen nowhere, and then no gate holds it.
@@ -648,7 +677,7 @@ async def test_the_byte_gate_counts_exactly_as_many_tools_as_this_file_freezes()
         f"the byte gate measures {counted} tools, {len(EXPECTED_TOOLS)} are frozen here"
     )
     assert {tool["name"] for tool in payload["tools"]} == EXPECTED_TOOLS
-    assert await gate.main() == 0, (
+    assert gate.main() == 0, (
         "the surface is over its byte budget or one tool is over the per tool ceiling; "
         "the gate prints which one"
     )
