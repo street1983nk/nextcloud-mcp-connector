@@ -282,3 +282,155 @@ def test_subline_form_refuses_when_the_owner_stays_elsewhere() -> None:
         "Bob Example: due (Team (Bob Example))", "Team (Bob Example)", "Bob Example"
     )
     assert form["bereinigt_moeglich"] is False
+
+
+# --- group shares, recurring forms and the cap (plan 32-10) ------------------------------------
+
+_OC = "http://owncloud.org/ns"
+
+
+def test_group_share_body_names_the_group_principal_and_the_write_right() -> None:
+    root = etree.fromstring(measure.group_share_body("testgroup", writable=True))
+    assert etree.QName(root).localname == "share"
+    entry = root.find(f"{{{_OC}}}set")
+    assert entry is not None
+    assert entry.findtext("{DAV:}href") == "principal:principals/groups/testgroup"
+    assert entry.find(f"{{{_OC}}}read-write") is not None
+
+
+def test_group_share_body_read_only_has_no_write_right() -> None:
+    root = etree.fromstring(measure.group_share_body("testgroup", writable=False))
+    entry = root.find(f"{{{_OC}}}set")
+    assert entry is not None
+    assert entry.find(f"{{{_OC}}}read-write") is None
+
+
+def test_group_share_body_remove_takes_the_share_back() -> None:
+    root = etree.fromstring(measure.group_share_body("testgroup", writable=False, remove=True))
+    assert root.find(f"{{{_OC}}}set") is None
+    entry = root.find(f"{{{_OC}}}remove")
+    assert entry is not None
+    assert entry.findtext("{DAV:}href") == "principal:principals/groups/testgroup"
+
+
+def _invite(inner: str) -> etree._Element:
+    return etree.fromstring(f'<oc:invite xmlns:oc="{_OC}" xmlns:d="DAV:">{inner}</oc:invite>')
+
+
+def test_invite_shape_of_a_group_entry_counts_without_returning_it() -> None:
+    shape = measure.invite_shape(
+        _invite(
+            "<oc:user><d:href>principal:principals/groups/testgroup</d:href>"
+            "<oc:common-name>testgroup</oc:common-name><oc:access><oc:read/></oc:access>"
+            "</oc:user>"
+        )
+    )
+    assert shape == measure.InviteShape(entries=1, children=("user",), kinds="groups")
+    assert "testgroup" not in repr(shape)
+
+
+def test_invite_shape_of_a_user_and_a_group() -> None:
+    shape = measure.invite_shape(
+        _invite(
+            "<oc:user><d:href>principal:principals/users/sharee</d:href></oc:user>"
+            "<oc:group><d:href>principal:principals/groups/testgroup</d:href></oc:group>"
+        )
+    )
+    assert shape.entries == 2
+    assert shape.children == ("group", "user")
+    assert shape.kinds == "groups+users"
+
+
+def test_invite_shape_of_an_empty_invite_and_of_an_unknown_principal() -> None:
+    assert measure.invite_shape(_invite("")) == measure.InviteShape(0, (), "keine")
+    other = measure.invite_shape(
+        _invite("<oc:user><d:href>principal:principals/system/public</d:href></oc:user>")
+    )
+    assert other.kinds == "andere"
+
+
+def _unfolded(text: str) -> list[str]:
+    return text.replace("\r\n ", "").split("\r\n")
+
+
+def test_recurring_todo_app_form_is_the_template_with_uid_and_summary() -> None:
+    text = measure.recurring_todo("p3210-w-1", "p3210 wieder app", "app")
+    lines = _unfolded(text)
+    assert "UID:p3210-w-1" in lines
+    assert "SUMMARY:p3210 wieder app" in lines
+    assert "RRULE:FREQ=DAILY" in lines
+    assert "DUE:20261120T130000Z" in lines
+    assert lines.count("BEGIN:VTODO") == 1
+    assert "s30 wiederkehrend" not in text
+    assert not any(line.startswith("STATUS:") for line in lines)
+
+
+def test_recurring_todo_completed_instance_is_an_override_in_the_same_object() -> None:
+    text = measure.recurring_todo("p3210-w-2", "p3210 wieder instanz", "instanz-erledigt")
+    lines = _unfolded(text)
+    assert lines.count("BEGIN:VTODO") == 2
+    assert lines.count("UID:p3210-w-2") == 2
+    assert "RECURRENCE-ID:20261121T130000Z" in lines
+    assert "STATUS:COMPLETED" in lines
+    assert "PERCENT-COMPLETE:100" in lines
+    assert any(line.startswith("COMPLETED:") for line in lines)
+    master = text.split("END:VTODO", 1)[0]
+    assert "RRULE:FREQ=DAILY" in master
+    assert "STATUS:" not in master
+    assert "COMPLETED:" not in master
+
+
+def test_recurring_todo_completed_master_carries_the_rule_and_the_status() -> None:
+    text = measure.recurring_todo("p3210-w-3", "p3210 wieder master", "master-erledigt")
+    lines = _unfolded(text)
+    assert lines.count("BEGIN:VTODO") == 1
+    assert "RRULE:FREQ=DAILY" in lines
+    assert "STATUS:COMPLETED" in lines
+    assert "PERCENT-COMPLETE:100" in lines
+    assert not any(line.startswith("RECURRENCE-ID") for line in lines)
+
+
+def test_recurring_todo_refuses_an_unknown_form() -> None:
+    with pytest.raises(ValueError, match="unknown recurring form"):
+        measure.recurring_todo("u", "s", "anders")
+
+
+def _page(ids: list[str], **extra: object) -> dict[str, object]:
+    return {"tasks": [{"id": i} for i in ids], **extra}
+
+
+def test_paging_summary_of_a_capped_walk() -> None:
+    pages = [_page([f"t{p}-{i}" for i in range(25)], truncated=True, next="c") for p in range(19)]
+    pages.append(_page([f"t19-{i}" for i in range(25)], truncated=True, note="capped"))
+    summary = measure.paging_summary(pages)
+    assert summary == measure.PagingSummary(
+        pages=20,
+        per_page=25,
+        hits=500,
+        unique=500,
+        last_note=True,
+        last_next=False,
+        degraded=False,
+    )
+
+
+def test_paging_summary_counts_duplicates_and_degraded_pages() -> None:
+    pages = [
+        _page(["a", "b"], next="c"),
+        _page(["b"], degraded=[{"list": "x", "reason": "slow"}]),
+    ]
+    summary = measure.paging_summary(pages)
+    assert summary.pages == 2
+    assert summary.per_page == 2
+    assert summary.hits == 3
+    assert summary.unique == 2
+    assert summary.last_note is False
+    assert summary.last_next is False
+    assert summary.degraded is True
+
+
+def test_paging_summary_of_no_page() -> None:
+    summary = measure.paging_summary([])
+    assert summary.pages == 0
+    assert summary.hits == 0
+    assert summary.last_note is False
