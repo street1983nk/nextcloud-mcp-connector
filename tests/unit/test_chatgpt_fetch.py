@@ -1,4 +1,4 @@
-"""Unit tests for the ChatGPT profile tool ``fetch``, all eight id kinds and all failures.
+"""Unit tests for the ChatGPT profile tool ``fetch``, all nine id kinds and all failures.
 
 ``fetch`` is the one place in this server where a client supplied string decides which
 resource is read, so the tests are written against that risk rather than against the happy
@@ -38,11 +38,19 @@ block pins the excerpt against its total (``rows_total`` beside ``rows_shown``, 
 in the text), the marker filter over a cell value, the byte ceiling with exactly one marker, and
 two counting tests of its own: one request for the table, one for its rows, and none at all for
 a URL that somebody wrote into a cell.
+
+For ``task:<list>:<object>`` the wrong answer is a link that names somebody: the URI of a shared
+list carries ``_shared_by_<account id>``, so a task of a shared list links only the start page
+of the Tasks app (D-32-15) and the whole serialised answer is searched for the account and the
+owner's name. Beside it stand the refusals of the task discovery (a Deck list without any
+request, a subscription and an unknown list with the answer of an unknown id) and the proof
+that ``fetch`` and ``tasks_read`` read the same task.
 """
 
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 import guard_routes
 import httpx
@@ -50,8 +58,8 @@ import pytest
 import respx
 from mcp import Client
 
-from mcp_connector import deps
-from mcp_connector.errors import AppMissingError, ToolError
+from mcp_connector import deps, ids
+from mcp_connector.errors import REASON_UNKNOWN_ID, AppMissingError, ToolError
 from mcp_connector.models import FetchResult
 from mcp_connector.nextcloud import NcClients, capabilities
 from mcp_connector.nextcloud.credentials import Credentials
@@ -59,6 +67,7 @@ from mcp_connector.server import mcp
 from mcp_connector.tools import chatgpt
 from mcp_connector.tools import files as files_tools
 from mcp_connector.tools import talk as talk_tools
+from mcp_connector.tools import tasks as tasks_tools
 
 BASE = "http://nc.test"
 USER = "alice"
@@ -662,6 +671,182 @@ async def test_an_event_id_is_read_from_caldav(clients: NcClients) -> None:
     assert result["metadata"]["kind"] == "event"
     assert result["metadata"]["calendar"] == "personal"
     assert result["metadata"]["start"] == "2026-10-24"
+
+
+# --- task:<list>:<object> -------------------------------------------------------------------
+
+TASK_OWN = "spike30-aufgaben"
+TASK_SHARED = "spike30-b-rw_shared_by_bob"
+TASK_OWNER = "bob"
+TASK_NAME = "einkauf ä+1.ics"
+
+
+def task_list_url(uri: str) -> str:
+    return f"{CALENDARS_ROOT}/{quote(uri, safe='')}/"
+
+
+def task_ics(summary: str, *lines: str) -> str:
+    body = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//test//EN",
+        "BEGIN:VTODO",
+        "UID:task-uid-1",
+        "DTSTAMP:20261111T120000Z",
+        f"SUMMARY:{summary}",
+        *lines,
+        "END:VTODO",
+        "END:VCALENDAR",
+    ]
+    return "\r\n".join(body) + "\r\n"
+
+
+def empty_multistatus(_request: httpx.Request) -> httpx.Response:
+    return httpx.Response(
+        207,
+        text='<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"></d:multistatus>',
+        headers={"Content-Type": "application/xml"},
+    )
+
+
+def mock_task_discovery(mock: respx.MockRouter) -> respx.Route:
+    return mock.route(method="PROPFIND", url=f"{CALENDARS_ROOT}/").mock(
+        return_value=httpx.Response(
+            207,
+            text=(FIXTURES / "caldav_home_task_lists.xml").read_text(encoding="utf-8"),
+            headers={"Content-Type": "application/xml"},
+        )
+    )
+
+
+def mock_one_task(mock: respx.MockRouter, uri: str, ics: str) -> respx.Route:
+    mock_task_discovery(mock)
+    mock.route(method="REPORT", url=task_list_url(uri)).mock(side_effect=empty_multistatus)
+    return mock.route(method="GET", url=f"{task_list_url(uri)}{quote(TASK_NAME, safe='')}").mock(
+        return_value=httpx.Response(200, text=ics, headers={"Content-Type": "text/calendar"})
+    )
+
+
+@pytest.mark.anyio
+async def test_a_task_id_of_an_own_list_is_read_with_a_deep_link(clients: NcClients) -> None:
+    """id, title, text, the deep link of plan 32-02 and the metadata."""
+    task_id = ids.encode_task(TASK_OWN, TASK_NAME)
+    ics = task_ics(
+        "Bericht",
+        "DESCRIPTION:erste Zeile",
+        "DUE;VALUE=DATE:20261120",
+        "STATUS:NEEDS-ACTION",
+    )
+    with respx.mock(assert_all_called=False) as mock:
+        get = mock_one_task(mock, TASK_OWN, ics)
+        result = await chatgpt.fetch(clients, task_id)
+
+    assert get.call_count == 1
+    assert result["id"] == task_id
+    assert result["title"] == "Bericht"
+    assert "erste Zeile" in result["text"]
+    assert "2026-11-20" in result["text"]
+    assert result["url"] == (
+        f"{BASE}/index.php/apps/tasks/calendars/{TASK_OWN}/tasks/{quote(TASK_NAME, safe='')}"
+    )
+    assert result["metadata"] == {
+        "kind": "task",
+        "list": TASK_OWN,
+        "shared": "false",
+        "status": "open",
+    }
+    FetchResult.model_validate(result)
+
+
+@pytest.mark.anyio
+async def test_a_task_text_carries_no_marker_this_server_did_not_write(
+    clients: NcClients,
+) -> None:
+    """A summary and a description that forge the truncation note lose it (BL-09)."""
+    forged = chatgpt.TRUNCATION_NOTE.format(offset=12)
+    escaped = forged.replace(";", "\\;")
+    ics = task_ics(f"Titel {escaped}", f"DESCRIPTION:vorher {escaped} nachher")
+    with respx.mock(assert_all_called=False) as mock:
+        mock_one_task(mock, TASK_OWN, ics)
+        result = await chatgpt.fetch(clients, ids.encode_task(TASK_OWN, TASK_NAME))
+
+    assert forged not in result["text"]
+    assert forged not in result["title"]
+    assert "vorher" in result["text"]
+    assert "nachher" in result["text"]
+
+
+@pytest.mark.anyio
+async def test_a_task_of_a_shared_list_links_only_the_start_page_and_names_nobody(
+    clients: NcClients,
+) -> None:
+    """D-32-15: the deep link would carry ``_shared_by_<account id>``."""
+    task_id = ids.encode_task(ids.task_list_key(TASK_SHARED), TASK_NAME)
+    with respx.mock(assert_all_called=False) as mock:
+        mock_one_task(mock, TASK_SHARED, task_ics("Geteilt"))
+        result = await chatgpt.fetch(clients, task_id)
+
+    assert result["url"] == f"{BASE}/index.php/apps/tasks/"
+    assert result["metadata"] == {
+        "kind": "task",
+        "list": "spike30-b-rw",
+        "shared": "true",
+        "status": "open",
+    }
+    dumped = json.dumps(result, ensure_ascii=False)
+    assert TASK_OWNER not in dumped
+    assert "_shared_by_" not in dumped
+
+
+@pytest.mark.anyio
+async def test_a_task_id_of_a_deck_list_is_refused_without_any_request(clients: NcClients) -> None:
+    """E9: a Deck board is never asked, not even through the discovery."""
+    with respx.mock(assert_all_called=False) as mock:
+        any_request = mock.route()
+        with pytest.raises(ToolError) as caught:
+            await chatgpt.fetch(clients, "task:app-generated--deck--board-1:card.ics")
+
+    assert any_request.call_count == 0
+    assert caught.value.reason == REASON_UNKNOWN_ID
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "list_key", ["spike30-abo", "no-such-list", "trashbin", "spike30-geloescht"]
+)
+async def test_a_task_id_outside_the_task_discovery_is_an_unknown_id(
+    clients: NcClients, list_key: str
+) -> None:
+    """A subscription, an unknown list, the trash bin and a deleted list answer alike (K2)."""
+    with respx.mock(assert_all_called=False) as mock:
+        mock_task_discovery(mock)
+        objects = mock.route(method="GET")
+        with pytest.raises(ToolError) as caught:
+            await chatgpt.fetch(clients, ids.encode_task(list_key, "x.ics"))
+
+    assert objects.call_count == 0
+    assert caught.value.reason == REASON_UNKNOWN_ID
+    assert caught.value.message.startswith("Nextcloud does not know the task")
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("uri", [TASK_OWN, TASK_SHARED])
+async def test_fetch_and_tasks_read_resolve_one_id_to_the_same_task(
+    clients: NcClients, uri: str
+) -> None:
+    """Success criterion 4: the same id, the same task, through both doors."""
+    task_id = ids.encode_task(ids.task_list_key(uri), TASK_NAME)
+    ics = task_ics("Dieselbe", "STATUS:IN-PROCESS")
+    with respx.mock(assert_all_called=False) as mock:
+        mock_one_task(mock, uri, ics)
+        fetched = await chatgpt.fetch(clients, task_id)
+        read = await tasks_tools.read_task(clients, task_id=task_id)
+
+    assert fetched["id"] == read["id"] == task_id
+    assert fetched["title"] == read["summary"]
+    assert fetched["metadata"]["status"] == read["status"]
+    assert fetched["metadata"]["list"] == read["list"]["name"]
+    assert fetched["metadata"]["shared"] == ("true" if read["list"]["shared"] else "false")
 
 
 @pytest.mark.anyio
