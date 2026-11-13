@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 #: The tools that register only with the switch on. Filled by plans 33-06 to 33-08.
-SWITCHED_TOOLS: frozenset[str] = frozenset()
+SWITCHED_TOOLS: frozenset[str] = frozenset({"tasks_complete"})
 
 #: One start of ``main`` in a fresh interpreter, the admin read and the data key answered
 #: locally and ``uvicorn.run`` replaced. It prints what the started process believes about

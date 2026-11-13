@@ -110,10 +110,11 @@ IDEMPOTENT_CREATE_TOOLS = {"files_create_folder"}
 # The tools that change an existing object in place (D-33-12): an overwrite of fields the
 # caller names, so destructive in the words of the MCP specification ("false" means "only
 # additive updates"), and idempotent, because the second identical call finds the target
-# state and changes nothing. Empty in plan 33-02; plans 33-06 to 33-08 enter tasks_complete,
-# tasks_update and tasks_move. Every member is optional, so the live registry this file
-# freezes never lists one: they are checked on the switched-on surface below.
-MODIFY_TOOLS: frozenset[str] = frozenset()
+# state and changes nothing. Empty in plan 33-02; plan 33-06 entered tasks_complete, plans
+# 33-07 and 33-08 enter tasks_update and tasks_move. Every member is optional, so the live
+# registry this file freezes never lists one: they are checked on the switched-on surface
+# below.
+MODIFY_TOOLS: frozenset[str] = frozenset({"tasks_complete"})
 
 # The documented exception to the schema diet: ChatGPT reads structured content (D-14).
 STRUCTURED_TOOLS = {"search", "fetch"}
@@ -956,6 +957,22 @@ def test_the_gate_refuses_a_planted_class_for_a_modifying_tool(
         _check_annotations("tasks_probe", planted)
 
 
+@pytest.mark.parametrize(
+    "planted",
+    [READ_ONLY, CREATE_ONLY, CREATE_IDEMPOTENT, UPDATE_EXISTING],
+    ids=["read_only", "create_only", "create_idempotent", "update_existing"],
+)
+def test_tasks_complete_with_a_planted_class_turns_the_gate_red(
+    planted: ToolAnnotations,
+) -> None:
+    """Plan 33-06: tasks_complete stands in MODIFY_TOOLS, so only MODIFY_EXISTING passes;
+    the positive control is the live class, which the switched-on gate above accepts."""
+    assert "tasks_complete" in MODIFY_TOOLS
+    _check_annotations("tasks_complete", MODIFY_EXISTING)
+    with pytest.raises(AssertionError):
+        _check_annotations("tasks_complete", planted)
+
+
 def test_the_live_class_of_files_create_folder_passes_the_gate() -> None:
     """Positive control of the counter proof below: the real class is accepted."""
     for name in sorted(IDEMPOTENT_CREATE_TOOLS):
@@ -1017,6 +1034,10 @@ async def test_no_input_schema_accepts_a_user_parameter() -> None:
     )
 
 
+#: The permission levels of the README table, one per class of tool.
+LEVELS = ("read", "create-only", "conditional-update", "modify")
+
+
 @pytest.mark.anyio
 async def test_the_readme_permission_table_matches_the_live_registry() -> None:
     """D-16: the documented permission level is generated from the same truth, or it lies."""
@@ -1028,13 +1049,14 @@ async def test_the_readme_permission_table_matches_the_live_registry() -> None:
         if not line.startswith("| `"):
             continue
         cells = [cell.strip() for cell in line.strip("|").split("|")]
-        if len(cells) < 2 or cells[1] not in ("read", "create-only", "conditional-update"):
+        if len(cells) < 2 or cells[1] not in LEVELS:
             continue
         documented[cells[0].strip("`")] = cells[1]
 
     # Derived from the one list of optional tools, so a tool of plans 33-06 to 33-08 is
-    # expected in the README the day it enters that list. Its level (``modify``) enters this
-    # table and this test with plan 33-09.
+    # expected in the README the day it enters that list, and with it its level ``modify``
+    # (plan 33-06 brought the level forward: without it the first modifying tool could not be
+    # documented at all). Plan 33-09 adds the other two READMEs to this check.
     optional_tools = set(OPTIONAL_TOOLS)
     assert set(documented) - optional_tools == set(tools), (
         "the README's always-available tools must match the default registry"
@@ -1044,6 +1066,8 @@ async def test_the_readme_permission_table_matches_the_live_registry() -> None:
         expected = (
             "conditional-update"
             if name == "files_update"
+            else "modify"
+            if name in MODIFY_TOOLS
             else "create-only"
             if name in CREATE_TOOLS or name in IDEMPOTENT_CREATE_TOOLS
             else "read"

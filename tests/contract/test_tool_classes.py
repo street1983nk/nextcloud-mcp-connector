@@ -21,9 +21,9 @@ from mcp_connector.server import mcp
 TOTAL = 27
 
 # The same registry with every switch on: the default plus every optional tool. 28 in plan
-# 33-02 (files_update); plans 33-06 to 33-08 raise it with each tool behind
-# NC_MCP_TASKS_UPDATE.
-TOTAL_SWITCHED_ON = 28
+# 33-02 (files_update), 29 since plan 33-06 (tasks_complete); plans 33-07 and 33-08 raise it
+# with each tool behind NC_MCP_TASKS_UPDATE.
+TOTAL_SWITCHED_ON = 29
 
 
 async def _tools() -> dict[str, Tool]:

@@ -127,6 +127,10 @@ UNAFFECTED: dict[str, str] = {
         "Answers id, summary, list, created, confirmed, due and start of its own task and "
         "takes no file argument (tools/tasks.py:810-821)."
     ),
+    "tasks_complete": (
+        "Answers task ids, status, the list name, counts and an ETag of its own task and takes "
+        "no file argument (tools/tasks.py:1296-1310, :1525, :1562-1572)."
+    ),
 }
 
 # The shortest reason the freeze accepts: long enough that "n/a" or "safe" cannot pass.

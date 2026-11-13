@@ -28,6 +28,7 @@ from mcp.types import ToolAnnotations
 #: Every tool that registers only behind a switch, with the variable of that switch.
 OPTIONAL_TOOLS: dict[str, str] = {
     "files_update": "NC_MCP_FILES_UPDATE",
+    "tasks_complete": "NC_MCP_TASKS_UPDATE",
 }
 
 #: The variable of the modifying task tools (D-33-01). Named here as well as through
