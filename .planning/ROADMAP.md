@@ -196,7 +196,20 @@ Plans:
   4. `tasks_read` und `fetch` lösen dieselbe `task:`-Id auf, ein Treffer des Suchproviders `tasks` führt auf diese Id; die Zeitmatrix (ganztägig, mit Zone, UTC, schwebend, ohne Datum) ist je als benannter Test grün, und Fremdtext aus einer geteilten Liste kommt gekappt und ohne Marker an
   5. Die Registry zeigt 27 Werkzeuge in zehn Familien; `EXPECTED_PUT_CALLS` steht weiter bei 6; das Budget ist nach der Hausregel aus der Messung neu verankert und kein Werkzeug liegt über 1400 Bytes; die Kanarie ruft die drei Werkzeuge auf; READMEs, `docs/` und die drei Changelogs sind nachgezogen, sodass der Stand ohne Phase 33 alle Gates besteht
 
-**Plans**: TBD
+**Plans**: 10 plans (zehn Wellen, streng nacheinander: ein Docker-Host, immer nur eine Instanz; Rahmen in 32-RULES.md)
+
+Plans:
+- [ ] 32-01-PLAN.md: Basis-Commit 32-BASE.txt, Messung `--name` und Heartbeat-URL auf 32/34/35, `scripts/bootstrap_exapp.sh` testgetrieben für Nextcloud 32, `--manual` auf 32 nach Owner-Freigabe zum unregister (TASK-03, TASK-07; D-32-13)
+- [ ] 32-02-PLAN.md: Messungen vor dem Bau (Kinderabfrage bei 2000 Aufgaben, text-match, Budgets, Namensform geteilter Listen auf 32 und 35, Erkennung der Tasks-App, Linkform), gemeinsame Owner-Freigabe für Zustandsänderungen (TASK-02 bis TASK-04; D-32-03, D-32-10, D-32-11, D-32-14)
+- [ ] 32-03-PLAN.md: Client-Schicht mit Byte-Pin der Kalenderkörper, create-only-Schreiber, `task:`-Codec mit Listenschlüssel, `clients/tasks.py` (TASK-01, TASK-03, TASK-06, TASK-07; D-32-05, D-32-06, D-32-14)
+- [ ] 32-04-PLAN.md: `tools/tasks.py` lesend, Zeitmatrix als benannte Tests, `tasks_search` und `tasks_read` mit Unteraufgaben (TASK-01 bis TASK-04; D-32-01 bis D-32-09)
+- [ ] 32-04b-PLAN.md: `tasks_create` mit E4 und D-32-16, Rücklesen, Erkennung der Tasks-App, Injektionskorpus (TASK-03, TASK-05 bis TASK-07; D-32-10, D-32-16)
+- [ ] 32-05-PLAN.md: Registrierung `reg_tasks.py`, Oberflächen-Gates mit 27 Werkzeugen, Budget neu verankert, READMEs, `info.xml`, drei CHANGELOGs (TASK-07, TASK-08)
+- [ ] 32-06-PLAN.md: TASK-09, Provider `tasks`, `fetch` über `tasks_read`, Link nur auf die Startseite bei geteilten Listen, Satz in `docs/hardening*.md` (TASK-07, TASK-09; D-32-06, D-32-15)
+- [ ] 32-05b-PLAN.md: Kanarie, Abnahmeskript, Live-Test mit Schalter, CI mit und ohne Tasks-App (TASK-01 bis TASK-03, TASK-05 bis TASK-07, TASK-09; D-32-11)
+- [ ] 32-07-PLAN.md: Live-Beweis auf Nextcloud 35 und 32, je ohne und mit Tasks-App, `docs/tasks-evidence.md` (TASK-01 bis TASK-07, TASK-09; D-32-11, D-32-12)
+- [ ] 32-08-PLAN.md: gemeinsame Abnahme in der Tasks-App per Playwright, Owner-Checkpoint zum Push, CI-Lauf beider Beine (TASK-05, TASK-07; D-32-11, D-32-13)
+
 **Abtrennbar**: TASK-09 (`task:`-Id über `fetch` und Provider) ist ein eigener Plan und nur per Owner-Entscheid verschiebbar
 
 ### Phase 33: Aufgaben ändern

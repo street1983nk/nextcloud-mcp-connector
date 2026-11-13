@@ -643,28 +643,33 @@ raw="$(occ_pw "$password" user:auth-tokens:add "$uid" --password-from-env "${tok
 | A10 | Die Datumssortierung "Datum vor Zeiten desselben Tages" entspricht der Erwartung | F3 | nur Reihenfolge; Planung legt fest und testet |
 | A11 | Byte-Größen der Werkzeuge (Prototyp 1417/906/292) | F9 | Budget und Decke; erst messbar mit der echten Registrierung (A10 der REQUIREMENTS) |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **D-32-06 und die Form geteilter Listen (Owner-Entscheid möglich)**
    - What we know: Nextcloud schreibt den Besitzernamen in den `displayname` und die Kontokennung in die URI jeder geteilten Liste (K1). Beides würde ohne Eingriff in Name und `task:`-Id stehen.
    - What's unclear: ob der Owner "Name, wie Nextcloud ihn anzeigt" als "ohne den Klammerzusatz" lesen will und ob ein pseudonymer Listenschlüssel in der Id für ihn passt.
    - Recommendation: Zusatz entfernen, Schlüssel `s<16 hex>` für geteilte Listen; beides als Entscheidung der Planung festschreiben und dem Owner in einem Satz vorlegen, weil es den Wortlaut einer Owner-Entscheidung auslegt.
+   - RESOLVED: D-32-14 (Owner 13.11.), Messung in 32-02, Umsetzung in 32-03.
 
 2. **Link in `fetch` für Aufgaben aus geteilten Listen**
    - What we know: der Deep-Link braucht `_shared_by_<uid>`.
    - Recommendation: für geteilte Listen nur die Startseite der Tasks-App verlinken; Entscheidung der Planung, im Plan TASK-09 festhalten.
+   - RESOLVED: D-32-15 (Owner 13.11.), Umsetzung in 32-06.
 
 3. **`parent` in einer geteilten Liste ohne `list`**
    - What we know: E4 erlaubt das Schreiben in geteilte Listen nur bei ausdrücklicher Nennung.
    - Recommendation: `parent` zählt nicht als Nennung; Fehler mit Ausweg `list`. Owner kann es anders wollen.
+   - RESOLVED: D-32-16 (Owner 13.11.), Umsetzung in 32-04b.
 
 4. **Wo meint TASK-07 "Bundle-Namen in `docs/hardening*.md`"?**
    - What we know: die drei Dateien enthalten heute keine Liste der Bundle-Namen (grep); die Liste steht in den READMEs und in `appinfo/info.xml:573`.
    - Recommendation: im Plan prüfen und die tatsächlichen Fundstellen nachziehen; sonst Satz im Plan, warum dort nichts zu ändern ist.
+   - RESOLVED: 32-06 Task 3 (Satz in Abschnitt 5 von docs/hardening*.md, drei Sprachen).
 
 5. **Zeitbudgets und Deckel**
    - What we know: Spike-Vorschlag 1 s je Liste als Untergrenze ohne Netzwerk und ohne Impersonation; Kalender nutzt 20 s.
    - Recommendation: Messung in Plan 32-02, Werte mit Messzeile im Code begründen (wie `check_tool_budget.py`).
+   - RESOLVED: Messung in 32-02, Werte in 32-04.
 
 ## Environment Availability
 

@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 
 ## Current Position
 
-Phase: 32 von 30 bis 34 (Tasks-Bundle suchen, lesen, anlegen), Kontext erfasst, noch nicht geplant; Phase 31 abgeschlossen und verifiziert
+Phase: 32 von 30 bis 34 (Tasks-Bundle suchen, lesen, anlegen), geplant und geprüft (10 Pläne, Plan-Check PASS nach einer Revision), Ausführung vom Owner freigegeben (2026-11-13, "Go"); Phase 31 abgeschlossen und verifiziert
 Plan: Phase 31 mit 31-01 bis 31-07 samt 31-04b und 31-05b fertig; 31-07 (Commits dccb134 bis 1ed43aa): ganze Kette über die installierte ExApp auf Nextcloud 35 und das Werkzeug gegen einen Gruppenordner mit ACL gemessen, kein Produktcode geändert; FOLD-01 bis FOLD-06 abgehakt; Verifikation passed (31-VERIFICATION.md mit Nachtrag); vor Phase 32 steht der kleine Plan für scripts/bootstrap_exapp.sh auf Nextcloud 32 (Owner 2026-11-12)
 Status: Phase 31 abgeschlossen (2026-11-13); Draft-PR 48 gegen main ist offen, CI auf 30e2134 vollständig grün; die Commits nach 30e2134 (Verifikation, 31-07, Abschluss) sind lokal und warten auf eine Push-Freigabe des Owners; auf der Testinstanz nc35 ist die ExApp jetzt 0.7.2 aus diesem Stand registriert (Rückweg im 31-07-SUMMARY.md), die Datei .env.nc35 liegt im Worktree (gitignored); offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13)
-Last activity: 2026-11-13, Diskussionsrunde zu Phase 32 mit dem Owner: 32-CONTEXT.md mit D-32-01 bis D-32-13 (Unteraufgaben, geteilte Listen, Suchtreffer, Tasks-App und Testumgebung, Live-Beweis auf 35 und 32, Reparatur von scripts/bootstrap_exapp.sh als erster Plan der Phase); als Nächstes /gsd:plan-phase 32
+Last activity: 2026-11-13, Phase 32 geplant: 32-RESEARCH.md (offene Fragen durch D-32-14 bis D-32-16 aufgelöst), 32-PATTERNS.md, 32-RULES.md (Hausregeln für alle Pläne), zehn Pläne 32-01 bis 32-08 samt 32-04b und 32-05b; Plan-Check erst 3 Blocker (unregister ohne Freigabe, roter Zwischencommit in 32-05, offene Fragen), nach Revision PASS; Owner-Checkpoints: 32-01 Task 4 (unregister auf 32), 32-02 Task 2 (gemeinsame Freigabe für Zustandsänderungen auf nc35 und 32), 32-07 Task 2 (Neuregistrierung nc35), 32-08 Task 3 (Push); als Nächstes Ausführung ab 32-01
 
 ## Performance Metrics
 
