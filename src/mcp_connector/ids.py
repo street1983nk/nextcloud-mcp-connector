@@ -23,9 +23,13 @@ Formats::
                                             provider builds #/view/<id> for views, and a
                                             view id used as a table id reads a foreign
                                             table or answers 404)
+    task:<list>:<object>                   (the key of a task list plus the object name; for
+                                            a shared list the key is neutral, see
+                                            task_list_key, and never the URI)
     url:<absolute-url>                     (honest rest category, see pitfall 10)
 """
 
+import hashlib
 import re
 
 from .errors import REASON_GUARD_TRIPPED, ToolError
@@ -39,8 +43,16 @@ SEPARATOR = ":"
 _HINT = (
     "Use an id exactly as returned by a search tool: file:<fileid>, note:<id>, "
     "card:<board>:<stack>:<card>, event:<calendar>:<object>, mail:<databaseId>, "
-    "message:<token>:<messageId>, table:<tableId> or url:<absolute-url>."
+    "message:<token>:<messageId>, table:<tableId>, task:<list>:<object> "
+    "or url:<absolute-url>."
 )
+
+#: The marker Nextcloud puts between the URI of a shared calendar or task list and the
+#: account id of the person who shared it: ``<uri>_shared_by_<account id>``.
+SHARED_BY_MARKER = "_shared_by_"
+
+#: Hex characters of the sha256 that make up the key of a shared task list.
+_SHARED_KEY_HEX = 16
 
 #: The digits a mail id may consist of, and only those. ``str.isdigit`` would accept a
 #: superscript two and an Arabic-Indic digit as well (the same reason ``tools/mail.py``
@@ -111,6 +123,32 @@ def encode_card_short(card_id: str | int) -> str:
 
 def encode_event(calendar_uri: str, object_name: str) -> str:
     return _join("event", calendar_uri, object_name)
+
+
+def task_list_key(uri: str) -> str:
+    """The key that stands for a task list in an id and in every answer (D-32-14).
+
+    An own list keeps its URI, readable like the calendar of an ``event:`` id. The URI of a
+    shared list reads ``<uri>_shared_by_<account id>`` and so names the person who shared
+    it, which no answer of the tasks bundle may do; its key is ``s`` plus the first sixteen
+    hex characters of the sha256 of the URI instead. That key is pseudonymous, not
+    anonymous: whoever guesses the URI and the account id can compute it. It stays stable
+    as long as the share exists. An own list whose URI happens to have the form ``s`` plus
+    sixteen hex characters could collide with it; the caller resolves a key against the
+    discovery, where two lists with one key are an ambiguity and an error, never a guess.
+
+    A pure function in this module and not in the client, because the codec must not import
+    the client layer and both the client and the provider map need the same key.
+    """
+    if SHARED_BY_MARKER not in uri:
+        return uri
+    digest = hashlib.sha256(uri.encode("utf-8")).hexdigest()
+    return "s" + digest[:_SHARED_KEY_HEX]
+
+
+def encode_task(list_key: str, object_name: str) -> str:
+    """One task: the key of its list (see :func:`task_list_key`) and its object name."""
+    return _join("task", list_key, object_name)
 
 
 def encode_url(url: str) -> str:
@@ -219,6 +257,15 @@ def parse(raw: str) -> tuple[str, tuple[str, ...]]:
         if len(parts) != 2:
             raise ToolError(
                 message=f"{raw!r} is not a valid event id.", hint=_HINT, reason=REASON_GUARD_TRIPPED
+            )
+    elif kind == "task":
+        # The same full split as ``event``, for the same reason: ``_join`` refuses the
+        # separator in the list key and in the object name, so a third segment is an id the
+        # encode side can never have built.
+        parts = tuple(rest.split(SEPARATOR))
+        if len(parts) != 2:
+            raise ToolError(
+                message=f"{raw!r} is not a valid task id.", hint=_HINT, reason=REASON_GUARD_TRIPPED
             )
     else:
         raise ToolError(

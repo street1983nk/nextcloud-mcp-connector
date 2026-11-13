@@ -359,3 +359,10 @@ background
 # Plan 30-05 parked nothing: every helper it added (assumption_rows, abort_rows,
 # e15_recommendation, headings_intact, has_dash and their neighbours) is called by the
 # block report-check of the same commit. No name of phase 30 is left in this list.
+
+# --- The client layer of the tasks bundle, plan 32-03 --------------------------------------
+# Temporary: the codec and the CalDAV client of the tasks bundle land before the tool layer
+# that calls them. Each name leaves this list with the plan that calls it: until reg_tasks.py
+# registers the bundle (32-05), and the tool layer of plan 32-04 is the caller.
+encode_task  # until reg_tasks.py registers the bundle (32-05)
+task_list_key  # until reg_tasks.py registers the bundle (32-05); clients/tasks.py (32-03 task 3)
