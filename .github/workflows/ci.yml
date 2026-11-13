@@ -104,6 +104,20 @@ jobs:
         run: |
           set -a && . ./.env.exapp && set +a
           uv run pytest tests/integration/test_exapp_dav_matrix.py -m integration
+      - name: Tasks bundle live without the Tasks app (TASK-03, D-32-11)
+        # The first of the two runs of D-32-11, on 34.0.3: the bootstrap never installs the
+        # Tasks app, so tasks_search, tasks_read and tasks_create are measured under
+        # impersonation without it, and unified_search has to answer without a task hit
+        # instead of a false one. The test reads the app state a second time with occ and
+        # fails on a contradiction to NC_MCP_EXPECT_TASKS_APP. The switch stands here and not
+        # on the job, so the job integration keeps skipping the file.
+        env:
+          PYTHONUTF8: "1"
+          NC_MCP_REQUIRE_LIVE: "1"
+          NC_MCP_EXPECT_TASKS_APP: "0"
+        run: |
+          set -a && . ./.env.exapp && set +a
+          uv run pytest tests/integration/test_tasks_live.py -m integration -s
       - name: Permission fidelity over the full chain (AUTH-05, D-28)
         # The permission promise proven through HaRP, the ExApp and impersonation: bob finds
         # nothing of alice's, alice finds her own content in the same run.
@@ -198,6 +212,35 @@ jobs:
           grep -E 'mcp_connector .*\[enabled\]' exapp-list.txt
       - name: Install locked environment
         run: uv sync --frozen --extra documents
+      - name: Install the Tasks app and restart Nextcloud (D-32-11)
+        # The second run of D-32-11 needs the Tasks app: its search provider is the link of
+        # TASK-09. It comes from the app store here and never from the bootstrap, whose fixed
+        # app list runs in every job and would leave no run without it. Search providers and
+        # navigation keep the old truth until a new PHP process (pitfall 8, measured on 32 in
+        # plan 32-02), so Nextcloud is restarted and polled until status.php answers again.
+        # The enabled list goes into the log with the version of the Tasks app.
+        run: |
+          set -a && . ./.env.exapp && set +a
+          if ! docker compose -f compose.exapp.yml exec -T --user www-data nextcloud \
+              php occ app:install tasks > tasks-install.txt 2>&1; then
+            cat tasks-install.txt
+            grep -E 'already installed' tasks-install.txt
+          fi
+          docker compose -f compose.exapp.yml restart nextcloud
+          ready=""
+          for _ in $(seq 1 60); do
+            if curl -sf "${NC_MCP_URL}/status.php" > status.json \
+                && grep -E '"installed": ?true' status.json > /dev/null; then
+              ready="yes"
+              break
+            fi
+            sleep 2
+          done
+          test -n "${ready}"
+          docker compose -f compose.exapp.yml exec -T --user www-data nextcloud \
+            php occ app:list > app-list.txt
+          sed -n '/^Enabled:/,/^Disabled:/p' app-list.txt > apps-enabled.txt
+          grep -E '^  - tasks: ' apps-enabled.txt
       - name: Canary and pair proofs of the kein-ki exclusion (GATE-02, GATE-03)
         # Every tool of the registry is called against a canary tagged kein-ki, in the normal
         # state and in three forced outages of the tag REPORT, and no answer may carry its
@@ -217,6 +260,17 @@ jobs:
         run: |
           set -a && . ./.env.exapp && set +a
           uv run pytest tests/integration/test_canary.py tests/integration/test_pair_equality_live.py tests/integration/test_provider_classes_live.py -m integration -s
+      - name: Tasks bundle live with the Tasks app (TASK-09, D-32-11)
+        # The second run of D-32-11, on 35.0.1 with the Tasks app installed above: the same
+        # test as in the exapp job, and here the hit of the tasks search provider has to
+        # resolve to the very id tasks_read reads. Switch at the step, as everywhere.
+        env:
+          PYTHONUTF8: "1"
+          NC_MCP_REQUIRE_LIVE: "1"
+          NC_MCP_EXPECT_TASKS_APP: "1"
+        run: |
+          set -a && . ./.env.exapp && set +a
+          uv run pytest tests/integration/test_tasks_live.py -m integration -s
       - name: exclusion:check live (OPS-01)
         # occ mcp_connector:exclusion:check against a real instance (plan 29-06): every case
         # of the command, and around every invocation a dump of systemtag,
