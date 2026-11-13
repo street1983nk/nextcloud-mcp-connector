@@ -171,12 +171,14 @@ Messbericht: `docs/spike-tasks.md`; Rohprotokolle unter `.planning/phases/30-mes
 **Plans**: 6 plans (sechs Wellen, streng nacheinander: ein Docker-Host, immer nur eine Instanz)
 
 Plans:
-- [ ] 31-01-PLAN.md: Machbarkeitsbeweis der Strecke Nextcloud 32 unter AppAPI-Impersonation mit Abbruchkriterium, Basis-Commit in 31-BASE.txt (FOLD-01; D-31-06)
-- [ ] 31-02-PLAN.md: `dav.make_folder`, `probe_folder`, Statusprüfer und `files.create_folder` mit Vorab-Zählung, Deckel 10, Sandbox und `kein-ki`, Unit-Tests (FOLD-01 bis FOLD-05; D-31-01 bis D-31-05)
-- [ ] 31-03-PLAN.md: Registrierung mit `CREATE_IDEMPOTENT`, Audit, Werkzeugmenge 24, Annotations-Gate, Freeze mit Paarfall, Budget-Messzeile, drei READMEs (FOLD-03, FOLD-05, FOLD-06)
-- [ ] 31-04-PLAN.md: MKCOL-Nadel mit gepflanzten Umgehungen, Kanarie mit `MUST_REFUSE`, Live-Paarfall und Abnahmeskript als Code (FOLD-05)
-- [ ] 31-05-PLAN.md: Live-Test unter Impersonation auf Nextcloud 35 und 32 mit 15 Fällen und 2 Kontrollen, Beleg in `docs/folder-evidence.md` (FOLD-01 bis FOLD-05; D-31-05 bis D-31-07)
-- [ ] 31-06-PLAN.md: `docs/exclusion*.md` mit stabilem Beleganker, drei CHANGELOGs, Umlaut-Audit, voller Lauf ohne Phase 32, Owner-Checkpoint zum Push (FOLD-06)
+- [x] 31-01-PLAN.md: Machbarkeitsbeweis der Strecke Nextcloud 32 unter AppAPI-Impersonation mit Abbruchkriterium, Basis-Commit in 31-BASE.txt (FOLD-01; D-31-06)
+- [x] 31-02-PLAN.md: `dav.make_folder`, `probe_folder`, Statusprüfer und `files.create_folder` mit Vorab-Zählung, Deckel 10, Sandbox und `kein-ki`, Unit-Tests (FOLD-01 bis FOLD-05; D-31-01 bis D-31-05)
+- [x] 31-03-PLAN.md: Registrierung mit `CREATE_IDEMPOTENT`, Audit, Werkzeugmenge 24, Annotations-Gate, Freeze mit Paarfall, Budget-Messzeile, drei READMEs (FOLD-03, FOLD-05, FOLD-06)
+- [x] 31-04-PLAN.md: MKCOL-Nadel mit gepflanzten Umgehungen, Kanarie mit `MUST_REFUSE`, Live-Paarfall und Abnahmeskript als Code (FOLD-05)
+- [x] 31-04b-PLAN.md: Zusatzplan, Netzfehler in der Ordnerkette nennen das Angelegte und trennen das Segment mit unbekanntem Zustand (FOLD-02; Owner 2026-11-12)
+- [x] 31-05-PLAN.md: Live-Test unter Impersonation auf Nextcloud 35 und 32 mit 15 Fällen und 2 Kontrollen, Beleg in `docs/folder-evidence.md` (FOLD-01 bis FOLD-05; D-31-05 bis D-31-07)
+- [x] 31-05b-PLAN.md: Zusatzplan, Ordnernamen mit Leerraum am Rand vorab abgelehnt, Knoten ohne Datei-Id nicht als Datei gemeldet, Abnahmeskript mit allen 24 Werkzeugen, Nachmessung auf Nextcloud 35 und 32 (FOLD-01, FOLD-05; Owner 2026-11-12)
+- [x] 31-06-PLAN.md: `docs/exclusion*.md` mit stabilem Beleganker, drei CHANGELOGs, Umlaut-Audit, voller Lauf ohne Phase 32, Owner-Checkpoint zum Push (FOLD-06)
 
 **Rückfallschnitt**: klemmt Phase 32, ist diese Phase allein als Release lieferbar (Owner-Entscheid)
 

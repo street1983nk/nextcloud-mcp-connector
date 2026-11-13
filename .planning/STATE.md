@@ -4,12 +4,12 @@ milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: executing
 last_updated: "2026-11-12T12:00:00.000Z"
-last_activity: 2026-11-12
+last_activity: 2026-11-13
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 11
-  completed_plans: 5
+  total_plans: 13
+  completed_plans: 13
   percent: 45
 ---
 
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 
 ## Current Position
 
-Phase: 31 von 30 bis 34 (Ordner anlegen), in Ausführung
-Plan: 31-01 bis 31-05 samt Zusatzplänen 31-04b und 31-05b fertig; 31-05b (Commits 91df8e4 bis 51f4abb): Ordnernamen mit Leerraum am Rand eines Segments werden vor jedem Schreiben abgelehnt (D-31-08), ein Knoten ohne Datei-Id heißt nicht mehr Datei (D-31-09), scripts/acceptance_all_tools.py ruft alle 24 Werkzeuge; live nachgemessen auf Nextcloud 35.0.0.10 und 32.0.15.1 (je 18 passed, Kanarie und Live-Paar je 10 passed); 5955 Tests grün, Budget 16222 Bytes; Abnahmeskript auf Nextcloud 32 mit Exit 0 belegt (Commit 29876a1: 24 von 24 Werkzeugen, 34 OK, 0 FAIL, 0 PREREQ; GreenMail hält Post nur im Speicher, vor jedem Lauf Testpost wie deliver_test_mail zustellen und `occ mail:account:sync 1 -f`); registrierte Version auf 32 steht auf 9.9.9, weil AppAPI 32.0.0 die Version aus dem Kopf EX-APP-VERSION hebt und nie senkt (Testaufruf aus 31-05, Wegwerf-Instanz, unverändert); offen 31-06 (Doku, README DE/FR nachziehen nach Owner-Freigabe des Entwurfs, endet mit Push-Checkpoint)
-Status: Phase 31 in Ausführung (Owner-Freigabe 2026-11-12); die Strecke Nextcloud 32 unter AppAPI-Impersonation steht nach der Nachmessung; offener Befund am Test-Bootstrap: `scripts/bootstrap_exapp.sh` braucht für Nextcloud 32 zwei Anpassungen (Daemon-Host ohne Port in register_manual_install; `--name` bei `occ user:auth-tokens:add` kennt 32.0.15 nicht), ob das auch für AppAPI 34 und 35 gilt, ist nicht gemessen, Skript unverändert; 31-06 hält für den Push-Entscheid
-Last activity: 2026-11-12, 31-01 ausgeführt (Commits 7f067f7, ba5b4c0, 8c4f541, b2ebdf8): Owner-Entscheid option-a, Topologie nc-mcp-exapp abgebaut und frisch auf 32.0.15 aufgebaut, Container nc_app_mcp_connector_park34 entfernt, Instanz gestoppt, Volume bleibt; lokal committet auf plan/v1.8-tasks-080, nicht gepusht
+Phase: 31 von 30 bis 34 (Ordner anlegen), alle Pläne ausgeführt, Phasen-Verifikation steht aus
+Plan: 31-01 bis 31-06 samt Zusatzplänen 31-04b und 31-05b fertig; 31-06 (Commits d8fdb9b, d25249d, 58844ee, dc74cc4): Grenze tech-folder-oracle in den drei exclusion-Seiten, Bundle-Abschnitt und zwei Tabellenzeilen in README.de.md und README.fr.md, files_update in der Bundle-Liste aller drei READMEs (belegt per Lauf und Contract-Test), drei CHANGELOGs mit je acht Punkten unter Unreleased; 5961 Tests grün, Budget 16222 Bytes, 24 Werkzeuge; als Nächstes Phasen-Verifikation, dann Phase 32 planen
+Status: Phase 31 ausgeführt (2026-11-12 und 2026-11-13); Owner-Entscheid option-push am 2026-11-13 für den Branch plan/v1.8-tasks-080; ein reiner Branch-Push löst keinen CI-Lauf aus (ci.yml und security.yml reagieren nur auf main und pull_request), der CI-Beleg entsteht erst mit einer PR (Owner-Frage offen); offen für später: scripts/bootstrap_exapp.sh für Nextcloud 32 anpassen (Daemon-Host ohne Port, `--name` bei user:auth-tokens:add; Owner 2026-11-12, eigener kleiner Plan nach Phase 31), neun Punkte für den README-Faktencheck in Phase 34 (31-06-SUMMARY.md), FOLD-01 bis FOLD-06 in REQUIREMENTS.md erst nach der Verifikation abhaken
+Last activity: 2026-11-13, Plan 31-06 abgeschlossen und Phase 31 damit vollständig ausgeführt; lokal committet auf plan/v1.8-tasks-080, Push vom Owner freigegeben
 
 ## Performance Metrics
 
