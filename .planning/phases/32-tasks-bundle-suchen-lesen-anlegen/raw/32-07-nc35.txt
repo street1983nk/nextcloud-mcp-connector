@@ -1,0 +1,12 @@
+Rohprotokoll Plan 32-07: Tasks-Bundle live auf Nextcloud 35 (nc35)
+====================================================================
+Datum: 2026-11-13 (UTC). Strecke: compose.nc35.yml (nc35-nc, nc35-harp, nc35-caddy, nc_app_mcp_connector).
+Gemeinsame Freigabe aus raw/32-02-messung.txt: FREIGABE zustand=option-a datum=2026-11-13.
+
+Owner-Checkpoint Task 2: Darf die ExApp auf nc35 für den Live-Beweis neu registriert werden?
+Vorgelegt: Auf nc35 ist die ExApp aus 31-07 registriert (0.7.2, Stand vor Phase 32). Sie wird per
+unregister ohne --rm-data und bootstrap_exapp.sh --nc35 durch ein Image dieses Standes ersetzt;
+vorher werden über die alte Kette die Vergleichsantworten von calendar_list_events aufgenommen.
+Rückweg: das alte Image liegt lokal. Antwort des Owners per Abfrage am 2026-11-13: option-a.
+
+FREIGABE owner=option-a datum=2026-11-13
