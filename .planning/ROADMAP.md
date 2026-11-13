@@ -230,7 +230,21 @@ Plans:
   4. Eine Aufgabe lässt sich in eine ausdrücklich genannte, beschreibbare Liste verschieben, mit gleicher UID und ohne ein belegtes Ziel zu überschreiben; für Unteraufgaben gilt das in Phase 30 Gemessene. Ein Löschen gibt es nicht (Owner, 12.11.2026, Auswahl "Löschen raus")
   5. Jedes ändernde Werkzeug trägt ehrliche Annotationen und erzeugt je Aufruf einen Audit-Eintrag; überschreibender `PUT` und `MOVE` haben je genau eine Aufrufstelle, die das Destruktiv-Gate als eng benannte Ausnahme mit eigener Gegenprobe führt, während jede andere Stelle rot bleibt; das Budget ist aus der Messung des Endstands verankert, und alle Gates sind grün
 
-**Plans**: TBD
+**Plans**: 10 plans (zehn Wellen, streng nacheinander: ein Docker-Host, eine Parallelsitzung, immer nur eine Instanz; Rahmen in 33-RULES.md)
+
+Plans:
+
+- [ ] 33-01-PLAN.md: Messungen vor dem Bau: Browser-Sitzung Tasks 0.18.1 (M-1 Wiederöffnen, M-2 Felder entfernen, CANCELLED), Kette mit 50 Nachfahren für PUT und MOVE auf 35 und 32 (M-3), ETag nach verändertem Text (M-4), Inventar A17 auf HEAD, gemeinsame Owner-Freigabe, Owner-Fragen bei Abweichung (TMOD-01 bis TMOD-04, TMOD-08; D-33-06, D-33-07, D-33-10, D-33-14)
+- [ ] 33-02-PLAN.md: Schalter NC_MCP_TASKS_UPDATE als ganze Kette, Annotationsklasse MODIFY_EXISTING, Gates für optionale Werkzeuge, Budget mit allen Schaltern an (TMOD-01, TMOD-05; D-33-00d, D-33-01, D-33-02, D-33-12)
+- [ ] 33-03-PLAN.md: Schreibschiene: ETag in tasks_read, put_existing_todo und move_todo mit je einer Aufrufstelle, EXPECTED_PUT_CALLS 7, MOVE-Ausnahme mit AST-Pin und Gegenproben (TMOD-01, TMOD-08; D-33-03, D-33-04)
+- [ ] 33-04-PLAN.md: Zeilen-Editor ics_edit mit Byte- und Semantik-Beweis über alle Fixtures (TMOD-02; D-33-07, D-33-08, D-33-13, D-33-15)
+- [ ] 33-05-PLAN.md: Kettenlogik: Nachfahren in Nachordnung, Obergrenze, Vorprüfung, serieller Lauf mit ehrlichem Bericht (D-33-09, D-33-10, D-33-11)
+- [ ] 33-06-PLAN.md: tasks_complete, abtrennbar (TMOD-03; D-33-00a, D-33-00b, D-33-05, D-33-06, D-33-08, D-33-14)
+- [ ] 33-07-PLAN.md: tasks_update, abtrennbar (TMOD-02, TMOD-04; D-33-07, D-33-13, D-33-15)
+- [ ] 33-08-PLAN.md: tasks_move, abtrennbar (TMOD-08; D-33-00c, D-33-09 bis D-33-11)
+- [ ] 33-09-PLAN.md: Abschluss: Budget aus dem Endstand, Audit je Aufruf, Kanarie und Abnahmeskript mit Schalter an, Rechtetabelle und Changelogs in drei Sprachen (TMOD-05; D-33-04)
+- [ ] 33-10-PLAN.md: Live-Beweis auf 35 und 32 je ohne und mit Tasks-App unter Impersonation, Owner-Frage zum Push (TMOD-06)
+
 **Abtrennbare Teile, je ein eigener Plan**: Abhaken und Wiederöffnen (TMOD-03); Felder ändern (TMOD-04); Verschieben (TMOD-08). 0.8.0 bleibt ohne jeden dieser Teile releasefähig; ein Teil fällt nur per Owner-Entscheid heraus. Das Löschen (TMOD-07) ist per Owner-Entscheid vom 12.11.2026 herausgefallen (Auswahl "Löschen raus", Aufwand gegen Nutzung)
 **Research flag**: ja. Die Recherche vom 11.11.2026 deckt ändernde Zugriffe nicht ab; die Planung dieser Phase stützt sich auf den Messbericht aus Phase 30 und braucht eine eigene kurze Recherche zum Erhalt fremder Eigenschaften mit `icalendar`
 **Aus Phase 30**: Ergebniswort für das Löschen "wiederherstellbar" (docs/spike-tasks.md Abschnitt 4.5): TMOD-07 wäre planbar gewesen, ist aber per Owner-Entscheid vom 12.11.2026 aus 0.8.0 gestrichen (Auswahl "Löschen raus"); die Messung bleibt als Beleg. Das Abbruchkriterium zu `MOVE` ist nicht ausgelöst: TMOD-08 ist planbar, der Kopf `Overwrite: F` ist Pflicht. Das Abbruchkriterium MESS-05 ist nicht ausgelöst. Owner-Entscheid vom 12.11.2026 (docs/spike-tasks.md Abschnitt 10.4): wiederkehrende Aufgaben bleiben abgelehnt (A15), Unteraufgaben werden beim Abhaken mit abgehakt (A16), Unteraufgaben ziehen beim Verschieben mit (A21; der Teil zum Mitlöschen entfällt mit TMOD-07). Das Erfolgskriterium 1 ist danach nachgezogen (Wortlaut vom Owner am 12.11.2026 freigegeben, "Ok"); was beim Wiederöffnen einer Elternaufgabe mit den Unteraufgaben geschieht, klärt die discuss-phase von Phase 33
