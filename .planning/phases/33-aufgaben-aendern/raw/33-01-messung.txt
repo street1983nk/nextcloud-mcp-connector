@@ -464,3 +464,16 @@ docker stop nc35-nc -> nc35-nc | laeuft=false
 docker stop nc35-harp -> nc35-harp | laeuft=false
 docker stop nc35-caddy -> nc35-caddy | laeuft=false
 DOCKER ende eigene_container_laufend=0 fremde=keine
+
+# 33-01b Task 2 ENTSCHEID-Zeilen 2026-11-13 (aus den Zeilen M1, M2, CANCELLED oben)
+ENTSCHEID wiederoeffnen_kinder=bleiben quelle=M1 (D-33-05 bestätigt, kein Auslöser für 33-01c Task 4)
+ENTSCHEID entfernen_due=zeile-weg quelle=M2
+ENTSCHEID entfernen_start=zeile-weg quelle=M2
+ENTSCHEID entfernen_description=leer quelle=M2 rohzeile=DESCRIPTION:
+ENTSCHEID entfernen_parent=zeile-weg quelle=M2
+ENTSCHEID entfernen_priority=zeile-weg quelle=M2 (wie D-33-07)
+ENTSCHEID entfernen_tags=zeile-weg quelle=M2 (wie D-33-07)
+ENTSCHEID pflegefelder_entfernen=DTSTAMP,LAST-MODIFIED
+ENTSCHEID cancelled_kette=unberuehrt quelle=CANCELLED kette (wie D-33-14)
+ENTSCHEID cancelled_direkt=abhaken-und-oeffnen abhaken=STATUS:COMPLETED,PERCENT-COMPLETE:100,COMPLETED(UTC) oeffnen=STATUS:NEEDS-ACTION,COMPLETED und PERCENT-COMPLETE entfernt pflegefelder=DTSTAMP,LAST-MODIFIED (wie D-33-14)
+ABWEICHUNG D-33-05/D-33-07/D-33-14 keine

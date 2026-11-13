@@ -304,7 +304,8 @@ def test_invalid_icalendar_or_no_vtodo_is_none_and_never_raises(raw: bytes) -> N
 def test_every_fixture_of_the_tasks_app_is_read(path: Path) -> None:
     todo = tasks_tools._read_todo(path.read_bytes())
     assert todo is not None
-    assert todo["summary"].startswith("s30 ")
+    # Phase 30 (spike) and plan 33-01b wrote the fixtures; each names its session.
+    assert todo["summary"].startswith(("s30 ", "p3301 "))
     assert todo["status"] in {"open", "in_progress", "completed", "cancelled"}
 
 
