@@ -42,6 +42,12 @@ Abtrennbare Teile, je ein eigener Plan: Abhaken und Wiederöffnen (TMOD-03), Fel
 - **D-33-10:** Obergrenze 50 Nachfahren je Aufruf; darüber lehnt das Werkzeug vor dem ersten Schreibzugriff mit klarer Meldung ab. Der Wert wird durch eine Messung bestätigt (Kosten und Laufzeit einer Kette mit 50 Objekten auf 35 und 32); weicht die Messung deutlich ab, legt die Planung den Wert nach der Hausregel aus dem Messwert fest und nennt ihn dem Owner.
 - **D-33-11:** Eine wiederkehrende Aufgabe oder ein Objekt ohne Schreibrecht unter den Nachfahren führt zur Ablehnung vor dem ersten Schreibzugriff (Vorprüfung aus den bereits gelesenen Daten), damit der häufige Fall keine halbe Kette hinterlässt.
 
+### Nachtrag nach der Recherche (Owner 13.11.2026, alle wie empfohlen)
+- **D-33-12:** Annotationen der drei Werkzeuge: `destructive_hint=True`, `idempotent_hint=True` (MCP-Spezifikation: nicht destruktiv heißt nur hinzufügend; gleich wie `files_update`). TMOD-05 ("nicht destruktiv") wird in `.planning/REQUIREMENTS.md` entsprechend nachgezogen, das Annotations-Gate trägt die Klasse "ändernd" mit diesen Werten.
+- **D-33-13:** Ändert `tasks_update` die Beschreibung, wird eine vorhandene HTML-Fassung (`X-ALT-DESC`) entfernt und `ALTREP` an `DESCRIPTION` weggelassen; die Antwort sagt, dass die HTML-Fassung entfernt wurde. Das ist die eine benannte Ausnahme zu TMOD-02 (Rundlauftest nennt sie ausdrücklich).
+- **D-33-14:** Abgebrochene Aufgaben (`STATUS:CANCELLED`): beim Abhaken einer Elternaufgabe bleiben abgebrochene Nachfahren unberührt (kein `PUT`, in der Antwort kenntlich). Direkt aufgerufen darf `tasks_complete` eine abgebrochene Aufgabe abhaken (`completed=true`) und wieder öffnen (`completed=false`). Vorher kurz messen, wie die Tasks-App 0.18.1 abgebrochene Aufgaben dabei behandelt; bei Abweichung Owner fragen, bevor gebaut wird.
+- **D-33-15:** Schema von `tasks_update`: ein weggelassenes Feld (oder `null`) bleibt unverändert; ein leerer Wert entfernt das Feld (`""` für Text- und Datumsfelder sowie Elternaufgabe, `[]` für Tags, `priority=0`). Ein leerer Titel wird abgelehnt. Kein eigener Zeitzonen-Parameter: Zeiten mit Versatz oder Zone im Wert angeben, geschrieben wird in UTC mit `Z` wie die Tasks-App; ganztägige Daten als `VALUE=DATE`.
+
 ### Claude's Discretion
 - Antwortform der drei Werkzeuge (Felder, Kurztexte), solange ehrlich und unter 1400 Bytes je Werkzeug.
 - Reihenfolge der Nachfahren untereinander (Tiefe zuerst), Zielname beim `MOVE` (gleicher Objektname, `Overwrite: F` Pflicht).
