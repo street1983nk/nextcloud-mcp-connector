@@ -19,6 +19,7 @@ from xml.sax.saxutils import escape
 import httpx
 import pytest
 import respx
+from icalendar import Calendar as IcsCalendar
 
 from mcp_connector import ids
 from mcp_connector.errors import (
@@ -373,10 +374,13 @@ async def test_summary_with_line_break_comma_and_semicolon_is_escaped(
     summary = "x\r\nEND:VTODO\r\nBEGIN:VTODO\r\nSUMMARY:evil, a; b"
     result, stores = await create(clients, summary=summary, description="d\nEND:VCALENDAR")
     body = stores[OWN].body
-    assert body.count("BEGIN:VTODO") == 1
-    assert body.count("END:VTODO") == 1
-    assert body.count("BEGIN:VCALENDAR") == 1
-    assert body.count("END:VCALENDAR") == 1
+    lines = body.split("\r\n")
+    for marker in ("BEGIN:VTODO", "END:VTODO", "BEGIN:VCALENDAR", "END:VCALENDAR"):
+        assert lines.count(marker) == 1, marker
+    assert [component.name for component in IcsCalendar.from_ical(body).walk()] == [
+        "VCALENDAR",
+        "VTODO",
+    ]
     assert "\\, a\\; b" in body
     assert result["summary"] == summary
 

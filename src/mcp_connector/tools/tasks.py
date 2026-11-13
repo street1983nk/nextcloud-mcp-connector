@@ -21,16 +21,21 @@ anything else happens (ME-03). Attachments are never read.
 
 import asyncio
 import re
-from datetime import date, datetime, time, timedelta
+import uuid
+from collections.abc import Sequence
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 from icalendar import Calendar as IcsCalendar
+from icalendar import Timezone as IcsTimezone
+from icalendar import Todo as IcsTodo
 
 from .. import ids, paging
 from ..errors import REASON_GUARD_TRIPPED, REASON_UNKNOWN_ID, ToolError
 from ..nextcloud import NcClients
+from ..nextcloud.clients import caldav
 from ..nextcloud.clients import tasks as tasks_client
 from . import calendar, marks
 
@@ -73,6 +78,18 @@ NO_LIST_HINT = (
     "This account has no task list yet. Create one in the Nextcloud Tasks app; "
     "tasks_search finds its tasks from then on."
 )
+
+#: ``tasks_create`` without any task list (E6): an error, because there is nowhere to write.
+NO_LIST_MESSAGE = "This account has no task list."
+NO_LIST_WAY_OUT = "Create a list in the Nextcloud Tasks app, then try again."
+
+#: The values ``priority`` may take (RFC 5545: 0 undefined, 1 highest, 9 lowest).
+PRIORITY_RANGE = range(10)
+
+_TASK_TIME_HINT = (
+    "Use a date such as 2026-11-20, or a time with a zone such as 2026-11-20T09:00:00+01:00."
+)
+_ZONE_HINT = "Use an IANA name such as Europe/Berlin, or leave timezone out."
 
 _OPEN_STATES = frozenset({"open", "in_progress"})
 _STATUS_RANK = {"open": 0, "in_progress": 0, "completed": 1, "cancelled": 2}
@@ -701,3 +718,361 @@ def _capped(text: str) -> tuple[str, bool]:
     if len(blob) <= MAX_DESCRIPTION_BYTES:
         return text, False
     return blob[:MAX_DESCRIPTION_BYTES].decode("utf-8", errors="ignore"), True
+
+
+async def create_task(
+    clients: NcClients,
+    *,
+    summary: str,
+    list_name: str | None = None,
+    description: str | None = None,
+    due: str | None = None,
+    start: str | None = None,
+    priority: int | None = None,
+    tags: Sequence[str] | None = None,
+    timezone: str | None = None,
+    parent: str | None = None,
+) -> dict[str, Any]:
+    """Create one task, exactly where the caller said, or nowhere (E4, TASK-05, TASK-06).
+
+    Every input is checked before the first request; a value that does not fit is refused,
+    never quietly changed (D-31-08). The target list: ``list_name`` wins and is resolved
+    against the discovery only; without it the task goes into the one own writable list of
+    the account, and with more than one or none of them the caller has to name it. A shared
+    list is only written to when it is named: a ``parent`` in a shared list does not count
+    as naming it (D-32-16). A read only list is refused before the request; the 403 and 404
+    of the server stay the last word. Deck calendars never appear in the discovery.
+
+    The object is written create-only (fresh UUID, ``If-None-Match: *``) through
+    ``caldav.put_new_object``, then read back once. ``confirmed`` is true only when the
+    object could be read and carries the UID that was written; a failing read back never
+    turns the write into a failure, or the model would create the task a second time.
+    """
+    if not summary or not summary.strip():
+        raise _refused("A task needs a summary.", "Give a short title, for example 'Angebot'.")
+    zone = _task_zone(timezone)
+    due_value = _parse_task_time(due, "due")
+    start_value = _parse_task_time(start, "start")
+    _check_times(due_value, start_value, zone)
+    _check_priority(priority)
+    categories = _clean_tags(tags)
+    parent_key, parent_object = _parse_parent(parent)
+
+    # Written in the named zone with its VTIMEZONE, otherwise in UTC; a date stays a date.
+    written_zone: Any = zone if zone is not None else UTC
+    due_value = _in_zone(due_value, written_zone)
+    start_value = _in_zone(start_value, written_zone)
+
+    lists = await tasks_client.discover_task_lists(clients.client, clients.creds)
+    if not lists:
+        raise ToolError(message=NO_LIST_MESSAGE, hint=NO_LIST_WAY_OUT)
+
+    parent_list: tasks_client.TaskList | None = None
+    if parent is not None:
+        matches = [entry for entry in lists if entry.key == parent_key]
+        if len(matches) != 1:
+            raise _unknown_task(parent)
+        parent_list = matches[0]
+    target = _pick_target(lists, (list_name or "").strip(), parent_list)
+
+    parent_uid = ""
+    if parent is not None:
+        parent_uid = await _parent_uid(clients, target, parent_object, parent)
+
+    object_name = f"{uuid.uuid4()}.ics"
+    uid = object_name.removesuffix(".ics")
+    ics = _build_todo(
+        uid=uid,
+        summary=summary,
+        description=description if description and description.strip() else None,
+        due=due_value,
+        start=start_value,
+        priority=priority,
+        tags=categories,
+        parent_uid=parent_uid,
+        zone=zone,
+    )
+    await caldav.put_new_object(
+        clients.client,
+        clients.creds,
+        target.uri,
+        object_name,
+        ics,
+        tasks_client.TASK_WORDING,
+        _list_name(target),
+    )
+    confirmed = await _confirm(clients, target, object_name, uid)
+
+    result: dict[str, Any] = {
+        "id": ids.encode_task(target.key, object_name),
+        "summary": summary,
+        "list": _list_info(target),
+        "created": True,
+        "confirmed": confirmed,
+    }
+    if due_value is not None:
+        result["due"] = _time_field(due_value)[0]
+    if start_value is not None:
+        result["start"] = _time_field(start_value)[0]
+    return result
+
+
+def _refused(message: str, hint: str) -> ToolError:
+    """A refusal before the first request."""
+    return ToolError(message=message, hint=hint, reason=REASON_GUARD_TRIPPED)
+
+
+def _task_zone(name: str | None) -> ZoneInfo | None:
+    if name is None or not name.strip():
+        return None
+    try:
+        return ZoneInfo(name.strip())
+    except (ZoneInfoNotFoundError, ValueError):
+        raise _refused(f"{_quoted(name)} is not a known timezone.", _ZONE_HINT) from None
+
+
+def _parse_task_time(text: str | None, field: str) -> date | datetime | None:
+    """A date, or a time with a zone. A time without a zone is refused, never guessed."""
+    raw = (text or "").strip()
+    if not raw:
+        return None
+    if _DATE_ONLY.fullmatch(raw):
+        try:
+            return date.fromisoformat(raw)
+        except ValueError:
+            raise _refused(f"{field} is not a valid date ({raw!r}).", _TASK_TIME_HINT) from None
+    try:
+        return calendar.parse_instant(raw, field=field)
+    except ToolError as exc:
+        raise _refused(exc.message, _TASK_TIME_HINT) from None
+
+
+def _check_times(
+    due: date | datetime | None, start: date | datetime | None, zone: ZoneInfo | None
+) -> None:
+    if zone is not None and not isinstance(due, datetime) and not isinstance(start, datetime):
+        raise _refused(
+            "timezone only applies to a due or start with a time.",
+            "Leave timezone out, or give due or start with a time.",
+        )
+    if due is None or start is None:
+        return
+    if isinstance(due, datetime) != isinstance(start, datetime):
+        raise _refused(
+            "start and due must both be dates or both be times.",
+            "Give both as dates such as 2026-11-20, or both as times with a zone.",
+        )
+    if not _before(start, due):
+        raise _refused("start must lie before due.", "Give a start before the due date or time.")
+
+
+def _before(first: date | datetime, second: date | datetime) -> bool:
+    """``first < second`` for two dates or two times with a zone (checked by the caller)."""
+    if isinstance(first, datetime) and isinstance(second, datetime):
+        return first < second
+    if not isinstance(first, datetime) and not isinstance(second, datetime):
+        return first < second
+    return False
+
+
+def _check_priority(priority: int | None) -> None:
+    if priority is None:
+        return
+    if isinstance(priority, bool) or priority not in PRIORITY_RANGE:
+        raise _refused(
+            f"priority must be a whole number from 0 to 9 (got {priority!r}).",
+            "1 is the highest, 9 the lowest, 0 means none.",
+        )
+
+
+def _clean_tags(tags: Sequence[str] | None) -> list[str]:
+    """Empty values and duplicates (casefolded) dropped, in the order of first mention."""
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for tag in tags or ():
+        value = str(tag).strip()
+        if value and value.casefold() not in seen:
+            seen.add(value.casefold())
+            cleaned.append(value)
+    return cleaned
+
+
+def _parse_parent(parent: str | None) -> tuple[str, str]:
+    """The list key and object name of a ``task:`` id; a Deck list is unknown at once."""
+    if parent is None:
+        return "", ""
+    kind, parts = ids.parse(parent)
+    if kind != "task":
+        raise _refused(
+            f"parent {_quoted(parent)} is not a task id.",
+            "Pass an id of the form task:<list>:<object> from a tasks_search hit.",
+        )
+    list_key, object_name = parts
+    if list_key.startswith(tasks_client.DECK_PREFIX):
+        # A Deck board is never asked, not even through the discovery (E9).
+        raise _unknown_task(parent)
+    return list_key, object_name
+
+
+def _in_zone(value: date | datetime | None, zone: Any) -> date | datetime | None:
+    """A time expressed in the zone it is written in; a date stays that very day."""
+    if isinstance(value, datetime):
+        return value.astimezone(zone)
+    return value
+
+
+def _pick_target(
+    lists: list[tasks_client.TaskList],
+    wanted: str,
+    parent_list: tasks_client.TaskList | None,
+) -> tasks_client.TaskList:
+    """The one list a create writes into, after E4 and D-32-16; never positional.
+
+    A named list wins. Without one, the list of the parent if it is an own list; a parent in
+    a shared list is not a naming of that list. Without both, exactly one own writable list,
+    otherwise the caller has to choose from the real names. No fallback on ``personal`` and
+    none on "exactly one list at all": that one could be shared.
+    """
+    if wanted:
+        target = _resolve_list(lists, wanted)
+        if parent_list is not None and parent_list.key != target.key:
+            raise _refused(
+                "The parent task lives in another list.",
+                "Leave list out to create the subtask in the list of its parent, "
+                "or pick a parent from the named list.",
+            )
+    elif parent_list is not None:
+        if parent_list.shared:
+            raise _refused(
+                "The parent task lives in a shared list, and a shared list is only written "
+                "to when it is named.",
+                "To create the subtask there, name that list with "
+                f"list={_list_name(parent_list)!r}.",
+            )
+        target = parent_list
+    else:
+        own = [entry for entry in lists if entry.own and entry.writable]
+        if len(own) == 1:
+            return own[0]
+        raise _no_default_target(lists, own)
+
+    if not target.writable:
+        raise _refused(
+            f"The task list {_list_name(target)!r} is read only for this account.",
+            _writable_hint(lists),
+        )
+    return target
+
+
+def _no_default_target(
+    lists: list[tasks_client.TaskList], own: list[tasks_client.TaskList]
+) -> ToolError:
+    if not any(entry.writable for entry in lists):
+        return ToolError(
+            message="None of the task lists of this account can be written to.",
+            hint=NO_LIST_WAY_OUT,
+        )
+    if own:
+        message = "This account has more than one task list to write to, so list has to be named."
+    else:
+        message = (
+            "This account has no own task list to write to, and a shared list is only "
+            "written to when it is named."
+        )
+    return ToolError(message=message, hint=_writable_hint(lists))
+
+
+def _writable_hint(lists: list[tasks_client.TaskList]) -> str:
+    names = sorted(
+        f"{_list_name(entry)} (shared, key {entry.key})" if entry.shared else _list_name(entry)
+        for entry in lists
+        if entry.writable
+    )
+    if not names:
+        return NO_LIST_WAY_OUT
+    return f"Name the list with list=<name>. Writable task lists: {', '.join(names)}."
+
+
+async def _parent_uid(
+    clients: NcClients, task_list: tasks_client.TaskList, object_name: str, parent: str
+) -> str:
+    """The UID of the parent task, read from the target list; unknown ids get one answer."""
+    try:
+        raw = await tasks_client.get_todo(clients.client, clients.creds, task_list, object_name)
+    except ToolError as exc:
+        if exc.reason == REASON_UNKNOWN_ID:
+            raise _unknown_task(parent) from None
+        raise
+    todo = _read_todo(raw)
+    if todo is None or not todo["uid"]:
+        raise _unknown_task(parent)
+    return todo["uid"]
+
+
+def _build_todo(
+    *,
+    uid: str,
+    summary: str,
+    description: str | None,
+    due: date | datetime | None,
+    start: date | datetime | None,
+    priority: int | None,
+    tags: list[str],
+    parent_uid: str,
+    zone: ZoneInfo | None,
+) -> bytes:
+    """One VCALENDAR with exactly one VTODO, always through icalendar.
+
+    Never by string concatenation: escaping, folding and ``VALUE=DATE`` are where a hand
+    written generator breaks, and a summary with a line break could open a second component
+    (threat T-32-04b-03). The VTIMEZONE comes from the zoneinfo database, never by hand.
+    ``RELATED-TO`` carries no ``RELTYPE``: ``PARENT`` is its default (RFC 5545).
+    """
+    ics = IcsCalendar()
+    ics.add("prodid", calendar.PRODID)
+    ics.add("version", "2.0")
+
+    timed = next((value for value in (due, start) if isinstance(value, datetime)), None)
+    if zone is not None and timed is not None:
+        component = IcsTimezone.from_tzinfo(
+            zone,
+            tzid=zone.key,
+            first_date=date(timed.year - 1, 1, 1),
+            last_date=date(timed.year + 5, 1, 1),
+        )
+        component.pop("COMMENT", None)
+        ics.add_component(component)
+
+    now = datetime.now(UTC).replace(microsecond=0)
+    todo = IcsTodo()
+    todo.add("uid", uid)
+    todo.add("created", now)
+    todo.add("last-modified", now)
+    todo.add("dtstamp", now)
+    todo.add("summary", summary)
+    if description is not None:
+        todo.add("description", description)
+    if start is not None:
+        todo.add("dtstart", start)
+    if due is not None:
+        todo.add("due", due)
+    if priority is not None:
+        todo.add("priority", priority)
+    if tags:
+        todo.add("categories", tags)
+    if parent_uid:
+        todo.add("related-to", parent_uid)
+    ics.add_component(todo)
+    return ics.to_ical()
+
+
+async def _confirm(
+    clients: NcClients, task_list: tasks_client.TaskList, object_name: str, uid: str
+) -> bool:
+    """Read the new object once. A failure here never undoes or fails the write."""
+    try:
+        raw = await tasks_client.get_todo(clients.client, clients.creds, task_list, object_name)
+    except (ToolError, TimeoutError, httpx.TimeoutException, httpx.RequestError):
+        return False
+    todo = _read_todo(raw)
+    return todo is not None and todo["uid"] == uid
