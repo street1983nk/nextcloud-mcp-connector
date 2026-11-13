@@ -12,3 +12,133 @@ BASIS b40f7623a5111b95a3fe3cf6e5295c4965ca7056
     Antwort des Owners per Abfrage über den Orchestrator am 2026-11-13: option-a
     (Freigabe für nc35 und die 32er Strecke).
 FREIGABE zustand=option-a datum=2026-11-13
+
+== Task 3 (2a): Wegwerf-Instanzen 35.0.2, SQLite und PostgreSQL ==
+    Geheimnisprüfung gegen alle Werte von .env.nc35 und .env.exapp (voll und erste 12 Zeichen):
+    Treffer nur auf den öffentlichen Kontonamen NC_MCP_TEST_USER (alice), kein Treffer aus Secrets.
+
+# tasks_measure.py throwaway 2026-11-13T11:52:32Z
+
+== wegwerf db=sqlite nc-tag=35.0.2-apache, start 2026-11-13T11:52:32Z ==
+
+== vorbedingungen ==
+RAM frei_host_gb=5.18 schwelle=4.0 ergebnis=ok
+(no running container)
+VORBEDINGUNG Container nc-spike-tags* vorhanden: nein
+VORBEDINGUNG Volume nc-spike-tags* vorhanden: nein
+
+== aufbau ==
+docker compose -f compose.spike-tags.yml up -d --wait: 16.7 s
+Container nc-spike-tags Starting / Container nc-spike-tags Started / Container nc-spike-tags Waiting / Container nc-spike-tags Healthy
+nc-spike-tags: installed (attempt 1)
+Installation abgewartet: 0.3 s
+bruteforce protection aus (Wegwerf-Instanz) -> System config value auth.bruteforce.protection.enabled set to boolean false
+- installed: true
+  - version: 35.0.2.2
+  - versionstring: 35.0.2
+  - edition: 
+  - maintenance: false
+  - needsDbUpgrade: false
+  - productname: Nextcloud
+  - extendedSupport: false
+VERSION OF RECORD 35.0.2
+dbtype: sqlite3
+memcache.local: \OC\Memcache\APCu
+nc-spike-tags  mem 291.2MiB / 5.786GiB  cpu 0.00%
+occ user:add --password-from-env alice (password via stdin)
+occ user:auth-tokens:add alice --password-from-env --name spike30 (token kept)
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+docker restart nc-spike-tags -> nc-spike-tags
+nc-spike-tags: installed (attempt 1)
+TASKSAPP wegwerf-sqlite version=0.18.1
+SETUP MKCALENDAR liste=p3202-serie status=201
+AUFBAU wegwerf-sqlite aufgaben=2000 erledigt=1900 kinder_von_eltern=0,1,25 dauer_s=87 gleichzeitig=1 wiederholte_put=0 GEGENPROBE datenbank_zeilen=2000 gleich=ja
+KOSTEN suche modus=offen impersonation=nein db=sqlite status=207 median_ms=96 max_ms=120 min_ms=88 p95_zweitgroesster_ms=119 bytes=70218 treffer=100 (n=15)
+KOSTEN suche modus=alle impersonation=nein db=sqlite status=207 median_ms=119 max_ms=147 min_ms=107 p95_zweitgroesster_ms=142 bytes=1514508 treffer=2000 (n=15)
+KOSTEN kinder kinder=0 collation=ohne db=sqlite status=207 median_ms=89 max_ms=95 min_ms=87 p95_zweitgroesster_ms=95 bytes=239 treffer=0 (n=15) impersonation=nein
+KOSTEN kinder kinder=0 collation=i;octet db=sqlite status=207 median_ms=88 max_ms=97 min_ms=85 p95_zweitgroesster_ms=91 bytes=239 treffer=0 (n=15) impersonation=nein
+KOSTEN kinder kinder=1 collation=ohne db=sqlite status=207 median_ms=91 max_ms=98 min_ms=87 p95_zweitgroesster_ms=96 bytes=978 treffer=1 (n=15) impersonation=nein
+KOSTEN kinder kinder=1 collation=i;octet db=sqlite status=207 median_ms=90 max_ms=94 min_ms=86 p95_zweitgroesster_ms=93 bytes=978 treffer=1 (n=15) impersonation=nein
+KOSTEN kinder kinder=25 collation=ohne db=sqlite status=207 median_ms=90 max_ms=95 min_ms=87 p95_zweitgroesster_ms=95 bytes=19004 treffer=25 (n=15) impersonation=nein
+KOSTEN kinder kinder=25 collation=i;octet db=sqlite status=207 median_ms=90 max_ms=121 min_ms=84 p95_zweitgroesster_ms=108 bytes=19004 treffer=25 (n=15) impersonation=nein
+KOSTEN eltern-uid collation=ohne db=sqlite status=207 median_ms=95 max_ms=101 min_ms=90 p95_zweitgroesster_ms=100 bytes=949 treffer=1 (n=15) impersonation=nein
+KOSTEN eltern-uid collation=i;octet db=sqlite status=207 median_ms=95 max_ms=107 min_ms=91 p95_zweitgroesster_ms=102 bytes=949 treffer=1 (n=15) impersonation=nein
+GEGENPROBE collation db=sqlite treffer_gleich=ja erwartete_anzahl=ja kinder0=0/0 kinder1=1/1 kinder25=25/25 eltern=1/1 (Mengen der Objekt-Hrefs, ohne/i;octet; erwartet kinder0=0 kinder1=1 kinder25=25 eltern=1)
+VORSCHLAG wegwerf-sqlite groesster_max_s=0.147 budget_s=1
+nc-spike-tags  mem 134.1MiB / 5.786GiB  cpu 0.00%
+
+== abbau ==
+Volume nc-mcp-spike-tags_nc-spike-tags-data Removing / Network nc-mcp-spike-tags_default Removing / Network nc-mcp-spike-tags_default Removed / Volume nc-mcp-spike-tags_nc-spike-tags-data Removed
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 151 s; ENDE 2026-11-13T11:55:03Z
+
+    Erster Anlauf PostgreSQL: RAM-Gate rot, nichts gestartet; danach drop_caches, 75 s, zweiter Anlauf.
+# tasks_measure.py throwaway 2026-11-13T11:55:13Z
+
+== wegwerf db=pg nc-tag=35.0.2-apache, start 2026-11-13T11:55:13Z ==
+
+== vorbedingungen ==
+RAM frei_host_gb=3.15 schwelle=4.0 ergebnis=zu wenig
+(no running container)
+ABBRUCH RAM gate shut: 3.15 GB free (needs 4.0), foreign runs: []; nothing was stopped
+# tasks_measure.py throwaway 2026-11-13T11:56:45Z
+
+== wegwerf db=pg nc-tag=35.0.2-apache, start 2026-11-13T11:56:45Z ==
+
+== vorbedingungen ==
+RAM frei_host_gb=5.34 schwelle=4.0 ergebnis=ok
+(no running container)
+VORBEDINGUNG Container nc-spike-tags* vorhanden: nein
+VORBEDINGUNG Volume nc-spike-tags* vorhanden: nein
+
+== aufbau ==
+docker compose -f compose.spike-tags-pg.yml up -d --wait: 32.6 s
+Container nc-spike-tags-pgdb Waiting / Container nc-spike-tags-pg Waiting / Container nc-spike-tags-pgdb Healthy / Container nc-spike-tags-pg Healthy
+nc-spike-tags-pg: installed (attempt 1)
+Installation abgewartet: 0.3 s
+bruteforce protection aus (Wegwerf-Instanz) -> System config value auth.bruteforce.protection.enabled set to boolean false
+- installed: true
+  - version: 35.0.2.2
+  - versionstring: 35.0.2
+  - edition: 
+  - maintenance: false
+  - needsDbUpgrade: false
+  - productname: Nextcloud
+  - extendedSupport: false
+VERSION OF RECORD 35.0.2
+dbtype: pgsql
+select version(): PostgreSQL 17.11 on x86_64-pc-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit
+show shared_buffers: 128MB
+postgres-Image: postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24
+memcache.local: \OC\Memcache\APCu
+nc-spike-tags-pg  mem 288.5MiB / 2GiB  cpu 0.00%
+nc-spike-tags-pgdb  mem 68.91MiB / 1GiB  cpu 0.03%
+occ user:add --password-from-env alice (password via stdin)
+occ user:auth-tokens:add alice --password-from-env --name spike30 (token kept)
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+docker restart nc-spike-tags-pg -> nc-spike-tags-pg
+nc-spike-tags-pg: installed (attempt 1)
+TASKSAPP wegwerf-pg version=0.18.1
+SETUP MKCALENDAR liste=p3202-serie status=201
+AUFBAU wegwerf-pg aufgaben=2000 erledigt=1900 kinder_von_eltern=0,1,25 dauer_s=46 gleichzeitig=4 wiederholte_put=0 GEGENPROBE datenbank_zeilen=2000 gleich=ja
+KOSTEN suche modus=offen impersonation=nein db=pg status=207 median_ms=125 max_ms=132 min_ms=119 p95_zweitgroesster_ms=128 bytes=70218 treffer=100 (n=15)
+KOSTEN suche modus=alle impersonation=nein db=pg status=207 median_ms=150 max_ms=255 min_ms=137 p95_zweitgroesster_ms=248 bytes=1514508 treffer=2000 (n=15)
+KOSTEN kinder kinder=0 collation=ohne db=pg status=207 median_ms=115 max_ms=143 min_ms=111 p95_zweitgroesster_ms=123 bytes=239 treffer=0 (n=15) impersonation=nein
+KOSTEN kinder kinder=0 collation=i;octet db=pg status=207 median_ms=114 max_ms=123 min_ms=111 p95_zweitgroesster_ms=120 bytes=239 treffer=0 (n=15) impersonation=nein
+KOSTEN kinder kinder=1 collation=ohne db=pg status=207 median_ms=115 max_ms=150 min_ms=111 p95_zweitgroesster_ms=123 bytes=978 treffer=1 (n=15) impersonation=nein
+KOSTEN kinder kinder=1 collation=i;octet db=pg status=207 median_ms=114 max_ms=125 min_ms=113 p95_zweitgroesster_ms=122 bytes=978 treffer=1 (n=15) impersonation=nein
+KOSTEN kinder kinder=25 collation=ohne db=pg status=207 median_ms=116 max_ms=172 min_ms=111 p95_zweitgroesster_ms=128 bytes=19004 treffer=25 (n=15) impersonation=nein
+KOSTEN kinder kinder=25 collation=i;octet db=pg status=207 median_ms=113 max_ms=121 min_ms=107 p95_zweitgroesster_ms=115 bytes=19004 treffer=25 (n=15) impersonation=nein
+KOSTEN eltern-uid collation=ohne db=pg status=207 median_ms=118 max_ms=170 min_ms=114 p95_zweitgroesster_ms=140 bytes=949 treffer=1 (n=15) impersonation=nein
+KOSTEN eltern-uid collation=i;octet db=pg status=207 median_ms=120 max_ms=127 min_ms=113 p95_zweitgroesster_ms=122 bytes=949 treffer=1 (n=15) impersonation=nein
+GEGENPROBE collation db=pg treffer_gleich=ja erwartete_anzahl=ja kinder0=0/0 kinder1=1/1 kinder25=25/25 eltern=1/1 (Mengen der Objekt-Hrefs, ohne/i;octet; erwartet kinder0=0 kinder1=1 kinder25=25 eltern=1)
+VORSCHLAG wegwerf-pg groesster_max_s=0.255 budget_s=1
+nc-spike-tags-pg  mem 145.9MiB / 2GiB  cpu 0.00%
+nc-spike-tags-pgdb  mem 74.95MiB / 1GiB  cpu 0.01%
+
+== abbau ==
+Volume nc-mcp-spike-tags-pg_nc-spike-tags-pgdb-data Removing / Network nc-mcp-spike-tags-pg_default Removed / Volume nc-mcp-spike-tags-pg_nc-spike-tags-pg-data Removed / Volume nc-mcp-spike-tags-pg_nc-spike-tags-pgdb-data Removed
+ABBAU Container vorhanden: nein
+ABBAU Volume vorhanden: nein
+DAUER 154 s; ENDE 2026-11-13T11:59:19Z
