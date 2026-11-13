@@ -151,3 +151,72 @@ RUECKWEG daemon:register manual_install "Manual Install" manual-install http hos
 FREIGABE unregister=option-a datum=2026-11-13
     Antwort des Owners auf die Checkpoint-Frage von Task 4, am 13.11.2026 per Abfrage
     eingeholt und vom Orchestrator übermittelt.
+
+== Task 5: Lauf --manual auf Nextcloud 32 (angehalten) ==
+
+RAM frei_host_gb=5.23 schwelle=4.0 ergebnis=ok (5485408, 5481036, 5479656 KiB; Port 23001 frei)
+    $ docker ps        (vorher)
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 20 hours
+    HP_SHARED_KEY für die Compose-Aufrufe aus dem gestoppten Container nc-mcp-exapp-harp
+    gelesen (docker inspect, 64 Zeichen, Wert nie ausgegeben), NC_EXAPP_NEXTCLOUD_IMAGE=nextcloud:32.0.15-apache.
+    $ docker compose -f compose.exapp.yml start
+     Container nc-mcp-exapp-nc Starting 
+     Container nc-mcp-exapp-greenmail Starting 
+     Container nc-mcp-exapp-registry Starting 
+     Container nc-mcp-exapp-nc Started 
+     Container nc-mcp-exapp-nc Waiting 
+     Container nc-mcp-exapp-nc Waiting 
+     Container nc-mcp-exapp-registry Started 
+     Container nc-mcp-exapp-greenmail Started 
+     Container nc-mcp-exapp-nc Healthy 
+     Container nc-mcp-exapp-harp Starting 
+     Container nc-mcp-exapp-nc Healthy 
+     Container nc-mcp-exapp-caddy Starting 
+     Container nc-mcp-exapp-harp Started 
+     Container nc-mcp-exapp-caddy Started 
+    exit=0
+RAM frei_host_gb=4.88 schwelle=4.0 ergebnis=ok (nach dem Start, 5112060, 5132996, 5116152 KiB)
+    $ occ app_api:app:unregister mcp_connector
+    Error during disabling mcp_connector ExApp.
+    exit=1
+    $ occ app_api:daemon:unregister manual_install
+    Error: manual_install daemon contains 1 ExApps, please remove them first to proceed.
+    exit=1
+    $ occ app_api:daemon:list
+    Registered ExApp daemon configs:
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    | Def | Name              | Display name        | Deploy ID      | Protocol | Host                 | NC Url       | Is HaRP | HaRP FRP Address | HaRP Docker Socket Port |
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    | *   | harp_proxy_docker | Harp Proxy (Docker) | docker-install | http     | appapi-harp:8780     | http://caddy | yes     | appapi-harp:8782 | 24000                   |
+    |     | manual_install    | Manual Install      | manual-install | http     | host.docker.internal | http://caddy | no      | (none)           | (none)                  |
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    $ occ app_api:app:list
+    ExApps:
+    mcp_connector (MCP Connector): 9.9.9 [disabled]
+    Ursache aus nextcloud.log (2026-11-13T11:29:15, occ app_api:app:unregister): AppAPI ruft
+    vor dem Abmelden http://host.docker.internal:23001/enabled?enabled=0 beim lokalen
+    Prozess auf; der lief nicht (cURL error 7), also "Failed to disable ExApp mcp_connector"
+    und Abbruch des unregister. Der Daemon lässt sich nicht abmelden, solange die App daran
+    hängt. Nebenwirkung: die App steht jetzt auf [disabled] statt [enabled]; Daemon-Eintrag
+    und App-Eintrag 9.9.9 sind sonst unverändert.
+ABBRUCH unregister grund=appapi-verweigert (app:unregister exit=1 ohne laufenden lokalen Prozess)
+    Nach dem Plan (Task 5: "Verweigert AppAPI einen Schritt: anhalten, melden") kein
+    zweiter Versuch, kein --force, kein Prozessstart, kein Lauf von bootstrap_exapp.sh.
+    $ docker compose -f compose.exapp.yml stop        (exit=0)
+     Container nc-mcp-exapp-caddy Stopping 
+     Container nc-mcp-exapp-harp Stopping 
+     Container nc-mcp-exapp-greenmail Stopping 
+     Container nc-mcp-exapp-registry Stopping 
+     Container nc-mcp-exapp-harp Stopped 
+     Container nc-mcp-exapp-caddy Stopped 
+     Container nc-mcp-exapp-nc Stopping 
+     Container nc-mcp-exapp-registry Stopped 
+     Container nc-mcp-exapp-greenmail Stopped 
+     Container nc-mcp-exapp-nc Stopped 
+GESTOPPT nc-mcp-exapp volume_bleibt=ja
+    Volumes nc-mcp-exapp_nextcloud-exapp-data und nc-mcp-exapp_registry-exapp-data vorhanden.
+    Fremder Container gameworld-dev-gameworld-docker-proxy-1: Exited (0) um
+    2026-11-13T11:29:16Z, also vor dem eigenen Stopp (11:29:30) und nicht durch ihn;
+    von hier weder gestoppt noch wieder gestartet.
+BOOTSTRAP NC32 ergebnis=abgebrochen grund=app-unregister-verweigert-ohne-lokalen-prozess
+    Geheimnisprüfung Task 5: einziger Treffer APP_ID (mcp_connector, öffentlich).
