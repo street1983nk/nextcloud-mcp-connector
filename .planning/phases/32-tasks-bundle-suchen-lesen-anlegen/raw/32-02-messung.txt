@@ -269,3 +269,132 @@ BASELINE-VERGLEICH nc35 konto=p3202nie gleich=ja
 docker stop nc35-nc -> nc35-nc | laeuft=false
 docker stop nc35-harp -> nc35-harp | laeuft=false
 docker stop nc35-caddy -> nc35-caddy | laeuft=false
+
+== Task 5 (2c): Nextcloud 32 unter Impersonation (FREIGABE zustand=option-a) ==
+    Geheimnisprüfung wie in Task 4: Treffer nur auf öffentliche Werte (APP_ID, APP_VERSION,
+    URL-Anfang, alice, bob). Gestartet nur nc-mcp-exapp-nc und nc-mcp-exapp-caddy per docker start;
+    der lokale Prozess war nicht nötig (KONTROLLE impersonation status=200 ohne ihn).
+    Befund im Rückbau: occ app:remove auf 32.0.15 verweigert eine deaktivierte App ("tasks is not
+    enabled"), der erste Rückbau endete mit tasksapp=abweichend. Das Programm entfernt seither die
+    App im aktiven Zustand (Fix im Commit nach diesem); der zweite Lauf "teardown --tasks-before keine"
+    stellte den Zustand vorher her (tasksapp=wie-vorher, App-Verzeichnis entfernt, BASELINE gleich).
+
+# tasks_measure.py up 2026-11-13T12:04:31Z
+
+== up nc32 ==
+RAM frei_host_gb=4.87 schwelle=4.0 ergebnis=ok
+(no running container)
+docker start nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+docker start nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy
+nc-mcp-exapp-nc: installed (attempt 1)
+# tasks_measure.py live 2026-11-13T12:04:39Z
+
+== live nc32 steps=names,link,home,appstate, start 2026-11-13T12:04:39Z ==
+EXAPP nc32 info_xml=0.7.2 registriert=mcp_connector (MCP Connector): 0.7.2 [enabled]
+GET http://127.0.0.1:8081/status.php -> HTTP 200
+VERSION OF RECORD nc32 32.0.15
+dbtype: sqlite3
+KONTROLLE impersonation status=200 gleich=ja
+TASKSAPP nc32 vorher=keine
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+TASKSAPP nc32 messung=0.18.1
+SETUP MKCALENDAR liste=p3202-eigen status=201
+SETUP MKCALENDAR liste=p3202-rw status=201
+SETUP FREIGABE liste=p3202-rw schreibrecht=ja status=200
+SETUP MKCALENDAR liste=p3202-ro status=201
+SETUP FREIGABE liste=p3202-ro schreibrecht=nein status=200
+PROPFIND Depth 1 kalender-home status=207 bytes=8892
+NAMEN nc32 sammlung=eigen owner_displayname_lesbar=ja zusatz_passt=nein name_ohne_zusatz_gleich_original=ja owner_gleich_eigenem_owner=ja read_only=fehlt privilegien=bind,read,read-acl,read-current-user-privilege-set,read-free-busy,unbind,unlock,write,write-acl,write-content,write-properties schreibrecht_spike_menge=ja shared_by_in_uri=nein komponenten=VTODO
+NAMEN nc32 sammlung=rw owner_displayname_lesbar=ja zusatz_passt=ja name_ohne_zusatz_gleich_original=ja owner_gleich_eigenem_owner=nein read_only=leer privilegien=bind,read,read-acl,read-current-user-privilege-set,read-free-busy,unbind,unlock,write,write-acl,write-content,write-properties schreibrecht_spike_menge=ja shared_by_in_uri=ja komponenten=VTODO
+NAMEN nc32 sammlung=ro owner_displayname_lesbar=ja zusatz_passt=ja name_ohne_zusatz_gleich_original=ja owner_gleich_eigenem_owner=nein read_only=1 privilegien=read,read-acl,read-current-user-privilege-set,read-free-busy,write-properties schreibrecht_spike_menge=nein shared_by_in_uri=ja komponenten=VTODO
+NAMEN nc32 sammlung=deck owner_displayname_lesbar=nein zusatz_passt=nein name_ohne_zusatz_gleich_original=n/a owner_gleich_eigenem_owner=nein read_only=fehlt privilegien=read,read-acl,read-current-user-privilege-set,read-free-busy,write-properties schreibrecht_spike_menge=nein shared_by_in_uri=nein komponenten=VTODO
+SETUP MKCALENDAR liste=p3202-sonder-äö status=201
+SETUP PUT link-aufgabe fall=eigen status=201
+SETUP PUT link-aufgabe fall=geteilt status=201
+SETUP PUT link-aufgabe fall=sonderzeichen status=201
+PROVIDER suche status=200 eintraege=3
+PROVIDERLINK nc32 fall=eigen form=pfad index_php=nein aufloesbar=ja shared_by_im_link=nein prozentkodiert=nein link={base}/apps/tasks/calendars/p3202-eigen/tasks/p3202-link-eigen-120442.ics
+PROVIDERLINK nc32 fall=geteilt form=pfad index_php=nein aufloesbar=ja shared_by_im_link=ja prozentkodiert=nein link={base}/apps/tasks/calendars/p3202-rw_shared_by_<konto>/tasks/p3202-link-geteilt-120442.ics
+PROVIDERLINK nc32 fall=sonderzeichen form=pfad index_php=nein aufloesbar=ja shared_by_im_link=nein prozentkodiert=nein link={base}/apps/tasks/calendars/p3202-sonder-äö/tasks/p3202-link-sonder-ä&+ 120442.ics
+LINK nc32 form=index.php auth=anonym status=401 ziel=fehler location=-
+LINK nc32 form=index.php auth=impersonation status=200 ziel=aufgabe location=-
+LINK nc32 form=ohne auth=anonym status=401 ziel=fehler location=-
+LINK nc32 form=ohne auth=impersonation status=200 ziel=aufgabe location=-
+LINK nc32 form=startseite auth=impersonation status=200 ziel=aufgabe
+occ user:add --password-from-env p3202frisch (password via stdin)
+occ user:add --password-from-env p3202nie (password via stdin, never used)
+ERSTANMELDUNG konto=frisch basic GET /ocs/v2.php/cloud/user status=200 kalender_db=2
+HOME nc32 konto=frisch status=207 vtodo_listen=0 kalender=2 nur_vevent=ja zweiter_status=207 kalender_db_vorher=2 kalender_db_danach=2 fehler=(root {DAV:}multistatus)
+HOME nc32 konto=nie status=207 vtodo_listen=0 kalender=0 nur_vevent=nein zweiter_status=207 kalender_db_vorher=0 kalender_db_danach=0 fehler=(root {DAV:}multistatus)
+APPSTATE nc32 zustand=an navigation=ja provider=ja app_list=0.18.1 nav_status=200 provider_suche_status=200 provider_treffer=3
+occ app:disable tasks -> tasks 0.18.1 disabled
+APPSTATE nc32 zustand=disable-ohne-neustart navigation=ja provider=ja app_list=aus-0.18.1 (installed 0.18.1) nav_status=200 provider_suche_status=200 provider_treffer=3
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+APPSTATE nc32 zustand=disable-nach-neustart navigation=nein provider=nein app_list=aus-0.18.1 (installed 0.18.1) nav_status=200 provider_suche_status=200 provider_treffer=0
+occ app:enable tasks -> tasks 0.18.1 enabled
+APPSTATE nc32 zustand=enable-ohne-neustart navigation=nein provider=nein app_list=0.18.1 nav_status=200 provider_suche_status=200 provider_treffer=0
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+APPSTATE nc32 zustand=wieder-an navigation=ja provider=ja app_list=0.18.1 nav_status=200 provider_suche_status=200 provider_treffer=3
+
+== rueckbau nc32 ==
+RUECKBAU freigabe_entfernt liste=p3202-rw status=200
+RUECKBAU freigabe_entfernt liste=p3202-ro status=200
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU papierkorb konto=alice entfernte_eintraege=0
+RUECKBAU reste konto=alice listen_mit_praefix=0
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+RUECKBAU papierkorb konto=bob entfernte_eintraege=0
+RUECKBAU reste konto=bob listen_mit_praefix=0
+occ user:delete p3202frisch -> The specified user was deleted
+occ user:delete p3202nie -> The specified user was deleted
+occ app:disable tasks -> tasks 0.18.1 disabled
+occ app:remove tasks -> tasks is not enabled
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+RUECKBAU nc32 tasksapp=abweichend vorher=keine nachher=aus-0.18.1
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE-VERGLEICH nc32 konto=alice gleich=ja
+BASELINE-VERGLEICH nc32 konto=bob gleich=ja
+BASELINE-VERGLEICH nc32 konto=p3202frisch gleich=ja
+BASELINE-VERGLEICH nc32 konto=p3202nie gleich=ja
+# tasks_measure.py teardown 2026-11-13T12:05:51Z
+
+== rueckbau nc32 ==
+RUECKBAU freigabe_entfernt liste=p3202-rw status=404
+RUECKBAU freigabe_entfernt liste=p3202-ro status=404
+RUECKBAU papierkorb konto=alice entfernte_eintraege=0
+RUECKBAU reste konto=alice listen_mit_praefix=0
+RUECKBAU papierkorb konto=bob entfernte_eintraege=0
+RUECKBAU reste konto=bob listen_mit_praefix=0
+occ user:delete p3202frisch -> User does not exist
+occ user:delete p3202nie -> User does not exist
+occ app:enable tasks -> tasks 0.18.1 enabled
+occ app:remove tasks -> tasks disabled tasks 0.18.1 removed
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+RUECKBAU nc32 tasksapp=wie-vorher vorher=keine nachher=keine
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=nach-teardown
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nach-teardown
+BASELINE nc32 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nach-teardown
+BASELINE nc32 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nach-teardown
+# tasks_measure.py stop 2026-11-13T12:06:11Z
+
+== stop nc32 ==
+docker stop nc-mcp-exapp-nc -> nc-mcp-exapp-nc | laeuft=false
+docker stop nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy | laeuft=false
+RUECKBAU nc32 tasksapp=keine (nach dem zweiten Lauf; App-Verzeichnisse custom_apps/tasks und apps/tasks nicht vorhanden)
