@@ -1,0 +1,103 @@
+BASIS b40f7623a5111b95a3fe3cf6e5295c4965ca7056
+    Rohprotokoll Plan 32-01 (D-32-13). Beginn 2026-11-13T11:11:25Z, Worktree tasks-080,
+    Branch plan/v1.8-tasks-080, HEAD = BASIS (Commit "docs(32): create phase plan"),
+    Phasenordner sauber, alle PLAN-Dateien und 32-RULES.md versioniert.
+
+== Task 1: Messung je Fassung vor dem Umbau (nur lesend) ==
+
+RAM frei_host_gb=4.99 schwelle=4.0 ergebnis=ok (vor nc32, drei Messungen 5234692, 5234184, 5234392 KiB)
+    $ docker ps --format "{{.Names}} {{.Image}} {{.Status}}"
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 20 hours
+    Alle Container von nc-mcp-exapp und nc35 Exited, kein eigener Container lief.
+
+    Vorgehen je Fassung: nur der Nextcloud-Container wurde gestartet (für occ und den
+    PHP-Aufruf genügt er; HaRP, Caddy, Greenmail und Registry blieben gestoppt, damit
+    weniger RAM belegt ist und kein HP_SHARED_KEY gelesen werden musste). Erlaubt nach
+    32-RULES.md Abschnitt 5 (nur docker start/stop). Der PHP-Aufruf ist ein Skript aus dem
+    Scratchpad, per stdin an `php` im Container übergeben (als www-data, Arbeitsordner
+    /var/www/html, `require '/var/www/html/lib/base.php'`), gleichwertig zu `php -r`:
+        $a = \OCP\Server::get(\OCA\AppAPI\DeployActions\ManualActions::class);
+        $cfg = ['harp' => false, 'nextcloud_url' => 'http://caddy', 'additional_options' => []];
+        $a->resolveExAppUrl('mcp_connector', 'http', $host, $cfg, 23001, $auth);
+    mit $host = 'host.docker.internal:23001' (mit-port) und 'host.docker.internal'
+    (ohne-port). Kein Registrieren, kein Schreibzugriff auf die Datenbank.
+
+-- nc32: Topologie nc-mcp-exapp, nur Container nc-mcp-exapp-nc --
+    $ docker start nc-mcp-exapp-nc        (healthy)
+FASSUNG nc32 version=32.0.15
+    $ occ status
+      - installed: true
+      - version: 32.0.15.1
+      - versionstring: 32.0.15
+      - maintenance: false
+      - needsDbUpgrade: false
+APPAPI nc32 version=32.0.0
+    $ occ app:list | grep app_api
+      - app_api: 32.0.0
+NAMEOPTION nc32 vorhanden=nein
+    $ occ user:auth-tokens:add --help        (Abschnitt Options, vollständig)
+    Options:
+          --password-from-env  Read password from environment variable NC_PASS/OC_PASS. ...
+      -h, --help               ...
+      -q, --quiet / -V, --version / --ansi|--no-ansi / -n, --no-interaction / --no-warnings / -v|vv|vvv
+    Signatur (apps/app_api/lib/DeployActions/ManualActions.php):
+    49:	public function resolveExAppUrl(
+    50-		string $appId, string $protocol, string $host, array $deployConfig, int $port, array &$auth
+    51-	): string {
+    69:		return sprintf('%s://%s:%s', $protocol, $host, $port);
+    (kein explode auf den Host)
+HEARTBEAT nc32 host=mit-port url=http://host.docker.internal:23001:23001
+HEARTBEAT nc32 host=ohne-port url=http://host.docker.internal:23001
+    $ docker stop nc-mcp-exapp-nc
+
+-- nc34: Wegwerf-Instanz aus compose.spike-tags.yml, NC_SPIKE_TAG=34.0.4-apache --
+    Volume nc-mcp-spike-tags_nc-spike-tags-data vorher nicht vorhanden (frische Installation).
+    Admin-Passwort per openssl rand erzeugt, nur in der Umgebung des Compose-Aufrufs, nie ausgegeben.
+    $ docker compose -f compose.spike-tags.yml up -d --wait        (Healthy)
+FASSUNG nc34 version=34.0.4
+    $ occ status
+      - installed: true
+      - version: 34.0.4.1
+      - versionstring: 34.0.4
+APPAPI nc34 version=34.0.0
+NAMEOPTION nc34 vorhanden=ja
+    $ occ user:auth-tokens:add --help | grep -- --name
+    13:      --name=NAME          Name for the app password, defaults to "cli".
+    Signatur gleich wie auf 32 (ein Komma am Ende der Parameterliste mehr), Zeile 69:
+    69:		$host = explode(':', $host)[0];
+    70:		return sprintf('%s://%s:%s', $protocol, $host, $port);
+HEARTBEAT nc34 host=mit-port url=http://host.docker.internal:23001
+HEARTBEAT nc34 host=ohne-port url=http://host.docker.internal:23001
+    $ docker compose -f compose.spike-tags.yml down -v
+     Volume nc-mcp-spike-tags_nc-spike-tags-data Removed
+     Network nc-mcp-spike-tags_default Removed
+    Danach kein Volume mit "spike" mehr vorhanden.
+
+RAM frei_host_gb=3.01 schwelle=4.0 ergebnis=zu wenig (vor nc35, 3100600, 3124812, 3160232 KiB; Docker leer bis auf den fremden Proxy)
+    $ wsl -d docker-desktop sh -c "sync; echo 3 > /proc/sys/vm/drop_caches; echo 1 > /proc/sys/vm/compact_memory"
+    exit=0, 75 s gewartet
+RAM frei_host_gb=5.31 schwelle=4.0 ergebnis=ok (vor nc35, 5577652, 5573628, 5565940 KiB)
+
+-- nc35: Topologie nc35, nur Container nc35-nc (Image nextcloud:35.0.0-apache-local) --
+    $ docker start nc35-nc
+FASSUNG nc35 version=35.0.0
+    $ occ status
+      - installed: true
+      - version: 35.0.0.10
+      - versionstring: 35.0.0
+APPAPI nc35 version=35.0.0
+NAMEOPTION nc35 vorhanden=ja
+    $ occ user:auth-tokens:add --help | grep -- --name
+    13:      --name=NAME              Name for the app password, defaults to "cli".
+    Signatur wie auf 34; Zeile 69: $host = explode(':', $host)[0];
+HEARTBEAT nc35 host=mit-port url=http://host.docker.internal:23001
+HEARTBEAT nc35 host=ohne-port url=http://host.docker.internal:23001
+    $ docker stop nc35-nc
+    $ docker ps        (danach)
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 20 hours
+
+ENTSCHEID UMBAU name_erkennung=ok host_ohne_port=ok
+    name_erkennung: 32 kennt --name nicht, 34 und 35 kennen es (Standardname dort "cli").
+    host_ohne_port: ohne Port auf 32, 34 und 35 http://host.docker.internal:23001; auf 34
+    und 35 mit und ohne Port dieselbe URL. Der Host ohne Port ändert auf 34 und 35 nichts
+    an der Heartbeat-URL; auf 32 behebt er "host.docker.internal:23001:23001".
