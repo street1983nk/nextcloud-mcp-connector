@@ -488,8 +488,9 @@ async def test_the_budget_covers_the_report(
         return store.report(request)
 
     with respx.mock(assert_all_called=False) as mock:
-        mock.route(method="REPORT", url=task_store.list_url(OWN)).mock(side_effect=slow)
         task_store.mount(mock, store)
+        # the same pattern again replaces the REPORT route of the store
+        mock.route(method="REPORT", url=task_store.list_url(OWN)).mock(side_effect=slow)
         with pytest.raises(ToolError) as caught:
             await run(clients, listed(OWN))
     assert "list did not answer in time" in caught.value.message
@@ -499,8 +500,10 @@ async def test_the_budget_covers_the_report(
 def test_no_write_runs_under_a_time_budget_or_side_by_side() -> None:
     source = Path(inspect.getfile(tasks_tools)).read_text(encoding="utf-8")
     body = source[source.index("async def run_chain(") :]
-    body = body[: body.index("\n\n\n")]
-    assert "write(" in body
+    end = body.find("\n\n\n")
+    body = body if end < 0 else body[:end]
+    assert "await write(" in body
+    assert "return report" in body
     assert "timeout" not in body
     assert "gather" not in body
     assert "create_task" not in body

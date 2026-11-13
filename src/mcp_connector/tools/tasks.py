@@ -20,10 +20,13 @@ anything else happens (ME-03). Attachments are never read.
 """
 
 import asyncio
+import dataclasses
 import re
 import uuid
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
+from enum import Enum
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -33,7 +36,14 @@ from icalendar import Timezone as IcsTimezone
 from icalendar import Todo as IcsTodo
 
 from .. import ids, paging
-from ..errors import REASON_GUARD_TRIPPED, REASON_UNKNOWN_ID, ToolError
+from ..errors import (
+    REASON_GUARD_TRIPPED,
+    REASON_PERMISSION_DENIED,
+    REASON_TIMEOUT,
+    REASON_UNKNOWN_ID,
+    ConflictError,
+    ToolError,
+)
 from ..nextcloud import NcClients
 from ..nextcloud.clients import caldav
 from ..nextcloud.clients import tasks as tasks_client
@@ -1210,3 +1220,164 @@ def check_chain(task_list: tasks_client.TaskList, descendants: list[dict[str, An
                 "recurring tasks.",
                 "Nothing was changed. Detach that subtask in the Nextcloud Tasks app first.",
             )
+
+
+async def read_chain_list(
+    clients: NcClients, task_list: tasks_client.TaskList
+) -> tuple[list[dict[str, Any]], int]:
+    """One REPORT of the whole list without prefilter, the entries of :func:`chain_entries`.
+
+    A completed or cancelled subtask is a descendant as well, so nothing is filtered on the
+    server. The budget :data:`PER_LIST_TIMEOUT` covers this read alone, never a write
+    (pitfall 4); a list that does not answer in time is a refusal before any write.
+    """
+    try:
+        async with asyncio.timeout(PER_LIST_TIMEOUT):
+            objects = await tasks_client.query_todos(
+                clients.client, clients.creds, task_list, tasks_client.build_todo_query(None)
+            )
+    except (TimeoutError, httpx.TimeoutException):
+        raise ToolError(
+            message=(
+                f"The task list did not answer in time ({_seconds(PER_LIST_TIMEOUT)}): "
+                f"nothing was changed in {_list_name(task_list)}."
+            ),
+            hint="Try again in a moment; the task and its subtasks are as they were.",
+            reason=REASON_TIMEOUT,
+        ) from None
+    return chain_entries(task_list, objects)
+
+
+class ChainSkip(Enum):
+    """What a step of the chain does instead of a write."""
+
+    #: Already in the target state: no request, counted in ``unchanged``.
+    UNCHANGED = "unchanged"
+    #: Deliberately not touched (a cancelled subtask when completing, D-33-14): no request,
+    #: named in ``left_alone``.
+    LEFT_ALONE = "left_alone"
+
+
+#: Builds the new text of one entry, or says why there is nothing to write. Raises
+#: ``ics_edit.EditRefused`` when the object cannot be edited safely.
+ChainDecide = Callable[[dict[str, Any]], bytes | ChainSkip]
+
+#: Writes one entry with the payload of :data:`ChainDecide` under the given ETag and returns
+#: the new ETag or an empty text; ``clients/tasks.put_existing_todo`` or ``move_todo``.
+ChainWrite = Callable[[dict[str, Any], bytes, str], Awaitable[str]]
+
+#: The sentence of each stop reason; the report never carries a message of the server.
+_CHAIN_STOPS = {
+    "conflict": "it changed since it was read (412)",
+    "uid_conflict": "the target list already holds a task with the same UID (409)",
+    "not_found_or_read_only": "Nextcloud does not find it or gives no write permission (404)",
+    "refused": "the change was refused",
+    "server_error": "Nextcloud reported an error, so the outcome of that write is not known",
+    "outcome_unknown": "Nextcloud did not answer, so the outcome of that write is not known",
+}
+
+
+@dataclass
+class ChainReport:
+    """What a chain did: task ids and the list only, never a URI or an owner."""
+
+    task_list: tasks_client.TaskList
+    root_id: str
+    changed: list[str] = dataclasses.field(default_factory=list)
+    unchanged: int = 0
+    left_alone: list[str] = dataclasses.field(default_factory=list)
+    skipped: int = 0
+    failed: str | None = None
+    reason: str | None = None
+    #: The new ETag of the named task after its write; ``None`` when it was not written,
+    #: empty when the server sent none (then only a new read tells it).
+    root_etag: str | None = None
+
+    def as_answer(self) -> dict[str, Any]:
+        answer: dict[str, Any] = {
+            "list": _list_info(self.task_list),
+            "changed": list(self.changed),
+            "unchanged": self.unchanged,
+        }
+        if self.left_alone:
+            answer["left_alone"] = list(self.left_alone)
+        if self.skipped:
+            answer["skipped"] = self.skipped
+        if self.failed is not None and self.reason is not None:
+            answer["failed"] = self.failed
+            answer["reason"] = self.reason
+            answer["message"] = self._stop_sentence()
+        return answer
+
+    def _stop_sentence(self) -> str:
+        sentence = f"Stopped at {self.failed}: {_CHAIN_STOPS[self.reason or 'refused']}."
+        if self.failed != self.root_id:
+            sentence += (
+                f" {len(self.changed)} subtasks listed in changed were changed and stay so; "
+                f"the named task {self.root_id} was not changed."
+            )
+        return sentence + (
+            " Nothing was retried or undone: read the task again with tasks_read before the "
+            "next call."
+        )
+
+
+def _chain_reason(exc: Exception) -> str:
+    """The stop reason of one failed step, from the error of the conditional writers."""
+    if isinstance(exc, ics_edit.EditRefused):
+        return "refused"
+    if isinstance(exc, httpx.RequestError):
+        return "outcome_unknown"
+    if isinstance(exc, ConflictError):
+        # The two conflicts of clients/tasks.py name their status in the message.
+        return "uid_conflict" if "(409)" in exc.message else "conflict"
+    if isinstance(exc, ToolError):
+        if exc.reason == REASON_UNKNOWN_ID:
+            return "not_found_or_read_only"
+        if exc.reason == REASON_PERMISSION_DENIED:
+            return "refused"
+        if exc.reason == REASON_TIMEOUT:
+            return "outcome_unknown"
+    return "server_error"
+
+
+async def run_chain(
+    task_list: tasks_client.TaskList,
+    root: dict[str, Any],
+    root_etag: str,
+    descendants: list[dict[str, Any]],
+    decide: ChainDecide,
+    write: ChainWrite,
+    *,
+    skipped: int = 0,
+) -> ChainReport:
+    """Write the descendants one after the other, then the named task (D-33-09).
+
+    Strictly sequential, never side by side (two writes of one account at once gave
+    "database is locked" on SQLite, pitfall 7), and without a time budget around a write
+    (pitfall 4). Every descendant carries ``If-Match`` on the ETag of the REPORT of this
+    call, only the named task the ETag of the assistant. A step in the target state or
+    marked to be left alone sends nothing. The first failure stops the chain: no further
+    request, no second attempt, nothing undone; the named task, which comes last, then
+    stays as it was, and the report names what was already changed and why it stopped.
+    """
+    report = ChainReport(task_list=task_list, root_id=root["id"], skipped=skipped)
+    for entry in [*descendants, root]:
+        is_root = entry is root
+        try:
+            step = decide(entry)
+            if step is ChainSkip.UNCHANGED:
+                report.unchanged += 1
+                continue
+            if step is ChainSkip.LEFT_ALONE:
+                report.left_alone.append(entry["id"])
+                continue
+            new_etag = await write(entry, step, root_etag if is_root else entry["etag"])
+        except (ToolError, ics_edit.EditRefused, httpx.RequestError) as exc:
+            report.failed = entry["id"]
+            report.reason = _chain_reason(exc)
+            return report
+        report.changed.append(entry["id"])
+        if is_root:
+            report.root_etag = new_etag
+    return report

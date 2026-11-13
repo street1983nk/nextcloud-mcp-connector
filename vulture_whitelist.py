@@ -405,3 +405,6 @@ verify
 chain_entries
 descendants_post_order
 check_chain
+read_chain_list
+run_chain
+as_answer

@@ -150,11 +150,17 @@ class TaskStore:
             self.open -= 1
 
 
+#: A carriage return survives XML only as a character reference; without it the parser turns
+#: every CRLF of the stored text into LF and the REPORT would not show the stored bytes.
+CR = {"\r": "&#13;"}
+
+
 def multistatus(uri: str, objects: Iterable[tuple[str, bytes, str]]) -> httpx.Response:
+    """The REPORT answer: every object with its ``getetag`` and its exact text."""
     entries = "".join(
         f"<d:response><d:href>{HOME_PATH}{quote(uri, safe='')}/{quote(name, safe='')}</d:href>"
         f"<d:propstat><d:prop><d:getetag>{escape(tag)}</d:getetag>"
-        f"<cal:calendar-data>{escape(blob.decode('utf-8'))}</cal:calendar-data></d:prop>"
+        f"<cal:calendar-data>{escape(blob.decode('utf-8'), CR)}</cal:calendar-data></d:prop>"
         "<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"
         for name, blob, tag in objects
     )
