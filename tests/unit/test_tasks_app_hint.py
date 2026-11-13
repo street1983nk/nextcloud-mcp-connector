@@ -24,6 +24,7 @@ import pytest
 import respx
 
 from mcp_connector import ids
+from mcp_connector.errors import ToolError
 from mcp_connector.nextcloud import NcClients, capabilities
 from mcp_connector.nextcloud.credentials import Credentials
 from mcp_connector.tools import tasks as tasks_tools
@@ -157,5 +158,39 @@ async def test_read_task_has_no_sentence_and_asks_no_ocs(clients: NcClients) -> 
         ocs = mock_ocs(mock)
         result = await tasks_tools.read_task(clients, task_id=ids.encode_task(OWN, name))
     assert result["summary"] == "one"
+    assert_no_off_sentence(result)
+    assert ocs.call_count == 0
+
+
+@pytest.mark.anyio
+async def test_e6_of_tasks_create_has_no_sentence_and_asks_no_ocs(clients: NcClients) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        mock_discovery(mock, "caldav_home_fresh_account.xml")
+        ocs = mock_ocs(mock)
+        with pytest.raises(ToolError) as caught:
+            await tasks_tools.create_task(clients, summary="t")
+    assert_no_off_sentence({"message": caught.value.message, "hint": caught.value.hint})
+    assert ocs.call_count == 0
+
+
+@pytest.mark.anyio
+async def test_a_created_task_has_no_hint_and_asks_no_ocs(clients: NcClients) -> None:
+    stored: dict[str, bytes] = {}
+
+    def put(request: httpx.Request) -> httpx.Response:
+        stored[request.url.path] = request.content
+        return httpx.Response(201)
+
+    def get(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=stored[request.url.path])
+
+    with respx.mock(assert_all_called=False) as mock:
+        mock_discovery(mock, "caldav_home_task_lists.xml")
+        mock.route(method="PUT", url__startswith=CALENDAR_HOME).mock(side_effect=put)
+        mock.route(method="GET", url__startswith=CALENDAR_HOME).mock(side_effect=get)
+        ocs = mock_ocs(mock)
+        result = await tasks_tools.create_task(clients, summary="t", list_name=OWN)
+    assert result["created"] is True
+    assert "hint" not in result
     assert_no_off_sentence(result)
     assert ocs.call_count == 0
