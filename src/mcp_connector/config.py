@@ -49,6 +49,7 @@ ENV_PUBLIC_URL = "NC_MCP_PUBLIC_URL"
 ENV_TALK_SEND = "NC_MCP_TALK_SEND"
 ENV_FILES_ROOT = "NC_MCP_FILES_ROOT"
 ENV_FILES_UPDATE = "NC_MCP_FILES_UPDATE"
+ENV_TASKS_UPDATE = "NC_MCP_TASKS_UPDATE"
 # Comma separated tool bundle names whose tools are not registered (issue #15).
 ENV_DISABLED_TOOLS = "NC_MCP_DISABLED_TOOLS"
 
@@ -730,6 +731,32 @@ def files_update_enabled(env: Mapping[str, str] | None = None) -> bool:
     logger.warning(
         "%s is neither on nor off, so files_update stays disabled (understood are %s and %s).",
         ENV_FILES_UPDATE,
+        ", ".join(sorted(_TRUE_VALUES)),
+        ", ".join(sorted(_FALSE_VALUES)),
+    )
+    return False
+
+
+def tasks_update_enabled(env: Mapping[str, str] | None = None) -> bool:
+    """Whether the tools that change existing tasks are available at all (D-33-01).
+
+    The direction of :func:`files_update_enabled`, and read the same way: once, when the
+    task tools register. The shipped state is off, so an unset, blank or unrecognised value
+    keeps tasks_complete, tasks_update and tasks_move disabled; only an explicitly understood
+    true value enables them. A value nobody understands is named by its field, never quoted.
+    """
+    source = os.environ if env is None else env
+    value = (source.get(ENV_TASKS_UPDATE) or "").strip().lower()
+    if not value:
+        return False
+    if value in _TRUE_VALUES:
+        return True
+    if value in _FALSE_VALUES:
+        return False
+    logger.warning(
+        "%s is neither on nor off, so tasks_complete, tasks_update and tasks_move stay "
+        "disabled (understood are %s and %s).",
+        ENV_TASKS_UPDATE,
         ", ".join(sorted(_TRUE_VALUES)),
         ", ".join(sorted(_FALSE_VALUES)),
     )

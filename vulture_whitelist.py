@@ -376,3 +376,10 @@ background
 # Empty again, as announced: _read_todo sat here between task 1 and task 2 of plan 32-04 and
 # left with search_tasks, its caller. search_tasks, read_task (plan 32-04) and create_task
 # (plan 32-04b) left with plan 32-05, whose reg_tasks.py calls all three.
+
+# --- The switch of the modifying task tools, plan 33-02 ------------------------------------
+# Temporary: the switch chain of NC_MCP_TASKS_UPDATE lands before any tool hangs on it
+# (D-33-00d). Its reader is reg_tasks.py once plan 33-06 registers tasks_complete behind it,
+# and the name leaves this list with that plan; until then the unit tests and the ExApp start
+# test in a fresh interpreter (tests/unit/test_exapp_tasks_update_switch.py) call it.
+tasks_update_enabled

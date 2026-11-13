@@ -669,6 +669,15 @@ def main() -> None:
     if config.ENV_FILES_UPDATE in resolved:
         os.environ[config.ENV_FILES_UPDATE] = resolved[config.ENV_FILES_UPDATE]
 
+    # The third key that travels, for the same reader and for the same reason (D-33-00d).
+    # The switch of the tools that change existing tasks is read once, when ``.server``
+    # registers the task tools, and that registration reads the process environment. Without
+    # this line a box unticked in Nextcloud would leave tools armed that overwrite and move
+    # existing tasks. The write comes before :func:`build_exapp_app` like the one above, and
+    # the price is the same activation cycle.
+    if config.ENV_TASKS_UPDATE in resolved:
+        os.environ[config.ENV_TASKS_UPDATE] = resolved[config.ENV_TASKS_UPDATE]
+
     try:
         config.exapp_settings(resolved)
         # The place the OAuth store writes to, checked before the first request and not on

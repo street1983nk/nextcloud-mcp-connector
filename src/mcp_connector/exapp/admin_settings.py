@@ -130,6 +130,7 @@ def form_scheme(env: Mapping[str, str] | None = None) -> dict[str, Any]:
         talk_send_field,
         audit_log_field,
         files_update_field,
+        tasks_update_field,
     ) = CONFIG_KEYS
     return {
         "id": ADMIN_FORM_ID,
@@ -213,6 +214,15 @@ def form_scheme(env: Mapping[str, str] | None = None) -> dict[str, Any]:
                 "title": strings.ADMIN_FIELD_FILES_UPDATE_LABEL,
                 "description": strings.ADMIN_FIELD_FILES_UPDATE_DESCRIPTION,
                 "type": "checkbox",
+                "default": False,
+            },
+            {
+                "id": tasks_update_field,
+                "title": strings.ADMIN_FIELD_TASKS_UPDATE_LABEL,
+                "description": strings.ADMIN_FIELD_TASKS_UPDATE_DESCRIPTION,
+                "type": "checkbox",
+                # Off like the switch above (D-33-01): tools that overwrite and move
+                # existing tasks are an administrator's decision, never a default.
                 "default": False,
             },
         ],

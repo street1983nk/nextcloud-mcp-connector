@@ -568,6 +568,11 @@ Prérequis :
 				<description>Off unless set to on. When enabled, the files_update tool can replace existing UTF-8 text files only when their current ETag matches the supplied ETag.</description>
 			</variable>
 			<variable>
+				<name>NC_MCP_TASKS_UPDATE</name>
+				<display-name>Allow changing existing tasks</display-name>
+				<description>Off unless set to on. When enabled, assistants can complete, reopen, edit and move existing tasks with tasks_complete, tasks_update and tasks_move, and only with the ETag returned by tasks_read. A change takes effect after you disable and enable this app again.</description>
+			</variable>
+			<variable>
 				<name>NC_MCP_DISABLED_TOOLS</name>
 				<display-name>Tool bundles to switch off</display-name>
 				<description>Comma separated tool bundle names, for example mail,calendar. Unset means every bundle is on. Valid names: calendar, chatgpt, contacts, context, deck, files, mail, notes, search, tables, talk, tasks. The tools of a named bundle are not offered to assistants, which helps smaller models that confuse similar tools of a second server. An unknown name, or every name at once, stops the app at start. This is not an access control: search, fetch and prepare_context still reach the content of a switched off bundle; use Nextcloud permissions, the kein-ki tag or NC_MCP_FILES_ROOT for that. The value is read when the app starts.</description>			</variable>

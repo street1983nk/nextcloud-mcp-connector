@@ -50,6 +50,8 @@ __all__ = [
     "ADMIN_FIELD_PUBLIC_URL_LABEL",
     "ADMIN_FIELD_TALK_SEND_DESCRIPTION",
     "ADMIN_FIELD_TALK_SEND_LABEL",
+    "ADMIN_FIELD_TASKS_UPDATE_DESCRIPTION",
+    "ADMIN_FIELD_TASKS_UPDATE_LABEL",
     "ADMIN_PUBLIC_URL_EXAMPLE",
     "ADMIN_SETTINGS_DESCRIPTION",
     "ADMIN_SETTINGS_PLACE",
@@ -811,6 +813,18 @@ ADMIN_FIELD_FILES_UPDATE_DESCRIPTION = (
     "read it again and decide what to do. Updates replace the whole file; they cannot create, "
     "delete, move or rename files. Creating files remains available through the upload tool. "
     "A change takes effect after you disable and enable this app again."
+)
+
+ADMIN_FIELD_TASKS_UPDATE_LABEL = "Allow changing existing tasks"
+
+#: The form half of ``NC_MCP_TASKS_UPDATE`` (D-33-01). An opt-in write capability like the
+#: one above: the three tools change an existing task only with the ETag tasks_read returned,
+#: so a task changed in the meantime becomes a conflict rather than an overwrite. They never
+#: remove a task, and the switch follows the same activation cycle as the other switches.
+ADMIN_FIELD_TASKS_UPDATE_DESCRIPTION = (
+    "Off by default. When on, assistants can complete, reopen, edit and move existing tasks "
+    "with tasks_complete, tasks_update and tasks_move, and only with the ETag returned by "
+    "tasks_read. A change takes effect after you disable and enable this app again."
 )
 
 

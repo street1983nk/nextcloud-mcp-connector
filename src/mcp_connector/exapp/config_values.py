@@ -124,6 +124,7 @@ CONFIG_KEYS: tuple[str, ...] = (
     "talk_send",
     "audit_log",
     "files_update",
+    "tasks_update",
 )
 
 #: The variable each key stands for. The overlay speaks the language of the deploy
@@ -137,15 +138,26 @@ KEY_TO_ENV: Mapping[str, str] = {
     "talk_send": config.ENV_TALK_SEND,
     "audit_log": config.ENV_AUDIT_LOG,
     "files_update": config.ENV_FILES_UPDATE,
+    "tasks_update": config.ENV_TASKS_UPDATE,
 }
 
 #: The keys that carry a checkbox, named once so the validation cannot drift from the form.
 #: Every one of them goes through :func:`_switch`, which refuses a value that is neither on
 #: nor off instead of guessing a default. Five since phase 18: a refused ``audit_log`` leaves
 #: the key out of the overlay, so the deploy variable and then the default in code decide,
-#: and that default is off (``config.audit_log_enabled``).
+#: and that default is off (``config.audit_log_enabled``). Seven since phase 33: the two
+#: opt-in write switches ``files_update`` and ``tasks_update`` follow the same rule, and both
+#: defaults in code are off.
 SWITCH_KEYS: frozenset[str] = frozenset(
-    {"oauth_dcr", "oauth_cimd", "oauth_allowlist_only", "talk_send", "audit_log", "files_update"}
+    {
+        "oauth_dcr",
+        "oauth_cimd",
+        "oauth_allowlist_only",
+        "talk_send",
+        "audit_log",
+        "files_update",
+        "tasks_update",
+    }
 )
 
 #: The spellings a switch may arrive in. Aligned with the two sets of ``oauth/registry.py``
