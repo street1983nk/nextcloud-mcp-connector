@@ -516,3 +516,45 @@ async def test_a_task_without_parent_asks_only_for_children(clients: NcClients) 
     assert reports.kinds == ["children"]
     assert "parent" not in result
     assert "parent_unavailable" not in result
+
+
+# --- Recurring forms measured live in plan 32-10 (raw/32-10-messung.txt, WIEDER) ------------
+
+_MASTER = (
+    "BEGIN:VTODO\r\nUID:task-uid-1\r\nDTSTAMP:20261111T125506Z\r\nSUMMARY:daily\r\n"
+    "DUE:20261120T130000Z\r\nRRULE:FREQ=DAILY\r\n"
+)
+_DONE = "STATUS:COMPLETED\r\nPERCENT-COMPLETE:100\r\nCOMPLETED:20261121T140000Z\r\n"
+_OVERRIDE = (
+    "BEGIN:VTODO\r\nUID:task-uid-1\r\nDTSTAMP:20261121T140000Z\r\nSUMMARY:daily override\r\n"
+    "RECURRENCE-ID:20261121T130000Z\r\nDUE:20261121T130000Z\r\n" + _DONE + "END:VTODO\r\n"
+)
+_HEAD = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Nextcloud Tasks v0.18.1\r\n"
+
+
+@pytest.mark.anyio
+async def test_reading_a_recurring_task_with_a_completed_instance_is_the_open_master(
+    clients: NcClients,
+) -> None:
+    ics = _HEAD + _MASTER + "END:VTODO\r\n" + _OVERRIDE + "END:VCALENDAR\r\n"
+    with respx.mock(assert_all_called=False) as mock:
+        mock_task(mock, ics)
+        result = await tasks_tools.read_task(clients, task_id=TASK_ID)
+    assert result["summary"] == "daily"
+    assert result["status"] == "open"
+    assert result["recurring"] is True
+    assert result["due"] == "2026-11-20T13:00:00+00:00"
+    assert "completed" not in result
+
+
+@pytest.mark.anyio
+async def test_reading_a_recurring_task_with_a_completed_master_is_completed(
+    clients: NcClients,
+) -> None:
+    ics = _HEAD + _MASTER + _DONE + "END:VTODO\r\nEND:VCALENDAR\r\n"
+    with respx.mock(assert_all_called=False) as mock:
+        mock_task(mock, ics)
+        result = await tasks_tools.read_task(clients, task_id=TASK_ID)
+    assert result["status"] == "completed"
+    assert result["recurring"] is True
+    assert result["completed"] == "2026-11-21T14:00:00+00:00"

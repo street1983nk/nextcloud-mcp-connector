@@ -815,3 +815,85 @@ async def test_a_word_of_the_description_finds_a_task_and_the_list_name_does_not
         by_list = await tasks_tools.search_tasks(clients, query=OWN)
     assert summaries(by_word) == ["Einkauf"]
     assert summaries(by_list) == []
+
+
+# --- Recurring forms measured live in plan 32-10 (raw/32-10-messung.txt, WIEDER) ------------
+#
+# The objects as written in the measurement, from the Tasks app template, UID and SUMMARY
+# neutral. Measured on 35 and 32: the server prefilter keeps an object as long as one of its
+# VTODOs has no COMPLETED, so "instanz-erledigt" passes it and "master-erledigt" does not.
+
+RECURRING_INSTANCE_DONE = (
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Nextcloud Tasks v0.18.1\r\n"
+    "BEGIN:VTODO\r\nUID:r-inst\r\nCREATED:20261111T125049Z\r\n"
+    "LAST-MODIFIED:20261111T125506Z\r\nDTSTAMP:20261111T125506Z\r\nSUMMARY:daily inst\r\n"
+    "DUE:20261120T130000Z\r\nRRULE:FREQ=DAILY\r\nEND:VTODO\r\n"
+    "BEGIN:VTODO\r\nUID:r-inst\r\nDTSTAMP:20261121T140000Z\r\nSUMMARY:daily inst\r\n"
+    "RECURRENCE-ID:20261121T130000Z\r\nDUE:20261121T130000Z\r\nSTATUS:COMPLETED\r\n"
+    "PERCENT-COMPLETE:100\r\nCOMPLETED:20261121T140000Z\r\nEND:VTODO\r\n"
+    "END:VCALENDAR\r\n"
+)
+RECURRING_MASTER_DONE = (
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Nextcloud Tasks v0.18.1\r\n"
+    "BEGIN:VTODO\r\nUID:r-master\r\nCREATED:20261111T125049Z\r\n"
+    "LAST-MODIFIED:20261111T125506Z\r\nDTSTAMP:20261111T125506Z\r\nSUMMARY:daily master\r\n"
+    "DUE:20261120T130000Z\r\nRRULE:FREQ=DAILY\r\nSTATUS:COMPLETED\r\nPERCENT-COMPLETE:100\r\n"
+    "COMPLETED:20261121T140000Z\r\nEND:VTODO\r\nEND:VCALENDAR\r\n"
+)
+
+
+class MeasuredPrefilter(ListServer):
+    """The prefilter as measured live: an object passes when one VTODO has no COMPLETED."""
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.bodies.append(request.content)
+        objects = self.objects
+        if PREFILTER in request.content:
+            objects = [
+                (name, ics)
+                for name, ics in objects
+                if any("\r\nCOMPLETED" not in part for part in ics.split("BEGIN:VTODO")[1:])
+            ]
+        return multistatus(self.uri, objects)
+
+
+def mock_measured(mock: respx.MockRouter, objects: list[tuple[str, str]]) -> None:
+    mock_discovery(mock)
+    for uri in ALL_LISTS:
+        server = MeasuredPrefilter(uri, objects if uri == OWN else [])
+        mock.route(method="REPORT", url=list_url(uri)).mock(side_effect=server)
+
+
+async def _hits(clients: NcClients, objects: list[tuple[str, str]], status: str) -> list[Any]:
+    with respx.mock(assert_all_called=False) as mock:
+        mock_measured(mock, objects)
+        result = await tasks_tools.search_tasks(clients, status=status)
+    return result["tasks"]
+
+
+@pytest.mark.anyio
+async def test_a_recurring_task_with_a_completed_instance_stays_one_open_hit(
+    clients: NcClients,
+) -> None:
+    objects = [("r-inst.ics", RECURRING_INSTANCE_DONE)]
+    for status in ("open", "all"):
+        hits = await _hits(clients, objects, status)
+        assert len(hits) == 1, status
+        assert hits[0]["summary"] == "daily inst"
+        assert hits[0]["status"] == "open"
+        assert hits[0]["recurring"] is True
+        assert hits[0]["due"] == "2026-11-20T13:00:00+00:00"
+    assert await _hits(clients, objects, "completed") == []
+
+
+@pytest.mark.anyio
+async def test_a_recurring_task_with_a_completed_master_is_one_completed_hit(
+    clients: NcClients,
+) -> None:
+    objects = [("r-master.ics", RECURRING_MASTER_DONE)]
+    assert await _hits(clients, objects, "open") == []
+    for status in ("completed", "all"):
+        hits = await _hits(clients, objects, status)
+        assert len(hits) == 1, status
+        assert hits[0]["status"] == "completed"
+        assert hits[0]["recurring"] is True
