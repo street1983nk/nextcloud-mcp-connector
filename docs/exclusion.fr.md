@@ -331,6 +331,14 @@ fichier étiqueté sous un dossier parent visible, ce refus montre quand même q
 est particulier à cet endroit, ce qui ne peut être évité sans écrire.
 Source : [27-SECURITY.md, A-27-03](../.planning/phases/27-familien-anschluss-und-sandbox-parit-t/27-SECURITY.md).
 
+<a id="tech-folder-oracle"></a>
+### Dossier à côté d'un dossier étiqueté
+
+La création d'un dossier dans un dossier étiqueté ou en dessous reçoit le refus d'un dossier
+parent manquant ; à côté d'un dossier parent visible, ce refus montre quand même que quelque
+chose est particulier à cet endroit, ce qui ne peut être évité sans écrire.
+Source : [folder-evidence.md, Folder next to a tagged folder](folder-evidence.md#folder-next-to-a-tagged-folder).
+
 <a id="tech-tables-talk-sandbox"></a>
 ### Tables et Talk sans bac à sable
 

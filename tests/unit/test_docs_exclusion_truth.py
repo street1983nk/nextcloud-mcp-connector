@@ -6,11 +6,14 @@ D-29-07). Every sentence of those pages is a promise an administrator makes data
 decisions on (T-29-24), so this module holds what can be held mechanically:
 
 *   **The anchors.** The nine limits of D-29-05, the eight further technical limits of
-    D-29-11 and four section anchors stand as ``<a id="...">`` in all three languages, with
-    the same ids, because the French page and the READMEs of plan 29-08 link to them.
+    D-29-11, the limit of FOLD-06 and four section anchors stand as ``<a id="...">`` in all
+    three languages, with the same ids, because the French page and the READMEs of plan
+    29-08 link to them.
 *   **The evidence.** Every limit section links at least one finding under
     ``../.planning/phases/``, the file it links exists, and the three limits measured in
     phase 25 (share boundary, invisible tag, app disabled) link the measuring report.
+    The limit of FOLD-06 (a folder next to a tagged folder) cites a finding under ``docs/``
+    instead, a place that outlives the planning folder of its phase.
 *   **The links.** Every relative link of a page resolves: files exist, anchors inside the
     page exist. The links of the language switcher are held by their own test and by the
     existence test of the sibling page, not here, so a page written before its sibling is
@@ -100,8 +103,12 @@ SECTION_ANCHORS = (
     "check-command",
 )
 
-#: All 21 ids, the contract of plan 29-08.
-ALL_ANCHORS = LIMIT_ANCHORS + TECH_ANCHORS + SECTION_ANCHORS
+#: FOLD-06: the limits whose finding lives at a stable place under ``docs/`` and not under
+#: ``.planning/phases/``, so the link survives when the planning folder of a phase moves.
+STABLE_EVIDENCE_ANCHORS = ("tech-folder-oracle",)
+
+#: All 22 ids, the contract of plan 29-08 plus the limit of FOLD-06.
+ALL_ANCHORS = LIMIT_ANCHORS + TECH_ANCHORS + STABLE_EVIDENCE_ANCHORS + SECTION_ANCHORS
 
 #: The 17 sections that have to cite a finding.
 EVIDENCE_ANCHORS = LIMIT_ANCHORS + TECH_ANCHORS
@@ -219,7 +226,7 @@ def test_the_page_exists(lang: str) -> None:
 
 @page_params
 def test_the_page_carries_all_anchors(lang: str) -> None:
-    """The 21 ids are the contract the other languages and the READMEs link to."""
+    """The 22 ids are the contract the other languages and the READMEs link to."""
     present = set(anchors_in(read(PAGES[lang])))
     missing = [anchor for anchor in ALL_ANCHORS if anchor not in present]
 
@@ -236,6 +243,63 @@ def test_each_limit_cites_a_finding_that_exists(lang: str) -> None:
         for link in cited:
             target = (DOCS / link.split("#", 1)[0]).resolve()
             assert target.is_file(), f"{PAGES[lang].name}#{anchor} links a missing {link}"
+
+
+def _stable_finding_problems(section_text: str) -> list[str]:
+    """What keeps a section from citing a finding at a stable place, empty when it does.
+
+    A stable finding is a link without ``../`` whose file exists below ``docs/`` and does
+    not resolve into ``.planning/``. Web links and links into the page itself are no
+    findings. A link that leaves ``docs/`` is a problem even next to a good one, because
+    it is the link that breaks when the planning folder moves (T-31-06-01).
+    """
+    problems: list[str] = []
+    stable: list[str] = []
+    planning = (ROOT / ".planning").resolve()
+    for link in links_in(section_text):
+        if link.startswith(("http://", "https://", "mailto:", "#")):
+            continue
+        target = (DOCS / link.split("#", 1)[0]).resolve()
+        if "../" in link or target.is_relative_to(planning):
+            problems.append(f"{link} leaves docs/")
+        elif not target.is_relative_to(DOCS.resolve()) or not target.is_file():
+            problems.append(f"{link} is no file under docs/")
+        else:
+            stable.append(link)
+    if not stable:
+        problems.append("no finding under docs/ is linked")
+    return problems
+
+
+@page_params
+def test_each_stable_finding_lives_under_docs(lang: str) -> None:
+    """FOLD-06: the limit of the folder tool cites a finding that stays where it is."""
+    text = read(PAGES[lang])
+    for anchor in STABLE_EVIDENCE_ANCHORS:
+        problems = _stable_finding_problems(section_at(text, anchor))
+        assert problems == [], f"{PAGES[lang].name}#{anchor}: {problems}"
+
+
+def test_the_stable_finding_check_can_go_red() -> None:
+    """The counter check: a planted link into the planning folder, and no link at all."""
+    head = '<a id="tech-folder-oracle"></a>\n### Folder next to a tagged folder\n\n'
+    planning_link = "../.planning/phases/31-ordner-anlegen/31-RESEARCH.md"
+    planted = f"{head}Source: [31-RESEARCH.md]({planning_link}).\n"
+    without_link = f"{head}A sentence without a source.\n"
+    good = planted.replace(planning_link, "folder-evidence.md#folder-next-to-a-tagged-folder")
+
+    # The planted target exists, so the check is red for where it lies, not for a dead link.
+    assert (DOCS / planning_link).resolve().is_file()
+    assert any("leaves docs/" in problem for problem in _stable_finding_problems(planted))
+    assert _stable_finding_problems(without_link) == ["no finding under docs/ is linked"]
+    assert _stable_finding_problems(good) == []
+
+
+def test_the_stable_limits_are_not_held_to_the_planning_folder() -> None:
+    """The 17 sections of phase 29 keep their own check; the stable ones are not among them."""
+    assert len(ALL_ANCHORS) == 22
+    assert len(EVIDENCE_ANCHORS) == 17
+    assert set(STABLE_EVIDENCE_ANCHORS).isdisjoint(EVIDENCE_ANCHORS)
 
 
 @page_params

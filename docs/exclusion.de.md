@@ -325,6 +325,14 @@ getaggten Datei unter einem sichtbaren Elternordner zeigt diese Abweisung trotzd
 etwas besonders ist, was sich ohne Schreiben nicht vermeiden lässt.
 Quelle: [27-SECURITY.md, A-27-03](../.planning/phases/27-familien-anschluss-und-sandbox-parit-t/27-SECURITY.md).
 
+<a id="tech-folder-oracle"></a>
+### Ordner neben einem getaggten Ordner
+
+Das Anlegen eines Ordners in einem getaggten Ordner oder darunter bekommt die Abweisung eines
+fehlenden Elternordners; neben einem sichtbaren Elternordner zeigt diese Abweisung trotzdem,
+dass dort etwas besonders ist, was sich ohne Schreiben nicht vermeiden lässt.
+Quelle: [folder-evidence.md, Folder next to a tagged folder](folder-evidence.md#folder-next-to-a-tagged-folder).
+
 <a id="tech-tables-talk-sandbox"></a>
 ### Tables und Talk ohne Sandbox
 

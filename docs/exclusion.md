@@ -315,6 +315,14 @@ file below a visible parent folder that refusal still shows that something is sp
 which cannot be avoided without writing.
 Source: [27-SECURITY.md, A-27-03](../.planning/phases/27-familien-anschluss-und-sandbox-parit-t/27-SECURITY.md).
 
+<a id="tech-folder-oracle"></a>
+### Folder next to a tagged folder
+
+Creating a folder inside a tagged folder or below it gets the refusal of a missing parent
+folder; next to a visible parent folder that refusal still shows that something is special
+there, which cannot be avoided without writing.
+Source: [folder-evidence.md, Folder next to a tagged folder](folder-evidence.md#folder-next-to-a-tagged-folder).
+
 <a id="tech-tables-talk-sandbox"></a>
 ### Tables and Talk without a sandbox
 
