@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
-status: verifying
-stopped_at: "32-10 (gap closure) ausgeführt bis zur Push-Frage (Task 6, angehalten): Gruppenfreigaben hinaus und hinein ohne Codeänderung gemessen und live belegt, wiederkehrende Aufgaben und Deckel 500 live, PER_LIST_TIMEOUT testgetrieben auf 2 s (ed22627 RED, 0f98fd4); vier Läufe je 34 passed; 11 Commits vor origin (plus Abschluss-Commit), nichts gepusht; Phase 32 nicht abgeschlossen, Re-Verifikation durch die Hauptsitzung; kein Container läuft"
-last_updated: "2026-11-13T18:55:00.000Z"
-last_activity: "2026-11-13, 32-10 ausgeführt bis Task 5 (4a75334); Gates 6433 passed, 35 skipped, tools/list 18770 Bytes; Push-Frage offen; als Nächstes Owner-Frage zum Push und Re-Verifikation von Phase 32"
+status: ready_to_plan
+stopped_at: "Phase 32 abgeschlossen (12/12 Pläne, Re-Verifikation passed da86da8, 57ae658 gepusht, CI grün); als Nächstes Phase 33 (Aufgaben ändern) besprechen und planen; kein Container läuft"
+last_updated: "2026-11-13T19:03:17.156Z"
+last_activity: 2026-11-13
 progress:
   total_phases: 5
   completed_phases: 3
@@ -25,16 +25,16 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 
 ## Current Position
 
-Phase: 32 von 30 bis 34 (Tasks-Bundle suchen, lesen, anlegen), geplant und geprüft (10 Pläne, Plan-Check PASS nach einer Revision), Ausführung vom Owner freigegeben (2026-11-13, "Go"); Phase 31 abgeschlossen und verifiziert
-Plan: 32-10 (gap closure) ausgeführt bis zur Push-Frage: Gruppenfreigabe hinaus und hinein (D-32-18, D-32-14 bis D-32-17, E4 für Gruppen) gemessen und live belegt, wiederkehrende Aufgaben live, Deckel 500 live, Budget je Liste aus der Messung auf 2 s, Anzeigename von bob ungleich der Kennung live; Task 6 (Push-Frage) offen, raw/32-10-push.txt fehlt noch; 32-09 Push-Frage ebenfalls offen
+Phase: 33
+Plan: Not started
 Status: Phase 32 ausgeführt inkl. Gap Closure 32-09 und 32-10 (lokal, nichts gepusht), Re-Verifikation durch die Hauptsitzung steht aus; Draft-PR 48 offen; Tasks-App auf nc35 und nc32 wieder entfernt, Testgruppen gelöscht, Anzeigename von bob zurück, keine Instanz läuft; offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13)
-Last activity: 2026-11-13, 32-10 ausgeführt bis Task 5: Messung (ad389ef), Gruppen-Fixture (5b949cb), wiederkehrend (c40a49b), Budget RED ed22627 und fix 0f98fd4, Live-Fälle (dd45b56, fa5b5cf), Beleg (4a75334); Gates 6433 passed, 35 skipped; als Nächstes Push-Frage und Re-Verifikation von Phase 32
+Last activity: 2026-11-13
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 177
+- Total plans completed: 189
 - Average duration: 35 min
 - Total execution time: 15.2 hours
 
@@ -66,6 +66,7 @@ Last activity: 2026-11-13, 32-10 ausgeführt bis Task 5: Messung (ad389ef), Grup
 | 28 | 12 | - | - |
 | 29 | 9 | - | - |
 | 30 | 5 | 385 min (P01 bis P04) | 96 min (P01 bis P04) |
+| 32 | 12 | - | - |
 
 **Recent Trend:**
 

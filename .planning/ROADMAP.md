@@ -120,7 +120,7 @@ Kein Milestone-Audit (wie v1.5 und v1.6): Aussagen aus den fünf Phase-Verifikat
 
 - [x] **Phase 30: Mess-Spike Aufgaben und Ordner** - Alles, was Recherche und Planung nur annehmen, wird gegen echte Nextcloud-Instanzen gemessen, bevor Produktcode entsteht; zuerst `MKCOL` unter AppAPI-Impersonation, mit Abbruchkriterien (completed 2026-11-12)
 - [x] **Phase 31: Ordner anlegen** - `files_create_folder` legt Ordner an, wahlweise mit fehlenden Elternordnern, hinter der ganzen v1.7-Kette aus Ausschluss, Sandbox, Paartest, Kanarie und Audit; allein releasefähig
-- [ ] **Phase 32: Tasks-Bundle suchen, lesen, anlegen** - `tasks_search`, `tasks_read` und `tasks_create` über CalDAV VTODO als zehnte Familie, samt `task:`-Id über `fetch`; ohne Phase 33 releasefähig
+- [x] **Phase 32: Tasks-Bundle suchen, lesen, anlegen** - `tasks_search`, `tasks_read` und `tasks_create` über CalDAV VTODO als zehnte Familie, samt `task:`-Id über `fetch`; ohne Phase 33 releasefähig (completed 2026-11-13)
 - [ ] **Phase 33: Aufgaben ändern** - Abhaken, Wiederöffnen, Felder ändern und Verschieben einer einzelnen Aufgabe, nur mit gelesener ETag; kein Löschen (Owner, 12.11.2026); jeder Teil abtrennbar
 - [ ] **Phase 34: Doku, Store, Release 0.8.0** - Doku und Store-Text in drei Sprachen sagen den Endstand samt präzisierter Schreibzusage, Release 0.8.0 steht mit Owner-Freigabe im Store
 
@@ -144,6 +144,7 @@ Grundlage: [research/v1.8-tasks-080-RESEARCH.md](research/v1.8-tasks-080-RESEARC
 **Plans**: 5 plans (fünf Wellen, streng nacheinander: ein Docker-Host, immer nur eine Instanz)
 
 Plans:
+
 - [x] 30-01-PLAN.md: Messwerkzeug, `MKCOL` unter AppAPI-Impersonation als erster Messpunkt samt Statusmatrix, Gruppenordner mit ACL und Negativtest (MESS-01, MESS-02; A7, A8, A9)
 - [x] 30-02-PLAN.md: Ändernde Zugriffe: `PUT` mit `If-Match` und Erhalt fremder Eigenschaften unter Impersonation, Browser-Sitzung in der Tasks-App, Inventar der Gates und Zusagen (MESS-05; A12 bis A17)
 - [x] 30-03-PLAN.md: `MOVE` unter Impersonation, Unteraufgaben, Löschen mit Papierkorb an und aus auf 32 bis 35, Ergebniswort nach E13 (MESS-06; A18, A19, A21)
@@ -171,6 +172,7 @@ Messbericht: `docs/spike-tasks.md`; Rohprotokolle unter `.planning/phases/30-mes
 **Plans**: 6 plans (sechs Wellen, streng nacheinander: ein Docker-Host, immer nur eine Instanz)
 
 Plans:
+
 - [x] 31-01-PLAN.md: Machbarkeitsbeweis der Strecke Nextcloud 32 unter AppAPI-Impersonation mit Abbruchkriterium, Basis-Commit in 31-BASE.txt (FOLD-01; D-31-06)
 - [x] 31-02-PLAN.md: `dav.make_folder`, `probe_folder`, Statusprüfer und `files.create_folder` mit Vorab-Zählung, Deckel 10, Sandbox und `kein-ki`, Unit-Tests (FOLD-01 bis FOLD-05; D-31-01 bis D-31-05)
 - [x] 31-03-PLAN.md: Registrierung mit `CREATE_IDEMPOTENT`, Audit, Werkzeugmenge 24, Annotations-Gate, Freeze mit Paarfall, Budget-Messzeile, drei READMEs (FOLD-03, FOLD-05, FOLD-06)
@@ -199,6 +201,7 @@ Plans:
 **Plans**: 12 plans (zwölf Wellen, streng nacheinander: ein Docker-Host, immer nur eine Instanz; Rahmen in 32-RULES.md; 32-09 schließt die Lücken der Verifikation, 32-10 die offenen Messungen der Re-Verifikation)
 
 Plans:
+
 - [x] 32-01-PLAN.md: Basis-Commit 32-BASE.txt, Messung `--name` und Heartbeat-URL auf 32/34/35, `scripts/bootstrap_exapp.sh` testgetrieben für Nextcloud 32, `--manual` auf 32 nach Owner-Freigabe zum unregister (TASK-03, TASK-07; D-32-13)
 - [x] 32-02-PLAN.md: Messungen vor dem Bau (Kinderabfrage bei 2000 Aufgaben, text-match, Budgets, Namensform geteilter Listen auf 32 und 35, Erkennung der Tasks-App, Linkform), gemeinsame Owner-Freigabe für Zustandsänderungen (TASK-02 bis TASK-04; D-32-03, D-32-10, D-32-11, D-32-14)
 - [x] 32-03-PLAN.md: Client-Schicht mit Byte-Pin der Kalenderkörper, create-only-Schreiber, `task:`-Codec mit Listenschlüssel, `clients/tasks.py` (TASK-01, TASK-03, TASK-06, TASK-07; D-32-05, D-32-06, D-32-14)
@@ -210,7 +213,7 @@ Plans:
 - [x] 32-07-PLAN.md: Live-Beweis auf Nextcloud 35 und 32, je ohne und mit Tasks-App, `docs/tasks-evidence.md` (TASK-01 bis TASK-07, TASK-09; D-32-11, D-32-12)
 - [x] 32-08-PLAN.md: gemeinsame Abnahme in der Tasks-App per Playwright, Owner-Checkpoint zum Push, CI-Lauf beider Beine (TASK-05, TASK-07; D-32-11, D-32-13)
 - [x] 32-09-PLAN.md: Lücken nach der Verifikation (gap closure): Messung der Freigabe eigener Listen und der Provider-subline auf 35 und 32, subline und text ohne Besitzer (D-32-17), hinausgeteilte eigene Liste ohne `list` nicht beschreiben (D-32-18), `fetch` mit Kürzungsvermerk und Schwebe-Kennzeichen (W2), Beschreibung von `query` (W3), nicht gemessene Teile im Beleg (W4), Live-Beweis, Owner-Frage zum Push (TASK-02, TASK-05 bis TASK-07, TASK-09); ausgeführt 2026-11-13 bis zur Push-Frage, die offen ist
-- [x ] 32-10-PLAN.md: offene Messungen der Re-Verifikation (gap closure): Gruppenfreigabe hinaus (D-32-18 für Gruppen) und hinein (D-32-14, D-32-15, D-32-17, E4, D-32-16), wiederkehrende Aufgabe live, Deckel 500 und Budget je Liste live, Anzeigename von bob ungleich der Kennung, Messkommentar in `scripts/check_tool_budget.py`; testgetrieben bei Befund, Live-Läufe auf 35 und 32 je ohne und mit Tasks-App, Owner-Frage zum Push (TASK-02, TASK-04, TASK-06, TASK-08, TASK-09); ausgeführt 2026-11-13 bis zur Push-Frage, die offen ist (Gruppe ohne Befund, Budget je Liste auf 2 s)
+- [x] 32-10-PLAN.md: offene Messungen der Re-Verifikation (gap closure): Gruppenfreigabe hinaus (D-32-18 für Gruppen) und hinein (D-32-14, D-32-15, D-32-17, E4, D-32-16), wiederkehrende Aufgabe live, Deckel 500 und Budget je Liste live, Anzeigename von bob ungleich der Kennung, Messkommentar in `scripts/check_tool_budget.py`; testgetrieben bei Befund, Live-Läufe auf 35 und 32 je ohne und mit Tasks-App, Owner-Frage zum Push (TASK-02, TASK-04, TASK-06, TASK-08, TASK-09); ausgeführt 2026-11-13, Owner-Push ja (57ae658), CI grün, Re-Verifikation passed (Gruppe ohne Befund, Budget je Liste auf 2 s)
 
 **Abtrennbar**: TASK-09 (`task:`-Id über `fetch` und Provider) ist ein eigener Plan und nur per Owner-Entscheid verschiebbar
 
@@ -287,7 +290,7 @@ Plans:
 | 29. Prüfkommando und Doku | v1.7 | 9/9 | Complete    | 2026-10-01 |
 | 30. Mess-Spike Aufgaben und Ordner | v1.8 | 5/5 | Complete    | 2026-11-12 |
 | 31. Ordner anlegen | v1.8 | 0/6 | Planned | - |
-| 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 12/12 | Human Needed | - |
+| 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 12/12 | Complete    | 2026-11-13 |
 | 33. Aufgaben ändern | v1.8 | 0/TBD | Not started | - |
 | 34. Doku, Store, Release 0.8.0 | v1.8 | 0/TBD | Not started | - |
 
