@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: executing
-stopped_at: 32-03 abgeschlossen (Client-Schicht: Byte-Pin, ein create-only-PUT, task:-Codec, clients/tasks.py); kein Docker; lokale Commits nicht gepusht
-last_updated: "2026-11-13T12:45:00.000Z"
-last_activity: "2026-11-13, 32-03 ausgeführt: Kalenderkörper gepinnt (69840d7), put_new_object mit put_event als Hülle (09711fa), task:-Codec mit Listenschlüssel (cb48348, 8a8d222), clients/tasks.py (56bf266, c7d60e3); Gates 6105 passed, 35 skipped; als Nächstes 32-04"
+stopped_at: 32-04 abgeschlossen (tools/tasks.py lesend: Zeitmatrix, search_tasks, read_task); kein Docker; lokale Commits nicht gepusht
+last_updated: "2026-11-13T14:30:00.000Z"
+last_activity: "2026-11-13, 32-04 ausgeführt: VTODO-Leser mit benannter Zeitmatrix (8b70913, baa1984), search_tasks über eigene und geteilte Listen (48a55df, 23b616a), read_task mit Unteraufgaben (77b7565, 41e0f69), Test-ASCII (7c5892a); Gates 6238 passed, 35 skipped; als Nächstes 32-04b"
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 24
-  completed_plans: 17
-  percent: 44
+  completed_plans: 18
+  percent: 46
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 ## Current Position
 
 Phase: 32 von 30 bis 34 (Tasks-Bundle suchen, lesen, anlegen), geplant und geprüft (10 Pläne, Plan-Check PASS nach einer Revision), Ausführung vom Owner freigegeben (2026-11-13, "Go"); Phase 31 abgeschlossen und verifiziert
-Plan: 32-03 fertig (3 von 10): Client-Schicht; caldav.put_new_object ist der eine PUT (EXPECTED_PUT_CALLS 6), put_event Hülle mit EVENT_WORDING; ids.task_list_key (s plus 16 Hex für geteilte Listen) und encode_task; clients/tasks.py mit Discovery ohne Deck/Papierkorb/Scheduling/Abo, Namensregel owner-displayname, home404=e6; sieben vorübergehende vulture-Einträge bis 32-05; als Nächstes 32-04
+Plan: 32-04 fertig (4 von 10): tools/tasks.py lesend; Zeitmatrix als 15 benannte Tests (schwebend bleibt schwebend mit <feld>_floating), search_tasks (open/completed/all, Vorfilter nur bei open, Elternverweis V-B, due_by, Seite 25, Deckel 500, Budget 1 s je Liste, degraded, skipped, E6-hint), read_task (Beschreibung 4096 Bytes, Unteraufgaben exakt, Deckel 50, Budget 1 s mit subtasks_unavailable/parent_unavailable); vorübergehende vulture-Einträge jetzt TASK_WORDING, search_tasks, read_task bis 32-05; als Nächstes 32-04b
 Status: Phase 31 abgeschlossen (2026-11-13); Draft-PR 48 gegen main ist offen, CI auf 30e2134 vollständig grün; die Commits nach 30e2134 (Verifikation, 31-07, Abschluss) sind lokal und warten auf eine Push-Freigabe des Owners; auf der Testinstanz nc35 ist die ExApp jetzt 0.7.2 aus diesem Stand registriert (Rückweg im 31-07-SUMMARY.md), die Datei .env.nc35 liegt im Worktree (gitignored); offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13)
-Last activity: 2026-11-13, 32-03 ausgeführt: Kalenderkörper gepinnt (69840d7), put_new_object mit put_event als Hülle (09711fa), task:-Codec mit Listenschlüssel (cb48348, 8a8d222), clients/tasks.py (56bf266, c7d60e3); Gates 6105 passed, 35 skipped; als Nächstes 32-04
+Last activity: 2026-11-13, 32-04 ausgeführt: VTODO-Leser mit benannter Zeitmatrix (8b70913, baa1984), search_tasks über eigene und geteilte Listen (48a55df, 23b616a), read_task mit Unteraufgaben (77b7565, 41e0f69), Test-ASCII (7c5892a); Gates 6238 passed, 35 skipped; als Nächstes 32-04b
 
 ## Performance Metrics
 
@@ -827,6 +827,8 @@ Recent decisions affecting current work:
 - [Phase 32]: 32-02: AppAPI-Impersonation auf 32 braucht keinen laufenden lokalen Prozess; occ app:remove auf 32.0.15 verweigert eine deaktivierte App (vorher aktivieren)
 - [Phase 32]: 32-03: put_new_object gibt die Sammlungs-URI nicht zurück; Ersatzname einer geteilten Liste ohne passenden Zusatz ist der URI-Teil vor _shared_by_, sonst der Schlüssel, nie der rohe displayname
 - [Phase 32]: 32-03: geteilt = oc:read-only im 2xx-Propstat ODER _shared_by_ in der URI; beschreibbar = read-only leer/0/false UND eines von write, write-content, bind, all
+- [Phase 32]: 32-04: COMPLETED mit TZID bekommt die genannte IANA-Zone per replace (icalendar liest es ohne Zone); nie Umrechnung, schwebend bleibt schwebend
+- [Phase 32]: 32-04: zweiter REPORT im Modus open teilt das Budget der Liste; ein Objekt ohne VTODO ist in tasks_read eine unbekannte Id; Eingaben mit _shared_by_ werden in Meldungen nicht wiederholt
 
 ### Pending Todos
 
@@ -898,10 +900,10 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 
 ## Session Continuity
 
-Last session: 2026-11-13T12:45:00Z
-Stopped at: 32-03 abgeschlossen (Client-Schicht: Byte-Pin, ein create-only-PUT, task:-Codec, clients/tasks.py); kein Docker; lokale Commits nicht gepusht
-Nächster Schritt: 32-04 ausführen (tools/tasks.py lesend; Budgets per_list_timeout_s=1, subtask_timeout_s=1, max_results=500 aus 32-02)
-Resume file: .planning/phases/32-tasks-bundle-suchen-lesen-anlegen/32-04-PLAN.md
+Last session: 2026-11-13T14:30:00Z
+Stopped at: 32-04 abgeschlossen (tools/tasks.py lesend: Zeitmatrix, search_tasks, read_task); kein Docker; lokale Commits nicht gepusht
+Nächster Schritt: 32-04b ausführen (tasks_create mit E4 und D-32-16; _resolve_list aus tools/tasks.py wiederverwenden)
+Resume file: .planning/phases/32-tasks-bundle-suchen-lesen-anlegen/32-04b-PLAN.md
 
 ## Operator Next Steps
 
