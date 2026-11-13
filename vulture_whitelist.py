@@ -366,13 +366,12 @@ background
 # registers the bundle (32-05), and the tool layer of plan 32-04 is the caller.
 # task_list_key sat here between task 2 and task 3 and left with clients/tasks.py, its caller.
 # encode_task, discover_task_lists, build_todo_query and query_todos left with search_tasks
-# of plan 32-04, their caller.
+# of plan 32-04, build_related_query and get_todo with read_task; their caller is the tool
+# layer. TASK_WORDING stays until tasks_create of plan 32-04b writes with it.
 TASK_WORDING  # until reg_tasks.py registers the bundle (32-05)
-build_related_query  # until reg_tasks.py registers the bundle (32-05)
-get_todo  # until reg_tasks.py registers the bundle (32-05)
 
 # --- The tool layer of the tasks bundle, plan 32-04 ----------------------------------------
 # Temporary: the reader lands in task 1, its callers search_tasks and read_task in tasks 2 and 3.
 # _read_todo sat here between task 1 and task 2 and left with search_tasks, its caller.
 search_tasks  # until reg_tasks.py registers the bundle (32-05)
-SUBTASK_TIMEOUT  # until read_task uses it (32-04 task 3)
+read_task  # until reg_tasks.py registers the bundle (32-05)

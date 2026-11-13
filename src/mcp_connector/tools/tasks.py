@@ -29,7 +29,7 @@ import httpx
 from icalendar import Calendar as IcsCalendar
 
 from .. import ids, paging
-from ..errors import REASON_GUARD_TRIPPED, ToolError
+from ..errors import REASON_GUARD_TRIPPED, REASON_UNKNOWN_ID, ToolError
 from ..nextcloud import NcClients
 from ..nextcloud.clients import tasks as tasks_client
 from . import calendar, marks
@@ -57,6 +57,13 @@ MAX_RESULTS = 500
 #: Appended when the answer stopped at :data:`MAX_RESULTS`; without it a capped answer
 #: would read like a complete one.
 SEARCH_CAP_NOTE = f"result window capped at {MAX_RESULTS} tasks; narrow with query, list or due_by"
+
+#: Cap of the subtask list of ``tasks_read``; above it the answer names the total.
+MAX_SUBTASKS = 50
+
+#: Cap of the description of ``tasks_read`` in UTF-8 bytes, the cut is a field beside the
+#: text (pattern of the mail preview).
+MAX_DESCRIPTION_BYTES = 4096
 
 #: The values of the ``status`` parameter (D-32-09). ``open`` includes ``in_progress``.
 STATUS_FILTERS = ("open", "completed", "all")
@@ -522,3 +529,175 @@ def _reason(exc: BaseException) -> str:
 
 def _seconds(value: float) -> str:
     return "1 second" if value == 1 else f"{value:g} seconds"
+
+
+async def read_task(clients: NcClients, *, task_id: str) -> dict[str, Any]:
+    """Read one task with its direct subtasks, one level deep (D-32-01, D-32-02).
+
+    Public because ``fetch`` resolves a ``task:`` id through this reader as well (32-06).
+    The id is resolved against the discovery only: a Deck list is refused before any
+    request, and a key the discovery does not hold, a deleted object and an object that is
+    not a task all get the same answer as an unknown id (E9). The subtask query and the
+    parent lookup run side by side, each under :data:`SUBTASK_TIMEOUT`; when one of them
+    fails, the task still comes back with an honest sentence instead of a guess (D-32-03).
+    """
+    kind, parts = ids.parse(task_id)
+    if kind != "task":
+        raise ToolError(
+            message=f"{_quoted(task_id)} is not a task id.",
+            hint="Pass an id of the form task:<list>:<object> from a tasks_search hit.",
+            reason=REASON_GUARD_TRIPPED,
+        )
+    list_key, object_name = parts
+    if list_key.startswith(tasks_client.DECK_PREFIX):
+        # A Deck board is never asked, not even through the discovery (E9).
+        raise _unknown_task(task_id)
+
+    lists = await tasks_client.discover_task_lists(clients.client, clients.creds)
+    matches = [entry for entry in lists if entry.key == list_key]
+    if len(matches) != 1:
+        raise _unknown_task(task_id)
+    task_list = matches[0]
+
+    try:
+        raw = await tasks_client.get_todo(clients.client, clients.creds, task_list, object_name)
+    except ToolError as exc:
+        if exc.reason == REASON_UNKNOWN_ID:
+            raise _unknown_task(task_id) from None
+        raise
+    todo = _read_todo(raw)
+    if todo is None:
+        raise _unknown_task(task_id)
+    own_id = ids.encode_task(task_list.key, object_name)
+
+    parent_uid = todo["parents"][0] if todo["parents"] else ""
+    parent: dict[str, Any] | BaseException | None = None
+    if parent_uid:
+        children, parent = await asyncio.gather(
+            _children(clients, task_list, todo["uid"], own_id),
+            _parent(clients, task_list, parent_uid),
+            return_exceptions=True,
+        )
+    else:
+        (children,) = await asyncio.gather(
+            _children(clients, task_list, todo["uid"], own_id), return_exceptions=True
+        )
+
+    result: dict[str, Any] = {"id": own_id, "summary": todo["summary"]}
+    if todo["description"]:
+        description, cut = _capped(todo["description"])
+        result["description"] = description
+        if cut:
+            result["description_truncated"] = True
+    result["status"] = todo["status"]
+    for field in (
+        "due",
+        "due_floating",
+        "start",
+        "start_floating",
+        "priority",
+        "tags",
+        "completed",
+        "completed_floating",
+        "recurring",
+    ):
+        if field in todo:
+            result[field] = todo[field]
+    result["list"] = _list_info(task_list)
+
+    if isinstance(parent, BaseException):
+        result["parent_unavailable"] = _side_reason(parent, "The parent task could not be read")
+    elif parent is not None:
+        result["parent"] = parent
+
+    if isinstance(children, BaseException):
+        result["subtasks_unavailable"] = _subtask_reason(children)
+    else:
+        children.sort(key=_subtask_key)
+        result["subtasks"] = [
+            {"id": entry["id"], "summary": entry["summary"], "status": entry["status"]}
+            for entry in children[:MAX_SUBTASKS]
+        ]
+        if len(children) > MAX_SUBTASKS:
+            result["subtasks_truncated"] = True
+            result["subtasks_total"] = len(children)
+    return result
+
+
+def _unknown_task(task_id: str) -> ToolError:
+    """One answer for every id Nextcloud does not hold as a task of a visible list (E9)."""
+    return ToolError(
+        message=f"Nextcloud does not know the task {_quoted(task_id)}.",
+        hint="Call tasks_search to find the task again; its hits carry valid ids.",
+        reason=REASON_UNKNOWN_ID,
+    )
+
+
+async def _children(
+    clients: NcClients, task_list: tasks_client.TaskList, uid: str, own_id: str
+) -> list[dict[str, Any]]:
+    """The direct subtasks of one task, checked exactly.
+
+    The server matches ``RELATED-TO`` with "contains", so every hit is a candidate: it
+    counts only with a ``RELATED-TO`` equal to the UID whose ``RELTYPE`` is missing or
+    ``PARENT``, and never the task itself.
+    """
+    async with asyncio.timeout(SUBTASK_TIMEOUT):
+        objects = await tasks_client.query_todos(
+            clients.client,
+            clients.creds,
+            task_list,
+            tasks_client.build_related_query("RELATED-TO", uid),
+        )
+    entries, _skipped = _parse_objects(task_list, objects)
+    return [
+        entry
+        for entry in entries
+        if uid in entry["parents"] and entry["uid"] != uid and entry["id"] != own_id
+    ]
+
+
+async def _parent(
+    clients: NcClients, task_list: tasks_client.TaskList, parent_uid: str
+) -> dict[str, Any]:
+    """The parent named by ``RELATED-TO``, looked up by its UID in the same list."""
+    async with asyncio.timeout(SUBTASK_TIMEOUT):
+        objects = await tasks_client.query_todos(
+            clients.client,
+            clients.creds,
+            task_list,
+            tasks_client.build_related_query("UID", parent_uid),
+        )
+    for entry in _parse_objects(task_list, objects)[0]:
+        if entry["uid"] == parent_uid:
+            return {"id": entry["id"], "summary": entry["summary"]}
+    return {"found": False}
+
+
+def _subtask_key(entry: dict[str, Any]) -> tuple[int, str, str]:
+    return (_STATUS_RANK[entry["status"]], entry["summary"].casefold(), entry["id"])
+
+
+def _subtask_reason(exc: BaseException) -> str:
+    return _side_reason(exc, "The subtasks could not be read")
+
+
+def _side_reason(exc: BaseException, sentence: str) -> str:
+    """The sentence for a side query that failed. Unknown failures are bugs and stay loud."""
+    if isinstance(exc, TimeoutError | httpx.TimeoutException):
+        return f"{sentence} within {_seconds(SUBTASK_TIMEOUT)}."
+    if isinstance(exc, ToolError | httpx.RequestError):
+        return f"{sentence}."
+    raise exc
+
+
+def _capped(text: str) -> tuple[str, bool]:
+    """One description at :data:`MAX_DESCRIPTION_BYTES`, and whether it had to be cut.
+
+    Measured on the UTF-8 encoding; a character split by the cut is dropped instead of
+    arriving broken. No marker inside the text: the cut is the field beside it.
+    """
+    blob = text.encode("utf-8")
+    if len(blob) <= MAX_DESCRIPTION_BYTES:
+        return text, False
+    return blob[:MAX_DESCRIPTION_BYTES].decode("utf-8", errors="ignore"), True
