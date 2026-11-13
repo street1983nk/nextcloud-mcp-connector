@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: verifying
-stopped_at: "32-09 (gap closure) ausgeführt bis zur Push-Frage (Task 6, angehalten): D-32-17, D-32-18, W2, W3, W4 gebaut und live auf nc35 und nc32 je ohne und mit Tasks-App belegt (je 21 passed), Befund zur subline ohne Fälligkeit behoben (39c1be9); 19 Commits lokal vor origin (inkl. Abschluss-Commit), nichts gepusht; Phase 32 nicht abgeschlossen, Re-Verifikation durch die Hauptsitzung; kein Container läuft"
-last_updated: "2026-11-13T17:20:00.000Z"
-last_activity: "2026-11-13, 32-09 ausgeführt bis Task 5 (ca68abd); Gates 6399 passed, 35 skipped, tools/list 18770 Bytes; Push-Frage offen; als Nächstes Owner-Frage zum Push und Re-Verifikation von Phase 32"
+stopped_at: "32-10 (gap closure) ausgeführt bis zur Push-Frage (Task 6, angehalten): Gruppenfreigaben hinaus und hinein ohne Codeänderung gemessen und live belegt, wiederkehrende Aufgaben und Deckel 500 live, PER_LIST_TIMEOUT testgetrieben auf 2 s (ed22627 RED, 0f98fd4); vier Läufe je 34 passed; 11 Commits vor origin (plus Abschluss-Commit), nichts gepusht; Phase 32 nicht abgeschlossen, Re-Verifikation durch die Hauptsitzung; kein Container läuft"
+last_updated: "2026-11-13T18:55:00.000Z"
+last_activity: "2026-11-13, 32-10 ausgeführt bis Task 5 (4a75334); Gates 6433 passed, 35 skipped, tools/list 18770 Bytes; Push-Frage offen; als Nächstes Owner-Frage zum Push und Re-Verifikation von Phase 32"
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 25
-  completed_plans: 25
+  total_plans: 26
+  completed_plans: 26
   percent: 60
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 ## Current Position
 
 Phase: 32 von 30 bis 34 (Tasks-Bundle suchen, lesen, anlegen), geplant und geprüft (10 Pläne, Plan-Check PASS nach einer Revision), Ausführung vom Owner freigegeben (2026-11-13, "Go"); Phase 31 abgeschlossen und verifiziert
-Plan: 32-09 (gap closure) ausgeführt bis zur Push-Frage: D-32-17 (subline ohne Besitzer), D-32-18 (hinausgeteilte eigene Liste ohne list kein Ziel), W2, W3, W4; live auf nc35 und nc32 je ohne und mit Tasks-App grün; Task 6 (Push-Frage) offen, raw/32-09-push.txt fehlt noch
-Status: Phase 32 ausgeführt inkl. Gap Closure 32-09 (lokal, 19 Commits vor origin/plan/v1.8-tasks-080, nichts gepusht), Re-Verifikation durch die Hauptsitzung steht aus; Draft-PR 48 offen; Tasks-App auf nc35 und nc32 wieder entfernt, keine Instanz läuft; offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13), Gruppenfreigabe einer eigenen Aufgabenliste nicht gemessen
-Last activity: 2026-11-13, 32-09 ausgeführt bis Task 5 (ca68abd): Fix der subline ohne Fälligkeit (e672187 RED, 39c1be9), Live-Fälle (83030c1, b0cadfe), Beleg und Changelogs (ca68abd); Gates 6399 passed, 35 skipped; als Nächstes Push-Frage und Re-Verifikation von Phase 32
+Plan: 32-10 (gap closure) ausgeführt bis zur Push-Frage: Gruppenfreigabe hinaus und hinein (D-32-18, D-32-14 bis D-32-17, E4 für Gruppen) gemessen und live belegt, wiederkehrende Aufgaben live, Deckel 500 live, Budget je Liste aus der Messung auf 2 s, Anzeigename von bob ungleich der Kennung live; Task 6 (Push-Frage) offen, raw/32-10-push.txt fehlt noch; 32-09 Push-Frage ebenfalls offen
+Status: Phase 32 ausgeführt inkl. Gap Closure 32-09 und 32-10 (lokal, nichts gepusht), Re-Verifikation durch die Hauptsitzung steht aus; Draft-PR 48 offen; Tasks-App auf nc35 und nc32 wieder entfernt, Testgruppen gelöscht, Anzeigename von bob zurück, keine Instanz läuft; offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13)
+Last activity: 2026-11-13, 32-10 ausgeführt bis Task 5: Messung (ad389ef), Gruppen-Fixture (5b949cb), wiederkehrend (c40a49b), Budget RED ed22627 und fix 0f98fd4, Live-Fälle (dd45b56, fa5b5cf), Beleg (4a75334); Gates 6433 passed, 35 skipped; als Nächstes Push-Frage und Re-Verifikation von Phase 32
 
 ## Performance Metrics
 
@@ -230,6 +230,8 @@ Last activity: 2026-11-13, 32-09 ausgeführt bis Task 5 (ca68abd): Fix der subli
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- [Phase 32]: Gruppenfreigaben brauchen keine eigene Regel: oc:invite trägt sie als oc:user mit href auf principals/groups/ (D-32-18 greift), eine per Gruppe hineingeteilte Liste trägt _shared_by_ und oc:read-only wie eine Freigabe an eine Person; gemessen auf 35 und 32 (32-10)
+- [Phase 32]: PER_LIST_TIMEOUT 2 s statt 1 s: bei 2000 offenen Aufgaben in einer Liste dauert ein Aufruf bis 0,831 s, mit 1 s brach auf nc35 schon die erste Seite ab; Regel max(1,ceil(2*max)) aus 32-02 (32-10)
 - [Phase 21]: audience ist in ExchangeSettings genau eine Zeichenkette und nie eine Liste, damit der erwartete Wert beim Vergleich in 21-02 nie zur Oder-Verknüpfung werden kann; azp_allowed steht validiert in den Settings, seine Prüfung baut 21-02 (21-01)
 - [Phase 21]: der typ-Claim wird im Payload geprüft (Bearer gegen ID), der Header-typ wird toleriert (JWT/at+jwt ohne Gross-Klein) und nie verlangt, weil Keycloak den Header je nach Client-Alter setzt (Diskussion 19419); der Grund steht als Kommentar im Modul, damit niemand die Prüfung später auf at+jwt im Header "korrigiert" (21-01)
 - [Phase 21]: der Prüfer führt zwei getrennte, injizierbare Uhren (monotone Uhr nur an das KeySet, Wanduhr nur für Lebensdauer- und Altersregel) und einen iss-Vorfilter auf dem ungeprüften Payload, der nur ablehnen kann und null ausgehende JWKS-Abrufe für fremde Issuer garantiert (per respx call_count gemessen); Toleranz 30 s, maximale Lebensdauer und maximales Alter 900 s, Abweisung statt Kürzung (21-01)
@@ -910,9 +912,9 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 
 ## Session Continuity
 
-Last session: 2026-11-13T15:42:37.302Z
-Stopped at: 32-08 abgeschlossen (Owner-Abnahme der Aufgabenansicht in der Tasks-App 0.18.1 auf nc35 am 13.11.2026: abgenommen; CI 43453276557 auf dcda6c8 alle Jobs grün, exapp 17 passed ohne Tasks-App auf 34.0.3, canary-nc35 17 passed mit Tasks-App auf 35.0.1); Phase 32 10/10, Verifikation der Phase steht aus; kein Container läuft
-Nächster Schritt: Phase 32 verifizieren (gsd-verifier), danach Phase 33 planen
+Last session: 2026-11-13T18:55:00.000Z
+Stopped at: 32-10 ausgeführt bis zur Push-Frage (Task 6); Push-Fragen 32-09 und 32-10 offen; Phase 32 nicht abgeschlossen; kein Container läuft
+Nächster Schritt: Owner-Frage zum Push (raw/32-09-push.txt, raw/32-10-push.txt), dann Phase 32 erneut verifizieren (gsd-verifier), danach Phase 33 planen
 Resume file: None
 
 ## Operator Next Steps
