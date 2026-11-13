@@ -241,3 +241,61 @@ async def test_a_call_answers_with_structured_content_and_the_same_json_as_text(
 
     texts = [block.text for block in result.content if isinstance(block, TextContent)]
     assert json.loads("\n".join(texts)) == result.structured_content
+
+
+# --- D-32-17 (plan 32-09): the text of a shared task list hit names no owner ----------------
+
+_TEAM_URI = "team_shared_by_bob"
+_TEAM_RAW = "Team-Aufgaben (Bob Beispiel)"
+_SHARED_TASK = {
+    "title": "Angebot schreiben",
+    "subline": f"Due on Nov 20, 2026 ({_TEAM_RAW})",
+    "resourceUrl": f"{BASE}/apps/tasks/calendars/{_TEAM_URI}/tasks/t1.ics",
+    "attributes": [],
+}
+
+
+def _team_discovery(status: int = 207) -> httpx.Response:
+    if status != 207:
+        return httpx.Response(status)
+    body = (
+        '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" '
+        'xmlns:cal="urn:ietf:params:xml:ns:caldav" xmlns:oc="http://owncloud.org/ns" '
+        'xmlns:x1="http://nextcloud.com/ns">'
+        f"<d:response><d:href>/remote.php/dav/calendars/{USER}/{_TEAM_URI}/</d:href>"
+        f"<d:propstat><d:prop><d:displayname>{_TEAM_RAW}</d:displayname>"
+        "<d:resourcetype><d:collection/><cal:calendar/></d:resourcetype>"
+        '<cal:supported-calendar-component-set><cal:comp name="VTODO"/>'
+        "</cal:supported-calendar-component-set>"
+        "<oc:read-only></oc:read-only>"
+        "<x1:owner-displayname>Bob Beispiel</x1:owner-displayname>"
+        "</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"
+        "</d:multistatus>"
+    )
+    return httpx.Response(207, text=body, headers={"Content-Type": "application/xml"})
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("status", "text"), [(207, "Due on Nov 20, 2026 (Team-Aufgaben)"), (500, "")]
+)
+async def test_the_text_of_a_shared_task_hit_never_names_the_owner(
+    clients: NcClients, status: int, text: str
+) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        mock.get(PROVIDERS_URL).mock(
+            return_value=httpx.Response(200, json=envelope([{"id": "tasks", "name": "Tasks"}]))
+        )
+        mock.get(search_url("tasks")).mock(
+            return_value=httpx.Response(200, json=hits("Tasks", [_SHARED_TASK]))
+        )
+        mock.route(method="PROPFIND", url=f"{BASE}/remote.php/dav/calendars/{USER}/").mock(
+            return_value=_team_discovery(status)
+        )
+
+        result = await chatgpt.search(clients, "Angebot")
+
+    (hit,) = result
+    assert hit["text"] == text
+    assert "Bob Beispiel" not in json.dumps(result, ensure_ascii=False)
+    assert "bob" not in json.dumps(result).casefold()

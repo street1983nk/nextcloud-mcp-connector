@@ -708,3 +708,75 @@ def test_the_own_property_is_the_opposite_of_shared() -> None:
     assert SHARED_LIST.own is False
     own = tasks.TaskList(uri="t", key="t", name="t", shared=False, writable=True)
     assert own.own is True
+
+
+# --------------------------------------------------------------------------------------
+# D-32-17 (plan 32-09): the owner suffix as recognised, and the subline of a provider hit
+# --------------------------------------------------------------------------------------
+
+TEAM_DISPLAY = "Team-Aufgaben (Bob Beispiel)"
+TEAM_OWNER = "Bob Beispiel"
+
+
+def team_list(owner: str = TEAM_OWNER, display: str = TEAM_DISPLAY) -> tasks.TaskList:
+    return parse(collection(RW_URI, displayname=display, read_only="", owner=owner))[0]
+
+
+def test_the_recognised_owner_suffix_is_kept_beside_the_clean_name() -> None:
+    entry = team_list()
+    assert entry.name == "Team-Aufgaben"
+    assert entry.owner_suffix == " (Bob Beispiel)"
+
+
+def test_an_own_list_has_no_owner_suffix() -> None:
+    entry = parse(collection("mine", displayname="Mine (alice)", owner="alice"))[0]
+    assert entry.owner_suffix == ""
+
+
+def test_a_suffix_that_does_not_match_leaves_no_owner_suffix() -> None:
+    entry = team_list(owner="Robert")
+    assert entry.owner_suffix == ""
+    assert entry.name == "spike30-b-rw"
+
+
+def test_the_repr_of_a_list_names_neither_the_owner_nor_the_shared_uri() -> None:
+    text = repr(team_list())
+    assert TEAM_OWNER not in text
+    assert "_shared_by_" not in text
+    assert OWNER not in text
+
+
+def test_clean_subline_replaces_the_raw_name_at_the_end() -> None:
+    subline = f"Due on Nov 20, 2026 ({TEAM_DISPLAY})"
+    assert tasks.clean_subline(subline, team_list()) == "Due on Nov 20, 2026 (Team-Aufgaben)"
+
+
+def test_clean_subline_keeps_a_due_date_only_subline() -> None:
+    assert tasks.clean_subline("Due on Nov 20, 2026", team_list()) == "Due on Nov 20, 2026"
+
+
+def test_clean_subline_is_none_without_a_recognised_suffix() -> None:
+    entry = team_list(owner="Robert")
+    assert tasks.clean_subline("Due on Nov 20, 2026", entry) is None
+    assert tasks.clean_subline(f"Due ({TEAM_DISPLAY})", entry) is None
+
+
+def test_clean_subline_is_none_when_the_owner_stands_elsewhere() -> None:
+    assert tasks.clean_subline(f"{TEAM_OWNER}: due ({TEAM_DISPLAY})", team_list()) is None
+    assert tasks.clean_subline(f"by {TEAM_OWNER}", team_list()) is None
+
+
+def test_clean_subline_is_none_with_the_share_marker_in_it() -> None:
+    assert tasks.clean_subline("see spike30-b-rw_shared_by_x", team_list()) is None
+
+
+def test_clean_subline_removes_an_owner_name_with_brackets_of_its_own() -> None:
+    entry = team_list(owner="Bob (Team)", display="Team-Aufgaben (Bob (Team))")
+    assert entry.owner_suffix == " (Bob (Team))"
+    cleaned = tasks.clean_subline("Due soon (Team-Aufgaben (Bob (Team)))", entry)
+    assert cleaned == "Due soon (Team-Aufgaben)"
+
+
+def test_clean_subline_never_touches_an_own_list() -> None:
+    entry = parse(collection("mine", displayname="Mine", owner="alice"))[0]
+    assert tasks.clean_subline("Due soon (Mine)", entry) is None

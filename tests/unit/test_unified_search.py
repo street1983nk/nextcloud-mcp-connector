@@ -512,3 +512,159 @@ async def test_the_note_stays_conservative_when_the_content_provider_broke(
 
     assert result["note"] == search_tools.SEARCH_NOTE
     assert result["degraded"][0]["provider"] == "findling"
+
+
+# --- D-32-17 (plan 32-09): no owner in the subline of a shared task list hit -----------------
+
+CALENDAR_HOME = f"{BASE}/remote.php/dav/calendars/{USER}/"
+TEAM_URI = "team_shared_by_bob"
+TEAM_RAW = "Team-Aufgaben (Bob Beispiel)"
+SHARED_TASK_ENTRY = {
+    "title": "Angebot schreiben",
+    "subline": f"Due on Nov 20, 2026 ({TEAM_RAW})",
+    "resourceUrl": f"{BASE}/apps/tasks/calendars/{TEAM_URI}/tasks/t1.ics",
+    "attributes": [],
+}
+OWN_TASK_ENTRY = {
+    "title": "Eigene Aufgabe",
+    "subline": "Due on Nov 21, 2026 (Meine Liste)",
+    "resourceUrl": f"{BASE}/apps/tasks/calendars/meine/tasks/t2.ics",
+    "attributes": [],
+}
+
+
+def tasks_providers() -> dict[str, Any]:
+    return envelope([{"id": "tasks", "name": "Tasks"}, {"id": "notes", "name": "Notes"}])
+
+
+def team_discovery(*, with_team: bool = True) -> httpx.Response:
+    def response(uri: str, display: str, extra: str) -> str:
+        return (
+            f"<d:response><d:href>/remote.php/dav/calendars/{USER}/{uri}/</d:href>"
+            "<d:propstat><d:prop>"
+            f"<d:displayname>{display}</d:displayname>"
+            "<d:resourcetype><d:collection/><cal:calendar/></d:resourcetype>"
+            '<cal:supported-calendar-component-set><cal:comp name="VTODO"/>'
+            "</cal:supported-calendar-component-set>"
+            "<d:current-user-privilege-set><d:privilege><d:write/></d:privilege>"
+            "</d:current-user-privilege-set>"
+            f"{extra}</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>"
+        )
+
+    parts = [response("meine", "Meine Liste", "<oc:invite/>")]
+    if with_team:
+        parts.append(
+            response(
+                TEAM_URI,
+                TEAM_RAW,
+                "<oc:read-only></oc:read-only>"
+                "<x1:owner-displayname>Bob Beispiel</x1:owner-displayname>",
+            )
+        )
+    body = (
+        '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" '
+        'xmlns:cal="urn:ietf:params:xml:ns:caldav" xmlns:oc="http://owncloud.org/ns" '
+        f'xmlns:x1="http://nextcloud.com/ns">{"".join(parts)}</d:multistatus>'
+    )
+    return httpx.Response(207, text=body, headers={"Content-Type": "application/xml"})
+
+
+def task_hits(*entries: dict[str, Any]) -> httpx.Response:
+    return httpx.Response(200, json=hits("Tasks", list(entries)))
+
+
+@pytest.mark.anyio
+async def test_a_shared_task_list_hit_keeps_its_subline_without_the_owner(
+    clients: NcClients,
+) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        mock.get(PROVIDERS_URL).mock(return_value=httpx.Response(200, json=tasks_providers()))
+        mock.get(search_url("tasks")).mock(return_value=task_hits(SHARED_TASK_ENTRY))
+        mock.get(search_url("notes")).mock(return_value=httpx.Response(200, json=hits("N", [])))
+        discovery = mock.route(method="PROPFIND", url=CALENDAR_HOME).mock(
+            return_value=team_discovery()
+        )
+
+        result = await search_tools.unified_search(clients, query="Angebot")
+
+    (hit,) = result["results"]
+    assert hit["subline"] == "Due on Nov 20, 2026 (Team-Aufgaben)"
+    assert list(hit)[:4] == ["id", "title", "subline", "url"]
+    dumped = json.dumps(result, ensure_ascii=False)
+    assert "Bob Beispiel" not in dumped
+    assert "bob" not in dumped.casefold()
+    assert discovery.call_count == 1
+
+
+@pytest.mark.anyio
+async def test_hits_of_own_lists_and_other_providers_cost_no_discovery(
+    clients: NcClients,
+) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        mock.get(PROVIDERS_URL).mock(return_value=httpx.Response(200, json=tasks_providers()))
+        mock.get(search_url("tasks")).mock(return_value=task_hits(OWN_TASK_ENTRY))
+        mock.get(search_url("notes")).mock(
+            return_value=httpx.Response(200, json=hits("Notes", [NOTE_ENTRY]))
+        )
+        discovery = mock.route(method="PROPFIND", url=CALENDAR_HOME).mock(
+            return_value=team_discovery()
+        )
+
+        result = await search_tools.unified_search(clients, query="Aufgabe")
+
+    sublines = {hit["title"]: hit.get("subline") for hit in result["results"]}
+    assert sublines["Eigene Aufgabe"] == OWN_TASK_ENTRY["subline"]
+    assert sublines[NOTE_ENTRY["title"]] == NOTE_ENTRY["subline"]
+    assert discovery.call_count == 0
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("failure", ["status", "transport"])
+async def test_a_failed_discovery_drops_only_the_subline_of_the_shared_hit(
+    clients: NcClients, failure: str
+) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        mock.get(PROVIDERS_URL).mock(return_value=httpx.Response(200, json=tasks_providers()))
+        mock.get(search_url("tasks")).mock(
+            return_value=task_hits(SHARED_TASK_ENTRY, OWN_TASK_ENTRY)
+        )
+        mock.get(search_url("notes")).mock(
+            return_value=httpx.Response(200, json=hits("Notes", [NOTE_ENTRY]))
+        )
+        route = mock.route(method="PROPFIND", url=CALENDAR_HOME)
+        if failure == "status":
+            route.mock(return_value=httpx.Response(500))
+        else:
+            route.mock(side_effect=httpx.ConnectError("down"))
+
+        result = await search_tools.unified_search(clients, query="Aufgabe")
+
+    by_title = {hit["title"]: hit for hit in result["results"]}
+    shared = by_title["Angebot schreiben"]
+    assert "subline" not in shared
+    assert shared["id"].startswith("task:s")
+    assert shared["url"] == f"{BASE}/index.php/apps/tasks/"
+    assert by_title["Eigene Aufgabe"]["subline"] == OWN_TASK_ENTRY["subline"]
+    assert by_title[NOTE_ENTRY["title"]]["subline"] == NOTE_ENTRY["subline"]
+    dumped = json.dumps(result, ensure_ascii=False)
+    assert "Bob Beispiel" not in dumped
+    assert "degraded" not in result
+
+
+@pytest.mark.anyio
+async def test_a_shared_hit_whose_list_is_not_in_the_discovery_loses_its_subline(
+    clients: NcClients,
+) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        mock.get(PROVIDERS_URL).mock(return_value=httpx.Response(200, json=tasks_providers()))
+        mock.get(search_url("tasks")).mock(return_value=task_hits(SHARED_TASK_ENTRY))
+        mock.get(search_url("notes")).mock(return_value=httpx.Response(200, json=hits("N", [])))
+        mock.route(method="PROPFIND", url=CALENDAR_HOME).mock(
+            return_value=team_discovery(with_team=False)
+        )
+
+        result = await search_tools.unified_search(clients, query="Angebot")
+
+    (hit,) = result["results"]
+    assert "subline" not in hit
+    assert "Bob Beispiel" not in json.dumps(result, ensure_ascii=False)
