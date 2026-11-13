@@ -419,3 +419,7 @@ ENTSCHEID home404=e6 (gemessen auf 32 und 35: das Kalender-Home eines Kontos ohn
 ENTSCHEID erkennung=keine (auf 35 spiegeln Navigation und Provider-Liste jeden Zustand sofort, auf 32 nach app:disable ohne Neustart weiter ja und nach app:enable ohne Neustart weiter nein, also falsch und nicht unklar; der Hinweis aus D-32-10 entfällt)
 ENTSCHEID linkform=index.php (auf 32 und 35 unter Impersonation öffnen beide Formen die Seite der Tasks-App mit Status 200; die Form mit index.php hängt nicht an hübschen URLs; der Provider selbst liefert die Form ohne index.php und ohne Prozentkodierung)
 ENTSCHEID namensregel=owner-displayname (auf 32 und 35 zeigt jede geteilte Sammlung, rw und ro, owner_displayname_lesbar=ja und zusatz_passt=ja, der Name ohne Zusatz ist gleich dem Originalnamen; eigene Listen tragen keinen Zusatz)
+
+== Task 7: Owner-Frage zur Namensform ==
+    ENTSCHEID namensregel=owner-displayname, die Messung trägt auf 32 und 35; keine Frage an den Owner.
+OWNERFRAGE entfaellt
