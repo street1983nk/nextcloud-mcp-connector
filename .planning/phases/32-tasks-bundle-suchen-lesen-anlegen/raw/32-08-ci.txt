@@ -1,2 +1,36 @@
 BASIS b40f7623a5111b95a3fe3cf6e5295c4965ca7056
 FREIGABE push=ja datum=2026-11-13
+
+Push durch die Hauptsitzung nach der Freigabe: Fast-Forward 7c9445c..dcda6c8 auf plan/v1.8-tasks-080, kein Force.
+
+== CI-Lauf ==
+$ gh run view 43453276557 --json jobs,headSha,status,conclusion
+CI lauf=43453276557 workflow=CI commit=dcda6c8590a209fba6f84e6854f7e7bc80bfc159 status=completed ergebnis=success
+CI job=exapp ergebnis=success lauf=43453276557
+CI job=integration ergebnis=success lauf=43453276557
+CI job=canary-nc35 ergebnis=success lauf=43453276557
+CI job=image ergebnis=success lauf=43453276557
+CI job=unit ergebnis=success lauf=43453276557
+$ gh run view 43453276506 --json jobs,headSha,conclusion
+CI lauf=43453276506 workflow=Security-scans commit=dcda6c8590a209fba6f84e6854f7e7bc80bfc159 ergebnis=success
+CI job=REUSE licensing lint ergebnis=success lauf=43453276506
+CI job=pip-audit over the locked set ergebnis=success lauf=43453276506
+CI job=CodeQL (python) ergebnis=success lauf=43453276506
+
+== Zitate aus dem Log der neuen Schritte ==
+$ gh run view 43453276557 --log, nur die Schritte "Tasks bundle live without the Tasks app", "Install the Tasks app and restart Nextcloud" und "Tasks bundle live with the Tasks app";
+  Zeitstempel entfernt, Format <job> | <schritt> | <zeile>; Auswahl: LAUF, VERSION, TASKSAPP, Fassung aus occ app:list, BASELINE alice, pytest-Ergebnis.
+  Kein Abschnitt "warnings summary", keine env-Zeilen. Vorher tasks_measure.py scan gegen .env.nc35 und .env.exapp: Treffer nur auf den Kontonamen alice.
+exapp | Tasks bundle live without the Tasks app (TASK-03, D-32-11) | LAUF aufgaben32 stempel=de322cbe kopf=p32live-de322cbe container=nc-mcp-exapp-nc
+exapp | Tasks bundle live without the Tasks app (TASK-03, D-32-11) | VERSION nc=34.0.3.2 versionstring=34.0.3 (occ status)
+exapp | Tasks bundle live without the Tasks app (TASK-03, D-32-11) | TASKSAPP erwartet=0 occ_app_list=keine passt=ja
+exapp | Tasks bundle live without the Tasks app (TASK-03, D-32-11) | BASELINE nc34.0.3.2 konto=alice calendars=1 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+exapp | Tasks bundle live without the Tasks app (TASK-03, D-32-11) | BASELINE nc34.0.3.2 konto=alice calendars=1 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+exapp | Tasks bundle live without the Tasks app (TASK-03, D-32-11) | 17 passed, 1 warning in 16.63s
+canary-nc35 | Install the Tasks app and restart Nextcloud (D-32-11) |   - tasks: 0.18.1
+canary-nc35 | Tasks bundle live with the Tasks app (TASK-09, D-32-11) | LAUF aufgaben32 stempel=c257a8b9 kopf=p32live-c257a8b9 container=nc-mcp-exapp-nc
+canary-nc35 | Tasks bundle live with the Tasks app (TASK-09, D-32-11) | VERSION nc=35.0.1.1 versionstring=35.0.1 (occ status)
+canary-nc35 | Tasks bundle live with the Tasks app (TASK-09, D-32-11) | TASKSAPP erwartet=1 occ_app_list=0.18.1 passt=ja
+canary-nc35 | Tasks bundle live with the Tasks app (TASK-09, D-32-11) | BASELINE nc35.0.1.1 konto=alice calendars=1 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+canary-nc35 | Tasks bundle live with the Tasks app (TASK-09, D-32-11) | BASELINE nc35.0.1.1 konto=alice calendars=1 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+canary-nc35 | Tasks bundle live with the Tasks app (TASK-09, D-32-11) | 17 passed, 1 warning in 19.34s

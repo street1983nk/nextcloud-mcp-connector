@@ -7,7 +7,8 @@ measured before any product code existed, and how the built bundle answered live
 PostgreSQL) and under AppAPI impersonation on Nextcloud 35.0.0 and Nextcloud 32.0.15; every
 value below is derived from these runs. Plan 32-07 then ran the built bundle live on both
 standing instances, each without and with the Tasks app 0.18.1, and on Nextcloud 35 over the
-whole chain through the installed app. The CI runs follow in plan 32-08.
+whole chain through the installed app. Plan 32-08 added the owner acceptance of the task view in
+the Tasks app and one CI run of both cases.
 
 Unit tests say what the code does with an answer. They cannot say which answer a real
 Nextcloud gives, how long it takes, or whether an assumption of the research holds. This page
@@ -27,6 +28,10 @@ rather than believed. Every quoted line is copied from the raw protocol:
   [tests/integration/test_tasks_live.py](../tests/integration/test_tasks_live.py) (function level
   under impersonation) and [scripts/tasks_chain_evidence.py](../scripts/tasks_chain_evidence.py)
   (whole chain)
+- the owner acceptance of plan 32-08:
+  [raw/32-08-abnahme.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-08-abnahme.txt)
+- the CI run of plan 32-08:
+  [raw/32-08-ci.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-08-ci.txt)
 
 The number of tools is not held by this page; `tests/contract/test_tool_surface.py` holds it.
 
@@ -371,6 +376,83 @@ resolve. Without the Tasks app the cloud wide search answers empty with an hones
 as before (`appinfo/info.xml` unchanged) and the same `APP_SECRET`.
 
 
+## Owner acceptance
+
+Plan 32-08, Nextcloud 35.0.0 with the Tasks app 0.18.1, account alice. Both tasks were created
+over the whole chain (OAuth, Caddy, HaRP, the ExApp image of plan 32-07, impersonation), the
+subtask with `parent`, `due` 2026-11-20, `start` 2026-11-18, two tags and priority 3, without
+`list`: the account holds one own writable list, `personal`, and the connector took it. The
+owner then opened the Tasks app as alice together with Claude in Playwright, at three widths
+in light and dark mode; the screenshots stay outside the repository.
+
+```
+TASKSAPP nc35 abnahme=0.18.1
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=vorher
+KETTE eltern werkzeug=tasks_create nutzer=alice argumente={"summary": "p3208 Projekt Abnahme"} fehler=nein | {"confirmed": true, "created": true, "id": "task:personal:25f505ce-7330-41d7-91eb-999f753c539e.ics", "list": {"name": "personal", "shared": false, "writable": true}, "summary": "p3208 Projekt Abnahme"}
+KETTE unteraufgabe werkzeug=tasks_create nutzer=alice argumente={"due": "2026-11-20", "parent": "task:personal:25f505ce-7330-41d7-91eb-999f753c539e.ics", "priority": 3, "start": "2026-11-18", "summary": "p3208 Teilschritt", "tags": ["abnahme", "p3208"]} fehler=nein | {"confirmed": true, "created": true, "due": "2026-11-20", "id": "task:personal:280e2532-3c76-4367-8e47-45d91f602ea5.ics", "list": {"name": "personal", "shared": false, "writable": true}, "start": "2026-11-18", "summary": "p3208 Teilschritt"}
+KETTE lesen-unteraufgabe werkzeug=tasks_read nutzer=alice argumente={"task_id": "task:personal:280e2532-3c76-4367-8e47-45d91f602ea5.ics"} fehler=nein | {"due": "2026-11-20", "id": "task:personal:280e2532-3c76-4367-8e47-45d91f602ea5.ics", "list": {"name": "personal", "shared": false, "writable": true}, "parent": {"id": "task:personal:25f505ce-7330-41d7-91eb-999f753c539e.ics", "summary": "p3208 Projekt Abnahme"}, "priority": 3, "start": "2026-11-18", "status": "open", "subtasks": [], "summary": "p3208 Teilschritt", "tags": ["abnahme", "p3208"]}
+ABNAHME owner=abgenommen datum=2026-11-13 | Tasks 0.18.1 auf nc35, alice, Liste personal: "p3208 Teilschritt" eingerückt unter "p3208 Projekt Abnahme"; "Beginnt am 18. November 2026" und "Fällig am 20. November 2026", ganztägig (kein Folgetag); Tags abnahme und p3208; "Priorität 3: hoch"; Screenshots außerhalb des Repos unter <scratch>/abnahme/ (hell-1440, hell-1024, hell-390, dunkel-1440, dunkel-1024, dunkel-390 .png)
+```
+
+**Result:** accepted. The Tasks app shows the subtask indented under its parent, due on
+20 November 2026 as an all day date (not the day after), starting on 18 November 2026, with
+both tags and as priority 3 ("hoch"), in the list `personal`. This is success criterion 3 seen
+from the app, not only from the connector.
+
+Removal followed section 7 of the phase rules: both objects deleted with
+`X-NC-CalDAV-No-Trashbin: 1`, which again left them in the trash bin (two entries, the same
+finding as in plan 32-07), so the trash bin was emptied with a DAV `DELETE` per entry, and the
+Tasks app was removed with its config keys:
+
+```
+BASELINE nc35 konto=alice calendars=1 objekte=33 geloescht=2 shares=0 abos=0 phase=geloescht
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE-VERGLEICH nc35 konto=alice gleich=ja
+RUECKBAU nc35 tasksapp=wie-vorher vorher=keine nachher=keine
+TASKSAPP nc35 nachher=keine
+```
+
+## CI run
+
+One run of the workflow `CI` on commit `dcda6c8`, pushed after the owner release
+`FREIGABE push=ja` (fast forward, no force); the security scans ran on the same commit. The job
+`exapp` holds the case without the Tasks app (Nextcloud 34.0.3, the step "Tasks bundle live
+without the Tasks app"), the job `canary-nc35` the case with it (Nextcloud 35.0.1, the steps
+"Install the Tasks app and restart Nextcloud" and "Tasks bundle live with the Tasks app"). Both
+jobs kept every step they had before this phase and stayed green, so the bootstrap change of
+plan 32-01 did not alter the setup on 34 and 35.
+
+```
+CI lauf=43453276557 workflow=CI commit=dcda6c8590a209fba6f84e6854f7e7bc80bfc159 status=completed ergebnis=success
+CI job=exapp ergebnis=success lauf=43453276557
+CI job=integration ergebnis=success lauf=43453276557
+CI job=canary-nc35 ergebnis=success lauf=43453276557
+CI job=image ergebnis=success lauf=43453276557
+CI job=unit ergebnis=success lauf=43453276557
+CI lauf=43453276506 workflow=Security-scans commit=dcda6c8590a209fba6f84e6854f7e7bc80bfc159 ergebnis=success
+CI job=REUSE licensing lint ergebnis=success lauf=43453276506
+CI job=pip-audit over the locked set ergebnis=success lauf=43453276506
+CI job=CodeQL (python) ergebnis=success lauf=43453276506
+exapp | Tasks bundle live without the Tasks app (TASK-03, D-32-11) | LAUF aufgaben32 stempel=de322cbe kopf=p32live-de322cbe container=nc-mcp-exapp-nc
+exapp | Tasks bundle live without the Tasks app (TASK-03, D-32-11) | VERSION nc=34.0.3.2 versionstring=34.0.3 (occ status)
+exapp | Tasks bundle live without the Tasks app (TASK-03, D-32-11) | TASKSAPP erwartet=0 occ_app_list=keine passt=ja
+exapp | Tasks bundle live without the Tasks app (TASK-03, D-32-11) | BASELINE nc34.0.3.2 konto=alice calendars=1 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+exapp | Tasks bundle live without the Tasks app (TASK-03, D-32-11) | BASELINE nc34.0.3.2 konto=alice calendars=1 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+exapp | Tasks bundle live without the Tasks app (TASK-03, D-32-11) | 17 passed, 1 warning in 16.63s
+canary-nc35 | Install the Tasks app and restart Nextcloud (D-32-11) |   - tasks: 0.18.1
+canary-nc35 | Tasks bundle live with the Tasks app (TASK-09, D-32-11) | LAUF aufgaben32 stempel=c257a8b9 kopf=p32live-c257a8b9 container=nc-mcp-exapp-nc
+canary-nc35 | Tasks bundle live with the Tasks app (TASK-09, D-32-11) | VERSION nc=35.0.1.1 versionstring=35.0.1 (occ status)
+canary-nc35 | Tasks bundle live with the Tasks app (TASK-09, D-32-11) | TASKSAPP erwartet=1 occ_app_list=0.18.1 passt=ja
+canary-nc35 | Tasks bundle live with the Tasks app (TASK-09, D-32-11) | BASELINE nc35.0.1.1 konto=alice calendars=1 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+canary-nc35 | Tasks bundle live with the Tasks app (TASK-09, D-32-11) | BASELINE nc35.0.1.1 konto=alice calendars=1 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+canary-nc35 | Tasks bundle live with the Tasks app (TASK-09, D-32-11) | 17 passed, 1 warning in 19.34s
+```
+
+Run: https://github.com/street1983nk/nextcloud-mcp-connector/actions/runs/43453276557 (CI) and
+https://github.com/street1983nk/nextcloud-mcp-connector/actions/runs/43453276506 (security
+scans). Lines are filtered from the log of the three new steps only; the timestamps are cut
+and no environment line is kept.
+
 ## What the run found
 
 No answer contradicted TASK-01 to TASK-07 or TASK-09; no product code was changed in plan 32-07.
@@ -400,8 +482,8 @@ No answer contradicted TASK-01 to TASK-07 or TASK-09; no product code was change
   `manual_install`, not as an image behind HaRP.
 - The outage of one list is produced in the client (a response hook holds the `REPORT` back for
   3 s), not by a slow server.
-- The CI runs of both cases (job `exapp` without the Tasks app, job `canary-nc35` with it) follow
-  in plan 32-08.
+- CI measured each case once on a single commit (see [CI run](#ci-run)); the job `exapp` runs
+  on Nextcloud 34.0.3, not 35, so the case without the Tasks app on 35 rests on plan 32-07 only.
 - Nextcloud 33 and 34: only through the source.
 - The acceptance script did not run on Nextcloud 35: it leaves a file, a note, an event, a Deck
   card, a table row and a Talk message behind and deletes nothing, which the standing instance
