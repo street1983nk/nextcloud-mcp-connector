@@ -196,7 +196,7 @@ Plans:
   4. `tasks_read` und `fetch` lösen dieselbe `task:`-Id auf, ein Treffer des Suchproviders `tasks` führt auf diese Id; die Zeitmatrix (ganztägig, mit Zone, UTC, schwebend, ohne Datum) ist je als benannter Test grün, und Fremdtext aus einer geteilten Liste kommt gekappt und ohne Marker an
   5. Die Registry zeigt 27 Werkzeuge in zehn Familien; `EXPECTED_PUT_CALLS` steht weiter bei 6; das Budget ist nach der Hausregel aus der Messung neu verankert und kein Werkzeug liegt über 1400 Bytes; die Kanarie ruft die drei Werkzeuge auf; READMEs, `docs/` und die drei Changelogs sind nachgezogen, sodass der Stand ohne Phase 33 alle Gates besteht
 
-**Plans**: 11 plans (elf Wellen, streng nacheinander: ein Docker-Host, immer nur eine Instanz; Rahmen in 32-RULES.md; 32-09 schließt die Lücken der Verifikation)
+**Plans**: 12 plans (zwölf Wellen, streng nacheinander: ein Docker-Host, immer nur eine Instanz; Rahmen in 32-RULES.md; 32-09 schließt die Lücken der Verifikation, 32-10 die offenen Messungen der Re-Verifikation)
 
 Plans:
 - [x] 32-01-PLAN.md: Basis-Commit 32-BASE.txt, Messung `--name` und Heartbeat-URL auf 32/34/35, `scripts/bootstrap_exapp.sh` testgetrieben für Nextcloud 32, `--manual` auf 32 nach Owner-Freigabe zum unregister (TASK-03, TASK-07; D-32-13)
@@ -210,6 +210,7 @@ Plans:
 - [x] 32-07-PLAN.md: Live-Beweis auf Nextcloud 35 und 32, je ohne und mit Tasks-App, `docs/tasks-evidence.md` (TASK-01 bis TASK-07, TASK-09; D-32-11, D-32-12)
 - [x] 32-08-PLAN.md: gemeinsame Abnahme in der Tasks-App per Playwright, Owner-Checkpoint zum Push, CI-Lauf beider Beine (TASK-05, TASK-07; D-32-11, D-32-13)
 - [x] 32-09-PLAN.md: Lücken nach der Verifikation (gap closure): Messung der Freigabe eigener Listen und der Provider-subline auf 35 und 32, subline und text ohne Besitzer (D-32-17), hinausgeteilte eigene Liste ohne `list` nicht beschreiben (D-32-18), `fetch` mit Kürzungsvermerk und Schwebe-Kennzeichen (W2), Beschreibung von `query` (W3), nicht gemessene Teile im Beleg (W4), Live-Beweis, Owner-Frage zum Push (TASK-02, TASK-05 bis TASK-07, TASK-09); ausgeführt 2026-11-13 bis zur Push-Frage, die offen ist
+- [ ] 32-10-PLAN.md: offene Messungen der Re-Verifikation (gap closure): Gruppenfreigabe hinaus (D-32-18 für Gruppen) und hinein (D-32-14, D-32-15, D-32-17, E4, D-32-16), wiederkehrende Aufgabe live, Deckel 500 und Budget je Liste live, Anzeigename von bob ungleich der Kennung, Messkommentar in `scripts/check_tool_budget.py`; testgetrieben bei Befund, Live-Läufe auf 35 und 32 je ohne und mit Tasks-App, Owner-Frage zum Push (TASK-02, TASK-04, TASK-06, TASK-08, TASK-09)
 
 **Abtrennbar**: TASK-09 (`task:`-Id über `fetch` und Provider) ist ein eigener Plan und nur per Owner-Entscheid verschiebbar
 
