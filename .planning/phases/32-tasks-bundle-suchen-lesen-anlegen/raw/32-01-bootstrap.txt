@@ -101,3 +101,47 @@ ENTSCHEID UMBAU name_erkennung=ok host_ohne_port=ok
     host_ohne_port: ohne Port auf 32, 34 und 35 http://host.docker.internal:23001; auf 34
     und 35 mit und ohne Port dieselbe URL. Der Host ohne Port ändert auf 34 und 35 nichts
     an der Heartbeat-URL; auf 32 behebt er "host.docker.internal:23001:23001".
+
+    Geheimnisprüfung Task 1 (Abschnitt 8): 70 Werte aus .env.exapp und .env.nc35 samt
+    ersten 12 Zeichen und AUTHORIZATION-APP-API geprüft; einziger Treffer ist APP_ID
+    (Wert mcp_connector, die öffentliche App-ID aus appinfo/info.xml, kein Geheimnis).
+
+== Task 2: Umbau scripts/bootstrap_exapp.sh ==
+
+    RED b21bf78: test_the_bootstrap_detects_the_token_name_option und
+    test_the_manual_daemon_is_registered_without_a_port rot, alle anderen grün.
+    GREEN 201e1ad: app_password mit Erkennung der Option aus --help, Daemon-Host ohne Port.
+
+== Task 3: Zustand der 32er Strecke vor dem unregister (nur lesend) ==
+
+RAM frei_host_gb=5.29 schwelle=4.0 ergebnis=ok (5547568, 5549068, 5547304 KiB)
+    $ docker ps        (vorher)
+    gameworld-dev-gameworld-docker-proxy-1 tecnativa/docker-socket-proxy:v0.5.0 Up 20 hours
+    nc35 gestoppt. Gestartet nur nc-mcp-exapp-nc (docker start, healthy); für
+    daemon:list und app:list genügt Nextcloud allein, HaRP und Caddy blieben gestoppt.
+    $ occ app_api:daemon:list
+    Registered ExApp daemon configs:
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    | Def | Name              | Display name        | Deploy ID      | Protocol | Host                 | NC Url       | Is HaRP | HaRP FRP Address | HaRP Docker Socket Port |
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    | *   | harp_proxy_docker | Harp Proxy (Docker) | docker-install | http     | appapi-harp:8780     | http://caddy | yes     | appapi-harp:8782 | 24000                   |
+    |     | manual_install    | Manual Install      | manual-install | http     | host.docker.internal | http://caddy | no      | (none)           | (none)                  |
+    +-----+-------------------+---------------------+----------------+----------+----------------------+--------------+---------+------------------+-------------------------+
+    exit=0
+    $ occ app_api:app:list
+    ExApps:
+    mcp_connector (MCP Connector): 9.9.9 [enabled]
+    exit=0
+    $ occ app:list | grep app_api
+      - app_api: 32.0.0
+VORHER daemon_manual=host.docker.internal app_version=9.9.9 registriert=ja
+    Daemon manual_install: Protokoll http, Deploy-ID manual-install, NC Url http://caddy,
+    kein HaRP (Handeintrag ohne Port aus 31-01 vom 12.11.2026). ExApp mcp_connector
+    9.9.9 [enabled] (Version aus 31-05b, lokaler Prozess). Daemon harp_proxy_docker ist
+    Standard und bleibt unberührt.
+RUECKWEG daemon:register manual_install "Manual Install" manual-install http host.docker.internal http://caddy
+    Vollständig: occ app_api:daemon:register manual_install "Manual Install" manual-install http host.docker.internal http://caddy
+    Die App-Registrierung 9.9.9 ist kein Wert aus info.xml; sie ist nur mit dem lokalen
+    Prozess nach 31-05b wiederherstellbar, nicht über diese Zeile.
+    $ docker stop nc-mcp-exapp-nc        (danach läuft nur der fremde Proxy)
+    Geheimnisprüfung Task 3: einziger Treffer APP_ID (mcp_connector, öffentlich).
