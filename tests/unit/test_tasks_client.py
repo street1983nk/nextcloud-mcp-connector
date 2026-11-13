@@ -28,7 +28,9 @@ from mcp_connector import ids
 from mcp_connector.errors import (
     REASON_GUARD_TRIPPED,
     REASON_PERMISSION_DENIED,
+    REASON_TIMEOUT,
     REASON_UNKNOWN_ID,
+    ConflictError,
     ToolError,
 )
 from mcp_connector.nextcloud.clients import caldav, tasks
@@ -751,6 +753,325 @@ async def test_a_write_to_a_shared_list_names_the_list_and_not_its_owner(
     assert error.reason == REASON_UNKNOWN_ID
     assert error.message == "The task list spike30-b-rw was not found or does not allow writing."
     assert OWNER not in f"{error.message} {error.hint}"
+
+
+# --------------------------------------------------------------------------------------
+# The two conditional writers of plan 33-03: put_existing_todo and move_todo
+# --------------------------------------------------------------------------------------
+
+OWN_TARGET = tasks.TaskList(
+    uri="spike30-aufgaben", key="spike30-aufgaben", name="Aufgaben", shared=False, writable=True
+)
+TARGET_URL = f"{CALENDAR_HOME}spike30-aufgaben/"
+ICS = b"BEGIN:VCALENDAR\r\nBEGIN:VTODO\r\nUID:uid-a\r\nEND:VTODO\r\nEND:VCALENDAR\r\n"
+
+#: Values no request may ever carry as If-Match: SabreDAV skips an empty one and honours
+#: ``*``, weak validators and lists (``dav.normalize_etag``).
+UNUSABLE_ETAGS = ["", "  ", "*", 'W/"1"', '"a","b"', '"a", "b"']
+
+
+def _no_secret_place(error: ToolError) -> None:
+    """Messages name the list only: never its URI, never its owner, never a URL."""
+    text = f"{error.message} {error.hint}"
+    assert OWNER not in text
+    assert "_shared_by_" not in text
+    assert "remote.php" not in text
+    assert BASE not in text
+
+
+async def _put(client: httpx.AsyncClient, creds: Credentials, etag: str = '"e1"') -> str:
+    return await tasks.put_existing_todo(client, creds, SHARED_LIST, "x.ics", ICS, etag)
+
+
+async def _move(client: httpx.AsyncClient, creds: Credentials, etag: str = '"e1"') -> None:
+    await tasks.move_todo(client, creds, SHARED_LIST, OWN_TARGET, "x.ics", etag)
+
+
+@pytest.mark.anyio
+async def test_put_existing_todo_sends_one_conditional_put_and_returns_the_new_etag(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.put(f"{SHARED_URL}x.ics").mock(
+            return_value=httpx.Response(204, headers={"ETag": '"e2"'})
+        )
+        new_etag = await _put(client, creds, "e1")
+
+    assert new_etag == '"e2"'
+    assert route.call_count == 1
+    request = route.calls[0].request
+    assert request.headers["If-Match"] == '"e1"', "a bare token is quoted, never sent bare"
+    assert request.headers["Content-Type"] == "text/calendar; charset=utf-8"
+    assert "If-None-Match" not in request.headers
+    assert request.content == ICS
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("status", [200, 204])
+async def test_put_existing_todo_without_an_etag_header_returns_an_empty_etag(
+    client: httpx.AsyncClient, creds: Credentials, status: int
+) -> None:
+    """33-01c: a server that changed the text answers 204 without ETag; the caller re-reads."""
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.put(f"{SHARED_URL}x.ics").mock(return_value=httpx.Response(status))
+        assert await _put(client, creds) == ""
+    assert route.call_count == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("etag", UNUSABLE_ETAGS)
+async def test_put_existing_todo_refuses_an_unusable_etag_before_any_request(
+    client: httpx.AsyncClient, creds: Credentials, etag: str
+) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        any_request = mock.route()
+        with pytest.raises(ToolError):
+            await _put(client, creds, etag)
+    assert any_request.call_count == 0
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("etag", UNUSABLE_ETAGS)
+async def test_move_todo_refuses_an_unusable_etag_before_any_request(
+    client: httpx.AsyncClient, creds: Credentials, etag: str
+) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        any_request = mock.route()
+        with pytest.raises(ToolError):
+            await _move(client, creds, etag)
+    assert any_request.call_count == 0
+
+
+@pytest.mark.anyio
+async def test_put_existing_todo_412_is_a_conflict_that_asks_for_a_new_read(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.put(f"{SHARED_URL}x.ics").mock(return_value=httpx.Response(412))
+        with pytest.raises(ConflictError) as excinfo:
+            await _put(client, creds)
+
+    assert route.call_count == 1, "no second attempt"
+    error = excinfo.value
+    assert "spike30-b-rw" in error.message
+    assert "tasks_read" in error.hint
+    assert "read the task again" in error.hint
+    _no_secret_place(error)
+
+
+@pytest.mark.anyio
+async def test_put_existing_todo_404_never_claims_the_task_is_gone(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    """A read only share answers a PUT with 404, so 404 says nothing about existence."""
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.put(f"{SHARED_URL}x.ics").mock(return_value=httpx.Response(404))
+        with pytest.raises(ToolError) as excinfo:
+            await _put(client, creds)
+
+    assert route.call_count == 1
+    error = excinfo.value
+    assert "not found or no write permission" in error.message
+    assert "deleted" not in f"{error.message} {error.hint}".lower()
+    assert "gone" not in f"{error.message} {error.hint}".lower()
+    _no_secret_place(error)
+
+
+@pytest.mark.anyio
+async def test_put_existing_todo_403_is_a_permission_refusal(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.put(f"{SHARED_URL}x.ics").mock(return_value=httpx.Response(403))
+        with pytest.raises(ToolError) as excinfo:
+            await _put(client, creds)
+
+    assert route.call_count == 1
+    assert excinfo.value.reason == REASON_PERMISSION_DENIED
+    assert "spike30-b-rw" in excinfo.value.message
+    _no_secret_place(excinfo.value)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("status", [500, 502, 503, 507])
+async def test_put_existing_todo_5xx_is_a_server_error_without_retry(
+    client: httpx.AsyncClient, creds: Credentials, status: int
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.put(f"{SHARED_URL}x.ics").mock(return_value=httpx.Response(status))
+        with pytest.raises(ToolError) as excinfo:
+            await _put(client, creds)
+
+    assert route.call_count == 1
+    assert str(status) in excinfo.value.message
+    assert "tasks_read" in excinfo.value.hint
+    _no_secret_place(excinfo.value)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("status", [201, 301, 400, 409, 415, 423])
+async def test_put_existing_todo_any_other_status_is_an_error(
+    client: httpx.AsyncClient, creds: Credentials, status: int
+) -> None:
+    """Only 200 and 204 are a successful change; a 201 would be a new object."""
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.put(f"{SHARED_URL}x.ics").mock(return_value=httpx.Response(status))
+        with pytest.raises(ToolError) as excinfo:
+            await _put(client, creds)
+
+    assert route.call_count == 1
+    _no_secret_place(excinfo.value)
+
+
+@pytest.mark.anyio
+async def test_put_existing_todo_timeout_is_an_unknown_outcome_without_retry(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.put(f"{SHARED_URL}x.ics").mock(side_effect=httpx.ReadTimeout("slow"))
+        with pytest.raises(ToolError) as excinfo:
+            await _put(client, creds)
+
+    assert route.call_count == 1
+    error = excinfo.value
+    assert error.reason == REASON_TIMEOUT
+    assert "outcome unknown" in error.message.lower()
+    assert "read the task again" in error.hint
+    assert "tasks_read" in error.hint
+    _no_secret_place(error)
+
+
+@pytest.mark.anyio
+async def test_move_todo_sends_one_guarded_move_and_accepts_only_201(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.route(method="MOVE", url=f"{SHARED_URL}x.ics").mock(
+            return_value=httpx.Response(201)
+        )
+        await _move(client, creds, "e1")
+
+    assert route.call_count == 1
+    request = route.calls[0].request
+    assert request.method == "MOVE"
+    assert request.headers["Destination"] == caldav.object_url(creds, OWN_TARGET.uri, "x.ics")
+    assert request.headers["Destination"] == f"{TARGET_URL}x.ics"
+    assert request.headers["Overwrite"] == "F"
+    assert request.headers["If-Match"] == '"e1"'
+    assert request.content == b""
+
+
+@pytest.mark.anyio
+async def test_move_todo_204_is_a_loud_error_because_an_object_was_replaced(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.route(method="MOVE", url=f"{SHARED_URL}x.ics").mock(
+            return_value=httpx.Response(204)
+        )
+        with pytest.raises(ToolError) as excinfo:
+            await _move(client, creds)
+
+    assert route.call_count == 1
+    assert "replaced an existing object" in excinfo.value.message
+    _no_secret_place(excinfo.value)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("status", "words", "error_type"),
+    [
+        (409, "UID", ConflictError),
+        (412, "changed since", ConflictError),
+        (404, "not found or no write permission", ToolError),
+        (403, "No permission", ToolError),
+        (500, "500", ToolError),
+        (503, "503", ToolError),
+        (200, "unexpected status 200", ToolError),
+        (207, "unexpected status 207", ToolError),
+    ],
+)
+async def test_move_todo_every_other_status_has_its_honest_sentence(
+    client: httpx.AsyncClient,
+    creds: Credentials,
+    status: int,
+    words: str,
+    error_type: type[ToolError],
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.route(method="MOVE", url=f"{SHARED_URL}x.ics").mock(
+            return_value=httpx.Response(status)
+        )
+        with pytest.raises(error_type) as excinfo:
+            await _move(client, creds)
+
+    assert route.call_count == 1, "no second attempt"
+    error = excinfo.value
+    assert words in error.message
+    assert "deleted" not in f"{error.message} {error.hint}".lower()
+    _no_secret_place(error)
+
+
+@pytest.mark.anyio
+async def test_move_todo_412_names_both_causes_and_asks_for_a_new_read(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    """Pitfall 2: 412 on a move is a stale ETag or a taken name in the target list."""
+    with respx.mock(assert_all_called=True) as mock:
+        mock.route(method="MOVE", url=f"{SHARED_URL}x.ics").mock(return_value=httpx.Response(412))
+        with pytest.raises(ConflictError) as excinfo:
+            await _move(client, creds)
+
+    error = excinfo.value
+    assert "changed since" in error.message
+    assert "target name" in error.message
+    assert "Aufgaben" in error.message
+    assert "spike30-b-rw" in error.message
+    assert "read" in error.hint
+    assert "tasks_read" in error.hint
+
+
+@pytest.mark.anyio
+async def test_move_todo_403_is_a_permission_refusal(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        mock.route(method="MOVE", url=f"{SHARED_URL}x.ics").mock(return_value=httpx.Response(403))
+        with pytest.raises(ToolError) as excinfo:
+            await _move(client, creds)
+    assert excinfo.value.reason == REASON_PERMISSION_DENIED
+
+
+@pytest.mark.anyio
+async def test_move_todo_timeout_is_an_unknown_outcome_without_retry(
+    client: httpx.AsyncClient, creds: Credentials
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        route = mock.route(method="MOVE", url=f"{SHARED_URL}x.ics").mock(
+            side_effect=httpx.ConnectTimeout("slow")
+        )
+        with pytest.raises(ToolError) as excinfo:
+            await _move(client, creds)
+
+    assert route.call_count == 1
+    error = excinfo.value
+    assert error.reason == REASON_TIMEOUT
+    assert "outcome unknown" in error.message.lower()
+    assert "read the task again" in error.hint
+    _no_secret_place(error)
+
+
+def test_the_writers_have_no_timeout_of_their_own() -> None:
+    """Pitfall 4: a timeout around a write would turn an arrived write into "not written"."""
+    source = Path(tasks.__file__).read_text(encoding="utf-8")
+    assert "asyncio.timeout" not in source
+    assert "wait_for" not in source
+
+
+def test_the_module_spells_overwrite_f_exactly_once() -> None:
+    source = Path(tasks.__file__).read_text(encoding="utf-8")
+    assert source.count('"Overwrite": "F"') == 1
+    assert source.count('"MOVE",') == 1
 
 
 # --------------------------------------------------------------------------------------
