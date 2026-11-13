@@ -1,0 +1,341 @@
+Rohprotokoll Plan 32-07: Tasks-Bundle live auf Nextcloud 32 (Strecke nc-mcp-exapp, 32.0.15)
+==========================================================================================
+Datum: 2026-11-13 (UTC). Gemeinsame Freigabe aus raw/32-02-messung.txt: FREIGABE zustand=option-a datum=2026-11-13.
+nc35 war vor dem Start gestoppt. Hilfsskript h.py im Scratchpad wie in raw/32-07-nc35.txt beschrieben.
+Jede Ausgabe ging zuerst ins Scratchpad und wurde gegen die Werte der Env-Dateien geprüft.
+
+(1) RAM-Gate, Start, Stand vorher
+---------------------------------
+RAM frei_kib=4310272 schwelle_kib=4194304 laufend=[]
+RAM frei_host_gb=4.31 schwelle=4.0 ergebnis=ok (kein Container lief)
+$ docker compose -f compose.exapp.yml start   (HP_SHARED_KEY aus .env.exapp per set -a)
+ Container nc-mcp-exapp-registry Starting 
+ Container nc-mcp-exapp-nc Starting 
+ Container nc-mcp-exapp-greenmail Starting 
+ Container nc-mcp-exapp-greenmail Started 
+ Container nc-mcp-exapp-nc Started 
+ Container nc-mcp-exapp-nc Waiting 
+ Container nc-mcp-exapp-nc Waiting 
+ Container nc-mcp-exapp-registry Started 
+ Container nc-mcp-exapp-nc Healthy 
+ Container nc-mcp-exapp-harp Starting 
+ Container nc-mcp-exapp-nc Healthy 
+ Container nc-mcp-exapp-caddy Starting 
+ Container nc-mcp-exapp-harp Started 
+ Container nc-mcp-exapp-caddy Started 
+exit=0
+BASIS ce6c3bf3974c173b2b336c23d060e063e45dad86 basis32=b40f7623a5111b95a3fe3cf6e5295c4965ca7056
+$ occ status
+  - installed: true
+  - version: 32.0.15.1
+  - versionstring: 32.0.15
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+TASKSAPP nc32 vorher=keine
+ExApps:
+mcp_connector (MCP Connector): 0.7.2 [enabled]
+RAM nach dem Start frei_kib=4060444
+PROZESS lokal gestartet port=23001 heartbeat_vom_host=200 heartbeat_aus_nc={"status":"ok"} kommando=uv run --no-sync nc-mcp-exapp (im Worktree, PYTHONPATH=src)
+    Umgebung: aus .env.exapp nur APP_ID, APP_SECRET, APP_VERSION, NC_MCP_URL, NC_MCP_PUBLIC_URL; dazu NEXTCLOUD_URL gleich NC_MCP_URL, APP_PORT=23001, APP_PERSISTENT_STORAGE im Scratchpad; alle übrigen Variablen der Datei vor dem Start entfernt. Kein Wert ausgegeben.
+KETTE nc32 entfaellt grund=manual-install (auf 32 läuft die ExApp als lokaler Prozess am Daemon manual_install; eine Kette über ein Image gibt es dort nicht, 31-07 offene Punkte)
+
+(2) Funktionsebene ohne Tasks-App
+---------------------------------
+$ NC_MCP_REQUIRE_LIVE=1 NC_MCP_EXPECT_TASKS_APP=0 uv run --no-sync pytest tests/integration/test_tasks_live.py -m integration -s -q -p no:warnings   (.env.exapp per set -a, Standardnamen von topology.py)
+
+LAUF aufgaben32 stempel=2dc3b0e4 kopf=p32live-2dc3b0e4 container=nc-mcp-exapp-nc
+VERSION nc=32.0.15.1 versionstring=32.0.15 (occ status)
+TASKSAPP erwartet=0 occ_app_list=keine passt=ja
+BASELINE nc32.0.15.1 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=p32live-2dc3b0e4-frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=p32live-2dc3b0e4-nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+
+KONTROLLE a nc=32.0.15.1 nutzer=alice ergebnis=ok | mode=appapi NC_MCP_APP_PASSWORD or NC_MCP_STATIC_BEARER set in the process=no; the credential is APP_SECRET and no app password
+.
+KONTROLLE b nc=32.0.15.1 nutzer=alice status=PROPFIND:401 ergebnis=ok | tool: ToolError reason=unspecified message='Nextcloud rejected the app password.'; calendarobjects p32live-2dc3b0e4-a vorher=4 nachher=4
+.
+AUFGABE anlegen-mit-list nc=32.0.15.1 nutzer=alice status=PROPFIND:207,PUT:201,GET:200,PROPFIND:207,GET:200,PUT:201,GET:200 ergebnis=ok | GET 200 with the app password; DUE;VALUE=DATE:20261203 in the raw object; no 20261204 anywhere in the raw object; DTSTART;VALUE=DATE:20261201; CATEGORIES 'CATEGORIES:p32live-2dc3b0e4-x,p32live-2dc3b0e4-y'; PRIORITY:3; RELATED-TO the UID of the parent 658e5521-2128-487a-b6b3-9383cf02181c; {"confirmed": true, "created": true, "due": "2026-12-03", "id": "task:p32live-2dc3b0e4-a:2e63e778-77f7-4306-801b-737f6ea71276.ics", "list": {"name": "p32live-2dc3b0e4-a", "shared": false, "writable": true}, "start": "2026-12-01", "summary": "p32live-2dc3b0e4-kind"}; no hint (erkennung=keine)
+.
+AUFGABE ohne-list-zwei-listen nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=unspecified message='This account has more than one task list to write to, so list has to be named.'; hint 'Name the list with list=<name>. Writable task lists: p32live-2dc3b0e4-a, p32live-2dc3b0e4-b, p32live-2dc3b0e4-rw (shared, key sf5ca01922474da16), personal.'; no PUT; calendarobjects vorher={'a': 6, 'b': 1} nachher={'a': 6, 'b': 1}
+.
+AUFGABE geteilt-namen nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | roher displayname mit zusatz in der discovery: 2 von 2; the server really adds the owner, so stripping is proven; rw: {'name': 'p32live-2dc3b0e4-rw', 'shared': True, 'writable': True}; ro: {'name': 'p32live-2dc3b0e4-ro', 'shared': True, 'writable': False}; a: {'name': 'p32live-2dc3b0e4-a', 'shared': False, 'writable': True}; the task of the rw share is a hit
+.
+AUFGABE geteilt-rw-mit-list nc=32.0.15.1 nutzer=alice status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | the id carries the hashed key: True; GET by the owner 200; calendarobjects vorher=1 nachher=2; PUT [201]
+.
+AUFGABE geteilt-ro-vorab nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The task list 'p32live-2dc3b0e4-ro' is read only for this account."; The task list 'p32live-2dc3b0e4-ro' is read only for this account.; the hook saw no PUT; calendarobjects vorher=1 nachher=1
+.
+AUFGABE geteilt-ro-server nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | harness PUT with the app password of alice, not the connector; PUT 404; calendarobjects vorher=1 nachher=1
+.
+AUFGABE d-32-16 nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message='The parent task lives in a shared list, and a shared list is only written to when it is named.'; no PUT; calendarobjects vorher=2 nachher=2
+.
+AUFGABE suche-standard-und-faellig nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207 ergebnis=ok | open task in the default search; completed task not in it; completed task with status=completed; due 2026-12-04 within due_by 2026-12-10; due 2026-12-20 outside; an undated task is not due by a day
+.
+AUFGABE ausfall-liste nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | REPORT of p32live-2dc3b0e4-b held back 3.0 s in the client hook; degraded [{'list': 'p32live-2dc3b0e4-b', 'reason': 'The task list did not answer within 1 second.'}]; the other lists still answer
+.
+AUFGABE fetch-gleich-read nc=32.0.15.1 nutzer=alice status=PROPFIND:207,GET:200,REPORT:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207,REPORT:207 ergebnis=ok | id task:p32live-2dc3b0e4-a:2e63e778-77f7-4306-801b-737f6ea71276.ics; title p32live-2dc3b0e4-kind; status open; deep link of an own list
+.
+AUFGABE deck nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | positive control: app-generated--deck--board-20 with VTODO in the discovery of alice; positive control: Deck REST 200; no hit for the card title: set(); ToolError reason=unknown_id message="Nextcloud does not know the task 'task:app-generated--deck--board-20:card-35.ics'."; deck marker in no answer
+.
+AUFGABE task-03-mit-anmeldung nc=32.0.15.1 nutzer=p32live-2dc3b0e4-frisch status=PROPFIND:207,PROPFIND:207 ergebnis=ok | occ user:add exit=0; Basic cloud/user 200; BASELINE calendars=2 objekte=2 geloescht=0 shares=0 abos=0; {"hint": "This account has no task list yet. Create one in the Nextcloud Tasks app; tasks_search finds its tasks from then on.", "tasks": []}; ToolError reason=unspecified message='This account has no task list.'; hint 'Create a list in the Nextcloud Tasks app, then try again.'; no PUT; occ user:delete ok
+.
+AUFGABE task-03-ohne-anmeldung nc=32.0.15.1 nutzer=p32live-2dc3b0e4-nie status=PROPFIND:207,PROPFIND:207 ergebnis=ok | occ user:add exit=0; BASELINE calendars=0 objekte=0 geloescht=0 shares=0 abos=0; {"hint": "This account has no task list yet. Create one in the Nextcloud Tasks app; tasks_search finds its tasks from then on.", "tasks": []}; ToolError reason=unspecified message='This account has no task list.'; hint 'Create a list in the Nextcloud Tasks app, then try again.'; no PUT; occ user:delete ok
+.
+AUFGABE provider-tasksapp-0 nc=32.0.15.1 nutzer=alice status=ocs.GET:200,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207,PUT:201,GET:200 ergebnis=ok | tasksapp occ=keine ENTSCHEID erkennung=keine; provider tasks listed=False hits=[]; the provider is not listed; no task hit; no hit of kind task from anywhere; tasks_create created=True hint=nein
+.
+AUFGABE keine-kennung nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | 22 answers scanned for the id and the display name of bob; answers kept: 22; found 0 of 2 names; no _shared_by_ in any answer
+.
+RUECKBAU freigabe rw status=200
+RUECKBAU freigabe ro status=200
+RUECKBAU liste a delete=204 no_trashbin=1 danach=404
+RUECKBAU liste b delete=204 no_trashbin=1 danach=404
+RUECKBAU liste rw delete=204 no_trashbin=1 danach=404
+RUECKBAU liste ro delete=204 no_trashbin=1 danach=404
+RUECKBAU deck board=20 gelöscht
+RUECKBAU papierkorb alice entfernt=0
+RUECKBAU papierkorb bob entfernt=0
+RUECKBAU konto p32live-2dc3b0e4-frisch nicht da
+RUECKBAU konto p32live-2dc3b0e4-nie nicht da
+RUECKBAU reste listen_mit_kopf=0
+BASELINE nc32.0.15.1 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=p32live-2dc3b0e4-frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=p32live-2dc3b0e4-nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+
+17 passed in 20.36s
+exit=0
+LAUF nc32 tasksapp=keine ergebnis=passed 17
+
+(3) Mit Tasks-App: Installation, Neustart, Funktionsebene
+---------------------------------------------------------
+$ occ app:install tasks; docker restart nc-mcp-exapp-nc
+tasks 0.18.1 installed
+tasks enabled
+nc-mcp-exapp-nc
+TASKSAPP nc32 lauf=0.18.1
+$ NC_MCP_REQUIRE_LIVE=1 NC_MCP_EXPECT_TASKS_APP=1 uv run --no-sync pytest tests/integration/test_tasks_live.py -m integration -s -q -p no:warnings
+
+LAUF aufgaben32 stempel=e9921be7 kopf=p32live-e9921be7 container=nc-mcp-exapp-nc
+VERSION nc=32.0.15.1 versionstring=32.0.15 (occ status)
+TASKSAPP erwartet=1 occ_app_list=0.18.1 passt=ja
+BASELINE nc32.0.15.1 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=p32live-e9921be7-frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=p32live-e9921be7-nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+
+KONTROLLE a nc=32.0.15.1 nutzer=alice ergebnis=ok | mode=appapi NC_MCP_APP_PASSWORD or NC_MCP_STATIC_BEARER set in the process=no; the credential is APP_SECRET and no app password
+.
+KONTROLLE b nc=32.0.15.1 nutzer=alice status=PROPFIND:401 ergebnis=ok | tool: ToolError reason=unspecified message='Nextcloud rejected the app password.'; calendarobjects p32live-e9921be7-a vorher=4 nachher=4
+.
+AUFGABE anlegen-mit-list nc=32.0.15.1 nutzer=alice status=PROPFIND:207,PUT:201,GET:200,PROPFIND:207,GET:200,PUT:201,GET:200 ergebnis=ok | GET 200 with the app password; DUE;VALUE=DATE:20261203 in the raw object; no 20261204 anywhere in the raw object; DTSTART;VALUE=DATE:20261201; CATEGORIES 'CATEGORIES:p32live-e9921be7-x,p32live-e9921be7-y'; PRIORITY:3; RELATED-TO the UID of the parent baf5a1ae-6d8e-4701-8c79-d2e05d68d679; {"confirmed": true, "created": true, "due": "2026-12-03", "id": "task:p32live-e9921be7-a:1c6f0713-6e91-4fee-b171-edf15e650f02.ics", "list": {"name": "p32live-e9921be7-a", "shared": false, "writable": true}, "start": "2026-12-01", "summary": "p32live-e9921be7-kind"}; no hint (erkennung=keine)
+.
+AUFGABE ohne-list-zwei-listen nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=unspecified message='This account has more than one task list to write to, so list has to be named.'; hint 'Name the list with list=<name>. Writable task lists: p32live-e9921be7-a, p32live-e9921be7-b, p32live-e9921be7-rw (shared, key sbc949da3f5b041b4), personal.'; no PUT; calendarobjects vorher={'a': 6, 'b': 1} nachher={'a': 6, 'b': 1}
+.
+AUFGABE geteilt-namen nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | roher displayname mit zusatz in der discovery: 2 von 2; the server really adds the owner, so stripping is proven; rw: {'name': 'p32live-e9921be7-rw', 'shared': True, 'writable': True}; ro: {'name': 'p32live-e9921be7-ro', 'shared': True, 'writable': False}; a: {'name': 'p32live-e9921be7-a', 'shared': False, 'writable': True}; the task of the rw share is a hit
+.
+AUFGABE geteilt-rw-mit-list nc=32.0.15.1 nutzer=alice status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | the id carries the hashed key: True; GET by the owner 200; calendarobjects vorher=1 nachher=2; PUT [201]
+.
+AUFGABE geteilt-ro-vorab nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The task list 'p32live-e9921be7-ro' is read only for this account."; The task list 'p32live-e9921be7-ro' is read only for this account.; the hook saw no PUT; calendarobjects vorher=1 nachher=1
+.
+AUFGABE geteilt-ro-server nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | harness PUT with the app password of alice, not the connector; PUT 404; calendarobjects vorher=1 nachher=1
+.
+AUFGABE d-32-16 nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message='The parent task lives in a shared list, and a shared list is only written to when it is named.'; no PUT; calendarobjects vorher=2 nachher=2
+.
+AUFGABE suche-standard-und-faellig nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207 ergebnis=ok | open task in the default search; completed task not in it; completed task with status=completed; due 2026-12-04 within due_by 2026-12-10; due 2026-12-20 outside; an undated task is not due by a day
+.
+AUFGABE ausfall-liste nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | REPORT of p32live-e9921be7-b held back 3.0 s in the client hook; degraded [{'list': 'p32live-e9921be7-b', 'reason': 'The task list did not answer within 1 second.'}]; the other lists still answer
+.
+AUFGABE fetch-gleich-read nc=32.0.15.1 nutzer=alice status=PROPFIND:207,GET:200,REPORT:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207,REPORT:207 ergebnis=ok | id task:p32live-e9921be7-a:1c6f0713-6e91-4fee-b171-edf15e650f02.ics; title p32live-e9921be7-kind; status open; deep link of an own list
+.
+AUFGABE deck nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | positive control: app-generated--deck--board-21 with VTODO in the discovery of alice; positive control: Deck REST 200; no hit for the card title: set(); ToolError reason=unknown_id message="Nextcloud does not know the task 'task:app-generated--deck--board-21:card-36.ics'."; deck marker in no answer
+.
+AUFGABE task-03-mit-anmeldung nc=32.0.15.1 nutzer=p32live-e9921be7-frisch status=PROPFIND:207,PROPFIND:207 ergebnis=ok | occ user:add exit=0; Basic cloud/user 200; BASELINE calendars=2 objekte=2 geloescht=0 shares=0 abos=0; {"hint": "This account has no task list yet. Create one in the Nextcloud Tasks app; tasks_search finds its tasks from then on.", "tasks": []}; ToolError reason=unspecified message='This account has no task list.'; hint 'Create a list in the Nextcloud Tasks app, then try again.'; no PUT; occ user:delete ok
+.
+AUFGABE task-03-ohne-anmeldung nc=32.0.15.1 nutzer=p32live-e9921be7-nie status=PROPFIND:207,PROPFIND:207 ergebnis=ok | occ user:add exit=0; BASELINE calendars=0 objekte=0 geloescht=0 shares=0 abos=0; {"hint": "This account has no task list yet. Create one in the Nextcloud Tasks app; tasks_search finds its tasks from then on.", "tasks": []}; ToolError reason=unspecified message='This account has no task list.'; hint 'Create a list in the Nextcloud Tasks app, then try again.'; no PUT; occ user:delete ok
+.
+AUFGABE provider-tasksapp-1 nc=32.0.15.1 nutzer=alice status=ocs.GET:200,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207,GET:200,REPORT:207,PROPFIND:207,PUT:201,GET:200 ergebnis=ok | tasksapp occ=0.18.1 ENTSCHEID erkennung=keine; provider tasks listed=True hits=['task:p32live-e9921be7-a:p32live-e9921be7-faellig-93e07c.ics']; the provider is listed; hit id == task:p32live-e9921be7-a:p32live-e9921be7-faellig-93e07c.ics; tasks_read of that id; tasks_create created=True hint=nein
+.
+AUFGABE keine-kennung nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | 23 answers scanned for the id and the display name of bob; answers kept: 23; found 0 of 2 names; no _shared_by_ in any answer
+.
+RUECKBAU freigabe rw status=200
+RUECKBAU freigabe ro status=200
+RUECKBAU liste a delete=204 no_trashbin=1 danach=404
+RUECKBAU liste b delete=204 no_trashbin=1 danach=404
+RUECKBAU liste rw delete=204 no_trashbin=1 danach=404
+RUECKBAU liste ro delete=204 no_trashbin=1 danach=404
+RUECKBAU deck board=21 gelöscht
+RUECKBAU papierkorb alice entfernt=0
+RUECKBAU papierkorb bob entfernt=0
+RUECKBAU konto p32live-e9921be7-frisch nicht da
+RUECKBAU konto p32live-e9921be7-nie nicht da
+RUECKBAU reste listen_mit_kopf=0
+BASELINE nc32.0.15.1 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=p32live-e9921be7-frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=p32live-e9921be7-nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+
+17 passed in 20.03s
+exit=0
+LAUF nc32 tasksapp=0.18.1 ergebnis=passed 17
+
+(4) Abnahmeskript (auf dieser Strecke statt auf nc35, siehe raw/32-07-nc35.txt ABNAHME nc35)
+------------------------------------------------------------------------------------------
+$ h.py ls alice personal   (vor dem Abnahmeskript)
+HARNESS PROPFIND personal/ nutzer=alice status=207 objekte=3
+  45530fe8-4fa8-4f74-b08f-29f499714fc8.ics
+  71b79dbe-a3eb-4d78-a252-6b29d5439c47.ics
+  b83105b4-eebc-4c83-b1da-814a789b12cd.ics
+$ NC_MCP_USER=$NC_MCP_TEST_USER NC_MCP_APP_PASSWORD=$NC_MCP_TEST_APP_PASSWORD uv run --no-sync python scripts/acceptance_all_tools.py   (mit Tasks-App 0.18.1, Code des Worktrees über stdio)
+INFO mcp_connector.entry_stdio: MCP Connector is serving over stdio
+starting nc-mcp.exe over stdio against http://127.0.0.1:8081
+
+tools/list: 27 tools: calendar_create_event, calendar_list_events, contacts_search, deck_browse, deck_create_card, fetch, files_create_folder, files_download, files_list, files_read, files_read_as_markdown, files_search, files_upload, mail_browse, notes_create, notes_read, notes_search, prepare_context, search, tables_browse, tables_create_row, talk_browse, talk_send, tasks_create, tasks_read, tasks_search, unified_search
+
+  OK      files_upload           {"path":"/abnahme34d11c0ced-20261113-160535.md","etag":"\"e77c0b23d24f5f34e5d27d80f2c5545a
+  OK      files_create_folder    {"path":"/abnahme34d11c0ced-20261113-160535-ordner/a/b","created":true,"id":"file:828","cr
+  OK      files_create_folder    {"path":"/abnahme34d11c0ced-20261113-160535-ordner/a/b","created":false,"id":"file:828","c
+  OK      files_search           {"query":"abnahme34d11c0ced","folder":"/","count":2,"items":[{"path":"/abnahme34d11c0ced-2
+  OK      files_list             {"path":"/","count":25,"items":[{"path":"/abnahme0a4f51708b-20261112-191615-ordner","name"
+  OK      files_read             {"path":"/abnahme34d11c0ced-20261113-160535.md","content":"# abnahme34d11c0ced\nAbnahmelau
+  OK      files_download         {"path":"/abnahme34d11c0ced-20261113-160535.md","size":54,"content_type":"text/markdown","
+  OK      files_upload           {"path":"/abnahme34d11c0ced-20261113-160535.docx","etag":"\"81c798f0e7376f19dd754cce941b8d
+  OK      files_read_as_markdown {"path":"/abnahme34d11c0ced-20261113-160535.docx","content":"Abnahmelauf abnahme34d11c0ced
+  OK      calendar_create_event  {"id":"event:personal:20d12d25-66d4-4b08-81bf-272ee658bfc1.ics","uid":"20d12d25-66d4-4b08-
+  OK      calendar_list_events   {"range":{"start":"2026-11-14T14:05:37+00:00","end":"2026-11-14T17:05:37+00:00","timezone"
+  OK      tasks_create           {"id":"task:personal:22a53e7f-387a-4255-bb7d-6768c858afbe.ics","summary":"Abnahme abnahme3
+  OK      tasks_search           {"tasks":[{"id":"task:personal:22a53e7f-387a-4255-bb7d-6768c858afbe.ics","summary":"Abnahm
+  OK      tasks_read             {"id":"task:personal:22a53e7f-387a-4255-bb7d-6768c858afbe.ics","summary":"Abnahme abnahme3
+  OK      fetch                  { "id": "task:personal:22a53e7f-387a-4255-bb7d-6768c858afbe.ics", "title": "Abnahme abnahm
+  OK      notes_create           {"id":"note:832","title":"Abnahme abnahme34d11c0ced","category":"","modified":1794582338,"
+  OK      notes_search           {"count":1,"results":[{"id":"note:832","title":"Abnahme abnahme34d11c0ced","excerpt":"Abna
+  OK      notes_read             {"id":"note:832","title":"Abnahme abnahme34d11c0ced","content":"Abnahmelauf abnahme34d11c0
+  OK      deck_browse            {"level":"boards","count":1,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_e
+  OK      deck_browse            {"level":"stacks","count":4,"results":[{"id":1,"title":"Custom lists - click to rename!","
+  OK      deck_create_card       {"id":"card:1:1:37","title":"Abnahme abnahme34d11c0ced","url":"http://127.0.0.1:8081/index
+  OK      tables_browse          {"level":"tables","count":1,"results":[{"id":10,"title":"Welcome to Nextcloud Tables!","ro
+  OK      tables_browse          {"level":"columns","count":4,"results":[{"id":10,"title":"What","type":"text","mandatory":
+  OK      tables_create_row      {"id":55,"table_id":"10","url":"http://127.0.0.1:8081/index.php/apps/tables/#/table/10","v
+  OK      talk_browse            {"level":"conversations","count":5,"results":[{"token":"f7rgfwke","name":"MCP-Talk-offen-G
+  OK      talk_browse            {"level":"messages","token":"f7rgfwke","conversation":"MCP-Talk-offen-Grüße-aus-Hamburg","
+  OK      talk_send              {"sent":true,"id":204,"token":"f7rgfwke","conversation":"MCP-Talk-offen-Grüße-aus-Hamburg"
+  OK      mail_browse            {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]}
+  OK      mail_browse            {"level":"mailboxes","count":1,"results":[{"id":1,"name":"INBOX","unread":0,"delimiter":".
+  OK      mail_browse            {"level":"messages","mailbox_id":"1","count":6,"results":[{"id":"mail:1","subject":"Gruess
+  OK      contacts_search        {"query":"a","count":0,"contacts":[]}
+  OK      unified_search         {"query":"abnahme34d11c0ced","count":8,"results":[{"id":"note:832","title":"Abnahme abnahm
+  OK      prepare_context        {"query":"abnahme34d11c0ced","window":{"start":"2026-11-13T15:05:41+00:00","end":"2026-11-
+  OK      search                 { "results": [ { "id": "note:832", "title": "Abnahme abnahme34d11c0ced", "url": "http://12
+  OK      fetch                  { "id": "file:825", "title": "abnahme34d11c0ced-20261113-160535.md", "text": "# abnahme34d
+[11/13/26 16:05:42] INFO     Tool 'fetch' failed: 'Error          server.py:453
+                             executing tool fetch: The Mail app                
+                             could not read the message 1 from                 
+                             the mail server of this account.                  
+                             Hint: Open Mail in Nextcloud and                  
+                             check that account: the usual causes              
+                             are a mail server that cannot be                  
+                             reached, a password the mail server               
+                             rejects, or a mailbox that has never              
+                             been synchronised.'                               
+  PREREQ  fetch                  the Mail app of this instance itself answers HTTP 500 for mail:1: its mail server does not
+  OK      fetch                  { "id": "message:f7rgfwke:203", "title": "MCP-Talk-offen-Grüße-aus-Hamburg", "text": "From
+  OK      fetch                  { "id": "table:10", "title": "Welcome to Nextcloud Tables!", "text": "Welcome to Nextcloud
+
+PREREQ: fetch: the Mail app of this instance itself answers HTTP 500 for mail:1: its mail server does not hand out a message it lists
+
+INCOMPLETE: all 27 tools of the registry answered, but 1 step met a missing prerequisite of the test instance (see PREREQ above). This is not a pass.
+
+=== acceptance matrix ===
+OK      files_upload           {"path":"/abnahme34d11c0ced-20261113-160535.md","etag":"\"e77c0b23d24f5f34e5d27d80f2c5545a\"","created":true}
+OK      files_create_folder    {"path":"/abnahme34d11c0ced-20261113-160535-ordner/a/b","created":true,"id":"file:828","created_folders":["/ab
+OK      files_create_folder    {"path":"/abnahme34d11c0ced-20261113-160535-ordner/a/b","created":false,"id":"file:828","created_folders":[]}
+OK      files_search           {"query":"abnahme34d11c0ced","folder":"/","count":2,"items":[{"path":"/abnahme34d11c0ced-20261113-160535-ordne
+OK      files_list             {"path":"/","count":25,"items":[{"path":"/abnahme0a4f51708b-20261112-191615-ordner","name":"abnahme0a4f51708b-
+OK      files_read             {"path":"/abnahme34d11c0ced-20261113-160535.md","content":"# abnahme34d11c0ced\nAbnahmelauf Phase 1, Straßenba
+OK      files_download         {"path":"/abnahme34d11c0ced-20261113-160535.md","size":54,"content_type":"text/markdown","offset":0,"bytes":54
+OK      files_upload           {"path":"/abnahme34d11c0ced-20261113-160535.docx","etag":"\"81c798f0e7376f19dd754cce941b8d51\"","created":true
+OK      files_read_as_markdown {"path":"/abnahme34d11c0ced-20261113-160535.docx","content":"Abnahmelauf abnahme34d11c0ced\n","content_type":"
+OK      calendar_create_event  {"id":"event:personal:20d12d25-66d4-4b08-81bf-272ee658bfc1.ics","uid":"20d12d25-66d4-4b08-81bf-272ee658bfc1","
+OK      calendar_list_events   {"range":{"start":"2026-11-14T14:05:37+00:00","end":"2026-11-14T17:05:37+00:00","timezone":"UTC"},"count":1,"e
+OK      tasks_create           {"id":"task:personal:22a53e7f-387a-4255-bb7d-6768c858afbe.ics","summary":"Abnahme abnahme34d11c0ced","list":{"
+OK      tasks_search           {"tasks":[{"id":"task:personal:22a53e7f-387a-4255-bb7d-6768c858afbe.ics","summary":"Abnahme abnahme34d11c0ced"
+OK      tasks_read             {"id":"task:personal:22a53e7f-387a-4255-bb7d-6768c858afbe.ics","summary":"Abnahme abnahme34d11c0ced","status":
+OK      fetch                  { "id": "task:personal:22a53e7f-387a-4255-bb7d-6768c858afbe.ics", "title": "Abnahme abnahme34d11c0ced", "text"
+OK      notes_create           {"id":"note:832","title":"Abnahme abnahme34d11c0ced","category":"","modified":1794582338,"url":"http://127.0.0
+OK      notes_search           {"count":1,"results":[{"id":"note:832","title":"Abnahme abnahme34d11c0ced","excerpt":"Abnahmelauf abnahme34d11
+OK      notes_read             {"id":"note:832","title":"Abnahme abnahme34d11c0ced","content":"Abnahmelauf abnahme34d11c0ced","category":"","
+OK      deck_browse            {"level":"boards","count":1,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_edit":true}]}
+OK      deck_browse            {"level":"stacks","count":4,"results":[{"id":1,"title":"Custom lists - click to rename!","cards":4},{"id":2,"t
+OK      deck_create_card       {"id":"card:1:1:37","title":"Abnahme abnahme34d11c0ced","url":"http://127.0.0.1:8081/index.php/apps/deck/card/
+OK      tables_browse          {"level":"tables","count":1,"results":[{"id":10,"title":"Welcome to Nextcloud Tables!","rowsCount":10,"columns
+OK      tables_browse          {"level":"columns","count":4,"results":[{"id":10,"title":"What","type":"text","mandatory":false,"subtype":"lin
+OK      tables_create_row      {"id":55,"table_id":"10","url":"http://127.0.0.1:8081/index.php/apps/tables/#/table/10","values_written":{"Wha
+OK      talk_browse            {"level":"conversations","count":5,"results":[{"token":"f7rgfwke","name":"MCP-Talk-offen-Grüße-aus-Hamburg","t
+OK      talk_browse            {"level":"messages","token":"f7rgfwke","conversation":"MCP-Talk-offen-Grüße-aus-Hamburg","count":3,"results":[
+OK      talk_send              {"sent":true,"id":204,"token":"f7rgfwke","conversation":"MCP-Talk-offen-Grüße-aus-Hamburg","timestamp":1794582
+OK      mail_browse            {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]}
+OK      mail_browse            {"level":"mailboxes","count":1,"results":[{"id":1,"name":"INBOX","unread":0,"delimiter":".","special_role":"in
+OK      mail_browse            {"level":"messages","mailbox_id":"1","count":6,"results":[{"id":"mail:1","subject":"Gruesse aus Hamburg, die M
+OK      contacts_search        {"query":"a","count":0,"contacts":[]}
+OK      unified_search         {"query":"abnahme34d11c0ced","count":8,"results":[{"id":"note:832","title":"Abnahme abnahme34d11c0ced","sublin
+OK      prepare_context        {"query":"abnahme34d11c0ced","window":{"start":"2026-11-13T15:05:41+00:00","end":"2026-11-20T15:05:41+00:00"},
+OK      search                 { "results": [ { "id": "note:832", "title": "Abnahme abnahme34d11c0ced", "url": "http://127.0.0.1:8081/apps/no
+OK      fetch                  { "id": "file:825", "title": "abnahme34d11c0ced-20261113-160535.md", "text": "# abnahme34d11c0ced\nAbnahmelauf
+PREREQ  fetch                  the Mail app of this instance itself answers HTTP 500 for mail:1: its mail server does not hand out a message it lists
+OK      fetch                  { "id": "message:f7rgfwke:203", "title": "MCP-Talk-offen-Grüße-aus-Hamburg", "text": "From: alice\nAbnahmelauf
+OK      fetch                  { "id": "table:10", "title": "Welcome to Nextcloud Tables!", "text": "Welcome to Nextcloud Tables!\nRows: 11\n
+exit=3
+$ h.py ls alice personal   (nach dem Abnahmeskript)
+HARNESS PROPFIND personal/ nutzer=alice status=207 objekte=5
+  20d12d25-66d4-4b08-81bf-272ee658bfc1.ics
+  22a53e7f-387a-4255-bb7d-6768c858afbe.ics
+  45530fe8-4fa8-4f74-b08f-29f499714fc8.ics
+  71b79dbe-a3eb-4d78-a252-6b29d5439c47.ics
+  b83105b4-eebc-4c83-b1da-814a789b12cd.ics
+
+(5) Rückbau
+-----------
+ABNAHME nc32 ergebnis=incomplete exit=3 tasks_create=OK tasks_search=OK tasks_read=OK fetch_task=OK prereq=fetch-mail (GreenMail nach dem Neustart leer, wie 31-05b) tasksapp=0.18.1
+HARNESS DELETE personal/20d12d25-66d4-4b08-81bf-272ee658bfc1.ics nutzer=alice status=204 no_trashbin=1
+HARNESS DELETE personal/22a53e7f-387a-4255-bb7d-6768c858afbe.ics nutzer=alice status=204 no_trashbin=1
+HARNESS PROPFIND personal/ nutzer=alice status=207 objekte=3
+$ h.py trash alice --purge; h.py trash bob --purge
+HARNESS REPORT trashbin/objects/ nutzer=alice status=207
+HARNESS PROPFIND trashbin/ nutzer=alice status=207 weitere=0
+PAPIERKORB konto=alice eintraege=2
+HARNESS DELETE trashbin-eintrag nutzer=alice status=204
+HARNESS DELETE trashbin-eintrag nutzer=alice status=204
+HARNESS REPORT trashbin/objects/ nutzer=bob status=207
+HARNESS PROPFIND trashbin/ nutzer=bob status=207 weitere=0
+PAPIERKORB konto=bob eintraege=0
+$ occ app:remove tasks (im aktiven Zustand); occ config:app:delete tasks <schlüssel>; docker restart nc-mcp-exapp-nc
+tasks disabled
+tasks 0.18.1 removed
+Config value installed_version of app tasks deleted
+Config value enabled of app tasks deleted
+Config value types of app tasks deleted
+occ config:list tasks -> {"apps":{"tasks":[]}}
+nc-mcp-exapp-nc
+RUECKBAU nc32 tasksapp=wie-vorher vorher=keine nachher=keine
+app-verzeichnis=entfernt
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher
+    Befund: Die zwei Objekte des Abnahmeskripts landeten trotz DELETE mit X-NC-CalDAV-No-Trashbin: 1 im Papierkorb (2 Einträge per REPORT gefunden, je DELETE 204). Der Kopf wirkt auf das Löschen einer Sammlung, nicht eines Objekts; der Papierkorb wurde deshalb nach Abschnitt 7 geleert.
+BASELINE-VERGLEICH nc32 konto=alice gleich=ja
+BASELINE-VERGLEICH nc32 konto=bob gleich=ja
+$ lokalen Prozess beenden (Port 23001, pid ermittelt per netstat)
+PROZESS beendet=ja port_23001=frei
+$ docker compose -f compose.exapp.yml stop
+ Container nc-mcp-exapp-harp Stopping 
+ Container nc-mcp-exapp-caddy Stopping 
+ Container nc-mcp-exapp-registry Stopping 
+ Container nc-mcp-exapp-greenmail Stopping 
+ Container nc-mcp-exapp-harp Stopped 
+ Container nc-mcp-exapp-registry Stopped 
+ Container nc-mcp-exapp-caddy Stopped 
+ Container nc-mcp-exapp-nc Stopping 
+ Container nc-mcp-exapp-greenmail Stopped 
+ Container nc-mcp-exapp-nc Stopped 
+exit=0
+docker ps -> []
+
+Geheimnisprüfung (tasks_measure.py scan gegen .env.nc35, .env.exapp des Worktrees und .env.nc35 des Hauptcheckouts, volle Werte und erste 12 Zeichen, Kopfname): Treffer nur auf öffentliche Werte (APP_ID, APP_VERSION, URLs, Kontonamen, Talk-Raumkennung); kein Treffer aus APP_SECRET, Passwort-Variablen, App-Passwörtern, HP_SHARED_KEY oder dem Kopfnamen. Muster Bearer, access_token, client_secret, eyJ: nur zwei Variablennamen in den KONTROLLE-Zeilen, kein Wert.
