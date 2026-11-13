@@ -15,7 +15,7 @@ from typing import Any
 
 import pytest
 
-from mcp_connector import provider_map
+from mcp_connector import ids, provider_map
 
 BASE = "http://nc.test"
 
@@ -309,6 +309,144 @@ def test_a_foreign_origin_in_a_tables_fragment_never_reaches_the_id() -> None:
     assert "evil.test" not in provider_map.hit_url(BASE, kind, identifier, entry)
 
 
+@pytest.mark.parametrize(
+    "resource_url",
+    [
+        # The form measured on 32 and 35: path, no index.php, no percent encoding.
+        "/apps/tasks/calendars/tasks/tasks/abc.ics",
+        # The same route behind index.php, for an instance without pretty URLs.
+        "/index.php/apps/tasks/calendars/tasks/tasks/abc.ics",
+        # The fragment form of older Tasks releases.
+        "/apps/tasks/#/calendars/tasks/tasks/abc.ics",
+        "/index.php/apps/tasks/#/calendars/tasks/tasks/abc.ics",
+        # Absolute, as the provider really sends it.
+        f"{BASE}/apps/tasks/calendars/tasks/tasks/abc.ics",
+    ],
+)
+def test_a_tasks_hit_becomes_a_task_id_in_every_measured_form(resource_url: str) -> None:
+    """TASK-09: path with or without index.php and the fragment after ``#/`` all read the same."""
+    entry = {"title": "Einkaufen", "resourceUrl": resource_url}
+
+    assert resolved("tasks", entry) == ("task", "task:tasks:abc.ics", True)
+
+
+def test_a_tasks_hit_of_a_shared_list_carries_the_key_and_never_the_account() -> None:
+    """D-32-14: the URI of a shared list names the sharer, the id carries the neutral key."""
+    entry = {
+        "title": "Team",
+        "resourceUrl": f"{BASE}/apps/tasks/calendars/team_shared_by_bob/tasks/t1.ics",
+    }
+
+    kind, identifier, canonical = resolved("tasks", entry)
+
+    assert (kind, canonical) == ("task", True)
+    assert identifier == f"task:{ids.task_list_key('team_shared_by_bob')}:t1.ics"
+    assert "bob" not in identifier
+    assert "shared_by" not in identifier
+
+
+def test_a_tasks_hit_of_a_shared_list_links_only_the_start_page_of_the_tasks_app() -> None:
+    """D-32-15 for the search hit as well: the deep link carries ``_shared_by_<account>``."""
+    entry = {
+        "title": "Team",
+        "resourceUrl": f"{BASE}/apps/tasks/calendars/team_shared_by_bob/tasks/t1.ics",
+    }
+    kind, identifier, _ = resolved("tasks", entry)
+
+    url = provider_map.hit_url(BASE, kind, identifier, entry)
+
+    assert url == f"{BASE}/index.php/apps/tasks/"
+    assert "bob" not in url
+
+
+def test_a_tasks_hit_of_an_own_list_keeps_its_deep_link() -> None:
+    """Only the shared case loses the deep link; an own list names nobody."""
+    entry = {"title": "t", "resourceUrl": f"{BASE}/apps/tasks/calendars/tasks/tasks/abc.ics"}
+    kind, identifier, _ = resolved("tasks", entry)
+
+    assert provider_map.hit_url(BASE, kind, identifier, entry) == (
+        f"{BASE}/apps/tasks/calendars/tasks/tasks/abc.ics"
+    )
+
+
+def test_a_tasks_hit_reads_special_characters_through_unquote() -> None:
+    """Percent encoded URI and object name come back as the codec reads them."""
+    entry = {
+        "title": "t",
+        "resourceUrl": "/apps/tasks/calendars/liste-%C3%A4%C3%B6/tasks/a%26%2B%20b.ics",
+    }
+
+    kind, identifier, _ = resolved("tasks", entry)
+
+    assert kind == "task"
+    assert ids.parse(identifier) == ("task", ("liste-äö", "a&+ b.ics"))
+
+
+def test_a_tasks_hit_reads_the_unencoded_form_the_provider_really_sends() -> None:
+    """Measured: the provider sends umlauts, ``&``, ``+`` and a blank as they are."""
+    entry = {"title": "t", "resourceUrl": "/apps/tasks/calendars/sonder-äö/tasks/ä&+ 1.ics"}
+
+    _, identifier, _ = resolved("tasks", entry)
+
+    assert ids.parse(identifier) == ("task", ("sonder-äö", "ä&+ 1.ics"))
+
+
+@pytest.mark.parametrize(
+    "resource_url",
+    [
+        # Deck: its calendars are never task lists of this bundle (E9).
+        "/apps/tasks/calendars/app-generated--deck--board-1/tasks/card.ics",
+        "/apps/tasks/#/calendars/app-generated--deck--board-1/tasks/card.ics",
+        # Extra segments, missing object, missing list, wrong app, wrong middle segment.
+        "/apps/tasks/calendars/tasks/tasks/abc.ics/more",
+        "/apps/tasks/calendars/extra/tasks/tasks/abc.ics",
+        "/apps/tasks/calendars/tasks/tasks/",
+        "/apps/tasks/calendars/tasks/tasks",
+        "/apps/tasks/calendars//tasks/abc.ics",
+        "/apps/tasks/",
+        "/apps/calendar/calendars/tasks/tasks/abc.ics",
+        "/apps/tasks/calendars/tasks/events/abc.ics",
+        # A colon would be refused by the codec; the hit degrades instead of failing.
+        "/apps/tasks/calendars/tasks/tasks/a%3Ab.ics",
+        # A query is not part of the measured form.
+        "/apps/tasks/calendars/tasks/tasks/abc.ics?x=1",
+    ],
+)
+def test_every_other_tasks_link_stays_a_url_and_is_never_a_task(resource_url: str) -> None:
+    """Never guess: anything outside the measured form is the honest ``url`` kind."""
+    kind, identifier, canonical = resolved("tasks", {"title": "t", "resourceUrl": resource_url})
+
+    assert kind == "url"
+    assert canonical is False
+    assert not identifier.startswith("task:")
+
+
+def test_a_foreign_origin_in_a_tasks_link_never_reaches_the_id() -> None:
+    """The origin is dropped like everywhere in this module (threat T-01-68, T-32-06-01)."""
+    entry = {"title": "t", "resourceUrl": "http://evil.test/apps/tasks/calendars/tasks/tasks/a.ics"}
+
+    kind, identifier, _ = resolved("tasks", entry)
+
+    assert (kind, identifier) == ("task", "task:tasks:a.ics")
+    assert "evil.test" not in provider_map.hit_url(BASE, kind, identifier, entry)
+
+
+def test_the_tasks_provider_link_is_only_parsed_never_fetched(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """No request at all: any attempt to open a connection fails this test."""
+    import httpx
+
+    def refuse(*_args: Any, **_kwargs: Any) -> None:
+        raise AssertionError("the provider link was fetched")
+
+    monkeypatch.setattr(httpx.Client, "send", refuse)
+    monkeypatch.setattr(httpx.AsyncClient, "send", refuse)
+
+    entry = {"title": "t", "resourceUrl": f"{BASE}/apps/tasks/calendars/tasks/tasks/abc.ics"}
+    assert resolved("tasks", entry)[0] == "task"
+
+
 def test_the_provider_table_knows_the_real_deck_provider_id() -> None:
     """It is ``search-deck-card-board``, not ``deck``, and that is worth a test."""
     assert provider_map.PROVIDER_KINDS["search-deck-card-board"] == "card"
@@ -324,7 +462,9 @@ def test_the_provider_table_is_not_a_list_of_installed_apps() -> None:
         "talk-message",
         "talk-message-current",
         "tables-search-tables",
+        "tasks",
     }
+    assert provider_map.PROVIDER_KINDS["tasks"] == "task"
     assert "talk-conversations" not in provider_map.PROVIDER_KINDS
     assert "mail" not in provider_map.PROVIDER_KINDS
 
