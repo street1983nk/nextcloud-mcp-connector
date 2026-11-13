@@ -305,10 +305,17 @@ def test_previous_places_read_the_phase_33_rows_of_the_report() -> None:
             "| gate | `b.py:1` | other | PUT | Phase 33 | 1 |",
         ]
     )
-    assert modify.previous_places(report) == [("a.py", "never delete"), ("a.py", "uses `x` | y")]
+    assert modify.previous_places(report) == [("a.py", "never delete"), ("a.py", "uses ''x'' | y")]
 
 
 def test_new_places_match_by_file_and_wording_not_by_line_number() -> None:
     previous = [("a.py", "never delete"), ("a.py", "keep this")]
     current = [("a.py", 40, "never delete, overwrite"), ("a.py", 41, "brand new line")]
-    assert modify.new_places(previous, current) == ["a.py:41"]
+    assert modify.match_places(previous, current)[0] == ["a.py:41"]
+    assert modify.match_places(previous, current)[1] == [("a.py", "keep this")]
+
+
+def test_new_places_read_the_backticks_of_the_report_as_apostrophes() -> None:
+    previous = [("a.py", "# ''Overwrite: F'' and")]
+    current = [("a.py", 140, "# ``Overwrite: F`` and is therefore still create-only")]
+    assert modify.match_places(previous, current)[0] == []
