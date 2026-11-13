@@ -364,5 +364,11 @@ background
 # Temporary: the codec and the CalDAV client of the tasks bundle land before the tool layer
 # that calls them. Each name leaves this list with the plan that calls it: until reg_tasks.py
 # registers the bundle (32-05), and the tool layer of plan 32-04 is the caller.
+# task_list_key sat here between task 2 and task 3 and left with clients/tasks.py, its caller.
 encode_task  # until reg_tasks.py registers the bundle (32-05)
-task_list_key  # until reg_tasks.py registers the bundle (32-05); clients/tasks.py (32-03 task 3)
+TASK_WORDING  # until reg_tasks.py registers the bundle (32-05)
+discover_task_lists  # until reg_tasks.py registers the bundle (32-05)
+build_todo_query  # until reg_tasks.py registers the bundle (32-05)
+build_related_query  # until reg_tasks.py registers the bundle (32-05)
+query_todos  # until reg_tasks.py registers the bundle (32-05)
+get_todo  # until reg_tasks.py registers the bundle (32-05)
