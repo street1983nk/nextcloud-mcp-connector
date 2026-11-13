@@ -41,12 +41,21 @@ somebody else's mail (threat T-11-05).
 
 ``talk-conversations`` is not in the table either: a conversation is not a document, and
 ``talk_browse`` is the way to it.
+
+A **tasks** hit becomes ``task:<list key>:<object>`` without a single request, and three known
+limits stand beside it (K2). The provider also searches subscriptions and shared objects
+without ``CLASS:PUBLIC``; such a hit still parses, and ``fetch`` refuses it through the task
+discovery exactly like an unknown id, because the discovery holds neither subscriptions nor
+foreign lists. Deck never reaches this provider as a task list, and a link into an
+``app-generated--`` calendar stays a ``url`` anyway (E9). The URI of a shared list carries
+``_shared_by_<account id>``: the id carries the neutral key of :func:`ids.task_list_key`
+instead, and the link of such a hit is the start page of the Tasks app (D-32-15).
 """
 
 import re
 from collections.abc import Mapping
 from typing import Any
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import unquote, urlsplit, urlunsplit
 
 from . import ids
 
@@ -82,6 +91,13 @@ PROVIDER_KINDS: Mapping[str, str] = {
     # SearchTablesProvider: it sets no attributes at all, and getInternalLink builds
     # "#/" . $nodeType . "/" . $nodeId with $nodeType being "table" or "view".
     "tables-search-tables": "table",
+    # Verified against nextcloud/server stable32 to stable35
+    # apps/dav/lib/Search/TasksSearchProvider.php, class TasksSearchProvider: getId returns
+    # 'tasks', it sets no attributes, and the link is linkToRoute('tasks.page.index') .
+    # 'calendars/' . <calendar uri> . '/tasks/' . <object uri>. Measured on 32 and 35 in plan
+    # 32-02: path form, no index.php, no percent encoding, and a shared list keeps its
+    # _shared_by_<account id> URI in the link.
+    "tasks": "task",
 }
 
 #: The honest rest category for everything the table does not cover.
@@ -107,6 +123,21 @@ _MESSAGE_FRAGMENT = re.compile(r"message_([0-9]+)")
 
 #: The fragment of a tables search entry, node type included: ``/table/7`` or ``/view/3``.
 _TABLES_NODE = re.compile(r"/?(table|view)/([0-9]+)")
+
+#: Start page of the Tasks app, the only link a task of a shared list gets (D-32-15). The form
+#: with index.php is the one plan 32-02 decided on: it opens the app on 32 and 35 and does not
+#: depend on pretty URLs.
+TASKS_WEB_PREFIX = "/index.php/apps/tasks/"
+
+#: The app route of a tasks link: ``/apps/tasks/`` with or without ``/index.php`` before it, and
+#: behind the web root of an instance that lives in a sub path (``/nextcloud/apps/tasks/``).
+_TASKS_APP = re.compile(r"(?:/index\.php)?/apps/tasks/")
+
+#: The task inside a tasks link, as path rest or as fragment: ``calendars/<uri>/tasks/<object>``.
+_TASKS_NODE = re.compile(r"/?calendars/([^/]+)/tasks/([^/]+)")
+
+#: The URI prefix of the calendars Deck generates; never a task list of this server (E9).
+_DECK_PREFIX = "app-generated--"
 
 
 def absolute_url(base_url: str, resource_url: Any) -> str:
@@ -167,6 +198,12 @@ def extract_id(
         # a view id used as a table id reads a foreign table (threat T-11-01).
         if node is not None and node[0] == "table":
             return "table", ids.encode_table(node[1]), True
+    elif kind == "task":
+        target = _tasks_target(url)
+        if target is not None:
+            uri, object_name = target
+            # The key, never the URI: a shared list names its sharer in the URI (D-32-14).
+            return "task", ids.encode_task(ids.task_list_key(uri), object_name), True
 
     if not url:
         return None
@@ -180,6 +217,9 @@ def hit_url(base_url: str, kind: str, identifier: str, entry: Mapping[str, Any])
     without a ``resourceUrl`` still gets the canonical ``/f/<fileid>`` route.
     """
     url = absolute_url(base_url, entry.get("resourceUrl"))
+    if kind == "task" and ids.SHARED_BY_MARKER in url:
+        # The deep link of a shared list carries the account id of the sharer (D-32-15).
+        return f"{base_url}{TASKS_WEB_PREFIX}"
     if url:
         return url
     if kind == "file":
@@ -251,6 +291,37 @@ def _tables_node(url: str) -> tuple[str, str] | None:
     if match is None:
         return None
     return match.group(1), match.group(2)
+
+
+def _tasks_target(url: str) -> tuple[str, str] | None:
+    """Return ``(calendar uri, object name)`` of a tasks link, or ``None``.
+
+    Path and fragment are read apart, like :func:`_tables_node`: the measured form puts the
+    task into the path after the app route, older Tasks releases put it into the fragment after
+    ``#/``. Exactly one of the two may carry it, and a query is no part of either form. Both
+    segments are read with ``unquote``, because the provider sends them raw today and a proxy
+    may encode them. Everything else is ``None`` and stays a ``url``: a Deck calendar (E9), a
+    segment the codec would refuse, and any link that is not exactly the measured shape.
+    """
+    parts = urlsplit(url)
+    if parts.query:
+        return None
+    app = _TASKS_APP.search(parts.path)
+    if app is None:
+        return None
+    rest = parts.path[app.end() :]
+    if rest and parts.fragment:
+        return None
+    match = _TASKS_NODE.fullmatch(rest or parts.fragment)
+    if match is None:
+        return None
+    uri, object_name = unquote(match.group(1)), unquote(match.group(2))
+    if uri.startswith(_DECK_PREFIX):
+        return None
+    for segment in (uri, object_name):
+        if not segment.strip() or ids.SEPARATOR in segment or "/" in segment:
+            return None
+    return uri, object_name
 
 
 def last_numeric_segment(url: str) -> str:

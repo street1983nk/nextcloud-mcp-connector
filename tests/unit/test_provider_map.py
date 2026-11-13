@@ -319,6 +319,8 @@ def test_a_foreign_origin_in_a_tables_fragment_never_reaches_the_id() -> None:
         # The fragment form of older Tasks releases.
         "/apps/tasks/#/calendars/tasks/tasks/abc.ics",
         "/index.php/apps/tasks/#/calendars/tasks/tasks/abc.ics",
+        # An instance in a sub path keeps its web root before the app route.
+        "/nextcloud/index.php/apps/tasks/calendars/tasks/tasks/abc.ics",
         # Absolute, as the provider really sends it.
         f"{BASE}/apps/tasks/calendars/tasks/tasks/abc.ics",
     ],
