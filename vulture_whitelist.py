@@ -390,3 +390,10 @@ tasks_update_enabled
 # list with the first plan that calls it.
 put_existing_todo
 move_todo
+
+# --- The line editor of the tasks bundle, plan 33-04 ---------------------------------------
+# Temporary: tools/ics_edit.py lands before the tools that edit with it; used by
+# tasks_complete, tasks_update, tasks_move (33-06 to 33-08). Each name leaves this list with
+# the first plan that calls it. inspect is not listed: apply calls it.
+apply
+verify

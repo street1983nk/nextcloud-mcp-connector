@@ -790,7 +790,7 @@ def test_text_is_escaped_and_folded_by_icalendar() -> None:
 def test_smuggled_component_lines_stay_a_value() -> None:
     from mcp_connector.tools import ics_edit
 
-    evil = "x\r\nEND:VTODO\r\nBEGIN:VTODO\r\nUID:evil\nEND:VCALENDAR"
+    evil = "x\nEND:VTODO\nBEGIN:VTODO\nUID:evil\nEND:VCALENDAR"
     before = SPIKE.decode()
     after = ics_edit.apply(before, set_fields={"SUMMARY": evil}, drop_fields=())
     ics_edit.verify(before, after, {"SUMMARY": evil})
@@ -798,6 +798,14 @@ def test_smuggled_component_lines_stay_a_value() -> None:
     assert str(todo["UID"]) == "spike-probe-uid"
     assert str(todo["SUMMARY"]) == evil
     assert len(IcsCalendar.from_ical(after).walk("VTODO")) == 1
+    # RFC 5545 TEXT has no escape for a carriage return; icalendar writes it as a line break.
+    # The object stays one VTODO with its UID, and verify refuses instead of writing a value
+    # that does not come back verbatim.
+    with_cr = ics_edit.apply(before, set_fields={"SUMMARY": "x\r\nEND:VTODO"}, drop_fields=())
+    assert len(IcsCalendar.from_ical(with_cr).walk("VTODO")) == 1
+    assert str(_todo(with_cr.encode())["UID"]) == "spike-probe-uid"
+    with pytest.raises(ics_edit.EditRefused):
+        ics_edit.verify(before, with_cr, {"SUMMARY": "x\r\nEND:VTODO"})
 
 
 def test_unknown_or_conflicting_field_names_are_refused() -> None:
