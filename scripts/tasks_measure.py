@@ -671,9 +671,13 @@ def restore_tasks_app(target: Target, before: str) -> None:
     now = tasks_app_state(target.container)
     if now != before:
         if before == "keine":
-            for command in ("app:disable", "app:remove"):
-                out = spike.occ(target.container, command, TASKS_APP, check=False)
-                note(f"occ {command} {TASKS_APP} -> {spike._one_line(out)[:160]}")
+            # app:remove disables the app itself. Measured on 32.0.15: it refuses an app that
+            # is already disabled ("tasks is not enabled"), so a disabled one is enabled first.
+            if tasks_app_state(target.container).startswith("aus-"):
+                out = spike.occ(target.container, "app:enable", TASKS_APP, check=False)
+                note(f"occ app:enable {TASKS_APP} -> {spike._one_line(out)[:160]}")
+            out = spike.occ(target.container, "app:remove", TASKS_APP, check=False)
+            note(f"occ app:remove {TASKS_APP} -> {spike._one_line(out)[:160]}")
             for key in spike.APP_STATE_KEYS:
                 spike.occ(target.container, "config:app:delete", TASKS_APP, key, check=False)
             left = spike.occ(target.container, "config:list", TASKS_APP, check=False)
@@ -1305,6 +1309,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         command.add_argument("--out", type=Path, required=True)
         if name in ("live", "teardown"):
             command.add_argument("--env-file", type=Path, required=True)
+        if name == "teardown":
+            command.add_argument(
+                "--tasks-before", help="state of the Tasks app before the run, e.g. keine"
+            )
         if name == "live":
             command.add_argument("--steps", default="names,link,home,appstate")
     fixture = sub.add_parser("privileges")
@@ -1333,6 +1341,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             elif args.command == "teardown":
                 env = _env(args.env_file)
                 asyncio.run(teardown(target, env))
+                if args.tasks_before:
+                    restore_tasks_app(target, args.tasks_before)
                 baseline(target, "nach-teardown")
             else:
                 env = _env(args.env_file)
