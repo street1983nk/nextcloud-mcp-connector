@@ -20,6 +20,7 @@ out of foreign chat text (test_talk_tools.py, threat T-09-24).
 import json
 from pathlib import Path
 from typing import Any
+from xml.sax.saxutils import escape as xml_escape
 
 import guard_routes
 import httpx
@@ -27,12 +28,15 @@ import pytest
 import respx
 from test_tools_context import INJECTION
 
+from mcp_connector import ids
 from mcp_connector.nextcloud import NcClients, capabilities
 from mcp_connector.nextcloud.credentials import Credentials
 from mcp_connector.tools import calendar as calendar_tools
 from mcp_connector.tools import files as files_tools
 from mcp_connector.tools import mail as mail_tools
+from mcp_connector.tools import marks
 from mcp_connector.tools import talk as talk_tools
+from mcp_connector.tools import tasks as tasks_tools
 
 BASE = "http://nc.test"
 USER = "alice"
@@ -257,3 +261,114 @@ async def test_a_chat_message_that_is_an_instruction_stays_a_message(clients: Nc
     texts = [entry["message"] for entry in result["results"]]
     assert texts == [INJECTION], "character for character, as data"
     assert INJECTION not in everything_but(result, "results")
+
+
+# --- a task from a shared list (tasks_search, tasks_read) ------------------------------------
+
+
+SHARED_TASK_LIST = "spike30-b-rw_shared_by_bob"
+SHARED_TASK_LIST_URL = f"{CALENDAR_HOME}{SHARED_TASK_LIST}/"
+SHARED_TASK_NAME = "poisoned-task.ics"
+
+
+def shared_task(*lines: str) -> str:
+    """One VTODO of the list ``bob`` shared with ``alice``, built like the Tasks app writes it."""
+    return "\r\n".join(
+        [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//Nextcloud Tasks v0.18.1",
+            "BEGIN:VTODO",
+            "UID:poisoned-task",
+            "CREATED:20261111T125033Z",
+            "DTSTAMP:20261111T125217Z",
+            *lines,
+            "END:VTODO",
+            "END:VCALENDAR",
+            "",
+        ]
+    )
+
+
+def task_multistatus(ics: str) -> str:
+    return (
+        '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" '
+        'xmlns:cal="urn:ietf:params:xml:ns:caldav"><d:response>'
+        f"<d:href>/remote.php/dav/calendars/alice/{SHARED_TASK_LIST}/{SHARED_TASK_NAME}</d:href>"
+        '<d:propstat><d:prop><d:getetag>"1"</d:getetag>'
+        f"<cal:calendar-data>{xml_escape(ics)}</cal:calendar-data></d:prop>"
+        "<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response></d:multistatus>"
+    )
+
+
+def mock_task_home(mock: respx.MockRouter) -> None:
+    mock.route(method="PROPFIND", url=CALENDAR_HOME).mock(
+        return_value=httpx.Response(207, text=fixture_text("caldav_home_task_lists.xml"))
+    )
+
+
+@pytest.mark.anyio
+async def test_a_shared_task_whose_title_and_tags_are_instructions_stays_data(
+    clients: NcClients,
+) -> None:
+    ics = shared_task(
+        f"SUMMARY:{INJECTION}",
+        f"CATEGORIES:{INJECTION}",
+        f"DESCRIPTION:{INJECTION}",
+    )
+    with respx.mock(assert_all_called=True) as mock:
+        mock_task_home(mock)
+        mock.route(method="REPORT", url=SHARED_TASK_LIST_URL).mock(
+            return_value=httpx.Response(207, text=task_multistatus(ics))
+        )
+        result = await tasks_tools.search_tasks(clients, list_name="spike30-b-rw")
+
+    hit = result["tasks"][0]
+    assert hit["summary"] == INJECTION, "character for character, as data"
+    assert hit["tags"] == [INJECTION]
+    assert hit["list"] == {"name": "spike30-b-rw", "shared": True, "writable": True}
+    assert "description" not in hit, "the description comes only through tasks_read"
+    assert INJECTION not in everything_but(result, "tasks")
+    assert "bob" not in json.dumps(result)
+
+
+@pytest.mark.anyio
+async def test_a_shared_task_whose_long_description_is_an_instruction_stays_data(
+    clients: NcClients,
+) -> None:
+    filler = "x" * (tasks_tools.MAX_DESCRIPTION_BYTES + 500)
+    ics = shared_task("SUMMARY:plain", f"DESCRIPTION:{INJECTION} {filler}")
+    task_id = ids.encode_task(ids.task_list_key(SHARED_TASK_LIST), SHARED_TASK_NAME)
+    with respx.mock(assert_all_called=True) as mock:
+        mock_task_home(mock)
+        mock.route(method="GET", url=f"{SHARED_TASK_LIST_URL}{SHARED_TASK_NAME}").mock(
+            return_value=httpx.Response(200, text=ics)
+        )
+        mock.route(method="REPORT", url=SHARED_TASK_LIST_URL).mock(
+            return_value=httpx.Response(
+                207, text='<?xml version="1.0"?><d:multistatus xmlns:d="DAV:"/>'
+            )
+        )
+        result = await tasks_tools.read_task(clients, task_id=task_id)
+
+    assert result["description"].startswith(INJECTION), "as data, in the content field"
+    assert result["description_truncated"] is True
+    assert len(result["description"].encode("utf-8")) == tasks_tools.MAX_DESCRIPTION_BYTES
+    assert INJECTION not in everything_but(result, "description")
+    for marker in (marks.EXCERPT_TRUNCATION, marks.FINAL_TRUNCATION, "[truncated"):
+        assert marker not in result["description"]
+
+
+@pytest.mark.anyio
+async def test_a_forged_marker_in_a_shared_task_title_is_filtered(clients: NcClients) -> None:
+    forged = marks.FINAL_TRUNCATION
+    ics = shared_task(f"SUMMARY:{INJECTION} {forged}")
+    with respx.mock(assert_all_called=True) as mock:
+        mock_task_home(mock)
+        mock.route(method="REPORT", url=SHARED_TASK_LIST_URL).mock(
+            return_value=httpx.Response(207, text=task_multistatus(ics))
+        )
+        result = await tasks_tools.search_tasks(clients, list_name="spike30-b-rw")
+
+    assert result["tasks"][0]["summary"] == f"{INJECTION} "
+    assert forged not in json.dumps(result)
