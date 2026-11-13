@@ -1,0 +1,353 @@
+Rohprotokoll Plan 32-10, Task 4: Live-Fälle Gruppe, wiederkehrend, Deckel und Anzeigename auf Nextcloud 32 (nc32)
+========================================================================================
+Datum: 2026-11-13 (UTC). Worktree tasks-080, Branch plan/v1.8-tasks-080, Stand der Läufe: dd45b56.
+Strecke: compose.exapp.yml (nc-mcp-exapp-nc, nc-mcp-exapp-caddy); der App-Container blieb gestoppt.
+Freigaben (beide gelten für diesen Plan):
+FREIGABE zustand-32-09=ja inkl-oeffentlicher-link datum=2026-11-13
+FREIGABE zustand-32-10=ja testgruppe alice+bob anzeigename serie datum=2026-11-13
+Keine Neuregistrierung der ExApp; Beweis auf Funktionsebene unter AppAPI-Impersonation wie in 32-07 und
+32-09 (tests/integration/test_tasks_live.py). Das Harness schreibt und räumt mit dem App-Passwort von
+alice und bob und mit dem Passwort des Testkontos p32live<stempel>aus (occ user:add, im Rückbau
+occ user:delete). Testgruppe p32live<stempel>grp mit bob und alice (occ group:add/adduser, im Rückbau
+occ group:delete). Kommando je Lauf: NC_MCP_REQUIRE_LIVE=1 NC_MCP_EXPECT_TASKS_APP=<0|1>
+NC_MCP_TASKS_CAP_SERIES=1 [NC_MCP_TASKS_BOB_DISPLAY=<Wert>] uv run --no-sync pytest
+tests/integration/test_tasks_live.py -m integration -s -p no:xdist -p no:warnings (.env.exapp per set -a).
+Der Anzeigename von bob wurde nur im Lauf mit Tasks-App gesetzt (Wert aus dem Auftrag, im Protokoll
+nicht wiederholt) und vor der BASELINE nachher zurückgesetzt; ohne Tasks-App blieb er unverändert.
+Jede Ausgabe ging zuerst ins Scratchpad und durch die Geheimnisprüfung (Abschnitt am Ende).
+
+(1) RAM-Gate und Start
+----------------------
+# tasks_measure.py up 2026-11-13T18:38:07Z
+
+== up nc32 ==
+RAM frei_host_gb=4.57 schwelle=4.0 ergebnis=ok
+(no running container)
+docker start nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+docker start nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy
+nc-mcp-exapp-nc: installed (attempt 1)
+
+(2) Lauf ohne Tasks-App (EXPECT 0, Anzeigename nicht gesetzt)
+-------------------------------------------------------------
+RAM frei_kib=4840560 vor dem Lauf
+
+LAUF aufgaben32 stempel=c0bc8112 kopf=p32live-c0bc8112 container=nc-mcp-exapp-nc
+VERSION nc=32.0.15.1 versionstring=32.0.15 (occ status)
+TASKSAPP erwartet=0 occ_app_list=keine passt=ja
+BASELINE nc32.0.15.1 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=p32live-c0bc8112-frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=p32live-c0bc8112-nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=p32livec0bc8112aus calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+GRUPPE nc32.0.15.1 name=p32livec0bc8112grp vorhanden=nein shares=0 phase=vorher
+SETUP gruppe mitglieder=2 alice_und_bob=ja
+
+KONTROLLE a nc=32.0.15.1 nutzer=alice ergebnis=ok | mode=appapi NC_MCP_APP_PASSWORD or NC_MCP_STATIC_BEARER set in the process=no; the credential is APP_SECRET and no app password
+.
+KONTROLLE b nc=32.0.15.1 nutzer=alice status=PROPFIND:401 ergebnis=ok | tool: ToolError reason=unspecified message='Nextcloud rejected the app password.'; calendarobjects p32live-c0bc8112-a vorher=4 nachher=4
+.
+AUFGABE anlegen-mit-list nc=32.0.15.1 nutzer=alice status=PROPFIND:207,PUT:201,GET:200,PROPFIND:207,GET:200,PUT:201,GET:200 ergebnis=ok | GET 200 with the app password; DUE;VALUE=DATE:20261203 in the raw object; no 20261204 anywhere in the raw object; DTSTART;VALUE=DATE:20261201; CATEGORIES 'CATEGORIES:p32live-c0bc8112-x,p32live-c0bc8112-y'; PRIORITY:3; RELATED-TO the UID of the parent 9cb096e3-2761-4ca0-bdaa-515aefe3d2dc; {"confirmed": true, "created": true, "due": "2026-12-03", "id": "task:p32live-c0bc8112-a:ede149a2-24a3-4bfb-b9ee-d27551c49dc2.ics", "list": {"name": "p32live-c0bc8112-a", "shared": false, "writable": true}, "start": "2026-12-01", "summary": "p32live-c0bc8112-kind"}; no hint (erkennung=keine)
+.
+AUFGABE ohne-list-zwei-listen nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=unspecified message='This account has more than one task list to write to, so list has to be named.'; hint 'Name the list with list=<name>. Writable task lists: p32live-c0bc8112-a, p32live-c0bc8112-b, p32live-c0bc8112-grw (shared, key s2c7f2658a60c85c0), p32live-c0bc8112-rw (shared, key s5d880695f64ab8c5), personal.'; no PUT; calendarobjects vorher={'a': 6, 'b': 4} nachher={'a': 6, 'b': 4}
+.
+AUFGABE geteilt-namen nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | roher displayname mit zusatz in der discovery: 2 von 2; the server really adds the owner, so stripping is proven; rw: {'name': 'p32live-c0bc8112-rw', 'shared': True, 'writable': True}; ro: {'name': 'p32live-c0bc8112-ro', 'shared': True, 'writable': False}; a: {'name': 'p32live-c0bc8112-a', 'shared': False, 'writable': True}; the task of the rw share is a hit
+.
+AUFGABE geteilt-rw-mit-list nc=32.0.15.1 nutzer=alice status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | the id carries the hashed key: True; GET by the owner 200; calendarobjects vorher=2 nachher=3; PUT [201]
+.
+AUFGABE geteilt-ro-vorab nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The task list 'p32live-c0bc8112-ro' is read only for this account."; The task list 'p32live-c0bc8112-ro' is read only for this account.; the hook saw no PUT; calendarobjects vorher=1 nachher=1
+.
+AUFGABE geteilt-ro-server nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | harness PUT with the app password of alice, not the connector; PUT 404; calendarobjects vorher=1 nachher=1
+.
+AUFGABE d-32-16 nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message='The parent task lives in a shared list, and a shared list is only written to when it is named.'; no PUT; calendarobjects vorher=3 nachher=3
+.
+AUFGABE suche-standard-und-faellig nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207 ergebnis=ok | open task in the default search; completed task not in it; completed task with status=completed; due 2026-12-04 within due_by 2026-12-10; due 2026-12-20 outside; an undated task is not due by a day
+.
+AUFGABE ausfall-liste nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | REPORT of p32live-c0bc8112-b held back 3.0 s in the client hook; degraded [{'list': 'p32live-c0bc8112-b', 'reason': 'The task list did not answer within 1 second.'}]; the other lists still answer
+.
+AUFGABE fetch-gleich-read nc=32.0.15.1 nutzer=alice status=PROPFIND:207,GET:200,REPORT:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207,REPORT:207 ergebnis=ok | id task:p32live-c0bc8112-a:ede149a2-24a3-4bfb-b9ee-d27551c49dc2.ics; title p32live-c0bc8112-kind; status open; deep link of an own list
+.
+AUFGABE deck nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | positive control: app-generated--deck--board-24 with VTODO in the discovery of alice; positive control: Deck REST 200; no hit for the card title: set(); ToolError reason=unknown_id message="Nextcloud does not know the task 'task:app-generated--deck--board-24:card-40.ics'."; deck marker in no answer
+.
+AUFGABE task-03-mit-anmeldung nc=32.0.15.1 nutzer=p32live-c0bc8112-frisch status=PROPFIND:207,PROPFIND:207 ergebnis=ok | occ user:add exit=0; Basic cloud/user 200; BASELINE calendars=2 objekte=2 geloescht=0 shares=0 abos=0; {"hint": "This account has no task list yet. Create one in the Nextcloud Tasks app; tasks_search finds its tasks from then on.", "tasks": []}; ToolError reason=unspecified message='This account has no task list.'; hint 'Create a list in the Nextcloud Tasks app, then try again.'; no PUT; occ user:delete ok
+.
+AUFGABE task-03-ohne-anmeldung nc=32.0.15.1 nutzer=p32live-c0bc8112-nie status=PROPFIND:207,PROPFIND:207 ergebnis=ok | occ user:add exit=0; BASELINE calendars=0 objekte=0 geloescht=0 shares=0 abos=0; {"hint": "This account has no task list yet. Create one in the Nextcloud Tasks app; tasks_search finds its tasks from then on.", "tasks": []}; ToolError reason=unspecified message='This account has no task list.'; hint 'Create a list in the Nextcloud Tasks app, then try again.'; no PUT; occ user:delete ok
+.
+AUFGABE provider-tasksapp-0 nc=32.0.15.1 nutzer=alice status=ocs.GET:200,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207,PUT:201,GET:200 ergebnis=ok | tasksapp occ=keine ENTSCHEID erkennung=keine; provider tasks listed=False hits=[]; the provider is not listed; no task hit; no hit of kind task from anywhere; tasks_create created=True hint=nein
+.
+SETUP d-32-18 occ user:add exit=0 konto=p32livec0bc8112aus
+SETUP d-32-18 MKCALENDAR liste=p32live-c0bc8112-aus status=201
+AUFGABE d-32-18-privat nc=32.0.15.1 nutzer=p32livec0bc8112aus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=0 nachher=1; raw object GET 200 with the password of the account; list {'name': 'p32live-c0bc8112-aus', 'shared': False, 'writable': True}
+SETUP d-32-18 DELETE privat-objekt status=204 (Papierkorb im Rueckbau)
+SETUP d-32-18 FREIGABE an-bob-ro status=200
+AUFGABE d-32-18-geteilt nc=32.0.15.1 nutzer=p32livec0bc8112aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-c0bc8112-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-c0bc8112-aus.'; the hook saw no PUT; calendarobjects vorher=0 nachher=0; neither the id nor the display name of bob; no share marker; no group id
+AUFGABE d-32-18-mit-list nc=32.0.15.1 nutzer=p32livec0bc8112aus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=0 nachher=1; raw object GET 200 with the password of the account; list {'name': 'p32live-c0bc8112-aus', 'shared': False, 'writable': True}
+AUFGABE d-32-18-parent nc=32.0.15.1 nutzer=p32livec0bc8112aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message='The parent task lives in a list that is shared with others, and such a list is only written to when it is named.'; shared with others in the message; hint "To create the subtask there, name that list with list='p32live-c0bc8112-aus'."; the hook saw no PUT; calendarobjects vorher=1 nachher=1; neither the id nor the display name of bob; no share marker; no group id
+SETUP d-32-18 FREIGABE zurueck status=200
+SETUP d-32-18 LINK veroeffentlicht status=202
+AUFGABE d-32-18-link nc=32.0.15.1 nutzer=p32livec0bc8112aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-c0bc8112-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-c0bc8112-aus.'; the hook saw no PUT; calendarobjects vorher=1 nachher=1; neither the id nor the display name of bob; no share marker; no group id
+SETUP d-32-18 LINK zurueck status=200
+AUFGABE d-32-18-zurueckgenommen nc=32.0.15.1 nutzer=p32livec0bc8112aus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=1 nachher=2; raw object GET 200 with the password of the account; list {'name': 'p32live-c0bc8112-aus', 'shared': False, 'writable': True}
+.
+AUFGABE d-32-17-geteilt nc=32.0.15.1 nutzer=alice status=keine ergebnis=entfaellt | without the Tasks app the provider tasks does not exist
+.
+AUFGABE d-32-17-geteilt-faellig nc=32.0.15.1 nutzer=alice status=keine ergebnis=entfaellt | without the Tasks app the provider tasks does not exist
+.
+AUFGABE d-32-17-eigen nc=32.0.15.1 nutzer=alice status=keine ergebnis=entfaellt | without the Tasks app the provider tasks does not exist
+.
+AUFGABE d-32-18-gruppe-privat nc=32.0.15.1 nutzer=p32livec0bc8112aus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=2 nachher=3; raw object GET 200 with the password of the account; list {'name': 'p32live-c0bc8112-aus', 'shared': False, 'writable': True}
+SETUP d-32-18-gruppe FREIGABE an-gruppe-ro status=200
+AUFGABE d-32-18-gruppe-ro nc=32.0.15.1 nutzer=p32livec0bc8112aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-c0bc8112-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-c0bc8112-aus.'; the hook saw no PUT; calendarobjects vorher=3 nachher=3; neither the id nor the display name of bob; no share marker; no group id
+SETUP d-32-18-gruppe FREIGABE an-gruppe-rw status=200
+AUFGABE d-32-18-gruppe-rw nc=32.0.15.1 nutzer=p32livec0bc8112aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-c0bc8112-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-c0bc8112-aus.'; the hook saw no PUT; calendarobjects vorher=3 nachher=3; neither the id nor the display name of bob; no share marker; no group id
+AUFGABE d-32-18-gruppe-parent nc=32.0.15.1 nutzer=p32livec0bc8112aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message='The parent task lives in a list that is shared with others, and such a list is only written to when it is named.'; shared with others in the message; hint "To create the subtask there, name that list with list='p32live-c0bc8112-aus'."; the hook saw no PUT; calendarobjects vorher=3 nachher=3; neither the id nor the display name of bob; no share marker; no group id
+SETUP d-32-18-gruppe FREIGABE zurueck status=200
+AUFGABE d-32-18-gruppe-zurueck nc=32.0.15.1 nutzer=p32livec0bc8112aus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=3 nachher=4; raw object GET 200 with the password of the account; list {'name': 'p32live-c0bc8112-aus', 'shared': False, 'writable': True}
+.
+AUFGABE gruppe-rein-flags nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | roher displayname mit zusatz in der discovery: 2 von 2; positive control: the server adds the owner to both; grw: {'name': 'p32live-c0bc8112-grw', 'shared': True, 'writable': True}; gro: {'name': 'p32live-c0bc8112-gro', 'shared': True, 'writable': False}; the task of grw is a hit; the task of gro is a hit; no group id in the answer
+.
+AUFGABE gruppe-rein-ohne-list nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=unspecified message='This account has more than one task list to write to, so list has to be named.'; hint offers the rw group share: 'Name the list with list=<name>. Writable task lists: p32live-c0bc8112-a, p32live-c0bc8112-b, p32live-c0bc8112-grw (shared, key s2c7f2658a60c85c0), p32live-c0bc8112-rw (shared, key s5d880695f64ab8c5), personal.'; the read only group share is not offered; the hook saw no PUT; calendarobjects vorher={'grw': 2, 'gro': 1} nachher={'grw': 2, 'gro': 1}; neither the id nor the display name of bob; no group, no marker
+.
+AUFGABE gruppe-rein-rw-mit-list nc=32.0.15.1 nutzer=alice status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | the id carries the hashed key: True; GET by the owner 200; calendarobjects vorher=2 nachher=3; PUT [201]; list {'name': 'p32live-c0bc8112-grw', 'shared': True, 'writable': True}
+.
+AUFGABE gruppe-rein-ro-vorab nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The task list 'p32live-c0bc8112-gro' is read only for this account."; The task list 'p32live-c0bc8112-gro' is read only for this account.; the hook saw no PUT; calendarobjects vorher=1 nachher=1; no group id
+.
+AUFGABE gruppe-rein-parent nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message='The parent task lives in a shared list, and a shared list is only written to when it is named.'; hint "To create the subtask there, name that list with list='p32live-c0bc8112-grw'."; no PUT; calendarobjects vorher=3 nachher=3
+.
+AUFGABE gruppe-rein-fetch nc=32.0.15.1 nutzer=alice status=PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | url='/index.php/apps/tasks/'; the link is the start page of the Tasks app; no owner in the link; metadata shared=true; title p32live-c0bc8112-gruppeohne
+.
+AUFGABE d-32-17-gruppe nc=32.0.15.1 nutzer=alice status=keine ergebnis=entfaellt | without the Tasks app the provider tasks does not exist
+.
+AUFGABE d-32-17-gruppe-faellig nc=32.0.15.1 nutzer=alice status=keine ergebnis=entfaellt | without the Tasks app the provider tasks does not exist
+.
+AUFGABE wiederkehrend-app nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | treffer_open=1 treffer_completed=0 treffer_all=1; open: 1; done: 0; all: one hit without expansion, 1; the hit is the object of the harness; recurring True; status open; lesen status=open recurring=True; tasks_read recurring=true; tasks_read status open; the master and not the override; DUE as written 2026-11-20T13:00:00+00:00
+.
+AUFGABE wiederkehrend-instanz-erledigt nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | treffer_open=1 treffer_completed=0 treffer_all=1; open: 1; done: 0; all: one hit without expansion, 1; the hit is the object of the harness; recurring True; status open; lesen status=open recurring=True; tasks_read recurring=true; tasks_read status open; the master and not the override; DUE as written 2026-11-20T13:00:00+00:00
+.
+AUFGABE wiederkehrend-master-erledigt nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | treffer_open=0 treffer_completed=1 treffer_all=1; open: 0; done: 1; all: one hit without expansion, 1; the hit is the object of the harness; recurring True; status completed; lesen status=completed recurring=True; tasks_read recurring=true; tasks_read status completed; the master and not the override; DUE as written 2026-11-20T13:00:00+00:00
+.
+SETUP deckel-500 MKCALENDAR liste=p32live-c0bc8112-deckel status=201
+SETUP deckel-500 aufgaben=520 fehlgeschlagen=0 wiederholt=0 dauer_s=24 GEGENPROBE datenbank_zeilen=520 gleich=ja
+AUFGABE deckel-500 nc=32.0.15.1 nutzer=bob status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207 ergebnis=ok | seiten=20 je_seite=[25] treffer=500 eindeutig=500 letzte_truncated=True letzte_next=False max_seite_ms=204 median_seite_ms=188 budget_s=2; 20 pages, got 20; pages of 25: [25]; 500 distinct hits; last page truncated; no next on the last page; note 'result window capped at 500 tasks; narrow with query, list or due_by'; no degraded list
+.
+AUFGABE keine-kennung nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | 51 answers scanned for the id and the display name of bob; answers kept: 51; found 0 of 2 names; no _shared_by_ in any answer
+.
+RUECKBAU freigabe rw status=200
+RUECKBAU freigabe ro status=200
+RUECKBAU freigabe grw status=200
+RUECKBAU freigabe gro status=200
+RUECKBAU liste a delete=204 no_trashbin=1 danach=404
+RUECKBAU liste b delete=204 no_trashbin=1 danach=404
+RUECKBAU liste rw delete=204 no_trashbin=1 danach=404
+RUECKBAU liste ro delete=204 no_trashbin=1 danach=404
+RUECKBAU liste grw delete=204 no_trashbin=1 danach=404
+RUECKBAU liste gro delete=204 no_trashbin=1 danach=404
+RUECKBAU liste deckel delete=204 no_trashbin=1 danach=404
+RUECKBAU deck board=24 gelöscht
+RUECKBAU papierkorb alice entfernt=0
+PAPIERKORB nc32.0.15.1 konto=alice gefunden=0 geleert=0
+RUECKBAU papierkorb bob entfernt=0
+PAPIERKORB nc32.0.15.1 konto=bob gefunden=0 geleert=0
+RUECKBAU freigabe aus status=200
+RUECKBAU gruppenfreigabe aus status=200
+RUECKBAU link aus status=200
+RUECKBAU papierkorb p32livec0bc8112aus vor-liste entfernt=1
+PAPIERKORB nc32.0.15.1 konto=p32livec0bc8112aus gefunden=1 geleert=1 phase=vor-liste
+RUECKBAU liste aus delete=204 no_trashbin=1 danach=404
+RUECKBAU papierkorb p32livec0bc8112aus entfernt=0
+PAPIERKORB nc32.0.15.1 konto=p32livec0bc8112aus gefunden=0 geleert=0 phase=nach-liste
+RUECKBAU reste p32livec0bc8112aus listen_mit_kopf=0
+RUECKBAU konto p32live-c0bc8112-frisch nicht da
+RUECKBAU konto p32live-c0bc8112-nie nicht da
+RUECKBAU konto p32livec0bc8112aus geloescht
+RUECKBAU gruppe geloescht
+RUECKBAU reste listen_mit_kopf=0
+ANZEIGENAME bob gesetzt=nein zurueck=entfaellt gleich_vorher=ja
+GRUPPE nc32.0.15.1 name=p32livec0bc8112grp vorhanden=nein shares=0 phase=nachher
+BASELINE nc32.0.15.1 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=p32live-c0bc8112-frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=p32live-c0bc8112-nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=p32livec0bc8112aus calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+
+34 passed in 71.00s (0:01:11)
+pytest exit 0
+
+(3) Tasks-App installieren
+--------------------------
+$ occ app:install tasks; docker restart nc-mcp-exapp-nc
+tasks 0.18.1 installed
+tasks enabled
+nc-mcp-exapp-nc
+status.php 200
+"tasks":"0.18.1"
+
+(4) Lauf mit Tasks-App (EXPECT 1, Anzeigename gesetzt)
+-----------------------------------------------------
+RAM frei_kib=4740956 vor dem Lauf
+
+LAUF aufgaben32 stempel=c408b127 kopf=p32live-c408b127 container=nc-mcp-exapp-nc
+VERSION nc=32.0.15.1 versionstring=32.0.15 (occ status)
+TASKSAPP erwartet=1 occ_app_list=0.18.1 passt=ja
+BASELINE nc32.0.15.1 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=p32live-c408b127-frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=p32live-c408b127-nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32.0.15.1 konto=p32livec408b127aus calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+GRUPPE nc32.0.15.1 name=p32livec408b127grp vorhanden=nein shares=0 phase=vorher
+SETUP gruppe mitglieder=2 alice_und_bob=ja
+
+KONTROLLE a nc=32.0.15.1 nutzer=alice ergebnis=ok | mode=appapi NC_MCP_APP_PASSWORD or NC_MCP_STATIC_BEARER set in the process=no; the credential is APP_SECRET and no app password
+.
+KONTROLLE b nc=32.0.15.1 nutzer=alice status=PROPFIND:401 ergebnis=ok | tool: ToolError reason=unspecified message='Nextcloud rejected the app password.'; calendarobjects p32live-c408b127-a vorher=4 nachher=4
+.
+AUFGABE anlegen-mit-list nc=32.0.15.1 nutzer=alice status=PROPFIND:207,PUT:201,GET:200,PROPFIND:207,GET:200,PUT:201,GET:200 ergebnis=ok | GET 200 with the app password; DUE;VALUE=DATE:20261203 in the raw object; no 20261204 anywhere in the raw object; DTSTART;VALUE=DATE:20261201; CATEGORIES 'CATEGORIES:p32live-c408b127-x,p32live-c408b127-y'; PRIORITY:3; RELATED-TO the UID of the parent c772ca98-104e-44bd-baa8-5aec42dc9e42; {"confirmed": true, "created": true, "due": "2026-12-03", "id": "task:p32live-c408b127-a:721bc342-e60d-4b9a-b930-448f75fcbe88.ics", "list": {"name": "p32live-c408b127-a", "shared": false, "writable": true}, "start": "2026-12-01", "summary": "p32live-c408b127-kind"}; no hint (erkennung=keine)
+.
+AUFGABE ohne-list-zwei-listen nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=unspecified message='This account has more than one task list to write to, so list has to be named.'; hint 'Name the list with list=<name>. Writable task lists: p32live-c408b127-a, p32live-c408b127-b, p32live-c408b127-grw (shared, key s6bd862336206e1fd), p32live-c408b127-rw (shared, key sf8e680aa7d8e68e1), personal.'; no PUT; calendarobjects vorher={'a': 6, 'b': 4} nachher={'a': 6, 'b': 4}
+.
+AUFGABE geteilt-namen nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | roher displayname mit zusatz in der discovery: 2 von 2; the server really adds the owner, so stripping is proven; rw: {'name': 'p32live-c408b127-rw', 'shared': True, 'writable': True}; ro: {'name': 'p32live-c408b127-ro', 'shared': True, 'writable': False}; a: {'name': 'p32live-c408b127-a', 'shared': False, 'writable': True}; the task of the rw share is a hit
+.
+AUFGABE geteilt-rw-mit-list nc=32.0.15.1 nutzer=alice status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | the id carries the hashed key: True; GET by the owner 200; calendarobjects vorher=2 nachher=3; PUT [201]
+.
+AUFGABE geteilt-ro-vorab nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The task list 'p32live-c408b127-ro' is read only for this account."; The task list 'p32live-c408b127-ro' is read only for this account.; the hook saw no PUT; calendarobjects vorher=1 nachher=1
+.
+AUFGABE geteilt-ro-server nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | harness PUT with the app password of alice, not the connector; PUT 404; calendarobjects vorher=1 nachher=1
+.
+AUFGABE d-32-16 nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message='The parent task lives in a shared list, and a shared list is only written to when it is named.'; no PUT; calendarobjects vorher=3 nachher=3
+.
+AUFGABE suche-standard-und-faellig nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207 ergebnis=ok | open task in the default search; completed task not in it; completed task with status=completed; due 2026-12-04 within due_by 2026-12-10; due 2026-12-20 outside; an undated task is not due by a day
+.
+AUFGABE ausfall-liste nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | REPORT of p32live-c408b127-b held back 3.0 s in the client hook; degraded [{'list': 'p32live-c408b127-b', 'reason': 'The task list did not answer within 1 second.'}]; the other lists still answer
+.
+AUFGABE fetch-gleich-read nc=32.0.15.1 nutzer=alice status=PROPFIND:207,GET:200,REPORT:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207,REPORT:207 ergebnis=ok | id task:p32live-c408b127-a:721bc342-e60d-4b9a-b930-448f75fcbe88.ics; title p32live-c408b127-kind; status open; deep link of an own list
+.
+AUFGABE deck nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | positive control: app-generated--deck--board-25 with VTODO in the discovery of alice; positive control: Deck REST 200; no hit for the card title: set(); ToolError reason=unknown_id message="Nextcloud does not know the task 'task:app-generated--deck--board-25:card-41.ics'."; deck marker in no answer
+.
+AUFGABE task-03-mit-anmeldung nc=32.0.15.1 nutzer=p32live-c408b127-frisch status=PROPFIND:207,PROPFIND:207 ergebnis=ok | occ user:add exit=0; Basic cloud/user 200; BASELINE calendars=2 objekte=2 geloescht=0 shares=0 abos=0; {"hint": "This account has no task list yet. Create one in the Nextcloud Tasks app; tasks_search finds its tasks from then on.", "tasks": []}; ToolError reason=unspecified message='This account has no task list.'; hint 'Create a list in the Nextcloud Tasks app, then try again.'; no PUT; occ user:delete ok
+.
+AUFGABE task-03-ohne-anmeldung nc=32.0.15.1 nutzer=p32live-c408b127-nie status=PROPFIND:207,PROPFIND:207 ergebnis=ok | occ user:add exit=0; BASELINE calendars=0 objekte=0 geloescht=0 shares=0 abos=0; {"hint": "This account has no task list yet. Create one in the Nextcloud Tasks app; tasks_search finds its tasks from then on.", "tasks": []}; ToolError reason=unspecified message='This account has no task list.'; hint 'Create a list in the Nextcloud Tasks app, then try again.'; no PUT; occ user:delete ok
+.
+AUFGABE provider-tasksapp-1 nc=32.0.15.1 nutzer=alice status=ocs.GET:200,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207,GET:200,REPORT:207,PROPFIND:207,PUT:201,GET:200 ergebnis=ok | tasksapp occ=0.18.1 ENTSCHEID erkennung=keine; provider tasks listed=True hits=['task:p32live-c408b127-a:p32live-c408b127-faellig-bfc012.ics']; the provider is listed; hit id == task:p32live-c408b127-a:p32live-c408b127-faellig-bfc012.ics; tasks_read of that id; tasks_create created=True hint=nein
+.
+SETUP d-32-18 occ user:add exit=0 konto=p32livec408b127aus
+SETUP d-32-18 MKCALENDAR liste=p32live-c408b127-aus status=201
+AUFGABE d-32-18-privat nc=32.0.15.1 nutzer=p32livec408b127aus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=0 nachher=1; raw object GET 200 with the password of the account; list {'name': 'p32live-c408b127-aus', 'shared': False, 'writable': True}
+SETUP d-32-18 DELETE privat-objekt status=204 (Papierkorb im Rueckbau)
+SETUP d-32-18 FREIGABE an-bob-ro status=200
+AUFGABE d-32-18-geteilt nc=32.0.15.1 nutzer=p32livec408b127aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-c408b127-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-c408b127-aus.'; the hook saw no PUT; calendarobjects vorher=0 nachher=0; neither the id nor the display name of bob; no share marker; no group id
+AUFGABE d-32-18-mit-list nc=32.0.15.1 nutzer=p32livec408b127aus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=0 nachher=1; raw object GET 200 with the password of the account; list {'name': 'p32live-c408b127-aus', 'shared': False, 'writable': True}
+AUFGABE d-32-18-parent nc=32.0.15.1 nutzer=p32livec408b127aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message='The parent task lives in a list that is shared with others, and such a list is only written to when it is named.'; shared with others in the message; hint "To create the subtask there, name that list with list='p32live-c408b127-aus'."; the hook saw no PUT; calendarobjects vorher=1 nachher=1; neither the id nor the display name of bob; no share marker; no group id
+SETUP d-32-18 FREIGABE zurueck status=200
+SETUP d-32-18 LINK veroeffentlicht status=202
+AUFGABE d-32-18-link nc=32.0.15.1 nutzer=p32livec408b127aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-c408b127-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-c408b127-aus.'; the hook saw no PUT; calendarobjects vorher=1 nachher=1; neither the id nor the display name of bob; no share marker; no group id
+SETUP d-32-18 LINK zurueck status=200
+AUFGABE d-32-18-zurueckgenommen nc=32.0.15.1 nutzer=p32livec408b127aus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=1 nachher=2; raw object GET 200 with the password of the account; list {'name': 'p32live-c408b127-aus', 'shared': False, 'writable': True}
+.
+AUFGABE d-32-17-geteilt nc=32.0.15.1 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200 ergebnis=ok | the provider finds the task of the rw share; roh_mit_besitzer=nein; subline_vorhanden=nein text_gleich=True; subline without bob; subline without the share marker; text without bob; text without the share marker; without an owner the subline is the raw one; search text equals the subline
+.
+AUFGABE d-32-17-geteilt-faellig nc=32.0.15.1 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207 ergebnis=ok | the provider finds the task of the rw share; roh_mit_besitzer=nein; subline_vorhanden=ja text_gleich=True; subline without bob; subline without the share marker; text without bob; text without the share marker; without an owner the subline is the raw one; search text equals the subline
+.
+AUFGABE d-32-17-eigen nc=32.0.15.1 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200 ergebnis=ok | the subline is the raw one; search text equals the raw subline
+.
+AUFGABE d-32-18-gruppe-privat nc=32.0.15.1 nutzer=p32livec408b127aus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=2 nachher=3; raw object GET 200 with the password of the account; list {'name': 'p32live-c408b127-aus', 'shared': False, 'writable': True}
+SETUP d-32-18-gruppe FREIGABE an-gruppe-ro status=200
+AUFGABE d-32-18-gruppe-ro nc=32.0.15.1 nutzer=p32livec408b127aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-c408b127-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-c408b127-aus.'; the hook saw no PUT; calendarobjects vorher=3 nachher=3; neither the id nor the display name of bob; no share marker; no group id
+SETUP d-32-18-gruppe FREIGABE an-gruppe-rw status=200
+AUFGABE d-32-18-gruppe-rw nc=32.0.15.1 nutzer=p32livec408b127aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The only own task list to write to, 'p32live-c408b127-aus', is shared with others, and a list others can see is only written to when it is named."; shared with others in the message; hint 'Name the list with list=<name>. Writable task lists: p32live-c408b127-aus.'; the hook saw no PUT; calendarobjects vorher=3 nachher=3; neither the id nor the display name of bob; no share marker; no group id
+AUFGABE d-32-18-gruppe-parent nc=32.0.15.1 nutzer=p32livec408b127aus status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message='The parent task lives in a list that is shared with others, and such a list is only written to when it is named.'; shared with others in the message; hint "To create the subtask there, name that list with list='p32live-c408b127-aus'."; the hook saw no PUT; calendarobjects vorher=3 nachher=3; neither the id nor the display name of bob; no share marker; no group id
+SETUP d-32-18-gruppe FREIGABE zurueck status=200
+AUFGABE d-32-18-gruppe-zurueck nc=32.0.15.1 nutzer=p32livec408b127aus status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | PUT [201]; calendarobjects vorher=3 nachher=4; raw object GET 200 with the password of the account; list {'name': 'p32live-c408b127-aus', 'shared': False, 'writable': True}
+.
+AUFGABE gruppe-rein-flags nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207,REPORT:207 ergebnis=ok | roher displayname mit zusatz in der discovery: 2 von 2; positive control: the server adds the owner to both; grw: {'name': 'p32live-c408b127-grw', 'shared': True, 'writable': True}; gro: {'name': 'p32live-c408b127-gro', 'shared': True, 'writable': False}; the task of grw is a hit; the task of gro is a hit; no group id in the answer
+.
+AUFGABE gruppe-rein-ohne-list nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=unspecified message='This account has more than one task list to write to, so list has to be named.'; hint offers the rw group share: 'Name the list with list=<name>. Writable task lists: p32live-c408b127-a, p32live-c408b127-b, p32live-c408b127-grw (shared, key s6bd862336206e1fd), p32live-c408b127-rw (shared, key sf8e680aa7d8e68e1), personal.'; the read only group share is not offered; the hook saw no PUT; calendarobjects vorher={'grw': 2, 'gro': 1} nachher={'grw': 2, 'gro': 1}; neither the id nor the display name of bob; no group, no marker
+.
+AUFGABE gruppe-rein-rw-mit-list nc=32.0.15.1 nutzer=alice status=PROPFIND:207,PUT:201,GET:200 ergebnis=ok | the id carries the hashed key: True; GET by the owner 200; calendarobjects vorher=2 nachher=3; PUT [201]; list {'name': 'p32live-c408b127-grw', 'shared': True, 'writable': True}
+.
+AUFGABE gruppe-rein-ro-vorab nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message="The task list 'p32live-c408b127-gro' is read only for this account."; The task list 'p32live-c408b127-gro' is read only for this account.; the hook saw no PUT; calendarobjects vorher=1 nachher=1; no group id
+.
+AUFGABE gruppe-rein-parent nc=32.0.15.1 nutzer=alice status=PROPFIND:207 ergebnis=ok | ToolError reason=guard_tripped message='The parent task lives in a shared list, and a shared list is only written to when it is named.'; hint "To create the subtask there, name that list with list='p32live-c408b127-grw'."; no PUT; calendarobjects vorher=3 nachher=3
+.
+AUFGABE gruppe-rein-fetch nc=32.0.15.1 nutzer=alice status=PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | url='/index.php/apps/tasks/'; the link is the start page of the Tasks app; no owner in the link; metadata shared=true; title p32live-c408b127-gruppeohne
+.
+AUFGABE d-32-17-gruppe nc=32.0.15.1 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:500,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200 ergebnis=ok | the provider finds the task of the grw share; roh_mit_besitzer=nein; subline_vorhanden=nein text_gleich=True; subline without bob; subline without the share marker; text without bob; text without the share marker; without an owner the subline is the raw one; search text equals the subline
+.
+AUFGABE d-32-17-gruppe-faellig nc=32.0.15.1 nutzer=alice status=ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:500,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207,ocs.GET:200,systemtags.PROPFIND:207,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,ocs.GET:200,PROPFIND:207 ergebnis=ok | the provider finds the task of the grw share; roh_mit_besitzer=nein; subline_vorhanden=ja text_gleich=True; subline without bob; subline without the share marker; text without bob; text without the share marker; without an owner the subline is the raw one; search text equals the subline
+.
+AUFGABE wiederkehrend-app nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | treffer_open=1 treffer_completed=0 treffer_all=1; open: 1; done: 0; all: one hit without expansion, 1; the hit is the object of the harness; recurring True; status open; lesen status=open recurring=True; tasks_read recurring=true; tasks_read status open; the master and not the override; DUE as written 2026-11-20T13:00:00+00:00
+.
+AUFGABE wiederkehrend-instanz-erledigt nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | treffer_open=1 treffer_completed=0 treffer_all=1; open: 1; done: 0; all: one hit without expansion, 1; the hit is the object of the harness; recurring True; status open; lesen status=open recurring=True; tasks_read recurring=true; tasks_read status open; the master and not the override; DUE as written 2026-11-20T13:00:00+00:00
+.
+AUFGABE wiederkehrend-master-erledigt nc=32.0.15.1 nutzer=alice status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,GET:200,REPORT:207 ergebnis=ok | treffer_open=0 treffer_completed=1 treffer_all=1; open: 0; done: 1; all: one hit without expansion, 1; the hit is the object of the harness; recurring True; status completed; lesen status=completed recurring=True; tasks_read recurring=true; tasks_read status completed; the master and not the override; DUE as written 2026-11-20T13:00:00+00:00
+.
+SETUP deckel-500 MKCALENDAR liste=p32live-c408b127-deckel status=201
+SETUP deckel-500 aufgaben=520 fehlgeschlagen=0 wiederholt=0 dauer_s=27 GEGENPROBE datenbank_zeilen=520 gleich=ja
+AUFGABE deckel-500 nc=32.0.15.1 nutzer=bob status=PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207,PROPFIND:207,REPORT:207 ergebnis=ok | seiten=20 je_seite=[25] treffer=500 eindeutig=500 letzte_truncated=True letzte_next=False max_seite_ms=197 median_seite_ms=186 budget_s=2; 20 pages, got 20; pages of 25: [25]; 500 distinct hits; last page truncated; no next on the last page; note 'result window capped at 500 tasks; narrow with query, list or due_by'; no degraded list
+.
+AUFGABE keine-kennung nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | 62 answers scanned for the id and the display name of bob; answers kept: 62; found 0 of 2 names; no _shared_by_ in any answer
+.
+RUECKBAU freigabe rw status=200
+RUECKBAU freigabe ro status=200
+RUECKBAU freigabe grw status=200
+RUECKBAU freigabe gro status=200
+RUECKBAU liste a delete=204 no_trashbin=1 danach=404
+RUECKBAU liste b delete=204 no_trashbin=1 danach=404
+RUECKBAU liste rw delete=204 no_trashbin=1 danach=404
+RUECKBAU liste ro delete=204 no_trashbin=1 danach=404
+RUECKBAU liste grw delete=204 no_trashbin=1 danach=404
+RUECKBAU liste gro delete=204 no_trashbin=1 danach=404
+RUECKBAU liste deckel delete=204 no_trashbin=1 danach=404
+RUECKBAU deck board=25 gelöscht
+RUECKBAU papierkorb alice entfernt=0
+PAPIERKORB nc32.0.15.1 konto=alice gefunden=0 geleert=0
+RUECKBAU papierkorb bob entfernt=0
+PAPIERKORB nc32.0.15.1 konto=bob gefunden=0 geleert=0
+RUECKBAU freigabe aus status=200
+RUECKBAU gruppenfreigabe aus status=200
+RUECKBAU link aus status=200
+RUECKBAU papierkorb p32livec408b127aus vor-liste entfernt=1
+PAPIERKORB nc32.0.15.1 konto=p32livec408b127aus gefunden=1 geleert=1 phase=vor-liste
+RUECKBAU liste aus delete=204 no_trashbin=1 danach=404
+RUECKBAU papierkorb p32livec408b127aus entfernt=0
+PAPIERKORB nc32.0.15.1 konto=p32livec408b127aus gefunden=0 geleert=0 phase=nach-liste
+RUECKBAU reste p32livec408b127aus listen_mit_kopf=0
+RUECKBAU konto p32live-c408b127-frisch nicht da
+RUECKBAU konto p32live-c408b127-nie nicht da
+RUECKBAU konto p32livec408b127aus geloescht
+RUECKBAU gruppe geloescht
+RUECKBAU reste listen_mit_kopf=0
+ANZEIGENAME bob gesetzt=ja zurueck=ja gleich_vorher=ja weg=occ
+GRUPPE nc32.0.15.1 name=p32livec408b127grp vorhanden=nein shares=0 phase=nachher
+BASELINE nc32.0.15.1 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=p32live-c408b127-frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=p32live-c408b127-nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc32.0.15.1 konto=p32livec408b127aus calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+
+34 passed in 78.61s (0:01:18)
+pytest exit 0
+
+(5) Tasks-App entfernen, Konfigurationsschlüssel löschen, stoppen
+-----------------------------------------------------------------
+$ occ app:remove tasks; occ config:app:delete tasks <installed_version|enabled|types>; docker restart nc-mcp-exapp-nc
+tasks disabled
+tasks 0.18.1 removed
+Config value installed_version of app tasks deleted
+Config value enabled of app tasks deleted
+Config value types of app tasks deleted
+{"apps":{"tasks":[]}}
+nc-mcp-exapp-nc
+status.php 200
+tasks in app:list: 0
+# tasks_measure.py stop 2026-11-13T18:41:08Z
+
+== stop nc32 ==
+docker stop nc-mcp-exapp-nc -> nc-mcp-exapp-nc | laeuft=false
+docker stop nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy | laeuft=false
+
+Geheimnisprüfung
+----------------
+tasks_measure.py scan gegen .env.nc35 und .env.exapp des Worktrees und .env.nc35 des Hauptcheckouts
+(volle Werte und erste 12 Zeichen, Name des AppAPI-Kopfes) über alle Ausgaben der Läufe: Treffer nur auf
+NC_MCP_TEST_USER und NC_MCP_TEST_USER2 (Kontonamen alice und bob, öffentlich); kein Treffer aus
+APP_SECRET, Passwörtern, App-Passwörtern oder HP_SHARED_KEY. Der gesetzte Anzeigename kommt in keiner
+Ausgabe vor (grep: 0 Treffer). Kein Abschnitt "warnings summary" (pytest mit -p no:warnings).
