@@ -13,6 +13,29 @@ dans [CHANGELOG.md](CHANGELOG.md).
 
 ## [Unreleased]
 
+### Ajouté
+
+- `files_create_folder` dans le bundle `files` : crée un dossier, ou avec `parents=true`
+  également les dossiers parents manquants, au plus 10 nouveaux dossiers par appel ; un
+  dossier existant répond `created` false.
+- La réponse contient le chemin, `created` et l'id du fichier (`file:<n>`), avec
+  `parents=true` également la liste des dossiers réellement créés. Un arrêt en cours de
+  route nomme ce qui a déjà été créé et le laisse en place.
+- Toutes les limites de `files_upload` s'appliquent : l'exclusion `kein-ki` (refus comme
+  pour un dossier parent manquant ; rien n'est écrit tant que la vérification reste sans
+  réponse), le bac à sable `NC_MCP_FILES_ROOT` (la racine n'est jamais créée) et aucune
+  vérification de droits propre (Nextcloud décide ; un droit manquant reçoit son propre
+  message).
+- Une panne réseau au milieu d'une chaîne de dossiers nomme les dossiers déjà créés et
+  indique que l'état du dossier en cours d'écriture à ce moment est inconnu.
+- Un nom de dossier qui commence ou se termine par un espace blanc est refusé avant toute
+  écriture.
+- Un nom comme `x.part` n'est pas signalé comme un fichier existant.
+- Sur Nextcloud 35, un nom que Nextcloud n'accepte pas, dans une chaîne avec
+  `parents=true`, reçoit le message d'un nom refusé au lieu d'une erreur du serveur.
+- Mesuré sur Nextcloud 32 et 35 sous impersonation AppAPI, voir
+  `docs/folder-evidence.md`.
+
 ## [0.7.2] - 2026-11-06
 
 ### Corrigé

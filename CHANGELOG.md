@@ -11,6 +11,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `files_create_folder` in the `files` bundle: creates one folder, or with `parents=true`
+  the missing parent folders as well, at most 10 new folders per call; an existing folder
+  answers `created` false.
+- The answer carries the path, `created` and the file id (`file:<n>`), with `parents=true`
+  also the list of the folders actually created. A stop midway names what was already
+  created and leaves it in place.
+- Every boundary of `files_upload` applies: the `kein-ki` exclusion (refused like a missing
+  parent folder; nothing is written while the check cannot be answered), the
+  `NC_MCP_FILES_ROOT` sandbox (the root is never created), and no permission check of its
+  own (Nextcloud decides; a missing permission gets its own message).
+- A network failure inside a chain of folders names the folders already created and says
+  that the state of the folder being written at that moment is unknown.
+- A folder name with whitespace at its start or end is refused before anything is written.
+- A name such as `x.part` is not reported as an existing file.
+- On Nextcloud 35 a name Nextcloud does not accept, inside a chain with `parents=true`,
+  gets the message of a refused name instead of a server error.
+- Measured on Nextcloud 32 and 35 under AppAPI impersonation, see
+  `docs/folder-evidence.md`.
+
 ## [0.7.2] - 2026-11-06
 
 ### Fixed
