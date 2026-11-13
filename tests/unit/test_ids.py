@@ -2,7 +2,7 @@
 
 The codec is the only place that builds or reads prefixed IDs. A wrong prefix would
 make ``fetch`` resolve a card as a note (silently), so the roundtrip property is
-pinned here for all eight kinds.
+pinned here for all nine kinds.
 
 ``mail`` is the one kind with a guard of its own, and the tests below are written against
 the reason for it rather than against its shape: a mail id that is not a number has to be
@@ -11,13 +11,16 @@ the whole server (every full message read opens an IMAP session inside the Mail 
 the app answers a non numeric id with 404 instead of refusing it.
 """
 
+import hashlib
+import re
+
 import pytest
 
 from mcp_connector import ids
-from mcp_connector.errors import ToolError
+from mcp_connector.errors import REASON_GUARD_TRIPPED, ToolError
 
 
-def test_roundtrip_for_all_eight_kinds() -> None:
+def test_roundtrip_for_all_nine_kinds() -> None:
     cases = [
         (ids.encode_file("12345"), ("file", ("12345",))),
         (ids.encode_note("42"), ("note", ("42",))),
@@ -27,6 +30,7 @@ def test_roundtrip_for_all_eight_kinds() -> None:
         (ids.encode_mail("4711"), ("mail", ("4711",))),
         (ids.encode_message("abcd1234", "42"), ("message", ("abcd1234", "42"))),
         (ids.encode_table("7"), ("table", ("7",))),
+        (ids.encode_task("tasks", "a b.ics"), ("task", ("tasks", "a b.ics"))),
         (
             ids.encode_url("https://nc.test/index.php/apps/notes/note/42"),
             ("url", ("https://nc.test/index.php/apps/notes/note/42",)),
@@ -45,6 +49,7 @@ def test_encoded_prefixes_are_stable() -> None:
     assert ids.encode_mail("1") == "mail:1"
     assert ids.encode_message("abcd1234", "1") == "message:abcd1234:1"
     assert ids.encode_table("1") == "table:1"
+    assert ids.encode_task("tasks", "x.ics") == "task:tasks:x.ics"
     assert ids.encode_url("https://nc.test/x") == "url:https://nc.test/x"
 
 
@@ -164,10 +169,12 @@ def test_a_table_id_that_is_not_a_number_is_refused_without_a_request(raw: str) 
     assert "message:" in excinfo.value.hint
 
 
-def test_the_hint_every_tool_prints_names_all_eight_forms() -> None:
+def test_the_hint_every_tool_prints_names_all_nine_forms() -> None:
     """The hint is contract: it is what a caller reads after any id was refused anywhere."""
-    for form in ("file:", "note:", "card:", "event:", "mail:", "message:", "table:", "url:"):
+    forms = ("file:", "note:", "card:", "event:", "mail:", "message:", "table:", "task:", "url:")
+    for form in forms:
         assert form in ids._HINT, form
+    assert "task:<list>:<object>" in ids._HINT
 
 
 def test_short_card_form_is_accepted() -> None:
@@ -209,6 +216,9 @@ def test_the_url_kind_reads_exactly_what_encode_url_can_build() -> None:
         "card:1:2",
         "card:1:2:3:4",
         "event:personal",
+        "task:a",
+        "task::b",
+        "task:a:",
         "url:",
         # The whitespace half of the url kind: a rest that is only whitespace, and a rest that
         # begins with whitespace. Neither is a value ``encode_url`` can build, because it
@@ -230,6 +240,7 @@ def test_invalid_ids_raise_toolerror_with_hint(raw: str) -> None:
         "note:4:2",
         "file:a:b",
         "event:a:b:c",
+        "task:a:b:c",
     ],
 )
 def test_an_id_the_encode_side_can_never_have_built_is_refused(raw: str) -> None:
@@ -258,6 +269,8 @@ def test_encode_rejects_empty_parts() -> None:
         lambda: ids.encode_message("", "42"),
         lambda: ids.encode_message("abcd1234", ""),
         lambda: ids.encode_table(""),
+        lambda: ids.encode_task("", "x.ics"),
+        lambda: ids.encode_task("tasks", ""),
         lambda: ids.encode_url(""),
     ):
         with pytest.raises(ToolError):
@@ -277,3 +290,50 @@ def test_encode_rejects_separator_inside_a_part() -> None:
         ids.encode_event("per:sonal", "x.ics")
     with pytest.raises(ToolError):
         ids.encode_card_short("9:9")
+
+
+def test_encode_task_rejects_a_separator_in_the_object_name() -> None:
+    """A foreign object named ``a:b.ics`` cannot get an id; the tool layer skips it (TASK-02)."""
+    with pytest.raises(ToolError) as excinfo:
+        ids.encode_task("tasks", "a:b.ics")
+    assert excinfo.value.reason == REASON_GUARD_TRIPPED
+
+
+@pytest.mark.parametrize("raw", ["task:a", "task:a:b:c", "task::b"])
+def test_a_task_id_of_the_wrong_shape_is_a_guard_refusal(raw: str) -> None:
+    with pytest.raises(ToolError) as excinfo:
+        ids.parse(raw)
+    assert excinfo.value.reason == REASON_GUARD_TRIPPED
+    assert "task:" in excinfo.value.hint
+
+
+# --------------------------------------------------------------------------------------
+# The neutral key of a shared task list (D-32-14)
+# --------------------------------------------------------------------------------------
+
+
+def test_the_key_of_an_own_list_is_its_uri() -> None:
+    assert ids.task_list_key("tasks") == "tasks"
+    assert ids.task_list_key("projekt alpha") == "projekt alpha"
+
+
+def test_the_key_of_a_shared_list_carries_no_account_id() -> None:
+    uri = "spike30-b-rw_shared_by_bob"
+    expected = "s" + hashlib.sha256(uri.encode("utf-8")).hexdigest()[:16]
+
+    key = ids.task_list_key(uri)
+
+    assert key == expected
+    assert len(key) == 17
+    assert re.fullmatch(r"s[0-9a-f]{16}", key)
+    assert "bob" not in key
+    assert "_shared_by_" not in key
+    assert ids.task_list_key(uri) == key, "deterministic"
+    assert ids.task_list_key("spike30-b-ro_shared_by_bob") != key
+
+
+def test_a_task_id_roundtrips_for_an_own_and_for_a_shared_list() -> None:
+    for key in ("tasks", ids.task_list_key("spike30-b-rw_shared_by_bob")):
+        encoded = ids.encode_task(key, "a b.ics")
+        assert ids.parse(encoded) == ("task", (key, "a b.ics"))
+        assert "bob" not in encoded
