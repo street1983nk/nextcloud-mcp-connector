@@ -1,0 +1,305 @@
+BASIS 1f7293b60cd0930511c67ebf3757d0fe0a8952ed
+    Rohprotokoll Plan 32-10, Task 1 (Messung Gruppe, wiederkehrend, Deckel). Datum 2026-11-13 (UTC),
+    Worktree tasks-080, Branch plan/v1.8-tasks-080. Messprogramm scripts/tasks_measure.py, Schritte
+    gruppe, wieder und deckel. Jede Ausgabe lief zuerst ins Scratchpad und durch die Geheimnisprüfung
+    (32-RULES.md Abschnitt 8).
+
+Freigaben (beide gelten für diesen Plan):
+FREIGABE zustand-32-09=ja inkl-oeffentlicher-link datum=2026-11-13
+FREIGABE zustand-32-10=ja testgruppe alice+bob anzeigename serie datum=2026-11-13
+    Owner-Freigabe vom 13.11.2026 per Abfrage ("Ja, alles"), übermittelt durch die Hauptsitzung:
+    Testgruppe mit bob und alice, Listen an die Gruppe teilen (auch durch das Testkonto
+    p32live<stempel>aus), Anzeigename von bob vorübergehend "Bärbel Probe (Team)", Serie mit 520 bis
+    2000 Aufgaben; Rückbau, Gruppe danach gelöscht, BASELINE vorher gleich nachher, Papierkorb geleert.
+    Keine Neuregistrierung der ExApp; gemessen auf Funktionsebene (App-Passwort und Impersonation).
+    Der Anzeigename von bob wird in dieser Messung nicht geändert (nur im Live-Test, Task 4).
+
+# tasks_measure.py up 2026-11-13T18:04:59Z
+
+== up nc35 ==
+RAM frei_host_gb=5.11 schwelle=4.0 ergebnis=ok
+(no running container)
+docker start nc35-nc -> nc35-nc
+docker start nc35-harp -> nc35-harp
+docker start nc35-caddy -> nc35-caddy
+nc35-nc: installed (attempt 1)
+# tasks_measure.py live 2026-11-13T18:05:05Z
+
+== live nc35 steps=gruppe,wieder,deckel, start 2026-11-13T18:05:05Z ==
+EXAPP nc35 info_xml=0.7.2 registriert=mcp_connector (MCP Connector): 0.7.2 [enabled]
+GET http://127.0.0.1:8082/status.php -> HTTP 200
+VERSION OF RECORD nc35 35.0.0
+dbtype: sqlite3
+KONTROLLE impersonation status=200 gleich=ja
+TASKSAPP nc35 vorher=keine
+GRUPPE nc35 name=p3210grp vorhanden=nein shares=0 phase=vorher
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+TASKSAPP nc35 messung=0.18.1
+SETUP GRUPPE angelegt mitglieder=2 alice_und_bob=ja
+SETUP MKCALENDAR liste=p3210-aus status=201
+GRUPPE-HINAUS nc35 zustand=privat auth=basic invite_status=2xx eintraege=0 kinder=keine principal_art=keine shared_out=nein
+ROHKOERPER zustand=privat anonymisiert bytes=17867
+GRUPPE-HINAUS nc35 zustand=privat auth=appapi invite_status=2xx eintraege=0 kinder=keine principal_art=keine shared_out=nein
+SETUP FREIGABE an-gruppe-ro status=200
+GRUPPE-HINAUS nc35 zustand=an-gruppe-ro auth=basic invite_status=2xx eintraege=1 kinder=user principal_art=groups shared_out=ja
+GRUPPE-SELBST nc35 zustand=an-gruppe-ro auth=basic eigene_liste_doppelt=nein
+ROHKOERPER zustand=an-gruppe-ro anonymisiert bytes=18047
+GRUPPE-HINAUS nc35 zustand=an-gruppe-ro auth=appapi invite_status=2xx eintraege=1 kinder=user principal_art=groups shared_out=ja
+GRUPPE-SELBST nc35 zustand=an-gruppe-ro auth=appapi eigene_liste_doppelt=nein
+SETUP FREIGABE an-gruppe-rw status=200
+GRUPPE-HINAUS nc35 zustand=an-gruppe-rw auth=basic invite_status=2xx eintraege=1 kinder=user principal_art=groups shared_out=ja
+GRUPPE-SELBST nc35 zustand=an-gruppe-rw auth=basic eigene_liste_doppelt=nein
+ROHKOERPER zustand=an-gruppe-rw anonymisiert bytes=18053
+GRUPPE-HINAUS nc35 zustand=an-gruppe-rw auth=appapi invite_status=2xx eintraege=1 kinder=user principal_art=groups shared_out=ja
+GRUPPE-SELBST nc35 zustand=an-gruppe-rw auth=appapi eigene_liste_doppelt=nein
+SETUP FREIGABE an-gruppe zurueck status=200
+GRUPPE-HINAUS nc35 zustand=zurueckgenommen auth=basic invite_status=2xx eintraege=0 kinder=keine principal_art=keine shared_out=nein
+ROHKOERPER zustand=zurueckgenommen anonymisiert bytes=17867
+GRUPPE-HINAUS nc35 zustand=zurueckgenommen auth=appapi invite_status=2xx eintraege=0 kinder=keine principal_art=keine shared_out=nein
+SETUP MKCALENDAR liste=p3210-rein-rw status=201
+SETUP FREIGABE rw an-gruppe status=200
+SETUP PUT gruppe-aufgabe liste=rw faellig=nein status=201
+SETUP PUT gruppe-aufgabe liste=rw faellig=ja status=201
+SETUP MKCALENDAR liste=p3210-rein-ro status=201
+SETUP FREIGABE ro an-gruppe status=200
+SETUP PUT gruppe-aufgabe liste=ro faellig=nein status=201
+SETUP PUT gruppe-aufgabe liste=ro faellig=ja status=201
+GRUPPE-REIN nc35 liste=rw auth=basic sichtbar=ja eintraege=1 uri_mit_marker=ja read_only_2xx=ja owner_displayname_passt=ja shared=ja writable=ja name_ohne_besitzer=ja
+GRUPPE-REIN nc35 liste=ro auth=basic sichtbar=ja eintraege=1 uri_mit_marker=ja read_only_2xx=ja owner_displayname_passt=ja shared=ja writable=nein name_ohne_besitzer=ja
+ROHKOERPER zustand=rein anonymisiert bytes=19953
+GRUPPE-REIN nc35 liste=rw auth=appapi sichtbar=ja eintraege=1 uri_mit_marker=ja read_only_2xx=ja owner_displayname_passt=ja shared=ja writable=ja name_ohne_besitzer=ja
+GRUPPE-REIN nc35 liste=ro auth=appapi sichtbar=ja eintraege=1 uri_mit_marker=ja read_only_2xx=ja owner_displayname_passt=ja shared=ja writable=nein name_ohne_besitzer=ja
+PROVIDER gruppe status=200 eintraege=4
+GRUPPE-SUBLINE nc35 liste=rw faellig=nein endet_mit_rohname=ja enthaelt_besitzer=ja clean_subline=bereinigt clean_subline_ohne_besitzer=ja
+GRUPPE-SUBLINE nc35 liste=rw faellig=ja endet_mit_rohname=ja enthaelt_besitzer=ja clean_subline=bereinigt clean_subline_ohne_besitzer=ja
+GRUPPE-SUBLINE nc35 liste=ro faellig=nein endet_mit_rohname=ja enthaelt_besitzer=ja clean_subline=bereinigt clean_subline_ohne_besitzer=ja
+GRUPPE-SUBLINE nc35 liste=ro faellig=ja endet_mit_rohname=ja enthaelt_besitzer=ja clean_subline=bereinigt clean_subline_ohne_besitzer=ja
+SETUP MKCALENDAR liste=p3210-wieder status=201
+SETUP PUT wiederkehrend form=app status=201
+SETUP PUT wiederkehrend form=instanz-erledigt status=201
+SETUP PUT wiederkehrend form=master-erledigt status=201
+WIEDER nc35 form=app filter_offen=ja treffer_offen=1 treffer_erledigt=0 treffer_alle=1 recurring=ja status=open lesen_recurring=ja lesen_status=open
+WIEDER nc35 form=instanz-erledigt filter_offen=ja treffer_offen=1 treffer_erledigt=0 treffer_alle=1 recurring=ja status=open lesen_recurring=ja lesen_status=open
+WIEDER nc35 form=master-erledigt filter_offen=nein treffer_offen=0 treffer_erledigt=1 treffer_alle=1 recurring=ja status=completed lesen_recurring=ja lesen_status=completed
+SETUP MKCALENDAR liste=p3210-deckel status=201
+AUFBAU nc35 aufgaben=600 neu=600 erledigt=0 mit_faelligkeit=300 dauer_s=27 gleichzeitig=1 wiederholte_put=0 GEGENPROBE datenbank_zeilen=600 gleich=ja
+KOSTEN deckel-report aufgaben=600 impersonation=ja status=207 median_ms=70 max_ms=84 min_ms=67 p95_zweitgroesster_ms=79 bytes=424754 treffer=600 (n=15)
+KOSTEN deckel-aufruf aufgaben=600 median_ms=265 max_ms=277 beantwortet=ja budget_waehrend_messung_s=60 (n=10)
+DECKEL nc35 aufgaben=600 seiten=20 je_seite=25 treffer=500 eindeutig=500 letzte_note=ja letzte_next=nein note_gleich=ja degraded=nein max_seite_ms=310 median_seite_ms=270 budget_s=1
+AUFBAU nc35 aufgaben=2000 neu=1400 erledigt=0 mit_faelligkeit=1000 dauer_s=63 gleichzeitig=1 wiederholte_put=0 GEGENPROBE datenbank_zeilen=2000 gleich=ja
+KOSTEN deckel-report aufgaben=2000 impersonation=ja status=207 median_ms=177 max_ms=220 min_ms=166 p95_zweitgroesster_ms=208 bytes=1415254 treffer=2000 (n=15)
+KOSTEN deckel-aufruf aufgaben=2000 median_ms=754 max_ms=819 beantwortet=ja budget_waehrend_messung_s=60 (n=10)
+DECKEL nc35 aufgaben=2000 seiten=0 je_seite=0 treffer=0 eindeutig=0 letzte_note=nein letzte_next=nein note_gleich=nein degraded=ja max_seite_ms=1056 median_seite_ms=1056 budget_s=1
+MESSWERT per_list_timeout_s=2 max_s=0.819 quelle=nc35-impersonation
+
+== rueckbau nc35 ==
+RUECKBAU gruppenfreigabe_entfernt liste=p3210-aus status=200
+RUECKBAU gruppenfreigabe_entfernt liste=p3210-rein-rw status=200
+RUECKBAU gruppenfreigabe_entfernt liste=p3210-rein-ro status=200
+RUECKBAU freigabe_entfernt liste=p3202-rw status=404
+RUECKBAU freigabe_entfernt liste=p3202-ro status=404
+RUECKBAU freigabe_entfernt liste=p3209-aus status=404
+RUECKBAU link_entfernt liste=p3209-aus status=404
+RUECKBAU freigabe_entfernt liste=p3209-rein status=404
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU papierkorb konto=alice entfernte_eintraege=0
+PAPIERKORB nc35 konto=alice gefunden=0 geleert=0
+RUECKBAU reste konto=alice listen_mit_praefix=0
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+RUECKBAU papierkorb konto=bob entfernte_eintraege=0
+PAPIERKORB nc35 konto=bob gefunden=0 geleert=0
+RUECKBAU reste konto=bob listen_mit_praefix=0
+occ user:delete p3202frisch -> User does not exist
+occ user:delete p3202nie -> User does not exist
+RUECKBAU gruppe_geloescht noch_vorhanden=nein
+GRUPPE nc35 name=p3210grp vorhanden=nein shares=0 phase=nachher
+occ app:remove tasks -> Disabled app 'tasks' (uninstall steps executed). Removed app 'tasks' (version 0.18.1).
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+RUECKBAU nc35 tasksapp=wie-vorher vorher=keine nachher=keine
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE-VERGLEICH nc35 konto=alice gleich=ja
+BASELINE-VERGLEICH nc35 konto=bob gleich=ja
+BASELINE-VERGLEICH nc35 konto=p3202frisch gleich=ja
+BASELINE-VERGLEICH nc35 konto=p3202nie gleich=ja
+# tasks_measure.py stop 2026-11-13T18:07:33Z
+
+== stop nc35 ==
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
+
+# tasks_measure.py up 2026-11-13T18:07:51Z
+
+== up nc32 ==
+RAM frei_host_gb=4.60 schwelle=4.0 ergebnis=ok
+(no running container)
+docker start nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+docker start nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy
+nc-mcp-exapp-nc: installed (attempt 1)
+# tasks_measure.py live 2026-11-13T18:07:54Z
+
+== live nc32 steps=gruppe,wieder,deckel, start 2026-11-13T18:07:54Z ==
+EXAPP nc32 info_xml=0.7.2 registriert=mcp_connector (MCP Connector): 0.7.2 [enabled]
+GET http://127.0.0.1:8081/status.php -> HTTP 200
+VERSION OF RECORD nc32 32.0.15
+dbtype: sqlite3
+KONTROLLE impersonation status=200 gleich=ja
+TASKSAPP nc32 vorher=keine
+GRUPPE nc32 name=p3210grp vorhanden=nein shares=0 phase=vorher
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+TASKSAPP nc32 messung=0.18.1
+SETUP GRUPPE angelegt mitglieder=2 alice_und_bob=ja
+SETUP MKCALENDAR liste=p3210-aus status=201
+GRUPPE-HINAUS nc32 zustand=privat auth=basic invite_status=2xx eintraege=0 kinder=keine principal_art=keine shared_out=nein
+ROHKOERPER zustand=privat anonymisiert bytes=7271
+GRUPPE-HINAUS nc32 zustand=privat auth=appapi invite_status=2xx eintraege=0 kinder=keine principal_art=keine shared_out=nein
+SETUP FREIGABE an-gruppe-ro status=200
+GRUPPE-HINAUS nc32 zustand=an-gruppe-ro auth=basic invite_status=2xx eintraege=1 kinder=user principal_art=groups shared_out=ja
+GRUPPE-SELBST nc32 zustand=an-gruppe-ro auth=basic eigene_liste_doppelt=nein
+ROHKOERPER zustand=an-gruppe-ro anonymisiert bytes=7451
+GRUPPE-HINAUS nc32 zustand=an-gruppe-ro auth=appapi invite_status=2xx eintraege=1 kinder=user principal_art=groups shared_out=ja
+GRUPPE-SELBST nc32 zustand=an-gruppe-ro auth=appapi eigene_liste_doppelt=nein
+SETUP FREIGABE an-gruppe-rw status=200
+GRUPPE-HINAUS nc32 zustand=an-gruppe-rw auth=basic invite_status=2xx eintraege=1 kinder=user principal_art=groups shared_out=ja
+GRUPPE-SELBST nc32 zustand=an-gruppe-rw auth=basic eigene_liste_doppelt=nein
+ROHKOERPER zustand=an-gruppe-rw anonymisiert bytes=7457
+GRUPPE-HINAUS nc32 zustand=an-gruppe-rw auth=appapi invite_status=2xx eintraege=1 kinder=user principal_art=groups shared_out=ja
+GRUPPE-SELBST nc32 zustand=an-gruppe-rw auth=appapi eigene_liste_doppelt=nein
+SETUP FREIGABE an-gruppe zurueck status=200
+GRUPPE-HINAUS nc32 zustand=zurueckgenommen auth=basic invite_status=2xx eintraege=0 kinder=keine principal_art=keine shared_out=nein
+ROHKOERPER zustand=zurueckgenommen anonymisiert bytes=7271
+GRUPPE-HINAUS nc32 zustand=zurueckgenommen auth=appapi invite_status=2xx eintraege=0 kinder=keine principal_art=keine shared_out=nein
+SETUP MKCALENDAR liste=p3210-rein-rw status=201
+SETUP FREIGABE rw an-gruppe status=200
+SETUP PUT gruppe-aufgabe liste=rw faellig=nein status=201
+SETUP PUT gruppe-aufgabe liste=rw faellig=ja status=201
+SETUP MKCALENDAR liste=p3210-rein-ro status=201
+SETUP FREIGABE ro an-gruppe status=200
+SETUP PUT gruppe-aufgabe liste=ro faellig=nein status=201
+SETUP PUT gruppe-aufgabe liste=ro faellig=ja status=201
+GRUPPE-REIN nc32 liste=rw auth=basic sichtbar=ja eintraege=1 uri_mit_marker=ja read_only_2xx=ja owner_displayname_passt=ja shared=ja writable=ja name_ohne_besitzer=ja
+GRUPPE-REIN nc32 liste=ro auth=basic sichtbar=ja eintraege=1 uri_mit_marker=ja read_only_2xx=ja owner_displayname_passt=ja shared=ja writable=nein name_ohne_besitzer=ja
+ROHKOERPER zustand=rein anonymisiert bytes=9357
+GRUPPE-REIN nc32 liste=rw auth=appapi sichtbar=ja eintraege=1 uri_mit_marker=ja read_only_2xx=ja owner_displayname_passt=ja shared=ja writable=ja name_ohne_besitzer=ja
+GRUPPE-REIN nc32 liste=ro auth=appapi sichtbar=ja eintraege=1 uri_mit_marker=ja read_only_2xx=ja owner_displayname_passt=ja shared=ja writable=nein name_ohne_besitzer=ja
+PROVIDER gruppe status=200 eintraege=4
+GRUPPE-SUBLINE nc32 liste=rw faellig=nein endet_mit_rohname=nein enthaelt_besitzer=nein clean_subline=unveraendert clean_subline_ohne_besitzer=ja
+GRUPPE-SUBLINE nc32 liste=rw faellig=ja endet_mit_rohname=nein enthaelt_besitzer=nein clean_subline=unveraendert clean_subline_ohne_besitzer=ja
+GRUPPE-SUBLINE nc32 liste=ro faellig=nein endet_mit_rohname=nein enthaelt_besitzer=nein clean_subline=unveraendert clean_subline_ohne_besitzer=ja
+GRUPPE-SUBLINE nc32 liste=ro faellig=ja endet_mit_rohname=nein enthaelt_besitzer=nein clean_subline=unveraendert clean_subline_ohne_besitzer=ja
+SETUP MKCALENDAR liste=p3210-wieder status=201
+SETUP PUT wiederkehrend form=app status=201
+SETUP PUT wiederkehrend form=instanz-erledigt status=201
+SETUP PUT wiederkehrend form=master-erledigt status=201
+WIEDER nc32 form=app filter_offen=ja treffer_offen=1 treffer_erledigt=0 treffer_alle=1 recurring=ja status=open lesen_recurring=ja lesen_status=open
+WIEDER nc32 form=instanz-erledigt filter_offen=ja treffer_offen=1 treffer_erledigt=0 treffer_alle=1 recurring=ja status=open lesen_recurring=ja lesen_status=open
+WIEDER nc32 form=master-erledigt filter_offen=nein treffer_offen=0 treffer_erledigt=1 treffer_alle=1 recurring=ja status=completed lesen_recurring=ja lesen_status=completed
+SETUP MKCALENDAR liste=p3210-deckel status=201
+AUFBAU nc32 aufgaben=600 neu=600 erledigt=0 mit_faelligkeit=300 dauer_s=25 gleichzeitig=1 wiederholte_put=0 GEGENPROBE datenbank_zeilen=600 gleich=ja
+KOSTEN deckel-report aufgaben=600 impersonation=ja status=207 median_ms=68 max_ms=77 min_ms=64 p95_zweitgroesster_ms=70 bytes=424754 treffer=600 (n=15)
+KOSTEN deckel-aufruf aufgaben=600 median_ms=250 max_ms=259 beantwortet=ja budget_waehrend_messung_s=60 (n=10)
+DECKEL nc32 aufgaben=600 seiten=20 je_seite=25 treffer=500 eindeutig=500 letzte_note=ja letzte_next=nein note_gleich=ja degraded=nein max_seite_ms=316 median_seite_ms=256 budget_s=1
+AUFBAU nc32 aufgaben=2000 neu=1400 erledigt=0 mit_faelligkeit=1000 dauer_s=60 gleichzeitig=1 wiederholte_put=0 GEGENPROBE datenbank_zeilen=2000 gleich=ja
+KOSTEN deckel-report aufgaben=2000 impersonation=ja status=207 median_ms=170 max_ms=176 min_ms=160 p95_zweitgroesster_ms=175 bytes=1415254 treffer=2000 (n=15)
+KOSTEN deckel-aufruf aufgaben=2000 median_ms=722 max_ms=831 beantwortet=ja budget_waehrend_messung_s=60 (n=10)
+DECKEL nc32 aufgaben=2000 seiten=20 je_seite=25 treffer=500 eindeutig=500 letzte_note=ja letzte_next=nein note_gleich=ja degraded=nein max_seite_ms=814 median_seite_ms=707 budget_s=1
+MESSWERT per_list_timeout_s=2 max_s=0.831 quelle=nc32-impersonation
+
+== rueckbau nc32 ==
+RUECKBAU gruppenfreigabe_entfernt liste=p3210-aus status=200
+RUECKBAU gruppenfreigabe_entfernt liste=p3210-rein-rw status=200
+RUECKBAU gruppenfreigabe_entfernt liste=p3210-rein-ro status=200
+RUECKBAU freigabe_entfernt liste=p3202-rw status=404
+RUECKBAU freigabe_entfernt liste=p3202-ro status=404
+RUECKBAU freigabe_entfernt liste=p3209-aus status=404
+RUECKBAU link_entfernt liste=p3209-aus status=404
+RUECKBAU freigabe_entfernt liste=p3209-rein status=404
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU papierkorb konto=alice entfernte_eintraege=0
+PAPIERKORB nc32 konto=alice gefunden=0 geleert=0
+RUECKBAU reste konto=alice listen_mit_praefix=0
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+RUECKBAU papierkorb konto=bob entfernte_eintraege=0
+PAPIERKORB nc32 konto=bob gefunden=0 geleert=0
+RUECKBAU reste konto=bob listen_mit_praefix=0
+occ user:delete p3202frisch -> User does not exist
+occ user:delete p3202nie -> User does not exist
+RUECKBAU gruppe_geloescht noch_vorhanden=nein
+GRUPPE nc32 name=p3210grp vorhanden=nein shares=0 phase=nachher
+occ app:remove tasks -> tasks disabled tasks 0.18.1 removed
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+RUECKBAU nc32 tasksapp=wie-vorher vorher=keine nachher=keine
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE-VERGLEICH nc32 konto=alice gleich=ja
+BASELINE-VERGLEICH nc32 konto=bob gleich=ja
+BASELINE-VERGLEICH nc32 konto=p3202frisch gleich=ja
+BASELINE-VERGLEICH nc32 konto=p3202nie gleich=ja
+# tasks_measure.py stop 2026-11-13T18:10:24Z
+
+== stop nc32 ==
+docker stop nc-mcp-exapp-nc -> nc-mcp-exapp-nc | laeuft=false
+docker stop nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy | laeuft=false
+
+== Papierkorb (32-RULES.md Abschnitt 7) ==
+    Aus den Zeilen PAPIERKORB oben (REPORT calendar-query auf trashbin/objects/, Treffer nach
+    UID-Präfix p3202, p3209 oder p3210). Die Listen wurden als Sammlung mit No-Trashbin gelöscht,
+    ihre Objekte landen damit nicht im Papierkorb; einzelne Objekte wurden nicht gelöscht.
+
+== Nebenbefunde ==
+    - oc:invite einer an eine Gruppe geteilten eigenen Liste: genau ein Eintrag mit dem lokalen
+      Namen user, sein href zeigt auf principals/groups/<gid> (principal_art=groups). Gleiche Form
+      auf 35 und 32, unter App-Passwort und Impersonation. Die unveränderte Funktion
+      parse_task_home liefert für ro und rw shared_out=ja, privat und nach der Rücknahme nein.
+    - alice ist selbst Mitglied der Gruppe, an die sie ihre Liste teilt: ihre eigene Liste
+      erscheint trotzdem nur einmal (GRUPPE-SELBST eigene_liste_doppelt=nein).
+    - Eine per Gruppe hineingeteilte Liste sieht bei alice aus wie eine Freigabe an eine Person:
+      URI mit _shared_by_, oc:read-only im 2xx-propstat (rw leer, ro 1), owner-displayname gleich
+      dem Anzeigenamen von bob; parse_task_home: shared=ja, writable passend, Name ohne Besitzer.
+    - Die Provider-subline der Gruppenlisten: auf 35 endet sie mit dem Rohnamen samt Besitzer (mit
+      und ohne DUE), clean_subline ersetzt ihn; auf 32 nennt sie den Besitzer nicht und bleibt.
+    - Deckel bei 2000 offenen Aufgaben auf nc35: Mit dem Produktbudget von 1 s brach schon die
+      erste Seite ab (DECKEL degraded=ja, seiten=0, die Antwort war die Ablehnung "None of the task
+      lists could be read."). Mit angehobenem Budget während der Messung (60 s) dauerte ein Aufruf
+      im Median 754 ms, höchstens 819 ms; der REPORT allein höchstens 220 ms, der Rest ist Parsen
+      im Client. Auf nc32 hielt 1 s knapp (max_seite_ms=814).
+    - Der Anzeigename von bob ist auf beiden Instanzen gleich seiner Kennung (wie 32-09).
+
+== Entscheid ==
+ENTSCHEID gruppe_hinaus=erkannt (Begründung: auf nc35 und nc32, unter App-Passwort und Impersonation gleich, trägt oc:invite einer an die Gruppe geteilten eigenen Liste genau ein Kind-Element mit dem lokalen Namen user und einem href auf principals/groups/; die unveränderte parse_task_home liefert für an-gruppe-ro und an-gruppe-rw shared_out=ja, für privat und zurueckgenommen nein; _shares_itself bleibt unverändert)
+ENTSCHEID gruppe_rein=geteilt-erkannt (Begründung: auf nc35 und nc32 trägt die per Gruppe hineingeteilte Liste den Marker _shared_by_ in der URI und oc:read-only im 2xx-propstat; parse_task_home liefert shared=ja, writable=ja für rw und nein für ro, den Namen ohne Besitzer; owner-displayname passt zum Anzeigenamen von bob)
+ENTSCHEID gruppe_subline=bereinigt (Begründung: auf nc35 enthält die rohe subline aller vier Aufgaben den Besitzer, clean_subline ersetzt ihn mit und ohne DUE; auf nc32 enthält sie ihn nicht und bleibt unverändert; in keinem Fall bleibt der Besitzer stehen)
+ENTSCHEID wiederkehrend=wie-erwartet (Begründung: auf nc35 und nc32 gleich: app und instanz-erledigt passieren den Vorfilter des Servers und sind je ein Treffer in open und all, keiner in completed, Status open, recurring=ja, tasks_read recurring=ja; master-erledigt fällt aus dem Vorfilter, ist keiner in open und je einer in completed und all, Status completed, recurring=ja)
+ENTSCHEID deckel_budget=anheben-auf-2 (Begründung: größtes max von deckel-aufruf 0.831 s auf nc32 und 0.819 s auf nc35 bei 2000 offenen Aufgaben, Regel max(1,ceil(2*max)) ergibt 2; auf nc35 brach das bisherige Budget von 1 s den Deckel bei 2000 offenen Aufgaben live ab; max_s liegt unter der Abbruchgrenze von 5 s; der Deckel selbst hielt bei 600 auf beiden und bei 2000 auf nc32: 20 Seiten zu 25, 500 eindeutige Treffer, letzte Seite mit Notiz und ohne next)
+
+Geheimnisprüfung (tasks_measure.py scan gegen .env.nc35 und .env.exapp des Worktrees und .env.nc35 des
+Hauptcheckouts, volle Werte und erste 12 Zeichen, Kopfname): 120 Treffer in 16 Dateien, alle auf
+öffentliche Werte (APP_ID, APP_VERSION, URLs, Kontonamen alice und bob); kein Treffer aus APP_SECRET,
+Passwörtern, App-Passwörtern oder HP_SHARED_KEY; kein Treffer auf den Namen des AppAPI-Kopfes.
