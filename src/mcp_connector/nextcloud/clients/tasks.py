@@ -356,7 +356,9 @@ def clean_subline(subline: str, task_list: TaskList) -> str | None:
 
     Nextcloud 34 and 35 append `` (<display name of the list>)`` to the subline, and the
     display name of a shared list ends with the owner (measured in plan 32-09). When the
-    subline ends with the raw name, that end becomes `` (<name>)``. A subline that ends
+    subline ends with the raw name, that end becomes `` (<name>)``; a task without a due date
+    has the bare ``(<raw name>)`` as its subline (measured live on 35), which becomes
+    ``(<name>)``. A subline that ends
     otherwise and names neither the owner nor the share marker stays as it is (the form of
     Nextcloud 32, the due date only). ``None`` in every other case: an own list, a suffix the
     name rule did not recognise, or the owner still in the text after the replacement. The
@@ -370,6 +372,8 @@ def clean_subline(subline: str, task_list: TaskList) -> str | None:
     cleaned = subline
     if subline.endswith(raw_tail):
         cleaned = f"{subline[: -len(raw_tail)]} ({task_list.name})"
+    elif subline == raw_tail[1:]:
+        cleaned = f"({task_list.name})"
     if owner in cleaned.casefold() or SHARED_MARKER in cleaned:
         return None
     return cleaned
