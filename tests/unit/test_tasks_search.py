@@ -783,3 +783,35 @@ async def test_a_home_that_answers_404_is_the_same_empty_answer(clients: NcClien
         result = await tasks_tools.search_tasks(clients)
     assert result["tasks"] == []
     assert "hint" in result
+
+
+# --- plan 32-09, W3: the description of query is what the code matches ----------------------
+
+
+@pytest.mark.anyio
+async def test_the_query_parameter_names_title_description_and_tags_not_the_list() -> None:
+    """W3: read from the registry the way a client sees it, not from the source."""
+    from mcp import Client
+
+    from mcp_connector.server import mcp
+
+    async with Client(mcp, raise_exceptions=True) as client:
+        tools = {tool.name: tool for tool in (await client.list_tools()).tools}
+    described = str(tools["tasks_search"].input_schema["properties"]["query"]["description"])
+    assert "title" in described
+    assert "description" in described
+    assert "tags" in described
+    assert "list" not in described
+
+
+@pytest.mark.anyio
+async def test_a_word_of_the_description_finds_a_task_and_the_list_name_does_not(
+    clients: NcClients,
+) -> None:
+    objects = [task("w3", "Einkauf", "DESCRIPTION:Milch und Quittenbrot")]
+    with respx.mock(assert_all_called=False) as mock:
+        mock_lists(mock, spike30_aufgaben=objects)
+        by_word = await tasks_tools.search_tasks(clients, query="quittenbrot")
+        by_list = await tasks_tools.search_tasks(clients, query=OWN)
+    assert summaries(by_word) == ["Einkauf"]
+    assert summaries(by_list) == []

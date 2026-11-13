@@ -1902,3 +1902,69 @@ async def test_a_url_inside_a_cell_is_text_and_is_never_requested(clients: NcCli
     assert foreign.call_count == 0, "a cell value is content, never a destination"
     assert CELL_DOMAIN in result["text"], "and it arrives as the text it is"
     assert CELL_DOMAIN not in result["url"], "the link of the answer is built from the instance"
+
+
+# --- plan 32-09, W2: the marks of tasks_read reach fetch ------------------------------------
+
+
+@pytest.mark.anyio
+async def test_a_cut_task_description_is_marked_truncated(clients: NcClients) -> None:
+    """W2: ``tasks_read`` cut the description, so the fetched text is not the whole task."""
+    long = "x" * 5000
+    with respx.mock(assert_all_called=False) as mock:
+        mock_one_task(mock, TASK_OWN, task_ics("Lang", f"DESCRIPTION:{long}"))
+        result = await chatgpt.fetch(clients, ids.encode_task(TASK_OWN, TASK_NAME))
+
+    assert result["metadata"]["truncated"] == "true"
+    assert result["text"].endswith("x")
+    assert long not in result["text"]
+
+
+@pytest.mark.anyio
+async def test_a_short_task_description_carries_no_truncated_key(clients: NcClients) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        mock_one_task(mock, TASK_OWN, task_ics("Kurz", "DESCRIPTION:kurz"))
+        result = await chatgpt.fetch(clients, ids.encode_task(TASK_OWN, TASK_NAME))
+
+    assert "truncated" not in result["metadata"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("line", "field", "label", "value"),
+    [
+        ("DUE:20261120T090000", "due", "Due", "2026-11-20T09:00:00"),
+        ("DTSTART:20261118T080000", "start", "Start", "2026-11-18T08:00:00"),
+        ("COMPLETED:20261119T170000", "completed", "Completed", "2026-11-19T17:00:00"),
+    ],
+)
+async def test_a_floating_task_time_is_marked_in_the_text_and_the_metadata(
+    clients: NcClients, line: str, field: str, label: str, value: str
+) -> None:
+    """W2: a time without a zone is named as such, never read as UTC."""
+    with respx.mock(assert_all_called=False) as mock:
+        mock_one_task(mock, TASK_OWN, task_ics("Schwebend", line))
+        result = await chatgpt.fetch(clients, ids.encode_task(TASK_OWN, TASK_NAME))
+
+    assert f"{label}: {value} (floating, no time zone)" in result["text"].splitlines()
+    assert result["metadata"][f"{field}_floating"] == "true"
+    assert "Z" not in value
+    FetchResult.model_validate(result)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "line",
+    ["DUE;TZID=Europe/Berlin:20261120T090000", "DUE:20261120T080000Z", "DUE;VALUE=DATE:20261120"],
+)
+async def test_a_zoned_or_all_day_task_time_carries_no_floating_mark(
+    clients: NcClients, line: str
+) -> None:
+    with respx.mock(assert_all_called=False) as mock:
+        mock_one_task(mock, TASK_OWN, task_ics("Mit Zone", line))
+        result = await chatgpt.fetch(clients, ids.encode_task(TASK_OWN, TASK_NAME))
+
+    assert "floating" not in result["text"]
+    assert not any(key.endswith("_floating") for key in result["metadata"])
+    if "VALUE=DATE" in line:
+        assert "Due: 2026-11-20" in result["text"].splitlines()
