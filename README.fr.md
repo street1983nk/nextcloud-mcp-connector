@@ -53,6 +53,9 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
   UTF-8 existant que si son ETag correspond à la valeur lue auparavant ; les fichiers modifiés
   ou supprimés sont refusés. L'historique des versions dépend du backend de stockage de
   Nextcloud.
+  Exception : `profile_fields_set_value` et `profile_fields_update_definition` de Profile Fields
+  sont autorisés uniquement selon les
+  droits du compte Nextcloud connecté ; elles ne disposent pas d'un ETag de concurrence.
 - Les tâches existantes restent inchangées tant que l'administrateur n'active pas
   l'interrupteur « Autoriser la modification des tâches existantes » (en anglais dans
   l'interface : « Allow changing existing tasks », `NC_MCP_TASKS_UPDATE`) :
@@ -73,8 +76,8 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
   l'assemblage privé de blocs de Nextcloud et refusent tout de même une destination existante
 - Mail est strictement en lecture seule : aucun envoi, aucun brouillon, aucun déplacement,
   aucun marquage, aucune suppression, aucun téléchargement de pièce jointe
-- Aucun accès administrateur : le serveur agit comme un utilisateur et hérite exactement de
-  ses droits
+- Aucune elevation de droits : le serveur conserve les autorisations du compte connecte,
+  y compris les droits administrateur lorsque ce compte en dispose deja
 - Aucune recherche plein texte dans le contenu des fichiers tant qu'une application de
   recherche comme Findling n'est pas installée
 
@@ -123,6 +126,11 @@ qu'un nom ou un niveau diverge.
 | `talk_send` | create-only | Un message dans une conversation ; jamais modifié ni supprimé, désactivable pour toute l'instance |
 | `mail_browse` | read | Les comptes Mail, leurs boîtes aux lettres et les en-têtes de messages ; strictement en lecture seule |
 | `contacts_search` | read | Des contacts dans les carnets d'adresses |
+| `profile_fields_browse` | read | Lit les champs administratifs Profile Fields avec les droits du compte Nextcloud ; uniquement si NC_MCP_PROFILE_FIELDS_READ=on |
+| `profile_fields_browse` | read | Lit ses propres champs et les resultats administratifs autorises |
+| `profile_fields_set_value` | modify | Modifie ses propres valeurs ou celles autorisees par ladministration Nextcloud |
+| `profile_fields_create_definition` | create-only | Cree une definition avec les droits administrateur |
+| `profile_fields_update_definition` | modify | Modifie une definition avec les droits administrateur, sans suppression |
 | `unified_search` | read | La recherche unifiée de Nextcloud à travers les fournisseurs, en respectant les permissions |
 | `prepare_context` | read | Fichiers, notes, cartes, la semaine d'événements à venir, les conversations Talk en attente et les courriels non lus en un appel |
 | `search` | read | Point d'entrée de recherche compatible OpenAI, délègue à la recherche unifiée |

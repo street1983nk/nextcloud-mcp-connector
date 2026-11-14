@@ -48,10 +48,14 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
 
 - Kein Löschen: kein Tool löscht Dateien, Termine, Aufgaben, Notizen, Karten oder Kontakte;
   das Löschen einer Aufgabe wird bewusst nicht angeboten
-- Kein bedingungsloses Überschreiben: `files_upload` lehnt einen vorhandenen Pfad ab. Aktiviert
+- Kein bedingungsloses Überschreiben von Dateien: `files_upload` lehnt einen vorhandenen Pfad ab. Aktiviert
   der Admin `NC_MCP_FILES_UPDATE`, ersetzt `files_update` eine bestehende UTF-8-Textdatei nur
   dann, wenn ihr ETag dem zuvor gelesenen Wert entspricht; geänderte oder gelöschte Dateien
   werden abgelehnt. Der Versionsverlauf hängt vom Speicher-Backend von Nextcloud ab.
+  Ausnahme: `profile_fields_set_value` und `profile_fields_update_definition` im Profile Fields
+  werden durch die Rechte des angemeldeten
+  Nextcloud-Nutzers im Profile Fields-App gesteuert; ohne ETag-Sperre bei konkurrierenden
+  Administratoren.
 - Bestehende Aufgaben bleiben unverändert, solange der Admin den Schalter
   "Bestehende Aufgaben ändern erlauben" (in der Oberfläche englisch "Allow changing existing
   tasks", `NC_MCP_TASKS_UPDATE`) nicht einschaltet; ab Werk ist er aus.
@@ -72,7 +76,7 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
   Ziel trotzdem ab
 - Mail ist strikt lesend: kein Senden, kein Entwurf, kein Verschieben, kein Markieren, kein
   Löschen, kein Anhang-Download
-- Kein Admin-Zugriff: Der Server handelt als ein Nutzer und erbt genau dessen Rechte
+- Keine Erhoehung von Administratorrechten: der Server handelt mit den Rechten des angemeldeten Kontos, einschliesslich bereits vorhandener Administratorrechte
 - Keine Volltextsuche in Dateiinhalten, solange keine Such-App wie Findling installiert ist
 
 Das ist eine Design-Einschränkung und kein Versprechen guten Verhaltens: Ein Contract-Test
@@ -120,6 +124,11 @@ abweicht.
 | `talk_send` | create-only | Eine Nachricht in ein Gespräch; nie bearbeitet oder gelöscht, instanzweit abschaltbar |
 | `mail_browse` | read | Mail-Konten, ihre Postfächer und Nachrichtenköpfe; strikt lesend |
 | `contacts_search` | read | Kontakte in den Adressbüchern |
+| `profile_fields_browse` | read | Liest Profile Fields Administrationsdaten mit der aktuellen Nextcloud-Identitaet; nur bei NC_MCP_PROFILE_FIELDS_READ=on |
+| `profile_fields_browse` | read | Liest eigene Profilfelder sowie berechtigte administrative Suchergebnisse |
+| `profile_fields_set_value` | modify | Aendert eigene oder administrativ berechtigte Profilfelder durch Profile Fields OCS |
+| `profile_fields_create_definition` | create-only | Erstellt eine Felddefinition als Instanzadministrator |
+| `profile_fields_update_definition` | modify | Aktualisiert eine bestehende Felddefinition als Administrator, ohne sie zu loeschen |
 | `unified_search` | read | Die Unified Search von Nextcloud über alle Provider, rechtegeprüft |
 | `prepare_context` | read | Dateien, Notizen, Karten, die nächste Terminwoche, wartende Talk-Gespräche und ungelesene Mails in einem Aufruf |
 | `search` | read | OpenAI-kompatibler Sucheinstieg, delegiert an die Unified Search |

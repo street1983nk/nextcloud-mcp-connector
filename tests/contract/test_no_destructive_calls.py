@@ -490,6 +490,8 @@ def test_file_updates_keep_create_and_compare_and_swap_puts_distinct() -> None:
 UNCONDITIONAL_PUTS = {
     ("nextcloud/clients/dav.py", "put_upload_chunk"),
     ("exapp/status.py", "report_init_progress"),
+    # Explicit Profile Fields exception: native app OCS checks the caller's permissions.
+    ("tools/profile_fields.py", "_put"),
 }
 
 #: Every PUT call in the production code, counted. A new PUT that this gate somehow does
@@ -497,7 +499,7 @@ UNCONDITIONAL_PUTS = {
 #: the one overwriting PUT of ``clients/tasks.put_existing_todo`` (TMOD-01, D-33-03), which
 #: always carries ``If-Match`` on a normalized strong ETag and is pinned below against the
 #: create-only writer of ``caldav.py``. It has no entry in ``UNCONDITIONAL_PUTS``.
-EXPECTED_PUT_CALLS = 7
+EXPECTED_PUT_CALLS = 8
 
 
 def _usable_precondition(call: ast.Call) -> bool:

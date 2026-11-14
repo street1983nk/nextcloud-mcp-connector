@@ -45,6 +45,14 @@ BUNDLE_TOOLS: dict[str, frozenset[str]] = {
     ),
     "mail": frozenset({"mail_browse"}),
     "notes": frozenset({"notes_search", "notes_read", "notes_create"}),
+    "profile_fields": frozenset(
+        {
+            "profile_fields_browse",
+            "profile_fields_set_value",
+            "profile_fields_create_definition",
+            "profile_fields_update_definition",
+        }
+    ),
     "search": frozenset({"unified_search"}),
     "tables": frozenset({"tables_browse", "tables_create_row"}),
     "talk": frozenset({"talk_browse", "talk_send"}),
@@ -97,6 +105,7 @@ def test_the_bundle_names_are_frozen() -> None:
         "files",
         "mail",
         "notes",
+        "profile_fields",
         "search",
         "tables",
         "talk",

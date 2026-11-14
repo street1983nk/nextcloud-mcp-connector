@@ -18,21 +18,34 @@ def payload(data: object, status: int = 200) -> dict:
 
 @pytest.fixture
 def clients() -> NcClients:
-    return NcClients(client=httpx.AsyncClient(follow_redirects=False),
-                     creds=Credentials("http://nc.test", "admin", "test-password"))
+    return NcClients(
+        client=httpx.AsyncClient(follow_redirects=False),
+        creds=Credentials("http://nc.test", "admin", "test-password"),
+    )
 
 
 @pytest.mark.anyio
 async def test_one_uid_only_explicit_fields(clients: NcClients) -> None:
     with respx.mock(assert_all_called=True) as mock:
-        mock.get(ROOT + "/definitions").mock(return_value=httpx.Response(
-            200, json=payload([{"id": 1, "field_key": "mailcow_mailbox"},
-                               {"id": 2, "field_key": "cpf"}])))
-        mock.get(ROOT + "/users/alice/values").mock(return_value=httpx.Response(
-            200, json=payload([
-                {"field_definition_id": 1, "value": {"value": "alice@example.org"}},
-                {"field_definition_id": 2, "value": {"value": "sensitive-id"}},
-            ])))
+        mock.get(ROOT + "/definitions").mock(
+            return_value=httpx.Response(
+                200,
+                json=payload(
+                    [{"id": 1, "field_key": "mailcow_mailbox"}, {"id": 2, "field_key": "cpf"}]
+                ),
+            )
+        )
+        mock.get(ROOT + "/users/alice/values").mock(
+            return_value=httpx.Response(
+                200,
+                json=payload(
+                    [
+                        {"field_definition_id": 1, "value": {"value": "alice@example.org"}},
+                        {"field_definition_id": 2, "value": {"value": "sensitive-id"}},
+                    ]
+                ),
+            )
+        )
         result = await profile_fields.browse(
             clients, "values", user_uid="alice", field_keys="mailcow_mailbox"
         )
@@ -47,7 +60,7 @@ async def test_rejects_non_admin(clients: NcClients) -> None:
             return_value=httpx.Response(403, json=payload([], 403))
         )
         with pytest.raises(ToolError):
-            await profile_fields.browse(clients)
+            await profile_fields.browse(clients, level="definitions")
         assert len(mock.calls) == 1
 
 

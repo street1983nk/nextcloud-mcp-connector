@@ -50,7 +50,6 @@ ENV_TALK_SEND = "NC_MCP_TALK_SEND"
 ENV_FILES_ROOT = "NC_MCP_FILES_ROOT"
 ENV_FILES_UPDATE = "NC_MCP_FILES_UPDATE"
 ENV_TASKS_UPDATE = "NC_MCP_TASKS_UPDATE"
-ENV_PROFILE_FIELDS_READ = "NC_MCP_PROFILE_FIELDS_READ"
 # Comma separated tool bundle names whose tools are not registered (issue #15).
 ENV_DISABLED_TOOLS = "NC_MCP_DISABLED_TOOLS"
 
@@ -713,12 +712,6 @@ def audit_log_enabled(env: Mapping[str, str] | None = None) -> bool:
         ", ".join(sorted(_FALSE_VALUES)),
     )
     return False
-
-
-def profile_fields_read_enabled(env: Mapping[str, str] | None = None) -> bool:
-    """Enable the Profile Fields reader only by an explicit opt-in."""
-    source = os.environ if env is None else env
-    return (source.get(ENV_PROFILE_FIELDS_READ) or "").strip().lower() in _TRUE_VALUES
 
 
 def files_update_enabled(env: Mapping[str, str] | None = None) -> bool:
