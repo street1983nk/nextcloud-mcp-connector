@@ -180,3 +180,285 @@ docker stop nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy | laeuft=false
 
 DOCKER nachher laufend=   (docker ps leer)
 PROZESS nc-mcp-exapp lokal=keiner port_23001=frei (in dieser Sitzung nie gestartet)
+
+==================================================================================================
+Teil 2: Nachstellen von 33-10 Lauf 1 auf nc32
+FREIGABE nachstellen=ja datum=2026-11-14 umfang=nc32
+    Owner-Antwort vom 14.11.2026 per AskUserQuestion ("Ja, nachstellen (Empfohlen)"), übermittelt durch die
+    Hauptsitzung: Tasks-App installieren (Stopp, wenn nicht 0.18.1), sofort neu starten, 7 Listen samt 2
+    Gruppenfreigaben (Gruppe vorübergehend), Suche direkt nach dem Neustart, mehrere Zyklen, Tasks-App wieder
+    entfernen; vollständiger Rückbau, BASELINE vorher gleich nachher.
+Docker-Gate: docker ps leer (kein avs-*), RAM frei_kib=5204800. Start wie 33-10 mit docker compose -f
+    compose.exapp.yml start (HP_SHARED_KEY aus .env.exapp per set -a), also nc, caddy, harp, greenmail, registry.
+Listen von alice danach: personal (eigen) + a, b (eigen) + rw, ro (Nutzerfreigabe bob) + grw, gro (Gruppe) = 7.
+Zyklus 1 wie Lauf 1: Installation, Neustart, Aufbau, erste Suche. Zyklen 2 bis 5: Tasks-App entfernen (mit
+    Neustart), installieren, Neustart, erste Suche (art=neu-installiert), Neustart, erste Suche (art=neustart);
+    Budget abwechselnd 60 s (gerade Zyklen, echte Dauer) und 2 s (ungerade, Produkt).
+DISCOVERY-ROH: je Sammlung der Discovery, die das Produkt bekam: Rolle (ohne Besitzer, ohne URI), Status der
+    propstats, oc:read-only, Komponenten. 'eigen' umfasst personal und die Sondersammlungen des Kalenderheims.
+    Die URIs selbst werden nicht protokolliert (Besitzerkennung in geteilten URIs).
+RAM-Verknappung: nicht künstlich herbeigeführt (Rechner nicht gefährden); freier Speicher je Zyklus als ram_gb.
+
+ Container nc-mcp-exapp-greenmail Starting 
+ Container nc-mcp-exapp-nc Starting 
+ Container nc-mcp-exapp-registry Starting 
+ Container nc-mcp-exapp-nc Started 
+ Container nc-mcp-exapp-nc Waiting 
+ Container nc-mcp-exapp-nc Waiting 
+ Container nc-mcp-exapp-greenmail Started 
+ Container nc-mcp-exapp-registry Started 
+ Container nc-mcp-exapp-nc Healthy 
+ Container nc-mcp-exapp-harp Starting 
+ Container nc-mcp-exapp-nc Healthy 
+ Container nc-mcp-exapp-caddy Starting 
+ Container nc-mcp-exapp-harp Started 
+ Container nc-mcp-exapp-caddy Started 
+
+# tasks_coldstart.py nachstellen 2026-11-14T05:26:40Z
+
+== nachstellen nc32 zyklen=5, start 2026-11-14T05:26:40Z ==
+EXAPP nc32 info_xml=0.7.3 kopf=0.7.2 registriert=mcp_connector (MCP Connector): 0.7.2 [enabled]
+VERSION nc32 nc=32.0.15.1
+TASKSAPP nc32 zustand=keine (unveraendert)
+KONTROLLE impersonation status=200 gleich=ja
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+TASKSAPP nc32 nach_installation=0.18.1
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+SETUP gruppe mitglieder=2
+SETUP MKCALENDAR liste=p3311-a status=201
+SETUP PUT liste=a status=201
+SETUP MKCALENDAR liste=p3311-b status=201
+SETUP PUT liste=b status=201
+SETUP MKCALENDAR liste=p3311-rw status=201
+SETUP PUT liste=rw status=201
+SETUP FREIGABE liste=rw art=user-rw status=200
+SETUP MKCALENDAR liste=p3311-ro status=201
+SETUP PUT liste=ro status=201
+SETUP FREIGABE liste=ro art=user-ro status=200
+SETUP MKCALENDAR liste=p3311-grw status=201
+SETUP PUT liste=grw status=201
+SETUP FREIGABE liste=grw art=group-rw status=200
+SETUP MKCALENDAR liste=p3311-gro status=201
+SETUP PUT liste=gro status=201
+SETUP FREIGABE liste=gro art=group-ro status=200
+NACH nc32 zyklus=1 art=wie-lauf1 budget_s=2 ram_gb=4.30 gesamt_ms=1090 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein trefferlisten=a,b,gro,grw,ro,rw | a:n=1,status=207,max_ms=84 b:n=1,status=207,max_ms=70 eigen:n=1,status=207,max_ms=60 gro:n=1,status=207,max_ms=87 grw:n=1,status=207,max_ms=78 home:n=1,status=207,max_ms=52 ro:n=1,status=207,max_ms=82 rw:n=1,status=207,max_ms=1030
+DISCOVERY-ROH NACH nc32 zyklus=1 art=wie-lauf1 sammlungen=11 bytes=12474
+  a:status=200/404,read_only=fehlt,comp=VTODO
+  b:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=VEVENT+VTODO+VJOURNAL
+  eigen:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  gro:status=200/404,read_only=1,comp=VTODO
+  grw:status=200/404,read_only=leer,comp=VTODO
+  ro:status=200/404,read_only=1,comp=VTODO
+  rw:status=200/404,read_only=leer,comp=VTODO
+WARM nc32 zyklus=1 budget_s=2 ram_gb=4.30 gesamt_ms=112 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein trefferlisten=a,b,gro,grw,ro,rw | a:n=1,status=207,max_ms=66 b:n=1,status=207,max_ms=59 eigen:n=1,status=207,max_ms=43 gro:n=1,status=207,max_ms=67 grw:n=1,status=207,max_ms=74 home:n=1,status=207,max_ms=33 ro:n=1,status=207,max_ms=55 rw:n=1,status=207,max_ms=69
+DISCOVERY-ROH WARM nc32 zyklus=1 sammlungen=11 bytes=12474
+  a:status=200/404,read_only=fehlt,comp=VTODO
+  b:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=VEVENT+VTODO+VJOURNAL
+  eigen:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  gro:status=200/404,read_only=1,comp=VTODO
+  grw:status=200/404,read_only=leer,comp=VTODO
+  ro:status=200/404,read_only=1,comp=VTODO
+  rw:status=200/404,read_only=leer,comp=VTODO
+occ app:remove tasks -> tasks disabled tasks 0.18.1 removed
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+RUECKBAU nc32 tasksapp=wie-vorher vorher=keine nachher=keine
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+TASKSAPP nc32 nach_installation=0.18.1
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+NACH nc32 zyklus=2 art=neu-installiert budget_s=60 ram_gb=4.27 gesamt_ms=619 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein trefferlisten=a,b,gro,grw,ro,rw | a:n=1,status=207,max_ms=96 b:n=1,status=207,max_ms=94 eigen:n=1,status=207,max_ms=67 gro:n=1,status=207,max_ms=110 grw:n=1,status=207,max_ms=109 home:n=1,status=207,max_ms=382 ro:n=1,status=207,max_ms=231 rw:n=1,status=207,max_ms=111
+DISCOVERY-ROH NACH nc32 zyklus=2 art=neu-installiert sammlungen=11 bytes=12474
+  a:status=200/404,read_only=fehlt,comp=VTODO
+  b:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=VEVENT+VTODO+VJOURNAL
+  eigen:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  gro:status=200/404,read_only=1,comp=VTODO
+  grw:status=200/404,read_only=leer,comp=VTODO
+  ro:status=200/404,read_only=1,comp=VTODO
+  rw:status=200/404,read_only=leer,comp=VTODO
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+NACH nc32 zyklus=2 art=neustart budget_s=60 ram_gb=4.29 gesamt_ms=627 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein trefferlisten=a,b,gro,grw,ro,rw | a:n=1,status=207,max_ms=78 b:n=1,status=207,max_ms=90 eigen:n=1,status=207,max_ms=63 gro:n=1,status=207,max_ms=110 grw:n=1,status=207,max_ms=109 home:n=1,status=207,max_ms=247 ro:n=1,status=207,max_ms=373 rw:n=1,status=207,max_ms=106
+DISCOVERY-ROH NACH nc32 zyklus=2 art=neustart sammlungen=11 bytes=12474
+  a:status=200/404,read_only=fehlt,comp=VTODO
+  b:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=VEVENT+VTODO+VJOURNAL
+  eigen:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  gro:status=200/404,read_only=1,comp=VTODO
+  grw:status=200/404,read_only=leer,comp=VTODO
+  ro:status=200/404,read_only=1,comp=VTODO
+  rw:status=200/404,read_only=leer,comp=VTODO
+occ app:remove tasks -> tasks disabled tasks 0.18.1 removed
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+RUECKBAU nc32 tasksapp=wie-vorher vorher=keine nachher=keine
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+TASKSAPP nc32 nach_installation=0.18.1
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+NACH nc32 zyklus=3 art=neu-installiert budget_s=2 ram_gb=4.30 gesamt_ms=599 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein trefferlisten=a,b,gro,grw,ro,rw | a:n=1,status=207,max_ms=77 b:n=1,status=207,max_ms=75 eigen:n=1,status=207,max_ms=69 gro:n=1,status=207,max_ms=103 grw:n=1,status=207,max_ms=101 home:n=1,status=207,max_ms=251 ro:n=1,status=207,max_ms=100 rw:n=1,status=207,max_ms=342
+DISCOVERY-ROH NACH nc32 zyklus=3 art=neu-installiert sammlungen=11 bytes=12474
+  a:status=200/404,read_only=fehlt,comp=VTODO
+  b:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=VEVENT+VTODO+VJOURNAL
+  eigen:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  gro:status=200/404,read_only=1,comp=VTODO
+  grw:status=200/404,read_only=leer,comp=VTODO
+  ro:status=200/404,read_only=1,comp=VTODO
+  rw:status=200/404,read_only=leer,comp=VTODO
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+NACH nc32 zyklus=3 art=neustart budget_s=2 ram_gb=4.31 gesamt_ms=627 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein trefferlisten=a,b,gro,grw,ro,rw | a:n=1,status=207,max_ms=96 b:n=1,status=207,max_ms=93 eigen:n=1,status=207,max_ms=78 gro:n=1,status=207,max_ms=106 grw:n=1,status=207,max_ms=112 home:n=1,status=207,max_ms=246 ro:n=1,status=207,max_ms=368 rw:n=1,status=207,max_ms=102
+DISCOVERY-ROH NACH nc32 zyklus=3 art=neustart sammlungen=11 bytes=12474
+  a:status=200/404,read_only=fehlt,comp=VTODO
+  b:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=VEVENT+VTODO+VJOURNAL
+  eigen:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  gro:status=200/404,read_only=1,comp=VTODO
+  grw:status=200/404,read_only=leer,comp=VTODO
+  ro:status=200/404,read_only=1,comp=VTODO
+  rw:status=200/404,read_only=leer,comp=VTODO
+occ app:remove tasks -> tasks disabled tasks 0.18.1 removed
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+RUECKBAU nc32 tasksapp=wie-vorher vorher=keine nachher=keine
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+TASKSAPP nc32 nach_installation=0.18.1
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+NACH nc32 zyklus=4 art=neu-installiert budget_s=60 ram_gb=4.27 gesamt_ms=614 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein trefferlisten=a,b,gro,grw,ro,rw | a:n=1,status=207,max_ms=77 b:n=1,status=207,max_ms=75 eigen:n=1,status=207,max_ms=71 gro:n=1,status=207,max_ms=103 grw:n=1,status=207,max_ms=327 home:n=1,status=207,max_ms=283 ro:n=1,status=207,max_ms=103 rw:n=1,status=207,max_ms=101
+DISCOVERY-ROH NACH nc32 zyklus=4 art=neu-installiert sammlungen=11 bytes=12474
+  a:status=200/404,read_only=fehlt,comp=VTODO
+  b:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=VEVENT+VTODO+VJOURNAL
+  eigen:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  gro:status=200/404,read_only=1,comp=VTODO
+  grw:status=200/404,read_only=leer,comp=VTODO
+  ro:status=200/404,read_only=1,comp=VTODO
+  rw:status=200/404,read_only=leer,comp=VTODO
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+NACH nc32 zyklus=4 art=neustart budget_s=60 ram_gb=4.31 gesamt_ms=617 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein trefferlisten=a,b,gro,grw,ro,rw | a:n=1,status=207,max_ms=85 b:n=1,status=207,max_ms=81 eigen:n=1,status=207,max_ms=79 gro:n=1,status=207,max_ms=109 grw:n=1,status=207,max_ms=108 home:n=1,status=207,max_ms=239 ro:n=1,status=207,max_ms=372 rw:n=1,status=207,max_ms=110
+DISCOVERY-ROH NACH nc32 zyklus=4 art=neustart sammlungen=11 bytes=12474
+  a:status=200/404,read_only=fehlt,comp=VTODO
+  b:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=VEVENT+VTODO+VJOURNAL
+  eigen:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  gro:status=200/404,read_only=1,comp=VTODO
+  grw:status=200/404,read_only=leer,comp=VTODO
+  ro:status=200/404,read_only=1,comp=VTODO
+  rw:status=200/404,read_only=leer,comp=VTODO
+occ app:remove tasks -> tasks disabled tasks 0.18.1 removed
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+RUECKBAU nc32 tasksapp=wie-vorher vorher=keine nachher=keine
+occ app:install tasks -> tasks 0.18.1 installed tasks enabled
+TASKSAPP nc32 nach_installation=0.18.1
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+NACH nc32 zyklus=5 art=neu-installiert budget_s=2 ram_gb=4.37 gesamt_ms=1026 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein trefferlisten=a,b,gro,grw,ro,rw | a:n=1,status=207,max_ms=98 b:n=1,status=207,max_ms=96 eigen:n=1,status=207,max_ms=65 gro:n=1,status=207,max_ms=109 grw:n=1,status=207,max_ms=111 home:n=1,status=207,max_ms=252 ro:n=1,status=207,max_ms=111 rw:n=1,status=207,max_ms=769
+DISCOVERY-ROH NACH nc32 zyklus=5 art=neu-installiert sammlungen=11 bytes=12474
+  a:status=200/404,read_only=fehlt,comp=VTODO
+  b:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=VEVENT+VTODO+VJOURNAL
+  eigen:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  gro:status=200/404,read_only=1,comp=VTODO
+  grw:status=200/404,read_only=leer,comp=VTODO
+  ro:status=200/404,read_only=1,comp=VTODO
+  rw:status=200/404,read_only=leer,comp=VTODO
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+NACH nc32 zyklus=5 art=neustart budget_s=2 ram_gb=4.32 gesamt_ms=620 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein trefferlisten=a,b,gro,grw,ro,rw | a:n=1,status=207,max_ms=124 b:n=1,status=207,max_ms=132 eigen:n=1,status=207,max_ms=100 gro:n=1,status=207,max_ms=155 grw:n=1,status=207,max_ms=153 home:n=1,status=207,max_ms=280 ro:n=1,status=207,max_ms=326 rw:n=1,status=207,max_ms=155
+DISCOVERY-ROH NACH nc32 zyklus=5 art=neustart sammlungen=11 bytes=12474
+  a:status=200/404,read_only=fehlt,comp=VTODO
+  b:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=VEVENT+VTODO+VJOURNAL
+  eigen:status=200/404,read_only=fehlt,comp=VTODO
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  eigen:status=200/404,read_only=fehlt,comp=keine
+  gro:status=200/404,read_only=1,comp=VTODO
+  grw:status=200/404,read_only=leer,comp=VTODO
+  ro:status=200/404,read_only=1,comp=VTODO
+  rw:status=200/404,read_only=leer,comp=VTODO
+
+== rueckbau nachstellen nc32 ==
+RUECKBAU freigabe_entfernt liste=rw status=200
+RUECKBAU freigabe_entfernt liste=ro status=200
+RUECKBAU freigabe_entfernt liste=grw status=200
+RUECKBAU freigabe_entfernt liste=gro status=200
+
+== rueckbau nc32 ==
+RUECKBAU freigabe_entfernt liste=ro status=200
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=alice status=204 no_trashbin=1
+PAPIERKORB nc32 konto=alice gefunden=0 geleert=0
+RUECKBAU reste konto=alice listen_mit_praefix=0
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+PAPIERKORB nc32 konto=bob gefunden=0 geleert=0
+RUECKBAU reste konto=bob listen_mit_praefix=0
+RUECKBAU gruppe p3311grp noch_vorhanden=nein shares=0
+occ app:remove tasks -> tasks disabled tasks 0.18.1 removed
+occ config:app:delete tasks -> config:list: { "apps": { "tasks": [] } }
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+RUECKBAU nc32 tasksapp=wie-vorher vorher=keine nachher=keine
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE-VERGLEICH nc32 konto=alice gleich=ja
+BASELINE-VERGLEICH nc32 konto=bob gleich=ja
+BASELINE-VERGLEICH nc32 konto=p3202frisch gleich=ja
+BASELINE-VERGLEICH nc32 konto=p3202nie gleich=ja
+
+$ docker compose -f compose.exapp.yml stop
+DOCKER nachher laufend=   (docker ps leer)
+PROZESS nc-mcp-exapp lokal=keiner port_23001=frei
+
+AUSWERTUNG: in keinem der 9 ersten Aufrufe fehlte eine Liste; Discovery immer 11 Sammlungen, ro immer mit
+    read_only=1 und VTODO; nie ein 5xx; degraded immer keine. Größte Dauer einer Liste im ersten Aufruf: 1030 ms
+    (zyklus=1 wie-lauf1, Liste rw), 769 ms (zyklus=5 neu-installiert, rw); bei reinem Neustart höchstens 373 ms.
+MESSWERT per_list_timeout_s=3 regel=max(1,ceil(2*max)) max_s=1.030 quelle=nc32-impersonation

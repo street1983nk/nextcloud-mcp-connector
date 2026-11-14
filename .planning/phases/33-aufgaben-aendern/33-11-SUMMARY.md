@@ -17,9 +17,12 @@ key-files:
     - .planning/phases/33-aufgaben-aendern/33-11-PLAN.md
   modified:
     - tests/integration/test_tasks_live.py
+    - src/mcp_connector/tools/tasks.py
+    - tests/unit/test_tasks_search.py
+    - docs/tasks-evidence.md
 decisions:
-  - "PER_LIST_TIMEOUT bleibt 2 s: kaltes Maximum je Liste 0,377 s (Hausregel ergäbe 1 s), das Budget aus 32-10 (2000 offene Aufgaben, 0,831 s) bleibt maßgeblich"
-  - "Kein Produkt-Fix: ein reiner Kaltstart lässt die Liste nicht fallen, und ein Ausfall wird ehrlich unter degraded gemeldet"
+  - "Teil 1 (überholt durch Teil 2): reiner Kaltstart lässt keine Liste fallen, Maximum 0,377 s"
+  - "Teil 2: PER_LIST_TIMEOUT 2 s -> 3 s nach Hausregel aus 1,030 s (erste Suche nach Installation der Tasks-App, NC 32)"
   - "Der Live-Fall geteilt-namen notiert künftig degraded, damit ein erneuter Ausfall Budget/Fehler von fehlender Discovery unterscheidet"
 metrics:
   completed: 2026-11-14
@@ -110,3 +113,48 @@ kein Container läuft, kein lokaler nc-mcp-exapp-Prozess, Port 23001 frei.
 - TASK-01-Diff gegen 33-BASE leer (Positivkontrolle Basis ok, Gegentreffer tasks.py 1180 Zeilen)
 - Dateien vorhanden: scripts/tasks_coldstart.py, tests/unit/test_tasks_coldstart.py, raw/33-11-kaltstart.txt, 33-11-PLAN.md
 - Commits 8eb8ade, baf714c, ac2d997 vorhanden, Autor street1983nk, ohne Trailer; kein Push
+
+---
+
+## Teil 2: Nachstellen von 33-10 Lauf 1 (Owner-Freigabe 2026-11-14, nur nc32)
+
+`FREIGABE nachstellen=ja datum=2026-11-14 umfang=nc32` steht im Rohprotokoll. Aufbau wie Lauf 1:
+Stack per `docker compose -f compose.exapp.yml start`, Tasks-App 0.18.1 installiert (Version
+geprüft), sofort Neustart, 7 Listen von alice (personal, a, b, rw und ro von bob per
+Nutzerfreigabe, grw und gro von bob per Gruppenfreigabe an die vorübergehende Gruppe p3311grp),
+dann die erste Suche. Danach 4 weitere Zyklen: Tasks-App entfernen, installieren, Neustart,
+erste Suche, Neustart, erste Suche; Budget abwechselnd 60 s (echte Dauer) und 2 s (Produkt).
+Je Aufruf `degraded` und die rohe Discovery (je Sammlung Rolle, Status, read-only, Komponenten).
+
+**Ergebnis:**
+- Keine Liste fehlte in 9 ersten Aufrufen. Die Discovery lieferte immer alle 11 Sammlungen, ro
+  immer mit `read_only=1` und VTODO. Nie ein 5xx, `degraded` immer leer. Der Ausfall aus Lauf 1
+  trat also nicht erneut auf; die Discovery und Nextcloud selbst sind als Ursache nicht belegt.
+- Aber: im ersten Aufruf nach der Installation brauchte eine Liste bis 1030 ms (Zyklus 1, wie
+  Lauf 1) und 769 ms (Zyklus 5); sonst 231 bis 373 ms für die langsamste Liste, die anderen
+  um 100 ms. Je erstem Aufruf zahlt eine Liste einmalige Anlaufkosten, nicht immer dieselbe.
+- Die Hausregel max(1, ceil(2 × 1,030)) ergibt 3 s. Das Budget 2 s lag also unter der Reserve
+  der Hausregel; Lauf 1 von 33-10 lief mit knapperem Speicher (RAM-Gate zuerst rot), dort
+  können diese Anlaufkosten 2 s übersteigen. Das ist die belegte Erklärung für den Befund; der
+  Abbruch selbst war, wie die Gegenprobe zeigt, nicht stumm (die Liste stand dann unter
+  `degraded`, was der alte Live-Fall nur nicht notierte).
+- Speicher wurde nicht künstlich verknappt (Rechner nicht gefährden), frei war 4,27 bis 4,37 GB.
+
+**Fix (testgetrieben):**
+- RED 8d6ef8a: `test_limit_policy_constants_are_the_measured_values` erwartet 3 und
+  `MESSWERT per_list_timeout_s=3` (einziger roter Test).
+- GREEN 12f4758: `PER_LIST_TIMEOUT = 3.0` mit Messzeile in `src/mcp_connector/tools/tasks.py`, Abschnitt
+  "Gap closure 33-11" in `docs/tasks-evidence.md`. Keine Wiederholung, keine stumme Kürzung:
+  eine Liste, die auch 3 s verfehlt, steht weiter mit Grund unter `degraded`.
+- Messprogramm erweitert (5cdce38): Unterbefehl `nachstellen`, Rollen aller Listen ohne
+  Besitzer, rohe Discovery je Aufruf, Unit-Tests dazu.
+
+**Rückbau Teil 2:** Freigaben entfernt (4 × 200), 6 Listen ohne Papierkorb gelöscht,
+Papierkorb gefunden=0, Gruppe p3311grp gelöscht (shares=0), Tasks-App entfernt (wie vorher
+"keine"), BASELINE vorher = nachher für alle Konten; Stack per `docker compose ... stop`,
+`docker ps` leer, kein lokaler nc-mcp-exapp-Prozess, Port 23001 frei.
+
+**Commits Teil 2:** 5cdce38 (Messprogramm), 8d6ef8a (RED), 12f4758 (GREEN), danach docs.
+
+**Self-Check Teil 2: PASSED** (Gates auf dem GREEN-Stand: pytest 8167 passed, 35 skipped; Budget,
+ruff, ruff format, pyright, vulture grün; TASK-01-Diff gegen 33-BASE leer)
