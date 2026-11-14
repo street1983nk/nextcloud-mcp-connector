@@ -168,3 +168,25 @@ ZAEHLUNG an=31 erwartet_an=31 aus=27 erwartet_aus=27 gleich=ja (31 = WERKZEUGE d
 DOCKER ende eigene=0 (nc35-nc, nc35-harp, nc35-caddy, nc35-greenmail per docker stop; fremde Container: keine)
 PROZESS nc-mcp=0
 SCAN gesamt treffer=0 (Talk-Raumname maskiert)
+
+== Sprachdurchsicht (Task 3)
+UMFANG: jede in Phase 34 hinzugefügte Zeile der READMEs und docs vollständig gelesen, die CHANGELOG-Blöcke 0.8.0 ganz, die sechs Store-Texte ganz, alle 175 Texte von tools/list (31 Werkzeuge, alle Schalter an) ganz, die Meldungen aus Lauf 1 und 2; dazu maschinell über die ganzen Dateien: U+2013/U+2014 (Positivkontrolle ok, 0 Treffer), Emojis (0), "die/der ETag" (0), Doppelwörter (nur echte: "die die", "der der"), französische Apostrophe (je Datei einheitlich gerade). Unveränderte README-Zeilen aus früheren Releases nicht erneut Zeile für Zeile gelesen.
+SPRACHE README.md sprache=en gelesen=23 fehler=0 |
+SPRACHE README.de.md sprache=de gelesen=48 fehler=0 behoben=1 | "nicht einschaltet: Ab Werk aus." (Großschreibung nach Doppelpunkt vor Satzfragment) -> "nicht einschaltet; ab Werk ist er aus."
+SPRACHE README.fr.md sprache=fr gelesen=47 fehler=0 behoben=2 | ") : Désactivé par défaut. Activé, les assistants" (Großbuchstabe nach Doppelpunkt, Partizip ohne Bezug) -> ") : désactivé par défaut. Une fois l'interrupteur activé, les assistants"; "prend effet après avoir désactivé puis réactivé l'application" (Infinitiv mit falschem Subjekt) -> "prend effet une fois l'application désactivée puis réactivée"
+SPRACHE CHANGELOG.md sprache=en gelesen=64 fehler=0 |
+SPRACHE CHANGELOG.de.md sprache=de gelesen=70 fehler=0 behoben=1 | Schalter-Label jetzt wie in der Oberfläche: ("Allow changing existing tasks", Bestehende Aufgaben ändern erlauben), Commit 70e7d05
+SPRACHE CHANGELOG.fr.md sprache=fr gelesen=69 fehler=0 behoben=1 | dito: (« Allow changing existing tasks », autoriser la modification des tâches existantes), Commit 70e7d05
+SPRACHE store-summary sprache=en,de,fr gelesen=3 fehler=0 |
+SPRACHE store-description sprache=en,de,fr gelesen=3 fehler=0 |
+STORETEXT unveraendert
+SPRACHE docs/hardening.md sprache=en gelesen=13 fehler=0 |
+SPRACHE docs/hardening.de.md sprache=de gelesen=15 fehler=0 behoben=1 | "Beide aus lassen" (missverständlich: auslassen) -> "Beide ausgeschaltet lassen"
+SPRACHE docs/hardening.fr.md sprache=fr gelesen=15 fehler=0 behoben=2 | "borne le dégât à la place" (keine Wendung) -> "limite plutôt les dégâts"; "aucun ne renomme ni ne modifie des partages" (Artikel nach Verneinung, fehlendes Objekt) -> "aucun ne renomme quoi que ce soit ni ne modifie les partages"
+SPRACHE docs/client-setup.md,conference-demo.md,conference-talk.md,exapp-install.md,faq.md,privacy.md,threat-model.md sprache=en gelesen=170 fehler=0 |
+SPRACHE tools-list sprache=en gelesen=175 fehler=0 | Hinweise ohne Fehlerwertung siehe HINWEIS
+SPRACHE meldungen sprache=en gelesen=3 fehler=0 | files_update und tasks_update veraltet, fetch PREREQ
+SPRACHE admin-felder sprache=en gelesen=2 fehler=0 behoben=1 | NC_MCP_FILES_UPDATE: info.xml "Allow updating existing files" -> "Allow editing existing text files" wie im Formular (Owner-Entscheid), Test hält beide Schalter gleich (e37a3fb, c223311)
+HINWEIS tools-list Bindestrich bei zusammengesetzten Attributen fehlt: "Comma separated provider ids" (unified_search), "space separated type:value" und "Percent encode" (mail_browse); Text unter src/, nicht geändert, Owner-Frage
+HINWEIS docs "read only list" statt "read-only list" (privacy.md, threat-model.md); Hausstil des Repos (44x "read only" gegen 29x "read-only"), nicht geändert
+SPRACHE gesamt fehler=0 (8 Fehler gefunden und behoben, 0 offen; 2 Stilhinweise offen beim Owner)
