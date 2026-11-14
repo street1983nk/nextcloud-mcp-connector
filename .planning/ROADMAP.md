@@ -121,7 +121,7 @@ Kein Milestone-Audit (wie v1.5 und v1.6): Aussagen aus den fünf Phase-Verifikat
 - [x] **Phase 30: Mess-Spike Aufgaben und Ordner** - Alles, was Recherche und Planung nur annehmen, wird gegen echte Nextcloud-Instanzen gemessen, bevor Produktcode entsteht; zuerst `MKCOL` unter AppAPI-Impersonation, mit Abbruchkriterien (completed 2026-11-12)
 - [x] **Phase 31: Ordner anlegen** - `files_create_folder` legt Ordner an, wahlweise mit fehlenden Elternordnern, hinter der ganzen v1.7-Kette aus Ausschluss, Sandbox, Paartest, Kanarie und Audit; allein releasefähig
 - [x] **Phase 32: Tasks-Bundle suchen, lesen, anlegen** - `tasks_search`, `tasks_read` und `tasks_create` über CalDAV VTODO als zehnte Familie, samt `task:`-Id über `fetch`; ohne Phase 33 releasefähig (completed 2026-11-13)
-- [ ] **Phase 33: Aufgaben ändern** - Abhaken, Wiederöffnen, Felder ändern und Verschieben einer einzelnen Aufgabe, nur mit gelesener ETag; kein Löschen (Owner, 12.11.2026); jeder Teil abtrennbar
+- [x] **Phase 33: Aufgaben ändern** - Abhaken, Wiederöffnen, Felder ändern und Verschieben einer einzelnen Aufgabe, nur mit gelesener ETag; kein Löschen (Owner, 12.11.2026); jeder Teil abtrennbar (completed 2026-11-14)
 - [ ] **Phase 34: Doku, Store, Release 0.8.0** - Doku und Store-Text in drei Sprachen sagen den Endstand samt präzisierter Schreibzusage, Release 0.8.0 steht mit Owner-Freigabe im Store
 
 ## Phase Details (v1.8)
@@ -234,18 +234,18 @@ Plans:
 
 Plans:
 
-- [ ] 33-01-PLAN.md: Messprogramm und Basis-SHA, Inventar A17 auf HEAD, gemeinsame Owner-Freigabe für Zustandsänderungen (TMOD-01 bis TMOD-04, TMOD-08)
-- [ ] 33-01b-PLAN.md: Browser-Sitzung Tasks 0.18.1 auf nc35 (M-1 Wiederöffnen, M-2 Felder entfernen, CANCELLED), Stopp bei anderer App-Fassung, Fixtures (TMOD-02 bis TMOD-04; D-33-06, D-33-07, D-33-14)
-- [ ] 33-01c-PLAN.md: Kette mit 50 Nachfahren für PUT und MOVE auf 35 und 32 (M-3), ETag nach verändertem Text (M-4), Werte und Beleg, Owner-Fragen bei Abweichung (TMOD-01, TMOD-03, TMOD-08; D-33-05, D-33-07, D-33-10, D-33-14)
-- [ ] 33-02-PLAN.md: Schalter NC_MCP_TASKS_UPDATE als ganze Kette, Annotationsklasse MODIFY_EXISTING, Gates für optionale Werkzeuge, Budget mit allen Schaltern an (TMOD-01, TMOD-05; D-33-00d, D-33-01, D-33-02, D-33-12)
-- [ ] 33-03-PLAN.md: Schreibschiene: ETag in tasks_read, put_existing_todo und move_todo mit je einer Aufrufstelle, EXPECTED_PUT_CALLS 7, MOVE-Ausnahme mit AST-Pin und Gegenproben (TMOD-01, TMOD-08; D-33-03, D-33-04)
-- [ ] 33-04-PLAN.md: Zeilen-Editor ics_edit mit Byte- und Semantik-Beweis über alle Fixtures (TMOD-02; D-33-07, D-33-08, D-33-13, D-33-15)
-- [ ] 33-05-PLAN.md: Kettenlogik: Nachfahren in Nachordnung, Obergrenze, Vorprüfung, serieller Lauf mit ehrlichem Bericht (D-33-09, D-33-10, D-33-11)
-- [ ] 33-06-PLAN.md: tasks_complete, abtrennbar, Budget neu verankert (TMOD-03; D-33-00a, D-33-00b, D-33-05, D-33-06, D-33-08, D-33-14)
-- [ ] 33-07-PLAN.md: tasks_update, abtrennbar, Budget neu verankert (TMOD-02, TMOD-04; D-33-07, D-33-13, D-33-15)
-- [ ] 33-08-PLAN.md: tasks_move, abtrennbar, Budget neu verankert (TMOD-08; D-33-00c, D-33-09 bis D-33-11)
-- [ ] 33-09-PLAN.md: Abschluss: endgültiges Budget aus dem Endstand, Audit je Aufruf, Kanarie und Abnahmeskript mit Schalter an, Rechtetabelle und Changelogs in drei Sprachen (TMOD-05; D-33-04)
-- [ ] 33-10-PLAN.md: Live-Beweis auf 35 und 32 je ohne und mit Tasks-App unter Impersonation, Owner-Frage zum Push (TMOD-06)
+- [x] 33-01-PLAN.md: Messprogramm und Basis-SHA, Inventar A17 auf HEAD, gemeinsame Owner-Freigabe für Zustandsänderungen (TMOD-01 bis TMOD-04, TMOD-08)
+- [x] 33-01b-PLAN.md: Browser-Sitzung Tasks 0.18.1 auf nc35 (M-1 Wiederöffnen, M-2 Felder entfernen, CANCELLED), Stopp bei anderer App-Fassung, Fixtures (TMOD-02 bis TMOD-04; D-33-06, D-33-07, D-33-14)
+- [x] 33-01c-PLAN.md: Kette mit 50 Nachfahren für PUT und MOVE auf 35 und 32 (M-3), ETag nach verändertem Text (M-4), Werte und Beleg, Owner-Fragen bei Abweichung (TMOD-01, TMOD-03, TMOD-08; D-33-05, D-33-07, D-33-10, D-33-14)
+- [x] 33-02-PLAN.md: Schalter NC_MCP_TASKS_UPDATE als ganze Kette, Annotationsklasse MODIFY_EXISTING, Gates für optionale Werkzeuge, Budget mit allen Schaltern an (TMOD-01, TMOD-05; D-33-00d, D-33-01, D-33-02, D-33-12)
+- [x] 33-03-PLAN.md: Schreibschiene: ETag in tasks_read, put_existing_todo und move_todo mit je einer Aufrufstelle, EXPECTED_PUT_CALLS 7, MOVE-Ausnahme mit AST-Pin und Gegenproben (TMOD-01, TMOD-08; D-33-03, D-33-04)
+- [x] 33-04-PLAN.md: Zeilen-Editor ics_edit mit Byte- und Semantik-Beweis über alle Fixtures (TMOD-02; D-33-07, D-33-08, D-33-13, D-33-15)
+- [x] 33-05-PLAN.md: Kettenlogik: Nachfahren in Nachordnung, Obergrenze, Vorprüfung, serieller Lauf mit ehrlichem Bericht (D-33-09, D-33-10, D-33-11)
+- [x] 33-06-PLAN.md: tasks_complete, abtrennbar, Budget neu verankert (TMOD-03; D-33-00a, D-33-00b, D-33-05, D-33-06, D-33-08, D-33-14)
+- [x] 33-07-PLAN.md: tasks_update, abtrennbar, Budget neu verankert (TMOD-02, TMOD-04; D-33-07, D-33-13, D-33-15)
+- [x] 33-08-PLAN.md: tasks_move, abtrennbar, Budget neu verankert (TMOD-08; D-33-00c, D-33-09 bis D-33-11)
+- [x] 33-09-PLAN.md: Abschluss: endgültiges Budget aus dem Endstand, Audit je Aufruf, Kanarie und Abnahmeskript mit Schalter an, Rechtetabelle und Changelogs in drei Sprachen (TMOD-05; D-33-04)
+- [x] 33-10-PLAN.md: Live-Beweis auf 35 und 32 je ohne und mit Tasks-App unter Impersonation, Owner-Frage zum Push (TMOD-06)
 
 **Abtrennbare Teile, je ein eigener Plan**: Abhaken und Wiederöffnen (TMOD-03); Felder ändern (TMOD-04); Verschieben (TMOD-08). 0.8.0 bleibt ohne jeden dieser Teile releasefähig; ein Teil fällt nur per Owner-Entscheid heraus. Das Löschen (TMOD-07) ist per Owner-Entscheid vom 12.11.2026 herausgefallen (Auswahl "Löschen raus", Aufwand gegen Nutzung)
 **Research flag**: ja. Die Recherche vom 11.11.2026 deckt ändernde Zugriffe nicht ab; die Planung dieser Phase stützt sich auf den Messbericht aus Phase 30 und braucht eine eigene kurze Recherche zum Erhalt fremder Eigenschaften mit `icalendar`
@@ -307,7 +307,7 @@ Plans:
 | 30. Mess-Spike Aufgaben und Ordner | v1.8 | 5/5 | Complete    | 2026-11-12 |
 | 31. Ordner anlegen | v1.8 | 0/6 | Planned | - |
 | 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 12/12 | Complete    | 2026-11-13 |
-| 33. Aufgaben ändern | v1.8 | 0/TBD | Not started | - |
+| 33. Aufgaben ändern | v1.8 | 12/12 | Complete    | 2026-11-14 |
 | 34. Doku, Store, Release 0.8.0 | v1.8 | 0/TBD | Not started | - |
 
 ## Coverage v1.8

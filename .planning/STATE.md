@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.8
-milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
-status: ready_to_plan
-stopped_at: "Phase 32 abgeschlossen (12/12 Pläne, Re-Verifikation passed da86da8, 57ae658 gepusht, CI grün); als Nächstes Phase 33 (Aufgaben ändern) besprechen und planen; kein Container läuft"
-last_updated: "2026-11-13T19:03:17.156Z"
-last_activity: 2026-11-13
+milestone_name: Tasks-Bundle und Ordner anlegen
+status: verifying
+stopped_at: 32-10 ausgeführt bis zur Push-Frage (Task 6); Push-Fragen 32-09 und 32-10 offen; Phase 32 nicht abgeschlossen; kein Container läuft
+last_updated: "2026-11-14T05:05:24.770Z"
+last_activity: 2026-11-14
 progress:
   total_phases: 5
-  completed_phases: 3
-  total_plans: 26
-  completed_plans: 26
-  percent: 60
+  completed_phases: 4
+  total_plans: 38
+  completed_plans: 38
+  percent: 80
 ---
 
 # Project State
@@ -25,16 +25,16 @@ See: .planning/PROJECT.md (updated 2026-11-12)
 
 ## Current Position
 
-Phase: 33
+Phase: 34
 Plan: Not started
 Status: Phase 32 ausgeführt inkl. Gap Closure 32-09 und 32-10 (lokal, nichts gepusht), Re-Verifikation durch die Hauptsitzung steht aus; Draft-PR 48 offen; Tasks-App auf nc35 und nc32 wieder entfernt, Testgruppen gelöscht, Anzeigename von bob zurück, keine Instanz läuft; offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13)
-Last activity: 2026-11-13
+Last activity: 2026-11-14
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 189
+- Total plans completed: 201
 - Average duration: 35 min
 - Total execution time: 15.2 hours
 
