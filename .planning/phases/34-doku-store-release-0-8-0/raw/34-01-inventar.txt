@@ -1,0 +1,19 @@
+# 34-01: abgearbeitete Inventarzeilen aus raw/33-01-inventar.txt (ZUORDNUNG ... plan=34), DOC-05
+# alte Zeile = Stand Commit 37790830 (33-01), neue Zeile = Stand nach 34-01
+ERLEDIGT README.md:43 plan=34-01 neu=44 | - No unconditional overwriting: `files_upload` refuses existing paths. If the admin enables `NC_MCP_FILES_UPDATE` ... (inhaltlich unverändert, Aufgaben-Punkt danach präzisiert)
+ERLEDIGT README.md:47 plan=34-01 neu=56 | - No moving or renaming of files, folders or other objects; the one exception is `tasks_move` for a single task when `NC_MCP_TASKS_UPDATE` is on ...
+ERLEDIGT README.md:55 plan=34-01 neu=66 | modules, allows exactly the named exceptions (`files_update` and the three task tools, each only with an ETag, the MOVE of the private chunk assembly and one MOVE in `move_todo`) and fails on any other destructive call,
+ERLEDIGT README.md:56 plan=34-01 neu=68 | [tests/contract/test_no_destructive_calls.py](tests/contract/test_no_destructive_calls.py). (Link bleibt)
+ERLEDIGT README.md:60 plan=34-01 neu=72 | **read** means ... **modify** means it changes an existing task, only with the ETag from `tasks_read` ... (in 33-09 präzisiert, geprüft, unverändert)
+ERLEDIGT README.de.md:50 plan=34-01 neu=50 | - Kein bedingungsloses Überschreiben: `files_upload` lehnt einen vorhandenen Pfad ab. Aktiviert der Admin `NC_MCP_FILES_UPDATE` ... (Aufbau wie EN)
+ERLEDIGT README.de.md:56 plan=34-01 neu=63 | - Kein Verschieben und kein Umbenennen von Dateien, Ordnern oder anderen Objekten; die einzige Ausnahme ist `tasks_move` ... private Chunk-Montage ...
+ERLEDIGT README.de.md:64 plan=34-01 neu=77 | liest die Module, erlaubt genau die benannten Ausnahmen (...) und wird bei jedem anderen zerstörenden Aufruf rot, [Link bleibt]
+ERLEDIGT README.de.md:68 plan=34-01 neu=81 | **read** heißt ... **modify** heißt, es ändert eine bestehende Aufgabe, nur mit dem ETag aus `tasks_read` ... (in 33-09 präzisiert, geprüft, unverändert)
+ERLEDIGT README.fr.md:51 plan=34-01 neu=51 | - Pas d'écrasement inconditionnel : `files_upload` refuse un chemin existant. Si l'administrateur active `NC_MCP_FILES_UPDATE` ... (Aufbau wie EN)
+ERLEDIGT README.fr.md:57 plan=34-01 neu=65 | - Aucun déplacement ni renommage de fichiers, de dossiers ou d'autres objets ; la seule exception est `tasks_move` ... assemblage privé de blocs ...
+ERLEDIGT README.fr.md:67 plan=34-01 neu=80 | contrat lit les modules, autorise exactement les exceptions nommées (...) et échoue à tout autre appel destructeur, [Link bleibt]
+ERLEDIGT README.fr.md:71 plan=34-01 neu=84 | **read** signifie ... **modify** signifie qu'il modifie une tâche existante, uniquement avec l'ETag de `tasks_read` ... (in 33-09 präzisiert, geprüft, unverändert)
+ERLEDIGT README.fr.md:72 plan=34-01 neu=85 | nouveaux objets mais ne modifie ni ne supprime jamais ceux qui existent, **conditional-update** ... (geprüft, unverändert)
+ERLEDIGT src/mcp_connector/server/__init__.py:63 plan=34-01 neu=64 | "Read and create content in the user's own Nextcloud. " (unverändert, Schaltersätze byte-gleich)
+ERLEDIGT src/mcp_connector/server/__init__.py:64 plan=34-01 neu=65 | "Files are never deleted, moved, renamed or unconditionally overwritten." + neu Zeile 66: " Tasks are never deleted."
+# Zusätzlich (Löschgrenze, im 33-01-Inventar ohne plan=34): README.md:42, README.de.md:48, README.fr.md:49 nennen jetzt Aufgaben und die bewusste Grenze (E13)

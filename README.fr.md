@@ -46,21 +46,26 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
 
 ## Ce que ce serveur ne peut pas faire
 
-- Rien supprimer : aucun outil n'émet de DELETE sur des fichiers, événements, notes, cartes
-  ou contacts
-- Pas d’écrasement inconditionnel : les écritures sont en création seule, et `files_upload`
-  refuse un chemin existant par une erreur claire au lieu de le remplacer ; les fichiers
-  binaires sont envoyés en blocs Base64 de taille totale quelconque. Si l’administrateur
-  active `NC_MCP_FILES_UPDATE`, `files_update` ne remplace un fichier texte UTF-8 existant
-  que si son ETag correspond à la valeur lue auparavant ; les fichiers modifiés ou supprimés
-  sont refusés, et l’historique des versions dépend du backend de stockage
-- Les tâches existantes restent inchangées tant que l’administrateur n’active pas
-  l’interrupteur « Autoriser la modification des tâches existantes » (`NC_MCP_TASKS_UPDATE`) :
-  Désactivé par défaut. Activé, les assistants peuvent cocher, rouvrir, modifier et déplacer
-  des tâches existantes avec `tasks_complete`, `tasks_update` et `tasks_move`, et uniquement
-  avec l'ETag renvoyé par `tasks_read`. Le changement prend effet après avoir désactivé puis
-  réactivé l'application.
-- Aucun déplacement, aucun renommage, aucune modification de partage ni de permission
+- Aucune suppression : aucun outil ne supprime de fichiers, d'événements, de tâches, de notes,
+  de cartes ou de contacts ; la suppression d'une tâche n'est volontairement pas proposée
+- Pas d'écrasement inconditionnel : `files_upload` refuse un chemin existant. Si
+  l'administrateur active `NC_MCP_FILES_UPDATE`, `files_update` ne remplace un fichier texte
+  UTF-8 existant que si son ETag correspond à la valeur lue auparavant ; les fichiers modifiés
+  ou supprimés sont refusés. L'historique des versions dépend du backend de stockage de
+  Nextcloud.
+- Les tâches existantes restent inchangées tant que l'administrateur n'active pas
+  l'interrupteur « Autoriser la modification des tâches existantes » (`NC_MCP_TASKS_UPDATE`) :
+  Désactivé par défaut. Activé, les assistants peuvent modifier une tâche à la fois, et
+  uniquement avec l'ETag renvoyé par `tasks_read` : `tasks_complete` la coche (d'abord ses
+  sous-tâches) ou la rouvre, `tasks_update` modifie son titre, sa description, son échéance,
+  sa date de début, sa priorité, ses étiquettes ou sa tâche parente, et `tasks_move` la
+  déplace avec ses sous-tâches dans une autre liste de tâches propre ou partagée en écriture.
+  Les tâches récurrentes et les tableaux Deck sont refusés. Un changement de l'interrupteur
+  prend effet après avoir désactivé puis réactivé l'application.
+- Aucun déplacement ni renommage de fichiers, de dossiers ou d'autres objets ; la seule
+  exception est `tasks_move` pour une seule tâche lorsque `NC_MCP_TASKS_UPDATE` est activé.
+  Aucune modification de partage ni de permission ; les fichiers binaires passent par
+  l'assemblage privé de blocs de Nextcloud et refusent tout de même une destination existante
 - Mail est strictement en lecture seule : aucun envoi, aucun brouillon, aucun déplacement,
   aucun marquage, aucune suppression, aucun téléchargement de pièce jointe
 - Aucun accès administrateur : le serveur agit comme un utilisateur et hérite exactement de
@@ -69,7 +74,9 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
   recherche comme Findling n'est pas installée
 
 C'est une contrainte de conception et non une promesse de bon comportement : un test de
-contrat lit les modules et échoue au premier appel destructeur,
+contrat lit les modules, autorise exactement les exceptions nommées (`files_update` et les
+trois outils de tâches, chacun uniquement avec un ETag, le MOVE de l'assemblage privé de blocs
+et un MOVE dans `move_todo`) et échoue à tout autre appel destructeur,
 [tests/contract/test_no_destructive_calls.py](tests/contract/test_no_destructive_calls.py).
 
 ## Outils

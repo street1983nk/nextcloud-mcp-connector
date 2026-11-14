@@ -39,25 +39,32 @@ You bring the model, and no content leaves your server.
 
 ## What this server cannot do
 
-- No deleting: no tool issues a DELETE against files, events, notes, cards or contacts
+- No deleting: no tool deletes files, events, tasks, notes, cards or contacts; deleting a task
+  is deliberately not offered
 - No unconditional overwriting: `files_upload` refuses existing paths. If the admin enables
   `NC_MCP_FILES_UPDATE`, `files_update` can replace an existing UTF-8 text file only when its
   ETag matches the value read earlier; stale or deleted files are rejected. Version history
   depends on the Nextcloud storage backend.
 - Existing tasks stay unchanged unless the admin turns on the switch
   "Allow changing existing tasks" (`NC_MCP_TASKS_UPDATE`): Off by default. When on, assistants
-  can complete, reopen, edit and move existing tasks with `tasks_complete`, `tasks_update` and
-  `tasks_move`, and only with the ETag returned by `tasks_read`. A change takes effect after
-  you disable and enable this app again.
-- No user-visible moving or renaming, no share changes and no permission changes; binary
-  uploads use Nextcloud's private chunk assembly and still refuse an existing destination
+  can change one task at a time, and only with the ETag returned by `tasks_read`:
+  `tasks_complete` completes it (its subtasks first) or reopens it, `tasks_update` changes its
+  title, description, due date, start date, priority, tags or parent task, and `tasks_move`
+  moves it with its subtasks into another own or writable shared task list. Recurring tasks
+  and Deck boards are refused. A change of the switch takes effect after you disable and
+  enable this app again.
+- No moving or renaming of files, folders or other objects; the one exception is `tasks_move`
+  for a single task when `NC_MCP_TASKS_UPDATE` is on. No share changes and no permission
+  changes; binary uploads use Nextcloud's private chunk assembly and still refuse an existing
+  destination
 - Mail is strictly read only: no sending, no draft, no move, no flag, no delete, and no
   attachment download
 - No admin access: the server acts as one user and inherits exactly that user's permissions
 - No full text search inside file contents unless a search app such as Findling is installed
 
 That is a design constraint and not a promise of good behaviour: a contract test reads the
-modules and fails on the first destructive call,
+modules, allows exactly the named exceptions (`files_update` and the three task tools, each
+only with an ETag, the MOVE of the private chunk assembly and one MOVE in `move_todo`) and fails on any other destructive call,
 [tests/contract/test_no_destructive_calls.py](tests/contract/test_no_destructive_calls.py).
 
 ## Tools

@@ -1280,11 +1280,12 @@ async def test_files_read_as_markdown_names_its_formats_and_is_read_only() -> No
     assert set(tool.input_schema["properties"]) == {"path", "offset"}
 
 
-#: The instruction the server hands every client, as it stood before phase 33: with the
-#: modifying task tools switched off it must stay byte for byte what it was (plan 33-09).
+#: The instruction the server hands every client with the modifying task tools switched off:
+#: the text before phase 33 (plan 33-09) plus the delete limit for tasks (plan 34-01, DOC-05).
 BASE_INSTRUCTION = (
     "Read and create content in the user's own Nextcloud. "
     "Files are never deleted, moved, renamed or unconditionally overwritten."
+    " Tasks are never deleted."
 )
 FILES_UPDATE_SENTENCE = (
     " Existing UTF-8 text files can be replaced with files_update, and only with a matching ETag."

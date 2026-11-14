@@ -45,28 +45,35 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
 
 ## Was dieser Server nicht kann
 
-- Nichts löschen: kein Tool setzt ein DELETE auf Dateien, Termine, Notizen, Karten oder
-  Kontakte ab
-- Kein bedingungsloses Überschreiben: Schreiben legt nur neu an, und `files_upload` lehnt einen
-  vorhandenen Pfad mit klarem Fehler ab, statt ihn zu ersetzen; Binärdateien werden in
-  Base64-Blöcken beliebiger Gesamtgröße hochgeladen. Aktiviert ein Administrator
-  `NC_MCP_FILES_UPDATE`, ersetzt `files_update` eine bestehende UTF-8-Textdatei nur dann, wenn
-  ihr ETag dem zuvor gelesenen Wert entspricht; geänderte oder gelöschte Dateien werden
-  abgelehnt, und der Versionsverlauf hängt vom Speicher-Backend ab
+- Kein Löschen: kein Tool löscht Dateien, Termine, Aufgaben, Notizen, Karten oder Kontakte;
+  das Löschen einer Aufgabe wird bewusst nicht angeboten
+- Kein bedingungsloses Überschreiben: `files_upload` lehnt einen vorhandenen Pfad ab. Aktiviert
+  der Admin `NC_MCP_FILES_UPDATE`, ersetzt `files_update` eine bestehende UTF-8-Textdatei nur
+  dann, wenn ihr ETag dem zuvor gelesenen Wert entspricht; geänderte oder gelöschte Dateien
+  werden abgelehnt. Der Versionsverlauf hängt vom Speicher-Backend von Nextcloud ab.
 - Bestehende Aufgaben bleiben unverändert, solange der Admin den Schalter
   "Bestehende Aufgaben ändern erlauben" (`NC_MCP_TASKS_UPDATE`) nicht einschaltet: Ab Werk aus.
-  Ist der Schalter an, können Assistenten bestehende Aufgaben mit `tasks_complete`,
-  `tasks_update` und `tasks_move` abhaken, wieder öffnen, ändern und verschieben, und zwar nur
-  mit dem ETag, das `tasks_read` geliefert hat. Eine Änderung wirkt, nachdem die App aus- und
-  wieder eingeschaltet wurde.
-- Kein Verschieben, kein Umbenennen, keine Änderung von Freigaben oder Berechtigungen
+  Ist der Schalter an, können Assistenten jeweils eine Aufgabe ändern, und zwar nur mit dem
+  ETag, das `tasks_read` geliefert hat: `tasks_complete` hakt sie ab (zuerst ihre
+  Unteraufgaben) oder öffnet sie wieder, `tasks_update` ändert Titel, Beschreibung,
+  Fälligkeit, Startdatum, Priorität, Tags oder Elternaufgabe, und `tasks_move` verschiebt sie
+  samt ihren Unteraufgaben in eine andere eigene oder schreibbar geteilte Aufgabenliste.
+  Wiederkehrende Aufgaben und Deck-Boards werden abgelehnt. Eine Änderung des Schalters wirkt,
+  nachdem die App aus- und wieder eingeschaltet wurde.
+- Kein Verschieben und kein Umbenennen von Dateien, Ordnern oder anderen Objekten; die einzige
+  Ausnahme ist `tasks_move` für eine einzelne Aufgabe bei eingeschaltetem
+  `NC_MCP_TASKS_UPDATE`. Keine Änderung von Freigaben oder Berechtigungen; Binärdateien
+  werden über die private Chunk-Montage von Nextcloud hochgeladen und lehnen ein vorhandenes
+  Ziel trotzdem ab
 - Mail ist strikt lesend: kein Senden, kein Entwurf, kein Verschieben, kein Markieren, kein
   Löschen, kein Anhang-Download
 - Kein Admin-Zugriff: Der Server handelt als ein Nutzer und erbt genau dessen Rechte
 - Keine Volltextsuche in Dateiinhalten, solange keine Such-App wie Findling installiert ist
 
 Das ist eine Design-Einschränkung und kein Versprechen guten Verhaltens: Ein Contract-Test
-liest die Module und wird beim ersten zerstörenden Aufruf rot,
+liest die Module, erlaubt genau die benannten Ausnahmen (`files_update` und die drei
+Aufgaben-Tools, jeweils nur mit ETag, das MOVE der privaten Chunk-Montage und ein MOVE in
+`move_todo`) und wird bei jedem anderen zerstörenden Aufruf rot,
 [tests/contract/test_no_destructive_calls.py](tests/contract/test_no_destructive_calls.py).
 
 ## Tools

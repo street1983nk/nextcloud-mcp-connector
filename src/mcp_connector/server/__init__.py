@@ -63,6 +63,7 @@ mcp = MCPServer(
     instructions=(
         "Read and create content in the user's own Nextcloud. "
         "Files are never deleted, moved, renamed or unconditionally overwritten."
+        " Tasks are never deleted."
         + (
             " Existing UTF-8 text files can be replaced with files_update, "
             "and only with a matching ETag."
