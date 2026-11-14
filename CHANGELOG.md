@@ -11,6 +11,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-14
+
 ### Added
 
 - `files_create_folder` in the `files` bundle: creates one folder, or with `parents=true`
@@ -54,6 +56,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `tasks` bundle.
 - `tasks_read` returns the task's ETag, and each of the three works only with it; a stale
   ETag is refused. Recurring tasks are refused.
+
+### Changed
+
+- The server instruction adds the sentence "Tasks are never deleted."
+- The documentation says exactly what changes existing content: `files_update` and the
+  three task tools, each only behind its admin switch; nothing deletes, not even a task,
+  and nothing moves except `tasks_move`. The admin guide (`docs/exapp-install.md`)
+  explains both write switches and that on a running installation a switch is changed
+  with `occ app_api:app:config:set ... --update-only`; without that option occ refuses
+  to change a value that is already set.
+- The App Store description in English, German and French names folders, tasks, the
+  delete limit and the switch for changing tasks.
 
 ### Fixed
 
@@ -1125,7 +1139,8 @@ First release, submitted to the Nextcloud App Store.
   never sees more than that user sees in the web interface.
 - A privacy and data flow description, see [docs/privacy.md](docs/privacy.md).
 
-[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.0...v0.7.1

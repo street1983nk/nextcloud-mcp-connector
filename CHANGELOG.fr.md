@@ -13,6 +13,8 @@ dans [CHANGELOG.md](CHANGELOG.md).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-14
+
 ### Ajouté
 
 - `files_create_folder` dans le bundle `files` : crée un dossier, ou avec `parents=true`
@@ -60,6 +62,20 @@ dans [CHANGELOG.md](CHANGELOG.md).
 - `tasks_read` renvoie l'ETag de la tâche, et chacun des trois outils ne fonctionne qu'avec
   lui ; un ETag périmé est refusé. Les tâches récurrentes sont refusées.
 
+### Modifié
+
+- L'instruction du serveur dit en plus « Tasks are never deleted. » (les tâches ne
+  sont jamais supprimées).
+- La documentation dit exactement ce qui modifie l'existant : `files_update` et les
+  trois outils de tâches, chacun seulement derrière son interrupteur d'administration ;
+  rien ne supprime, pas même une tâche, et rien ne déplace sauf `tasks_move`. Le guide
+  d'administration (`docs/exapp-install.md`) explique les deux interrupteurs
+  d'écriture et qu'un interrupteur se change, sur une installation en service, avec
+  `occ app_api:app:config:set ... --update-only` ; sans cette option, occ refuse de
+  modifier une valeur déjà définie.
+- La description dans l'App Store en anglais, allemand et français nomme les dossiers,
+  les tâches, la limite de suppression et l'interrupteur de modification des tâches.
+
 ### Corrigé
 
 - `unified_search` et `search` n'affichent plus le nom de la personne qui a partagé une
@@ -85,3 +101,6 @@ dans [CHANGELOG.md](CHANGELOG.md).
   jetons : `occ app_api:app:register --env` les acceptait et le conteneur ne les
   voyait jamais (#42). Un test maintient désormais les déclarations identiques à
   la liste dans laquelle le code les lit.
+
+[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.3...v0.8.0

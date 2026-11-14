@@ -12,6 +12,8 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-14
+
 ### Hinzugefügt
 
 - `files_create_folder` im Bundle `files`: legt einen Ordner an, mit `parents=true` auch
@@ -59,6 +61,20 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
 - `tasks_read` liefert das ETag der Aufgabe, und jedes der drei Werkzeuge arbeitet nur mit
   ihm; ein veraltetes ETag wird abgelehnt. Wiederkehrende Aufgaben werden abgelehnt.
 
+### Geändert
+
+- Die Server-Instruktion sagt zusätzlich "Tasks are never deleted." (Aufgaben werden
+  nie gelöscht).
+- Die Dokumentation sagt genau, was Bestehendes ändert: `files_update` und die drei
+  Aufgaben-Werkzeuge, jedes nur hinter seinem Admin-Schalter; nichts löscht, auch keine
+  Aufgabe, und außer `tasks_move` verschiebt nichts. Die Admin-Anleitung
+  (`docs/exapp-install.md`) erklärt beide Schreibschalter und dass ein Schalter auf
+  einer laufenden Installation mit `occ app_api:app:config:set ... --update-only`
+  geändert wird; ohne diese Option lehnt occ es ab, einen schon gesetzten Wert zu
+  ändern.
+- Die Beschreibung im App Store auf Englisch, Deutsch und Französisch nennt Ordner,
+  Aufgaben, die Löschgrenze und den Schalter zum Ändern von Aufgaben.
+
 ### Behoben
 
 - `unified_search` und `search` zeigen bei einem Treffer des Nextcloud-Suchproviders
@@ -84,3 +100,6 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
   `occ app_api:app:register --env` nahm sie an, und der Container sah sie nie (#42).
   Ein Test hält die Deklarationen jetzt gleich mit der Liste, aus der der Code sie
   liest.
+
+[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.3...v0.8.0

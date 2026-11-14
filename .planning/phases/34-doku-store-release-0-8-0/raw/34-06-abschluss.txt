@@ -28,3 +28,28 @@ FRANZ appinfo/info.xml geprueft=5 fehler=0
 
 ## Strich-Prüfung (LC_ALL=C.UTF-8, Positivkontrolle Exit 0)
 DASH README*.md CHANGELOG*.md docs/*.md appinfo/info.xml treffer=0
+
+## Versionssprung (Runbook Schritt 1), Commit 4c1694e "release: 0.8.0"
+# pyproject.toml version, __version__, info.xml <version> und <image-tag> auf 0.8.0; uv lock: nur nextcloud-mcp-connector 0.7.3 -> 0.8.0, kein anderes Paket
+# README-Statuszeile "Version <x>.": keine vorhanden (grep leer)
+# Zwischenstand ohne Changelog geprüft: test_changelog_translations, test_exapp_env_setup, test_store_texts_frozen, tests/contract: 445 passed
+
+## Sprachprüfung des 0.8.0-Blocks (Runbook Schritt 2)
+# CHANGELOG.de.md hinzugefügte Zeilen seit B: 15; Fundstelle: dass (Konjunktion, echt). Ganzer 0.8.0-Block zusätzlich gelesen: Ausschluss, Gemessen, dass, lässt, neue, neuen: echt; true: Code
+# "die ETag"/"der ETag": 0 Treffer; Schließwort vor #: 0 Treffer
+UMLAUT CHANGELOG.de.md geprueft=1 fehler=0
+# CHANGELOG.fr.md hinzugefügte Zeilen: 15; einzige Musterfunde sind die zwei Linkzeilen ([Unreleased]:, [0.8.0]:), kein Satzzeichen; 0 typografische Apostrophe
+FRANZ CHANGELOG.fr.md geprueft=15 fehler=0
+DASH changelog treffer=0
+
+## Gates (Runbook Schritt 3, Stand Version 0.8.0 plus 0.8.0-Block)
+GATE pytest-unit-contract exit=0 passed=8212 skipped=35
+GATE check_tool_budget exit=0 alle_schalter=22198/31 standard=18770/27 budget=26000
+GATE ruff-check exit=0
+GATE ruff-format exit=0 dateien=407
+GATE pyright exit=0 errors=0 warnings=0
+GATE vulture exit=0
+GATE pytest-voll exit=0 passed=8212 skipped=35
+GATE pip-audit exit=0 befund="No known vulnerabilities found"
+# Diff-Beweis: git diff --stat B -- src/ nur server/__init__.py und mcp_connector/__init__.py (Gegentreffer server/__init__.py: 1)
+# build_store_release.sh nicht gelaufen: das Skript signiert mit dem Store-Schlüssel, das gehört zu 34-10 und braucht dort die Freigabe
