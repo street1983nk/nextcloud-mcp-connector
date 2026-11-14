@@ -170,6 +170,16 @@ print(json.dumps(asyncio.run(main())))
 #               per tool ceiling, which stays where it is (plan 33-08).
 #   Budget      22198 + 15 percent = 25527.7, rounded up to the next 500 = 26000 bytes,
 #               re-anchored by the house rule; plan 33-09 anchors on the end state.
+#
+#   Measurement 2026-11-14, 31 tools with every switch on: 22198 bytes; standard state
+#               18770 bytes, 27 tools. The end state of phase 33 (plan 33-09): files_update,
+#               tasks_complete, tasks_update and tasks_move on top of the 27 standard tools;
+#               the biggest tool is tasks_create at 1380 bytes, below the per tool ceiling,
+#               which stays where it is. The sentence plan 33-09 adds to the server
+#               instruction is not part of tools/list and costs this gate nothing.
+#   Budget      22198 + 15 percent = 25527.7, rounded up to the next 500 = 26000 bytes,
+#               anchored by the house rule on the measured end state (D-33-04, TMOD-05).
+#               It is the number plan 33-08 wrote, because the surface did not move since.
 BUDGET_BYTES = 26_000
 
 # The second claim, and the one that actually reports a regression. A total with headroom

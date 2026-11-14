@@ -69,6 +69,12 @@ mcp = MCPServer(
             if config.files_update_enabled()
             else ""
         )
+        + (
+            " Existing tasks can be completed, changed or moved with tasks_complete, "
+            "tasks_update and tasks_move, and only with the ETag from tasks_read."
+            if config.tasks_update_enabled()
+            else ""
+        )
     ),
     token_verifier=_token_verifier,
     auth=_auth_settings,
