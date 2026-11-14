@@ -384,6 +384,42 @@ def test_the_tasks_update_texts_are_the_ones_of_the_plan() -> None:
     )
 
 
+def _manifest_display_name(variable: str) -> str:
+    """The ``display-name`` of one environment variable in appinfo/info.xml."""
+    from pathlib import Path
+
+    from lxml import etree
+
+    info_xml = Path(__file__).resolve().parents[2] / "appinfo" / "info.xml"
+    parser = etree.XMLParser(resolve_entities=False, no_network=True)
+    root = etree.fromstring(info_xml.read_bytes(), parser)
+    names = root.xpath(f"//variable[name='{variable}']/display-name/text()")
+    return str(names[0]) if len(names) == 1 else ""
+
+
+@pytest.mark.parametrize(
+    ("variable", "label"),
+    [
+        ("NC_MCP_FILES_UPDATE", "ADMIN_FIELD_FILES_UPDATE_LABEL"),
+        ("NC_MCP_TASKS_UPDATE", "ADMIN_FIELD_TASKS_UPDATE_LABEL"),
+    ],
+)
+def test_each_write_switch_has_one_label_in_the_form_and_the_manifest(
+    variable: str, label: str
+) -> None:
+    """Owner decision 2026-11-14: a write switch carries one English label everywhere.
+
+    The admin form and the environment variable of the manifest name the same switch, so an
+    admin who reads either sees the same words.
+    """
+    assert _manifest_display_name(variable) == getattr(strings, label)
+
+
+def test_the_files_update_label_is_the_one_the_owner_chose() -> None:
+    """Owner decision 2026-11-14: "Allow editing existing text files" applies everywhere."""
+    assert strings.ADMIN_FIELD_FILES_UPDATE_LABEL == "Allow editing existing text files"
+
+
 @pytest.mark.anyio
 @respx.mock
 async def test_the_audit_log_description_says_what_is_kept_and_what_is_not() -> None:
