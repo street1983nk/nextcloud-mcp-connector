@@ -55,8 +55,8 @@ dans [CHANGELOG.md](CHANGELOG.md).
 - Mesuré sur Nextcloud 32 et 35 sous impersonation AppAPI, voir
   `docs/tasks-evidence.md`.
 - Trois outils qui modifient des tâches existantes, derrière le nouvel interrupteur
-  d'administration `NC_MCP_TASKS_UPDATE` (« Autoriser la modification des tâches
-  existantes »), désactivé par défaut : `tasks_complete` coche une tâche ou la rouvre,
+  d'administration `NC_MCP_TASKS_UPDATE` (« Allow changing existing tasks », autoriser
+  la modification des tâches existantes), désactivé par défaut : `tasks_complete` coche une tâche ou la rouvre,
   `tasks_update` modifie ses champs, `tasks_move` la déplace avec ses sous-tâches dans une
   autre liste. Les trois font partie du bundle `tasks`.
 - `tasks_read` renvoie l'ETag de la tâche, et chacun des trois outils ne fonctionne qu'avec
