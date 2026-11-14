@@ -59,7 +59,7 @@ async def mail_browse(
         str,
         Field(
             description=(
-                "Only level=messages: space separated type:value; types "
+                "Only level=messages: space-separated type:value; types "
                 "is/not/from/subject/tags/start/end; start/end in Unix seconds"
             )
         ),
@@ -75,7 +75,7 @@ async def mail_browse(
 ) -> str:
     """List the mail accounts of this user, the mailboxes of one, or the messages of one.
 
-    Envelopes newest first; the full text of one is a fetch("mail:<id>") away. Percent encode a
+    Envelopes newest first; the full text of one is a fetch("mail:<id>") away. Percent-encode a
     filter value with a space or colon (subject:Rechnung%20Mai). truncated: page cut;
     preview_truncated: preview cut. Reads only: never sends, drafts, moves, flags or
     deletes."""

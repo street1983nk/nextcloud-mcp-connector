@@ -23,7 +23,7 @@ async def unified_search(
         int, Field(ge=1, le=search_tools.MAX_LIMIT, description="Maximum hits per provider")
     ] = search_tools.DEFAULT_LIMIT,
     providers: Annotated[
-        str, Field(description="Comma separated provider ids, e.g. files,notes; empty means all")
+        str, Field(description="Comma-separated provider ids, e.g. files,notes; empty means all")
     ] = "",
     ctx: Context | None = None,
 ) -> str:
