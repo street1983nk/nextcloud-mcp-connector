@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.8
-milestone_name: Tasks-Bundle und Ordner anlegen
-status: verifying
-stopped_at: 32-10 ausgeführt bis zur Push-Frage (Task 6); Push-Fragen 32-09 und 32-10 offen; Phase 32 nicht abgeschlossen; kein Container läuft
+milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
+status: ready_to_plan
+stopped_at: "Phase 33 abgeschlossen (12/12 Pläne, Verifikation passed bdb8eee, f464455 gepusht, CI grün); offen vor 0.8.0: Zusatzplan kalte Suche (NC 32, PER_LIST_TIMEOUT), dann Phase 34; Merge von PR #48 vom Owner vorab freigegeben"
 last_updated: "2026-11-14T05:05:24.770Z"
 last_activity: 2026-11-14
 progress:
