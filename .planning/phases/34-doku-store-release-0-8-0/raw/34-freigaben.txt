@@ -20,3 +20,5 @@ FREIGABE merge-pr48 antwort=vorab quelle=owner-vorabfreigabe-phase34 datum=2026-
   Owner 14.11. "Freigegeben" (Merge PR #48 nach Phase 33 verifiziert, kalte Suche fertig, Phase 34 bis 34-08 fertig, CI grün). Über origin/plan/v1.8-tasks-080 nur Dateien unter .planning/ (34-08-SUMMARY.md, raw/34-08-push.txt).
 FREIGABE tag-v0.8.0 antwort=tag datum=2026-11-14
   Owner-Antwort: "Tag setzen (Empfohlen)" per AskUserQuestion; Tag auf main b4b6518.
+FREIGABE signatur antwort=signieren-und-hochladen datum=2026-11-14
+  Owner-Antwort: "Signieren und hochladen (Empfohlen)" per AskUserQuestion.
