@@ -1152,3 +1152,66 @@ async def test_files_read_as_markdown_names_its_formats_and_is_read_only() -> No
     assert tool.annotations is not None
     assert tool.annotations.read_only_hint is True
     assert set(tool.input_schema["properties"]) == {"path", "offset"}
+
+
+#: The instruction the server hands every client, as it stood before phase 33: with the
+#: modifying task tools switched off it must stay byte for byte what it was (plan 33-09).
+BASE_INSTRUCTION = (
+    "Read and create content in the user's own Nextcloud. "
+    "Files are never deleted, moved, renamed or unconditionally overwritten."
+)
+FILES_UPDATE_SENTENCE = (
+    " Existing UTF-8 text files can be replaced with files_update, and only with a matching ETag."
+)
+TASKS_UPDATE_SENTENCE = (
+    " Existing tasks can be completed, changed or moved with tasks_complete, tasks_update "
+    "and tasks_move, and only with the ETag from tasks_read."
+)
+
+
+_PRINT_INSTRUCTIONS = (
+    "import json; from mcp_connector.server import mcp; print(json.dumps(mcp.instructions))"
+)
+
+
+def _instructions(switches: dict[str, str]) -> str:
+    """The server instruction of a fresh interpreter with exactly these switches set."""
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in SWITCHES and key != "NC_MCP_DISABLED_TOOLS"
+    }
+    env["PYTHONUTF8"] = "1"
+    env.update(switches)
+    done = subprocess.run(  # noqa: S603 - the interpreter of this test run, a fixed snippet
+        [sys.executable, "-c", _PRINT_INSTRUCTIONS],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    return json.loads(done.stdout.strip().splitlines()[-1])
+
+
+@pytest.mark.parametrize(
+    ("files", "tasks", "expected"),
+    [
+        ("off", "off", BASE_INSTRUCTION),
+        ("on", "off", BASE_INSTRUCTION + FILES_UPDATE_SENTENCE),
+        ("off", "on", BASE_INSTRUCTION + TASKS_UPDATE_SENTENCE),
+        ("on", "on", BASE_INSTRUCTION + FILES_UPDATE_SENTENCE + TASKS_UPDATE_SENTENCE),
+    ],
+)
+def test_the_instruction_names_the_modifying_task_tools_only_with_their_switch_on(
+    files: str, tasks: str, expected: str
+) -> None:
+    """Plan 33-09: one sentence per switch, and the switch-off text stays byte for byte."""
+    instruction = _instructions({"NC_MCP_FILES_UPDATE": files, "NC_MCP_TASKS_UPDATE": tasks})
+
+    assert instruction == expected
+    if tasks == "on":
+        # Only the tools that are built are named, and every one of them is.
+        for name in MODIFY_TOOLS:
+            assert name in instruction

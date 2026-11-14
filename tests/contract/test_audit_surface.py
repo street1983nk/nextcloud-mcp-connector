@@ -19,12 +19,22 @@ because that is the only place a registered tool still has its ``fn``; the bound
 so this is a source gate doing its job rather than a break of one.
 """
 
+import json
+import os
+import subprocess
+import sys
 from collections.abc import Mapping
 from typing import Any
 
 import pytest
 from mcp import Client
-from optional_surface import OPTIONAL_TOOLS, switched_on_surface
+from optional_surface import (
+    OPTIONAL_TOOLS,
+    SWITCHES,
+    TASKS_UPDATE_SWITCH,
+    switched_on_surface,
+    tools_of_switch,
+)
 
 from mcp_connector.audit.allowlist import FORBIDDEN_PARAMS, PARAM_ALLOWLIST
 from mcp_connector.server import mcp
@@ -262,3 +272,190 @@ def test_the_two_ways_to_the_tool_name_cannot_drift_apart() -> None:
         "recorder writes one of them and the allowlist is read for the other: "
         + ", ".join(findings)
     )
+
+
+#: One call per case in a fresh interpreter with ``NC_MCP_TASKS_UPDATE`` on, through the
+#: registered (and therefore decorated) function, with a real store in a file of its own per
+#: case. The tool logic is replaced by a stand-in that answers or refuses, so the case is
+#: about the recording and needs no Nextcloud; the identity sits on the request the way the
+#: transport boundary leaves it (the shape of ``tests/unit/test_audit_record.py``).
+_RECORD_CALLS = """
+import asyncio, json, sqlite3, sys
+from pathlib import Path
+from starlette.requests import Request
+
+from mcp_connector import deps
+from mcp_connector.audit import AUDIT_STATE_ATTR
+from mcp_connector.audit.record import Recorder
+from mcp_connector.audit.store import AuditStore
+from mcp_connector.errors import REASON_GUARD_TRIPPED, ConflictError
+from mcp_connector.oauth.verifier import OAUTH_STATE_ATTR, OAuthIdentity
+from mcp_connector.server import mcp
+from mcp_connector.tools import tasks as tasks_tools
+
+folder = Path(sys.argv[1])
+cases = json.loads(sys.argv[2])
+registered = {tool.name: tool for tool in mcp._tool_manager.list_tools()}
+deps.resolve_clients = lambda ctx: object()
+
+
+class Holder:
+    def __init__(self, request, params):
+        self.request = request
+        self.params = params
+
+
+class Context:
+    def __init__(self, params, recorder):
+        request = Request(
+            {"type": "http", "method": "POST", "path": "/mcp", "query_string": b"", "headers": []}
+        )
+        setattr(
+            request.state,
+            OAUTH_STATE_ATTR,
+            OAuthIdentity(
+                nc_user="alice",
+                principal="alice",
+                app_password="aaaaa-bbbbb-ccccc-ddddd-eeeee",
+                auth_id="flow",
+                client_id="9d0f8f1a-0b3c-4a0e-9f4c-000000000001",
+                client_name="Claude",
+                actor="",
+            ),
+        )
+        setattr(request.state, AUDIT_STATE_ATTR, recorder)
+        self.headers = {}
+        self.request_context = Holder(request, params)
+
+
+def stand_in(refuse):
+    async def answer(clients, **kwargs):
+        if refuse:
+            raise ConflictError(
+                "The task changed since it was read.",
+                "Read it again with tasks_read.",
+                reason=REASON_GUARD_TRIPPED,
+            )
+        return {"id": kwargs["task_id"], "ok": True}
+
+    return answer
+
+
+async def run(index, case):
+    for name in ("complete_task", "update_task", "move_task"):
+        setattr(tasks_tools, name, stand_in(case["refuse"]))
+    path = folder / f"audit-{index}.sqlite3"
+    store = AuditStore(path)
+
+    async def provider():
+        return store
+
+    context = Context(
+        {"name": case["tool"], "arguments": case["arguments"]}, Recorder(store_provider=provider)
+    )
+    try:
+        await registered[case["tool"]].fn(ctx=context, **case["arguments"])
+        raised = False
+    except Exception:
+        raised = True
+    connection = sqlite3.connect(path)
+    try:
+        connection.row_factory = sqlite3.Row
+        rows = [
+            {k: v.hex() if isinstance(v, bytes) else v for k, v in dict(row).items()}
+            for row in connection.execute("SELECT * FROM entries ORDER BY seq")
+        ]
+    finally:
+        connection.close()
+    return {"raised": raised, "rows": rows}
+
+
+async def main():
+    return [await run(index, case) for index, case in enumerate(cases)]
+
+
+print(json.dumps(asyncio.run(main())))
+"""
+
+#: A value no column name contains, so a hit in a row is a leak and never a coincidence.
+_PAYLOAD_MARK = "PAYLOADMARK"
+
+#: One call per modifying task tool, and the payload names of tasks_update set on purpose.
+_MODIFY_CALLS: list[dict[str, Any]] = [
+    {
+        "tool": "tasks_complete",
+        "arguments": {"task_id": "personal/a.ics", "etag": '"e1"', "completed": True},
+        "expected": ["completed", "etag", "task_id"],
+    },
+    {
+        "tool": "tasks_update",
+        "arguments": {
+            "task_id": "personal/a.ics",
+            "etag": '"e1"',
+            "summary": _PAYLOAD_MARK,
+            "description": _PAYLOAD_MARK,
+            "tags": [_PAYLOAD_MARK],
+            "priority": 3,
+        },
+        "expected": ["etag", "priority", "tags", "task_id"],
+    },
+    {
+        "tool": "tasks_move",
+        "arguments": {"task_id": "personal/a.ics", "etag": '"e1"', "list": _PAYLOAD_MARK},
+        "expected": ["etag", "list", "task_id"],
+    },
+]
+
+
+def _record_calls(tmp_path: Any, cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Run ``_RECORD_CALLS`` with the task switch on and return one result per case."""
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in SWITCHES and key != "NC_MCP_DISABLED_TOOLS"
+    }
+    env["PYTHONUTF8"] = "1"
+    env[TASKS_UPDATE_SWITCH] = "on"
+    payload = [
+        {"tool": case["tool"], "arguments": case["arguments"], "refuse": case["refuse"]}
+        for case in cases
+    ]
+    done = subprocess.run(  # noqa: S603 - the interpreter of this test run, a fixed snippet
+        [sys.executable, "-c", _RECORD_CALLS, str(tmp_path), json.dumps(payload)],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    return json.loads(done.stdout.strip().splitlines()[-1])
+
+
+@pytest.mark.parametrize("refuse", [False, True], ids=["answered", "refused"])
+def test_every_modifying_task_call_leaves_one_entry_with_parameter_names_only(
+    tmp_path: Any, refuse: bool
+) -> None:
+    """T-33-09-02: one entry per call, tool name and allowlisted names, never a value.
+
+    summary and description are never recorded (FORBIDDEN_PARAMS), and a refused call is
+    recorded exactly like an answered one, with the outcome class and the fixed reason.
+    """
+    assert {case["tool"] for case in _MODIFY_CALLS} == tools_of_switch(TASKS_UPDATE_SWITCH)
+    cases = [{**case, "refuse": refuse} for case in _MODIFY_CALLS]
+
+    results = _record_calls(tmp_path, cases)
+
+    for case, result in zip(cases, results, strict=True):
+        assert result["raised"] is refuse, case["tool"]
+        assert len(result["rows"]) == 1, f"{case['tool']}: {len(result['rows'])} entries"
+        row = result["rows"][0]
+        assert row["tool"] == case["tool"]
+        assert row["kind"] == "call"
+        assert json.loads(row["params"]) == case["expected"]
+        assert row["outcome"] == ("rejected" if refuse else "ok")
+        assert row["reason"] == ("guard_tripped" if refuse else None)
+        every_column = "\n".join(f"{name}={value!r}" for name, value in row.items())
+        assert _PAYLOAD_MARK not in every_column
+        assert "summary" not in row["params"]
+        assert "description" not in row["params"]
