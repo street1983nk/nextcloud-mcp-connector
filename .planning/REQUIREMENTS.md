@@ -93,11 +93,11 @@ Geprüft und bewusst nicht übernommen: Die `CLAUDE.md` des Repos sieht kein eig
 
 ### Doku, Store, Release
 
-- [ ] **DOC-04**: READMEs und `docs/` sagen in drei Sprachen den Endstand: Werkzeugliste, Rechtetabelle, Werkzeug- und Familienzahl, Bundle-Namen, "What this server cannot do" um den Ordner und die Aufgaben präzisiert, `docs/threat-model.md` um die Aufgabenfamilie ergänzt (Fremdtext in geteilten Listen als Injektionsfläche), ehrliche Grenzen aus Phase 30 (zum Beispiel ungemessene externe Speicher) mit Befundlink an stabilem Ort. Die Doku-Wahrheits- und Zähltests sind grün.
-- [ ] **DOC-05**: Die Zusage "create-only, keine destruktiven Writes" ist überall präzisiert, wo sie steht, und sagt genau das Ausgelieferte: `.planning/PROJECT.md` (Constraints, Out of Scope, Key Decisions), drei READMEs, `docs/threat-model.md`, `docs/hardening*.md`, Server-Instruktion und Store-Text. Benannt ist die eng begrenzte Ausnahme (eine einzelne Aufgabe abhaken, wieder öffnen und in den genannten Feldern ändern, nur mit gelesener ETag), dazu das Verschieben in eine andere Liste (E14), und ebenso deutlich, was weiterhin nicht geht. Das Löschen einer Aufgabe steht als bewusste Grenze im Text (E13, Owner 12.11.2026). Das Inventar aus MESS-05 ist vollständig abgearbeitet, und ein Test hält die Aussage gegen die Registry.
-- [ ] **EXAPP-13**: Der Store-Text ist in drei Sprachen neu (E11): Aufgaben und Ordner als kurze Faktenliste, mit der Aussage, was an Aufgaben geändert werden kann und was nicht (E8, E14), einschließlich der Grenze, dass Aufgaben nicht gelöscht werden (E13, Owner 12.11.2026). Der Entwurf wird dem Owner vor dem Release gezeigt; der SHA-256-Pin wird erst nach seiner Freigabe erneuert.
-- [ ] **EXAPP-14**: Release 0.8.0 ist im Store: Version an allen Stellen, die der Versionstest prüft; `CHANGELOG.md`, `CHANGELOG.de.md` und `CHANGELOG.fr.md` tragen denselben 0.8.0-Block; Gesamtlauf aller Gates lokal und im CI einschließlich `canary-nc35`; Umlaut-Audit der nutzersichtbaren Texte; Runbook mit Nachweiszeilen; Signatur über das heruntergeladene Asset. Push, Tag und Submit jeweils nur mit Owner-Freigabe.
-- [ ] **EXAPP-15**: Für #32 und #44 liegen kurze Antwortentwürfe vor, ohne schließende Schlüsselwörter. Gepostet wird erst nach dem Store-Release, vom Owner oder mit seiner Freigabe.
+- [x] **DOC-04**: READMEs und `docs/` sagen in drei Sprachen den Endstand: Werkzeugliste, Rechtetabelle, Werkzeug- und Familienzahl, Bundle-Namen, "What this server cannot do" um den Ordner und die Aufgaben präzisiert, `docs/threat-model.md` um die Aufgabenfamilie ergänzt (Fremdtext in geteilten Listen als Injektionsfläche), ehrliche Grenzen aus Phase 30 (zum Beispiel ungemessene externe Speicher) mit Befundlink an stabilem Ort. Die Doku-Wahrheits- und Zähltests sind grün.
+- [x] **DOC-05**: Die Zusage "create-only, keine destruktiven Writes" ist überall präzisiert, wo sie steht, und sagt genau das Ausgelieferte: `.planning/PROJECT.md` (Constraints, Out of Scope, Key Decisions), drei READMEs, `docs/threat-model.md`, `docs/hardening*.md`, Server-Instruktion und Store-Text. Benannt ist die eng begrenzte Ausnahme (eine einzelne Aufgabe abhaken, wieder öffnen und in den genannten Feldern ändern, nur mit gelesener ETag), dazu das Verschieben in eine andere Liste (E14), und ebenso deutlich, was weiterhin nicht geht. Das Löschen einer Aufgabe steht als bewusste Grenze im Text (E13, Owner 12.11.2026). Das Inventar aus MESS-05 ist vollständig abgearbeitet, und ein Test hält die Aussage gegen die Registry.
+- [x] **EXAPP-13**: Der Store-Text ist in drei Sprachen neu (E11): Aufgaben und Ordner als kurze Faktenliste, mit der Aussage, was an Aufgaben geändert werden kann und was nicht (E8, E14), einschließlich der Grenze, dass Aufgaben nicht gelöscht werden (E13, Owner 12.11.2026). Der Entwurf wird dem Owner vor dem Release gezeigt; der SHA-256-Pin wird erst nach seiner Freigabe erneuert.
+- [x] **EXAPP-14**: Release 0.8.0 ist im Store: Version an allen Stellen, die der Versionstest prüft; `CHANGELOG.md`, `CHANGELOG.de.md` und `CHANGELOG.fr.md` tragen denselben 0.8.0-Block; Gesamtlauf aller Gates lokal und im CI einschließlich `canary-nc35`; Umlaut-Audit der nutzersichtbaren Texte; Runbook mit Nachweiszeilen; Signatur über das heruntergeladene Asset. Push, Tag und Submit jeweils nur mit Owner-Freigabe.
+- [x] **EXAPP-15**: Für #32 und #44 liegen kurze Antwortentwürfe vor, ohne schließende Schlüsselwörter. Gepostet wird erst nach dem Store-Release, vom Owner oder mit seiner Freigabe.
 
 ## Future Requirements (deferred)
 
@@ -195,10 +195,10 @@ Stand je Annahme nach dem Mess-Spike: docs/spike-tasks.md, Abschnitt 8. Zu A15, 
 | TMOD-06 | Phase 33 | Complete |
 | TMOD-07 | Out of Scope (Owner, 12.11.2026) | Gestrichen |
 | TMOD-08 | Phase 33 | Complete |
-| DOC-04 | Phase 34 | Pending |
-| DOC-05 | Phase 34 | Pending |
-| EXAPP-13 | Phase 34 | Pending |
-| EXAPP-14 | Phase 34 | Pending |
-| EXAPP-15 | Phase 34 | Pending |
+| DOC-04 | Phase 34 | Complete |
+| DOC-05 | Phase 34 | Complete |
+| EXAPP-13 | Phase 34 | Complete |
+| EXAPP-14 | Phase 34 | Complete |
+| EXAPP-15 | Phase 34 | Complete |
 
 **Coverage:** 33/33 v1-Requirements zugeordnet (Phase 30: 6, Phase 31: 6, Phase 32: 9, Phase 33: 7, Phase 34: 5), keine Waisen, keine Doppelungen. TMOD-07 ist seit dem 12.11.2026 Out of Scope und zählt nicht mehr mit. Anders als in v1.7 trägt der Mess-Spike eigene Requirements, weil E12 eine Messung ausdrücklich verlangt und zwei Abbruchkriterien an ihm hängen.

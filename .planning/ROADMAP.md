@@ -116,13 +116,13 @@ Kein Milestone-Audit (wie v1.5 und v1.6): Aussagen aus den fünf Phase-Verifikat
 
 </details>
 
-### v1.8 Tasks-Bundle und Ordner anlegen (Phasen 30-34), IN PLANUNG
+### v1.8 Tasks-Bundle und Ordner anlegen (Phasen 30-34), ABGESCHLOSSEN 2026-11-14 (0.8.0 im Store)
 
 - [x] **Phase 30: Mess-Spike Aufgaben und Ordner** - Alles, was Recherche und Planung nur annehmen, wird gegen echte Nextcloud-Instanzen gemessen, bevor Produktcode entsteht; zuerst `MKCOL` unter AppAPI-Impersonation, mit Abbruchkriterien (completed 2026-11-12)
 - [x] **Phase 31: Ordner anlegen** - `files_create_folder` legt Ordner an, wahlweise mit fehlenden Elternordnern, hinter der ganzen v1.7-Kette aus Ausschluss, Sandbox, Paartest, Kanarie und Audit; allein releasefähig
 - [x] **Phase 32: Tasks-Bundle suchen, lesen, anlegen** - `tasks_search`, `tasks_read` und `tasks_create` über CalDAV VTODO als zehnte Familie, samt `task:`-Id über `fetch`; ohne Phase 33 releasefähig (completed 2026-11-13)
 - [x] **Phase 33: Aufgaben ändern** - Abhaken, Wiederöffnen, Felder ändern und Verschieben einer einzelnen Aufgabe, nur mit gelesener ETag; kein Löschen (Owner, 12.11.2026); jeder Teil abtrennbar (completed 2026-11-14)
-- [ ] **Phase 34: Doku, Store, Release 0.8.0** - Doku und Store-Text in drei Sprachen sagen den Endstand samt präzisierter Schreibzusage, Release 0.8.0 steht mit Owner-Freigabe im Store
+- [x] **Phase 34: Doku, Store, Release 0.8.0** - Doku und Store-Text in drei Sprachen sagen den Endstand samt präzisierter Schreibzusage, Release 0.8.0 steht mit Owner-Freigabe im Store (completed 2026-11-14)
 
 ## Phase Details (v1.8)
 
@@ -273,17 +273,17 @@ Plans:
 
 Plans:
 
-- [ ] 34-01-PLAN.md: Schreibzusage in den drei READMEs und der Server-Instruktion präzisiert (Ausnahme tasks_move, Löschgrenze der Aufgaben), Wahrheitstest gegen die Registry (DOC-05)
-- [ ] 34-02-PLAN.md: README-Faktencheck aller drei Sprachen gegen den Endstand, neun Punkte aus 31-06 (DOC-04)
-- [ ] 34-03-PLAN.md: Threat-Model mit Aufgabenfamilie und Fremdtext aus geteilten Listen, Hardening EN/DE/FR, Privacy, Doku-Wahrheitstest (DOC-04, DOC-05)
-- [ ] 34-04-PLAN.md: Admin-Anleitung der Schreibschalter mit `--update-only`, übrige Doku-Stellen des Inventars, PROJECT.md (DOC-04, DOC-05)
-- [ ] 34-05-PLAN.md: Store-Text dreisprachig als Faktenliste, Owner-Freigabe (Checkpoint), danach SHA-256-Pin neu (EXAPP-13)
-- [ ] 34-06-PLAN.md: Version 0.8.0 an allen gekoppelten Stellen, CHANGELOG-Block EN/DE/FR, Inventarabschluss, Umlaut-Audit, Gesamtlauf der Gates (EXAPP-14)
-- [ ] 34-07-PLAN.md: Volltest aller Funktionen und Meldungen DE/EN/FR auf nc35 mit 0.8.0, Owner-Freigabe, ggf. zweite Store-Text-Freigabe und Abnahme (Checkpoints) (EXAPP-14)
-- [ ] 34-08-PLAN.md: Release-Notiz englisch, Antwortentwürfe #32 und #44, Push-Frage (Checkpoint), CI des PR #48 grün inkl. canary-nc35 (EXAPP-14, EXAPP-15)
-- [ ] 34-09-PLAN.md: PR #48 per Fast-Forward in main (Owner-Vorabfreigabe), Tag v0.8.0 nach Owner-Frage (Checkpoint), release-Workflow (EXAPP-14)
-- [ ] 34-10-PLAN.md: Signatur über das heruntergeladene Asset und Store-Submit, je nach Owner-Frage (Checkpoints) (EXAPP-14)
-- [ ] 34-11-PLAN.md: Runbook Schritt 8 und Nachweiszeilen, Push-Frage für den Nachtrag (Checkpoint), Übergabe der Issue-Entwürfe an den Owner (EXAPP-14, EXAPP-15)
+- [x] 34-01-PLAN.md: Schreibzusage in den drei READMEs und der Server-Instruktion präzisiert (Ausnahme tasks_move, Löschgrenze der Aufgaben), Wahrheitstest gegen die Registry (DOC-05)
+- [x] 34-02-PLAN.md: README-Faktencheck aller drei Sprachen gegen den Endstand, neun Punkte aus 31-06 (DOC-04)
+- [x] 34-03-PLAN.md: Threat-Model mit Aufgabenfamilie und Fremdtext aus geteilten Listen, Hardening EN/DE/FR, Privacy, Doku-Wahrheitstest (DOC-04, DOC-05)
+- [x] 34-04-PLAN.md: Admin-Anleitung der Schreibschalter mit `--update-only`, übrige Doku-Stellen des Inventars, PROJECT.md (DOC-04, DOC-05)
+- [x] 34-05-PLAN.md: Store-Text dreisprachig als Faktenliste, Owner-Freigabe (Checkpoint), danach SHA-256-Pin neu (EXAPP-13)
+- [x] 34-06-PLAN.md: Version 0.8.0 an allen gekoppelten Stellen, CHANGELOG-Block EN/DE/FR, Inventarabschluss, Umlaut-Audit, Gesamtlauf der Gates (EXAPP-14)
+- [x] 34-07-PLAN.md: Volltest aller Funktionen und Meldungen DE/EN/FR auf nc35 mit 0.8.0, Owner-Freigabe, ggf. zweite Store-Text-Freigabe und Abnahme (Checkpoints) (EXAPP-14)
+- [x] 34-08-PLAN.md: Release-Notiz englisch, Antwortentwürfe #32 und #44, Push-Frage (Checkpoint), CI des PR #48 grün inkl. canary-nc35 (EXAPP-14, EXAPP-15)
+- [x] 34-09-PLAN.md: PR #48 per Fast-Forward in main (Owner-Vorabfreigabe), Tag v0.8.0 nach Owner-Frage (Checkpoint), release-Workflow (EXAPP-14)
+- [x] 34-10-PLAN.md: Signatur über das heruntergeladene Asset und Store-Submit, je nach Owner-Frage (Checkpoints) (EXAPP-14)
+- [x] 34-11-PLAN.md: Runbook Schritt 8 und Nachweiszeilen, Push-Frage für den Nachtrag (Checkpoint), Übergabe der Issue-Entwürfe an den Owner (EXAPP-14, EXAPP-15)
 
 ## Progress
 
@@ -319,10 +319,10 @@ Plans:
 | 28. Gates und Beweise | v1.7 | 12/12 | Complete    | 2026-10-01 |
 | 29. Prüfkommando und Doku | v1.7 | 9/9 | Complete    | 2026-10-01 |
 | 30. Mess-Spike Aufgaben und Ordner | v1.8 | 5/5 | Complete    | 2026-11-12 |
-| 31. Ordner anlegen | v1.8 | 0/6 | Planned | - |
+| 31. Ordner anlegen | v1.8 | 9/9 | Complete    | 2026-11-13 |
 | 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 12/12 | Complete    | 2026-11-13 |
-| 33. Aufgaben ändern | v1.8 | 12/12 | Complete    | 2026-11-14 |
-| 34. Doku, Store, Release 0.8.0 | v1.8 | 0/TBD | Not started | - |
+| 33. Aufgaben ändern | v1.8 | 13/13 | Complete    | 2026-11-14 |
+| 34. Doku, Store, Release 0.8.0 | v1.8 | 11/11 | Complete    | 2026-11-14 |
 
 ## Coverage v1.8
 

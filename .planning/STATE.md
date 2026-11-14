@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
-status: ready_to_plan
-stopped_at: "Phase 33 abgeschlossen (12/12 Pläne, Verifikation passed bdb8eee, f464455 gepusht, CI grün); offen vor 0.8.0: Zusatzplan kalte Suche (NC 32, PER_LIST_TIMEOUT), dann Phase 34; Merge von PR #48 vom Owner vorab freigegeben"
-last_updated: "2026-11-14T05:05:24.770Z"
+status: milestone_complete
+stopped_at: "Phase 34 abgeschlossen (11/11 Pläne, Verifikation passed); 0.8.0 im Store (Tag v0.8.0 auf b4b6518, store-submit HTTP 201, Katalog 0.8.0); #32 und #44 beantwortet und geschlossen; Milestone v1.8 fertig"
+last_updated: "2026-11-14T10:00:00.000Z"
 last_activity: 2026-11-14
 progress:
   total_phases: 5
-  completed_phases: 4
-  total_plans: 38
-  completed_plans: 38
-  percent: 80
+  completed_phases: 5
+  total_plans: 50
+  completed_plans: 50
+  percent: 100
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-12)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** Milestone v1.8, Release 0.8.0: Ordner anlegen (Issue #44) und Tasks-Bundle samt ändernden Zugriffen (Issue #32). Roadmap mit den Phasen 30 bis 34 steht, Phase 30 (Mess-Spike) ist mit 30-01 bis 30-05 ausgeführt, der Owner hat E15 am 12.11.2026 entschieden und am selben Tag das Löschen einer Aufgabe (TMOD-07) aus 0.8.0 gestrichen; Phase 31 (Ordner anlegen) ist mit sechs Plänen geplant und geprüft, als Nächstes folgt ihre Ausführung nach Owner-Freigabe.
+**Current focus:** Milestone v1.8 abgeschlossen: Release 0.8.0 (Ordner anlegen nach #44, Tasks-Bundle samt ändernden Zugriffen hinter Schalter nach #32, kein Löschen) ist seit 14.11.2026 im Nextcloud App Store. Nächster Milestone noch nicht geplant.
 
 ## Current Position
 
-Phase: 34
-Plan: Not started
-Status: Phase 32 ausgeführt inkl. Gap Closure 32-09 und 32-10 (lokal, nichts gepusht), Re-Verifikation durch die Hauptsitzung steht aus; Draft-PR 48 offen; Tasks-App auf nc35 und nc32 wieder entfernt, Testgruppen gelöscht, Anzeigename von bob zurück, keine Instanz läuft; offen für später: neun Punkte für den README-Faktencheck in Phase 34, Tag-Alias no-ai neben kein-ki als eigene Phase nach 0.8.0 (Owner 2026-11-13)
+Phase: 34 (abgeschlossen)
+Plan: 11/11
+Status: Milestone v1.8 abgeschlossen: Release 0.8.0 im Nextcloud App Store (14.11.2026), PR #48 per Fast-Forward in main, Tag v0.8.0, Signatur Verified OK, store-submit HTTP 201; Issues #32 und #44 beantwortet und geschlossen. Offen für später: Tag-Alias no-ai neben kein-ki als eigene Phase (Schreibweise fragen), Audit-Grund "unspecified" bei veraltetem ETag, Forum-Post zurückgestellt
 Last activity: 2026-11-14
 
 ## Performance Metrics
