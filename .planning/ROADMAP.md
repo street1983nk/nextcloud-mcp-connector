@@ -269,7 +269,21 @@ Plans:
   4. Release 0.8.0 ist im Store: `CHANGELOG.md`, `CHANGELOG.de.md` und `CHANGELOG.fr.md` tragen denselben 0.8.0-Block, der Gesamtlauf aller Gates ist lokal und im CI einschließlich `canary-nc35` grün, die Nachweiszeilen des Runbooks sind geschlossen; Push, Tag und Submit sind je mit Owner-Freigabe geschehen
   5. Für #32 und #44 liegen kurze Antwortentwürfe ohne schließende Schlüsselwörter vor; gepostet ist bis zum Store-Release nichts
 
-**Plans**: TBD
+**Plans**: 11 plans (acht Wellen; Rahmen für alle Pläne: `phases/34-doku-store-release-0-8-0/34-RULES.md`)
+
+Plans:
+
+- [ ] 34-01-PLAN.md: Schreibzusage in den drei READMEs und der Server-Instruktion präzisiert (Ausnahme tasks_move, Löschgrenze der Aufgaben), Wahrheitstest gegen die Registry (DOC-05)
+- [ ] 34-02-PLAN.md: README-Faktencheck aller drei Sprachen gegen den Endstand, neun Punkte aus 31-06 (DOC-04)
+- [ ] 34-03-PLAN.md: Threat-Model mit Aufgabenfamilie und Fremdtext aus geteilten Listen, Hardening EN/DE/FR, Privacy, Doku-Wahrheitstest (DOC-04, DOC-05)
+- [ ] 34-04-PLAN.md: Admin-Anleitung der Schreibschalter mit `--update-only`, übrige Doku-Stellen des Inventars, PROJECT.md (DOC-04, DOC-05)
+- [ ] 34-05-PLAN.md: Store-Text dreisprachig als Faktenliste, Owner-Freigabe (Checkpoint), danach SHA-256-Pin neu (EXAPP-13)
+- [ ] 34-06-PLAN.md: Version 0.8.0 an allen gekoppelten Stellen, CHANGELOG-Block EN/DE/FR, Inventarabschluss, Umlaut-Audit, Gesamtlauf der Gates (EXAPP-14)
+- [ ] 34-07-PLAN.md: Volltest aller Funktionen und Meldungen DE/EN/FR auf nc35 mit 0.8.0, Owner-Freigabe und Abnahme (Checkpoints) (EXAPP-14)
+- [ ] 34-08-PLAN.md: Release-Notiz englisch, Antwortentwürfe #32 und #44, Push-Frage (Checkpoint), CI des PR #48 grün inkl. canary-nc35 (EXAPP-14, EXAPP-15)
+- [ ] 34-09-PLAN.md: PR #48 per Fast-Forward in main (Owner-Vorabfreigabe), Tag v0.8.0 nach Owner-Frage (Checkpoint), release-Workflow (EXAPP-14)
+- [ ] 34-10-PLAN.md: Signatur über das heruntergeladene Asset und Store-Submit, je nach Owner-Frage (Checkpoints) (EXAPP-14)
+- [ ] 34-11-PLAN.md: Runbook Schritt 8 und Nachweiszeilen, Push-Frage für den Nachtrag (Checkpoint), Übergabe der Issue-Entwürfe an den Owner (EXAPP-14, EXAPP-15)
 
 ## Progress
 
