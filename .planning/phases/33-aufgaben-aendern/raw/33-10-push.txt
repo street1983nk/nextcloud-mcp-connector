@@ -1,0 +1,79 @@
+Rohprotokoll Plan 33-10 Task 6: Owner-Frage zum Push (kein Push in diesem Plan)
+BASIS 17429f6aae4cc636819dff1820994607a6e8a8b6
+upstream=origin/plan/v1.8-tasks-080 lokale_commits=72
+PRUEFUNG autor_committer_fremd=0 trailer=0 closes_woerter=0
+Offener Draft-PR #48 zeigt auf plan/v1.8-tasks-080; ein Push startet die CI.
+$ git log --oneline origin/plan/v1.8-tasks-080..HEAD
+17429f6 docs(33-10): evidence for the modifying task tools
+2c63ffa docs(33-10): modifying task tools proven live on Nextcloud 32
+7e99c18 docs(33-10): modifying task tools proven live on Nextcloud 35
+c44be4a docs(33-10): owner release for re-registering the ExApp on nc35
+02bf368 test(33-10): live cases for the modifying task tools
+f839542 docs(33-09): complete closing plan of phase 33
+1836c6c docs(33-09): permission table, switch and changelogs for the modifying task tools
+faede92 test(33-09): readme permission tier for modifying tools
+512ce54 test(33-09): canary and acceptance with the tasks_update switch on
+cf5d30a feat(33-09): budget anchored on the measured end state
+24de427 test(33-09): audit per call and instruction sentence
+273ac6d docs(33-08): complete tasks_move plan
+033c2fc feat(33-08): register tasks_move behind the tasks_update switch
+0e3e205 test(33-08): tasks_move in the surface gates
+59eed3a feat(33-08): move a task with its subtasks into a named list
+df493ce test(33-08): tasks_move behaviour
+e49ab93 docs(33-07): complete tasks_update plan
+05dd7b2 feat(33-07): register tasks_update behind the tasks_update switch
+e7e3cdc test(33-07): tasks_update in the surface gates
+eb3c1ca feat(33-07): change or clear named fields of a task
+d086933 test(33-07): tasks_update behaviour and round trip
+e047afb fix(33-07): refuse a task chain whose subtask text is not UTF-8
+9ad7b54 test(33-07): a subtask that is not UTF-8 refuses the whole chain
+cb3a30a docs(33-06): complete tasks_complete plan
+ea25a08 feat(33-06): register tasks_complete behind the tasks_update switch
+b63ac13 test(33-06): tasks_complete in the surface gates
+61e2f25 feat(33-06): complete and reopen a task, subtasks first
+bce8cc4 test(33-06): tasks_complete behaviour
+4b80077 docs(33-05): complete task chain plan
+83afdaf feat(33-05): task chain runner with an honest report
+4966428 test(33-05): sequential task chain that stops at the first failure
+ed73cd2 feat(33-05): descendants in post-order with cap and pre-checks
+f77edec test(33-05): descendants and pre-checks of a task chain
+827f917 docs(33-04): complete task line editor plan
+d46d2c7 feat(33-04): line editor that keeps every untouched property
+50811a9 test(33-04): round-trip proofs for the task line editor
+67edc34 docs(33-03): complete write rail and destructive gate plan
+aa94f00 test(33-03): AST pins and counter-probes for task PUT and MOVE
+8d65a51 feat(33-03): compare-and-swap PUT and guarded MOVE for tasks
+cd27f7c test(33-03): conditional task writes
+762d000 feat(33-03): tasks_read returns the etag of the task
+a57691c test(33-03): etag in task reads
+3520844 docs(33-02): complete switch chain and gates plan
+92b5b57 feat(33-02): budget measured with every switch on
+5956240 test(33-02): audit and class gates know optional tools
+3350c62 feat(33-02): annotation class MODIFY_EXISTING and switched-on surface
+323c815 test(33-02): annotation class and optional tools in the surface gates
+c0c7cd7 feat(33-02): admin switch NC_MCP_TASKS_UPDATE, off by default
+e40f5c3 test(33-02): tasks_update switch chain
+1382d14 docs(33-01c): complete chain cost and etag form plan
+92b4ea3 docs(33-01c): no owner question, no measured deviation
+66ac378 docs(33-01c): values derived for the modifying tools
+e3d88f1 docs(33-01c): chain cost on Nextcloud 32
+95cce2e docs(33-01c): chain cost and etag form on Nextcloud 35
+b78ad26 docs(33-01b): complete tasks app measurement plan
+881461e test(33-01b): tasks app fixtures for clearing and cancelled
+3f2aff6 docs(33-01b): tasks app behaviour for reopen, clearing and cancelled
+8fbbafb docs(33-01b): browser session prepared on nc35 with tasks 0.18.1
+e58dca9 docs(33-01): complete base, measurement program and release plan
+bc9a030 docs(33-01): owner release for state changes
+41ea21c docs(33-01): A17 inventory on HEAD with plan assignment
+3779083 feat(33-01): measurement program for the modifying task tools
+1f8aeaa test(33-01): helpers of the modify measurement program
+bc0798c docs(33): close plan check warnings
+423b6bb docs(33): revise plans after check
+8635813 docs(33): create phase plan
+a44b082 docs(33): pattern map
+0e7427c docs(33): owner decisions after research
+68a945c docs(33): research phase 33
+63221a9 docs(33): capture phase context
+36e413c docs(32): phase 32 complete
+da86da8 docs(32): re-verification after 32-10
+PUSHFRAGE antwort=option-a datum=2026-11-14 quelle=owner-antwort-checkpoint-33-10-task-6 (gepusht wird durch die Hauptsitzung, nicht in diesem Plan)
