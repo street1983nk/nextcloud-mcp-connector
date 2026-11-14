@@ -41,13 +41,13 @@ async def test_one_uid_only_explicit_fields(clients: NcClients) -> None:
 
 
 @pytest.mark.anyio
-async def test_rejects_non_admin(clsients: NcClients) -> None:
+async def test_rejects_non_admin(clients: NcClients) -> None:
     with respx.mock(assert_all_called=True) as mock:
         mock.get(ROOT + "/definitions").mock(
             return_value=httpx.Response(403, json=payload([], 403))
         )
         with pytest.raises(ToolError):
-            await profile_fields.browse(clsients)
+            await profile_fields.browse(clients)
         assert len(mock.calls) == 1
 
 
