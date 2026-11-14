@@ -21,7 +21,7 @@ Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick install
 - Vorab ein Mess-Spike (Phase 30) gegen echte Instanzen, weil die Recherche nichts live gemessen hat; zuerst `MKCOL` unter AppAPI-Impersonation, mit Abbruchkriterien
 - Doku, Store-Text (drei Sprachen, Entwurf vorab an den Owner) und Release 0.8.0; Phase 34
 
-**Schreibzusage:** Mit Phase 33 bekommt die Zusage "create-only, keine destruktiven Writes" erstmals eine eng begrenzte Ausnahme für eine einzelne Aufgabe (ändern und verschieben mit ETag-Prüfung; kein Löschen, E13). Kalendertermine, Dateien außerhalb von `files_update`, Notizen und alle übrigen Familien bleiben unberührt. Der Wortlaut in Constraints, Out of Scope, READMEs, `docs/threat-model.md` und Store-Text wird in Phase 34 auf das tatsächlich Ausgelieferte nachgezogen (DOC-05); bis dahin gilt für alles Ausgelieferte der alte Wortlaut.
+**Schreibzusage:** Seit 0.8.0 hat die Zusage "create-only, keine destruktiven Writes" genau zwei eng benannte Ausnahmen, beide ab Werk aus und beide nur mit dem zuvor gelesenen ETag: Mit `NC_MCP_TASKS_UPDATE` darf ein Assistent eine einzelne Aufgabe abhaken, wieder öffnen, in den genannten Feldern ändern und samt Unteraufgaben in eine andere eigene oder mit Schreibrecht geteilte Liste verschieben (`tasks_complete`, `tasks_update`, `tasks_move`); mit `NC_MCP_FILES_UPDATE` ersetzt `files_update` eine bestehende UTF-8-Textdatei. Löschen bleibt ausgeschlossen, auch für Aufgaben (E13, Owner 12.11.2026), und außer `tasks_move` verschiebt nichts. Kalendertermine, Notizen und alle übrigen Familien bleiben unberührt. READMEs, Server-Instruktion und Doku sagen das seit Phase 34 (DOC-05); der Store-Text folgt nach Owner-Freigabe (EXAPP-13).
 
 **Key context:** Owner-Ansage 28.10.: Connector-Release vor Findling 1.6 vor Gameworld Phase 6. Öffentliche Zusagen des Owners vom 08.11.2026 in #32 ("They're coming in 0.8.0 (search, read and create)") und #44 (`files_create_folder`, "optionally creating missing parent folders, in the next release"). Der Melder von #44 arbeitet fast nur mit Gruppenordnern und ACL, deshalb wird dieser Fall gemessen (E12). Issue-Antworten erst nach dem Store-Release. Die v1.7-Phasenordner 25-29 bleiben in .planning/phases/ liegen (docs/exclusion*.md, Tests und src/ verlinken darauf, Entscheid beim v1.7-Abschluss).
 
@@ -67,7 +67,7 @@ Kandidaten nach v1.7 (Stand 2026-10-01):
 - ✓ Per-User-Verwaltung in den Nextcloud-Settings , v1.0 (Verbindungsseite unter Settings/Security, Pause wirkt an allen 4 Autorisierungspunkten)
 - ✓ Kuratierte Tool-Basis , v1.0 (16 Tools, Budget-Gate 12500 Bytes, Contract-Test gegen die aktive Registry)
 - ✓ prepare_context , v1.0 (Suche + Terminwoche in einem Aufruf, Marker-Filter gegen Text-Fälschung)
-- ✓ Risikoarme Writes, destruktive Ops konstruktionsbedingt ausgeschlossen , v1.0 (AST-Grep-Gate, Zwei-Konten-Negativbeweis)
+- ✓ Risikoarme Writes, destruktive Ops konstruktionsbedingt ausgeschlossen , v1.0 (AST-Grep-Gate, Zwei-Konten-Negativbeweis); seit 0.8.0 mit den benannten Ausnahmen `files_update` und den drei Aufgabenwerkzeugen, je nur mit ETag und nur bei eingeschaltetem Schalter (ab Werk aus), Löschen weiter ausgeschlossen
 - ✓ Transport stdio + Streamable HTTP, App-Passwort + Login Flow v2 , v1.0
 - ✓ App-Store-Einreichung vor der Nextcloud Conference September 2026 , v1.0 (eingereicht 2026-08-19, fünf Wochen vor Termin)
 - ✓ Contribution-Fix an nextcloud/context_agent#227 , v1.0 (Fork + DCO-signierter Fix, Disclosure in #203)
@@ -115,7 +115,7 @@ Kandidaten nach v1.7 (Stand 2026-10-01):
 
 - openDesk-Suite-Breite (OpenProject, XWiki, Matrix, OX) - Phase 3 nach Oktober 2026, eigener Meilenstein
 - Tool-Flut (100+ Tools) - bewusste Gegenposition zum Platzhirsch; Client-Tool-Limits (z.B. Cursor 80) machen Flut zum Nachteil
-- Destruktive Operationen (Löschen, Überschreiben, Teilen/Freigaben ändern) - Sicherheitsversprechen der v1: "kann konstruktionsbedingt nichts zerstören"
+- Destruktive Operationen (Löschen, Überschreiben, Teilen/Freigaben ändern) - Sicherheitsversprechen der v1: "kann konstruktionsbedingt nichts zerstören". Löschen bleibt auch in 0.8.0 ausgeschlossen, auch für Aufgaben (E13, Owner 12.11.2026); die einzigen Ausnahmen beim Ändern sind `files_update` hinter `NC_MCP_FILES_UPDATE` und das Abhaken, Ändern und Verschieben einer einzelnen Aufgabe hinter `NC_MCP_TASKS_UPDATE`, je ab Werk aus und nur mit gelesenem ETag
 - Aufgabenlisten anlegen, umbenennen oder löschen; wiederkehrende Aufgaben ändern oder abhaken; mehrere Aufgaben je Aufruf, ausgenommen die Unteraufgaben einer genannten Aufgabe beim Abhaken und Verschieben (Owner, 12.11.2026); eine Aufgabe löschen (Owner, 12.11.2026, Auswahl "Löschen raus"); Zwischenzustände, Erinnerungen und `ATTACH`; Deck über CalDAV; Kalendertermine ändern (v1.8, Owner 11.11.2026; die Ausnahme von der Zeile darüber für eine einzelne Aufgabe steht im Milestone-Abschnitt und in den Key Decisions E8, E13, E14)
 - Ordner umbenennen, verschieben oder löschen; ein Schalter `create_parents` an `files_upload` - wäre ein stiller Zweitschreiber (v1.8)
 - Eigener LLM/RAG-Index - der MCP liefert Daten, das Modell sitzt beim Client; semantische Suche hat der Platzhirsch (Qdrant+Ollama), wir differenzieren über Zugänglichkeit und Auth
@@ -147,7 +147,7 @@ Kandidaten nach v1.7 (Stand 2026-10-01):
 - **Repo**: public auf GitHub street1983nk (privates Konto, NICHT Akara-GitLab) - Konto-Trennungs-Regel
 - **Solo-Betrieb**: Ein Entwickler; Wartungsaufwand pro Feature zählt, kuratiert schlank schlägt breit
 - **Sprache**: Code/README Englisch (internationales Nextcloud-Publikum), Projektkommunikation Deutsch; keine Em-Dashes, echte Umlaute in deutschen Texten
-- **Security**: Der MCP darf nie mehr sehen als der angemeldete Nutzer (Berechtigungs-Durchgriff); keine destruktiven Writes in v1
+- **Security**: Der MCP darf nie mehr sehen als der angemeldete Nutzer (Berechtigungs-Durchgriff); keine destruktiven Writes bis auf die eng benannte Ausnahme, eine einzelne Aufgabe abzuhaken, wieder zu öffnen, in den genannten Feldern zu ändern und in eine andere Liste zu verschieben, nur mit gelesenem ETag und nur bei eingeschaltetem `NC_MCP_TASKS_UPDATE` (ab Werk aus), sowie `files_update` mit ETag hinter `NC_MCP_FILES_UPDATE`; Löschen bleibt ausgeschlossen, auch für Aufgaben
 
 ## Key Decisions
 
@@ -159,7 +159,7 @@ Kandidaten nach v1.7 (Stand 2026-10-01):
 | mcp>=2.0,<3 statt 1.x (revidiert 14.08.) | 2.0.0 seit 28.07. GA; v2 bedient alte und neue Clients aus einem Endpoint | ✓ Good , Matrix-Test SDK 1.29 + 2.x gegen dieselbe URL grün |
 | Contribution-Fix an context_agent#227 als Flanke | Sichtbarkeit + Goodwill beim Nextcloud-Team vor der Conference | ✓ Good , Fix eingereicht, Disclosure platziert |
 | AGPL-3.0 | Ökosystem-Kultur; Übernahme-Chance wichtiger als maximale Wiederverwendbarkeit | ✓ Good |
-| Risikoarme Writes, destruktive Ops ausgeschlossen | "Kann nichts zerstören" ist Verkaufsargument, kein Mangel | ✓ Good , als Gate implementiert (AST-Grep), Kern der Store-Beschreibung und des LinkedIn-Narrativs |
+| Risikoarme Writes, destruktive Ops ausgeschlossen | "Kann nichts zerstören" ist Verkaufsargument, kein Mangel; seit 0.8.0 präzisiert: nichts löscht (auch keine Aufgabe, E13), Ändern nur über `files_update` und die drei Aufgabenwerkzeuge, je mit ETag und Schalter ab Werk aus | ✓ Good , als Gate implementiert (AST-Grep), Kern der Store-Beschreibung und des LinkedIn-Narrativs |
 | Fail-closed bei DCR-redirect_uris revidiert zu Teilregistrierung (20.08.) | Cursor registriert 3 URIs auf einmal, eine unzulässige sperrte den ganzen Client aus | ✓ Good , wirkt live (201 mit den zwei zulässigen Adressen); Cursor scheitert danach an sich selbst (schickt die verworfene cursor://-Adresse an /authorize) |
 | BL-14 "sichtbar machen plus Doku" statt cursor://-Registrierung (Owner, 20.08.) | D-35 steht (Desktop-Schemes kann jede App abfangen); E5-Seite nennt den App-Passwort-Ausweg, Doku den Grund | ✓ Good , Phase 6 verified 6/6, kein Sicherheitsversprechen aufgeweicht |
 | MUCGPT-Verprobung als geführte Lücke abgenommen (Owner, 20.08.) | Braucht fremde Instanz (it@M); Protokoll einlösbar dokumentiert | , Pending (Mail gesendet, Antwort ausstehend) |
