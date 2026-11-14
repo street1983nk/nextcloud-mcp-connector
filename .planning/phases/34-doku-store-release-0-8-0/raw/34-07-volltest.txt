@@ -1,0 +1,82 @@
+# 34-07 Volltest 0.8.0 auf Nextcloud 35, Lauf 1 (2026-11-14)
+BASIS 83a6b9d4111517fc047173c59ba1f8604e09f6aa
+FREIGABE volltest-nc35 antwort=option-a datum=2026-11-14
+KORREKTUR changelog-label commit=70e7d05 (DE/FR nennen das englische Admin-Label "Allow changing existing tasks" mit Glosse)
+
+== Docker- und RAM-Gate
+DOCKER fremd=0 laufend=0 (vor dem Start)
+RAM frei_host_gb=4.81 schwelle=4.0 ergebnis=ok
+docker start nc35-nc -> nc35-nc
+docker start nc35-harp -> nc35-harp
+docker start nc35-caddy -> nc35-caddy
+nc35-nc: installed (attempt 1)
+
+== BASELINE vorher
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+
+== Installierte Kette
+EXAPP vorher version=0.7.2 image=127.0.0.1:5000/mcp_connector:0.7.2 image_id=sha256:fc08a65ff0d61cf08373dbcd5908805c0dfbde233dfdd5c358378584e9089df4
+RUECKWEG image=0.7.2-vor34 image_id=sha256:fc08a65ff0d61cf08373dbcd5908805c0dfbde233dfdd5c358378584e9089df4
+$ occ app_api:app:unregister mcp_connector (ohne --rm-data) exit=0
+$ HP_SHARED_KEY aus nc35-harp exportiert (nicht ausgegeben); bash scripts/bootstrap_exapp.sh --nc35 exit=0 (Auszug)
+daemon harp_proxy_docker: exists
+image 127.0.0.1:5000/mcp_connector:0.8.0: built and pushed (sha256:a3b60b041174ba63121ab257235dec43d4f64cfcd6abb33fc90f9d6eb8db7728)
+image digest sha256:a3b60b041174ba63121ab257235dec43d4f64cfcd6abb33fc90f9d6eb8db7728: unchanged since the push
+exapp mcp_connector: registered and deployed
+exapp mcp_connector: enabled
+app passwords: created for alice and bob
+wrote .env.nc35
+EXAPP nachher version=0.8.0 image=127.0.0.1:5000/mcp_connector:0.8.0 image_id=sha256:a3b60b041174ba63121ab257235dec43d4f64cfcd6abb33fc90f9d6eb8db7728 status=running
+SCHALTER an files_update=on (Schlüssel fehlte nach der Neuregistrierung, daher config:set ohne --update-only angelegt; --update-only meldete 'not found') tasks_update=on (--update-only) app_neu_gestartet=ja
+VERBINDUNG nutzer=alice weg=oauth ergebnis=ok
+WERKZEUGE anzahl=31 tasks=ja familien=10 aendernd=tasks_complete,tasks_update,tasks_move
+WERKZEUGE tasks_bundle=tasks_complete,tasks_create,tasks_move,tasks_read,tasks_search,tasks_update
+
+== stdio mit beiden Schaltern an (NC_MCP_FILES_UPDATE=on NC_MCP_TASKS_UPDATE=on, Konto alice, NC_MCP_USER/NC_MCP_APP_PASSWORD aus den Testvariablen der .env.nc35)
+STDIO schalter=an tools_list=31 exit=1 grund="FAIL: never called: files_update"
+VOLLTEST calendar_create_event schalter=an urteil=OK aufrufe=1 | {"id":"event:personal:9dc8420b-8d2e-421a-a8e9-1cfdc51feedf.ics","uid":"9dc8420b-8d2e-421a-a8e9-1cfdc51feedf","
+VOLLTEST calendar_list_events schalter=an urteil=OK aufrufe=1 | {"range":{"start":"2026-11-15T06:49:34+00:00","end":"2026-11-15T09:49:34+00:00","timezone":"UTC"},"count":1,"e
+VOLLTEST contacts_search schalter=an urteil=OK aufrufe=1 | {"query":"a","count":0,"contacts":[]}
+VOLLTEST deck_browse schalter=an urteil=OK aufrufe=2 | {"level":"boards","count":13,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_edit":true},{"id":2,
+VOLLTEST deck_create_card schalter=an urteil=OK aufrufe=1 | {"id":"card:1:1:166","title":"Abnahme abnahme8b5860466f","url":"http://127.0.0.1:8082/index.php/apps/deck/card
+VOLLTEST fetch schalter=an urteil=OK aufrufe=5 | { "id": "task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics", "title": "Abnahme abnahme8b5860466f", "text"
+VOLLTEST files_create_folder schalter=an urteil=OK aufrufe=2 | {"path":"/abnahme8b5860466f-20261114-084932-ordner/a/b","created":true,"id":"file:26191","created_folders":["/
+VOLLTEST files_download schalter=an urteil=OK aufrufe=1 | {"path":"/abnahme8b5860466f-20261114-084932.md","size":54,"content_type":"text/markdown","offset":0,"bytes":54
+VOLLTEST files_list schalter=an urteil=OK aufrufe=1 | {"path":"/","count":100,"items":[{"path":"/abnahme8b5860466f-20261114-084932-ordner","name":"abnahme8b5860466f
+VOLLTEST files_read schalter=an urteil=OK aufrufe=1 | {"path":"/abnahme8b5860466f-20261114-084932.md","content":"# abnahme8b5860466f\nAbnahmelauf Phase 1, Straßenba
+VOLLTEST files_read_as_markdown schalter=an urteil=OK aufrufe=1 | {"path":"/abnahme8b5860466f-20261114-084932.docx","content":"Abnahmelauf abnahme8b5860466f\n","content_type":"
+VOLLTEST files_search schalter=an urteil=OK aufrufe=1 | {"query":"abnahme8b5860466f","folder":"/","count":2,"items":[{"path":"/abnahme8b5860466f-20261114-084932-ordne
+VOLLTEST files_update schalter=an urteil=FAIL aufrufe=0 | never called: das Abnahmeskript hat keinen Schritt für files_update
+VOLLTEST files_upload schalter=an urteil=OK aufrufe=2 | {"path":"/abnahme8b5860466f-20261114-084932.md","etag":"\"0723d36ca925562ab1ecb97f76b8186a\"","created":true}
+VOLLTEST mail_browse schalter=an urteil=OK aufrufe=3 | {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]}
+VOLLTEST notes_create schalter=an urteil=OK aufrufe=1 | {"id":"note:26195","title":"Abnahme abnahme8b5860466f","category":"","modified":1794642576,"url":"http://127.0
+VOLLTEST notes_read schalter=an urteil=OK aufrufe=1 | {"id":"note:26195","title":"Abnahme abnahme8b5860466f","content":"Abnahmelauf abnahme8b5860466f","category":""
+VOLLTEST notes_search schalter=an urteil=OK aufrufe=1 | {"count":1,"results":[{"id":"note:26195","title":"Abnahme abnahme8b5860466f","excerpt":"Abnahmelauf abnahme8b5
+VOLLTEST prepare_context schalter=an urteil=OK aufrufe=1 | {"query":"abnahme8b5860466f","window":{"start":"2026-11-14T07:49:40+00:00","end":"2026-11-21T07:49:40+00:00"},
+VOLLTEST search schalter=an urteil=OK aufrufe=1 | { "results": [ { "id": "note:26195", "title": "Abnahme abnahme8b5860466f", "url": "http://127.0.0.1:8082/apps/
+VOLLTEST tables_browse schalter=an urteil=OK aufrufe=2 | {"level":"tables","count":3,"results":[{"id":1,"title":"Welcome to Nextcloud Tables!","rowsCount":8,"columnsCo
+VOLLTEST tables_create_row schalter=an urteil=OK aufrufe=1 | {"id":253,"table_id":"1","url":"http://127.0.0.1:8082/index.php/apps/tables/#/table/1","values_written":{"What
+VOLLTEST talk_browse schalter=an urteil=OK aufrufe=2 | {"level":"conversations","count":5,"results":[{"token":"2uqkjpn2","name":"<raum>","t
+VOLLTEST talk_send schalter=an urteil=OK aufrufe=1 | {"sent":true,"id":601,"token":"2uqkjpn2","conversation":"<raum>","timestamp":1794642
+VOLLTEST tasks_complete schalter=an urteil=OK aufrufe=1 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","already":false,"status":"completed","list":{"n
+VOLLTEST tasks_create schalter=an urteil=OK aufrufe=1 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","summary":"Abnahme abnahme8b5860466f","list":{"
+VOLLTEST tasks_move schalter=an urteil=OK aufrufe=1 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","list":{"name":"personal","shared":false,"writa
+VOLLTEST tasks_read schalter=an urteil=OK aufrufe=1 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","summary":"Abnahme abnahme8b5860466f","status":
+VOLLTEST tasks_search schalter=an urteil=OK aufrufe=1 | {"tasks":[{"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","summary":"Abnahme abnahme8b5860466f"
+VOLLTEST tasks_update schalter=an urteil=OK aufrufe=2 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","list":{"name":"personal","shared":false,"writa
+VOLLTEST unified_search schalter=an urteil=OK aufrufe=1 | {"query":"abnahme8b5860466f","count":7,"results":[{"id":"note:26195","title":"Abnahme abnahme8b5860466f","subl
+MELDUNG tasks_update veraltet: "The task task:personal:<id>.ics changed since it was read. Hint: Nothing was changed: read the task again with tasks_read and use its new etag." (Englisch korrekt, kein Host, kein Token)
+
+BEFUND files_update: scripts/acceptance_all_tools.py reicht NC_MCP_FILES_UPDATE seit 33-09 durch, hat aber keinen Schritt für files_update; mit Schalter an meldet es das Werkzeug als nie aufgerufen (Exit 1). Kein Produktfehler belegt, Lücke im Abnahmeskript. Nach 34-RULES Abschnitt 11 angehalten, nicht nachgebessert; der Lauf ohne Schalter ist deshalb nicht gelaufen.
+
+== Rückbau
+RUECKBAU kalenderobjekte_alice=2 (Termin und Aufgabe des Laufs) DELETE 204, landeten trotz X-NC-CalDAV-No-Trashbin im Papierkorb, danach aus dem Papierkorb gelöscht (2x 204)
+RUECKBAU deck-kalenderobjekt=1 status=403 (Kalenderobjekt der Deck-Karte, app-generated, nicht in der BASELINE; bleibt wie Notiz, Dateien, Tabellenzeile und Talk-Nachricht des Laufs im Testkonto)
+SCHALTER aus files_update=off tasks_update=off (--update-only) app_neu_gestartet=ja
+WERKZEUGE nach_aus anzahl=27 tasks=ja familien=10 aendernd=keine
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+DOCKER ende eigene=0 (nc35-nc, nc35-harp, nc35-caddy, nc35-greenmail, nc_app_mcp_connector, nc-mcp-exapp-registry per docker stop; fremde Container: keine)
+PROZESS nc-mcp=0
+SCAN gesamt treffer=0 (Talk-Raumname maskiert als <raum>)

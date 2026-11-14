@@ -4,3 +4,5 @@ FREIGABE store-text antwort=freigabe-mit-aenderung discussion=kein datum=2026-11
   discussion: "Kein Link (Empfohlen)", kein discussion-Element.
   summary: alle drei unverändert.
   Quelle: Owner-Antwort per AskUserQuestion, über die Hauptsitzung übermittelt.
+FREIGABE volltest-nc35 antwort=option-a datum=2026-11-14
+  Owner-Antwort: "Ja, NC 35 komplett (Empfohlen)" per AskUserQuestion, über die Hauptsitzung übermittelt.
