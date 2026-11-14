@@ -1091,6 +1091,9 @@ async def test_shared_lists_carry_no_owner_and_the_right_flags(run: Run) -> None
             f"a: {lists.get(LISTS['a'][2])}",
         )
         case.expect(task_id(run, "fremdrw") in hit_ids(answer), "the task of the rw share is a hit")
+        # Plan 33-11: a list missing from the hits is either named here (budget or error) or
+        # was not in the discovery at all; without this line a failure cannot tell which.
+        case.note(f"degraded {answer.get('degraded') or 'keine'}")
 
 
 async def test_a_named_writable_shared_list_is_written_to(run: Run) -> None:
