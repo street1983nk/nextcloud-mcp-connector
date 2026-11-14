@@ -66,6 +66,15 @@ dans [CHANGELOG.md](CHANGELOG.md).
   liste de tâches dans un résultat du fournisseur de recherche Nextcloud `tasks` issu de
   cette liste ; là où ce nom ne peut pas être retiré sans risque, la ligne est omise.
 
+## [0.7.3] - 2026-11-13
+
+### Sécurité
+
+- opentelemetry-api passe de 1.45.1 à 1.45.2, ce qui corrige CVE-2026-126360
+  (GHSA-mf5v-w3w3-f6cg, faible) : une expression régulière lente lors de la
+  lecture de l'en-tête `traceparent` des requêtes entrantes, atteinte via le SDK
+  MCP. pip-audit sur l'ensemble livré est de nouveau propre.
+
 ## [0.7.2] - 2026-11-06
 
 ### Corrigé
