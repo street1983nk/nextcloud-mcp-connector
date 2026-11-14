@@ -605,7 +605,7 @@ wheels = [
 
 [[package]]
 name = "nextcloud-mcp-connector"
-version = "0.7.3"
+version = "0.8.0"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
