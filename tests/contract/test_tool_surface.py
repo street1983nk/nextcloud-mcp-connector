@@ -47,6 +47,8 @@ from mcp_connector.server import (
 from mcp_connector.tools import mail as mail_tools
 
 README = Path(__file__).resolve().parents[2] / "README.md"
+#: The three READMEs (EN, DE, FR); each carries the permission table (plan 33-09).
+READMES = (README, README.with_name("README.de.md"), README.with_name("README.fr.md"))
 DOCS = Path(__file__).resolve().parents[2] / "docs"
 
 # The curated set (D-03 to D-09). A set comparison, not a subset check: a twenty-eighth tool
@@ -1040,41 +1042,165 @@ async def test_no_input_schema_accepts_a_user_parameter() -> None:
 LEVELS = ("read", "create-only", "conditional-update", "modify")
 
 
-@pytest.mark.anyio
-async def test_the_readme_permission_table_matches_the_live_registry() -> None:
-    """D-16: the documented permission level is generated from the same truth, or it lies."""
-    async with Client(mcp, raise_exceptions=True) as client:
-        tools = {tool.name: tool for tool in (await client.list_tools()).tools}
-
+def _documented_levels(text: str) -> dict[str, str]:
+    """Tool name to permission level, read from the table rows of one README."""
     documented: dict[str, str] = {}
-    for line in README.read_text(encoding="utf-8").splitlines():
+    for line in text.splitlines():
         if not line.startswith("| `"):
             continue
         cells = [cell.strip() for cell in line.strip("|").split("|")]
         if len(cells) < 2 or cells[1] not in LEVELS:
             continue
         documented[cells[0].strip("`")] = cells[1]
+    return documented
 
-    # Derived from the one list of optional tools, so a tool of plans 33-06 to 33-08 is
-    # expected in the README the day it enters that list, and with it its level ``modify``
-    # (plan 33-06 brought the level forward: without it the first modifying tool could not be
-    # documented at all). Plan 33-09 adds the other two READMEs to this check.
-    optional_tools = set(OPTIONAL_TOOLS)
-    assert set(documented) - optional_tools == set(tools), (
-        "the README's always-available tools must match the default registry"
+
+def _readme_levels(readme: Path) -> dict[str, str]:
+    """The permission levels of one README file."""
+    return _documented_levels(readme.read_text(encoding="utf-8"))
+
+
+def _expected_level(name: str) -> str:
+    return (
+        "conditional-update"
+        if name == "files_update"
+        else "modify"
+        if name in MODIFY_TOOLS
+        else "create-only"
+        if name in CREATE_TOOLS or name in IDEMPOTENT_CREATE_TOOLS
+        else "read"
     )
-    assert optional_tools <= set(documented), "the README must document optional tools too"
-    for name, level in sorted(documented.items()):
-        expected = (
-            "conditional-update"
-            if name == "files_update"
-            else "modify"
-            if name in MODIFY_TOOLS
-            else "create-only"
-            if name in CREATE_TOOLS or name in IDEMPOTENT_CREATE_TOOLS
-            else "read"
-        )
-        assert level == expected, f"README calls {name} {level}, the registry says {expected}"
+
+
+def _permission_findings(documented: dict[str, str], default_tools: set[str]) -> list[str]:
+    """What separates one README table from the registry, in the printed form.
+
+    One function for the gate and its counter proofs. Derived from the one list of optional
+    tools, so a tool of plans 33-06 to 33-08 is expected in every README the day it enters
+    that list, and with it its level ``modify``.
+    """
+    optional_tools = set(OPTIONAL_TOOLS)
+    findings = [
+        f"{name} is registered by default but not documented"
+        for name in sorted(default_tools - set(documented))
+    ]
+    findings += [
+        f"{name} is documented but neither registered by default nor optional"
+        for name in sorted(set(documented) - default_tools - optional_tools)
+    ]
+    findings += [
+        f"{name} is optional but not documented"
+        for name in sorted(optional_tools - set(documented))
+    ]
+    findings += [
+        f"{name} is documented as {level}, the registry says {_expected_level(name)}"
+        for name, level in sorted(documented.items())
+        if level != _expected_level(name)
+    ]
+    return findings
+
+
+async def _default_tool_names() -> set[str]:
+    async with Client(mcp, raise_exceptions=True) as client:
+        return {tool.name for tool in (await client.list_tools()).tools}
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("readme", READMES, ids=lambda path: path.name)
+async def test_the_readme_permission_table_matches_the_live_registry(readme: Path) -> None:
+    """D-16: the documented permission level is generated from the same truth, or it lies.
+
+    All three READMEs since plan 33-09, because each of them is a promise to its reader.
+    """
+    documented = _readme_levels(readme)
+
+    findings = _permission_findings(documented, await _default_tool_names())
+
+    assert findings == [], f"{readme.name}: " + "; ".join(findings)
+
+
+@pytest.mark.anyio
+async def test_the_permission_gate_reports_a_wrong_level_and_a_missing_row() -> None:
+    """Counter proof through the same function: a planted level and a dropped row are named."""
+    default_tools = await _default_tool_names()
+    documented = _readme_levels(README)
+    assert _permission_findings(documented, default_tools) == []
+
+    planted = {**documented, "tasks_move": "create-only"}
+    assert _permission_findings(planted, default_tools) == [
+        "tasks_move is documented as create-only, the registry says modify"
+    ]
+    dropped = {name: level for name, level in documented.items() if name != "tasks_update"}
+    assert _permission_findings(dropped, default_tools) == [
+        "tasks_update is optional but not documented"
+    ]
+    softened = {**documented, "tasks_complete": "conditional-update"}
+    assert _permission_findings(softened, default_tools) == [
+        "tasks_complete is documented as conditional-update, the registry says modify"
+    ]
+
+
+#: The admin label of the switch in the language of each README (D-33-01, plan 33-02).
+SWITCH_LABELS = {
+    "README.md": "Allow changing existing tasks",
+    "README.de.md": "Bestehende Aufgaben ändern erlauben",
+    "README.fr.md": "Autoriser la modification des tâches existantes",
+}
+
+
+def _bundle_entry(text: str, bundle: str) -> str:
+    """The entry of one bundle in the bundle list, continuation lines included."""
+    lines = text.splitlines()
+    start = next(
+        (i for i, line in enumerate(lines) if line.lstrip().startswith(f"- `{bundle}`")), None
+    )
+    if start is None:
+        return ""
+    entry = [lines[start]]
+    for line in lines[start + 1 :]:
+        if line.lstrip().startswith("- ") or not line.startswith("    "):
+            break
+        entry.append(line)
+    return " ".join(entry)
+
+
+def _switch_findings(name: str, text: str) -> list[str]:
+    """What one README misses of the tasks_update switch, in the printed form."""
+    findings: list[str] = []
+    label = SWITCH_LABELS[name]
+    switch_lines = [line for line in text.splitlines() if "NC_MCP_TASKS_UPDATE" in line]
+    if not any(label in line for line in text.splitlines()):
+        findings.append(f"{name}: the label {label!r} of the switch is missing")
+    if not any("tasks_complete" not in line for line in switch_lines):
+        findings.append(f"{name}: NC_MCP_TASKS_UPDATE appears only in the permission table")
+    entry = _bundle_entry(text, "tasks")
+    findings += [
+        f"{name}: the tasks bundle does not name {tool}"
+        for tool in sorted(MODIFY_TOOLS)
+        if f"`{tool}`" not in entry
+    ]
+    return findings
+
+
+@pytest.mark.parametrize("readme", READMES, ids=lambda path: path.name)
+def test_each_readme_documents_the_tasks_update_switch(readme: Path) -> None:
+    """Plan 33-09: the switch with its label, and the tasks bundle with its optional tools."""
+    assert _switch_findings(readme.name, readme.read_text(encoding="utf-8")) == []
+
+
+def test_the_switch_gate_reports_a_missing_label_and_bundle_tool() -> None:
+    """Counter proof through the same function, on a text built for it."""
+    text = (
+        "- `tasks`: `tasks_search`, `tasks_read`, `tasks_create`, and `tasks_complete`,\n"
+        "    `tasks_update` (only when enabled)\n"
+        "- `talk`: `talk_browse`\n"
+        "| `tasks_complete` | modify | ... `NC_MCP_TASKS_UPDATE` |\n"
+    )
+    assert _switch_findings("README.md", text) == [
+        "README.md: the label 'Allow changing existing tasks' of the switch is missing",
+        "README.md: NC_MCP_TASKS_UPDATE appears only in the permission table",
+        "README.md: the tasks bundle does not name tasks_move",
+    ]
 
 
 def test_a_documented_tool_count_is_the_current_one_or_says_which_run_it_is_from() -> None:
