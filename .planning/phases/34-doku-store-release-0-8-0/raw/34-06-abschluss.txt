@@ -1,0 +1,30 @@
+# 34-06 Abschlussprotokoll (Inventar, Sprachprüfung, Gates)
+# Datum: 2026-11-14
+# Basis B = 83a6b9d4111517fc047173c59ba1f8604e09f6aa (docs(34): create phase plan), Positivkontrolle grün (40 Hex, Vorfahr von HEAD)
+
+## Inventarabschluss
+# Quelle: .planning/phases/33-aufgaben-aendern/raw/33-01-inventar.txt, alle Zeilen ZUORDNUNG mit plan=34 (gezählt: 48)
+# Abgleich je Schlüssel <datei>:<alte zeile> gegen die ERLEDIGT-Zeilen in raw/34-01-inventar.txt bis raw/34-05-inventar.txt
+# ERLEDIGT-Zeilen je Datei: 34-01=16, 34-03=15, 34-04=14, 34-05=3 (34-02 führt kein Inventar, nur raw/34-02-faktencheck.txt)
+# Fehlende Schlüssel: keine. Doppelte ERLEDIGT-Schlüssel: keine. ERLEDIGT ohne ZUORDNUNG: keine.
+# Zusätzlich: BESTAETIGT docs/n8n-setup.md:40 plan=entfaellt (34-04), nicht Teil der 48
+INVENTAR gesamt=48 erledigt=48 offen=0
+
+## Umlaut-Audit (hinzugefügte Zeilen seit B, Fundstellen ae/oe/ue/ss gelesen)
+# README.de.md: Assistenten (2), Passwort, bewusst, gemessenen, neue, neuer, ungemessen, zuerst (2): echt; value: Code `--value`
+UMLAUT README.de.md geprueft=12 fehler=0
+# docs/hardening.de.md: Assistent, lassen, stattdessen, zuverlässig: echt
+UMLAUT docs/hardening.de.md geprueft=4 fehler=0
+# appinfo/info.xml, DE-Beschreibung: vertrauenswürdige: echt (übrige Treffer across, missing, message, dossiers, marquer, que, suppression stehen in EN/FR)
+UMLAUT appinfo/info.xml geprueft=1 fehler=0
+# CHANGELOG.de.md: seit B unverändert (Block folgt in Task 2)
+
+## Französische Typografie (hinzugefügte Zeilen seit B; Code, URLs und Linkziele ausgenommen)
+# Prüfmuster: Satzzeichen : ; ? ! ohne Leerzeichen davor; Positivkontrolle "voici: test" wird gemeldet
+# Apostrophe: README.fr.md 0 typografische, 108 gerade; hardening.fr.md 0 typografische, 53 gerade (einheitlich je Datei)
+FRANZ README.fr.md geprueft=44 fehler=0
+FRANZ docs/hardening.fr.md geprueft=14 fehler=0
+FRANZ appinfo/info.xml geprueft=5 fehler=0
+
+## Strich-Prüfung (LC_ALL=C.UTF-8, Positivkontrolle Exit 0)
+DASH README*.md CHANGELOG*.md docs/*.md appinfo/info.xml treffer=0
