@@ -24,3 +24,7 @@ FREIGABE signatur antwort=signieren-und-hochladen datum=2026-11-14
   Owner-Antwort: "Signieren und hochladen (Empfohlen)" per AskUserQuestion.
 FREIGABE submit antwort=workflow datum=2026-11-14
   Owner-Antwort: "Workflow einreichen (Empfohlen)" per AskUserQuestion.
+FREIGABE post-issues antwort=posten datum=2026-11-14
+  Owner: "Du kannst die Kommentare posten"; englische Teile aus raw/34-08-issue-32.md und -44.md gepostet (issuecomment-6874963457, issuecomment-6874963631).
+FREIGABE close-issues antwort=schliessen datum=2026-11-14
+  Owner: "Schließen"; #32 und #44 CLOSED als completed.
