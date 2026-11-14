@@ -65,6 +65,11 @@ without a relocation; the real relocation between two lists is the canary's), an
 ``tasks_update`` once more with the very first ETag, which is stale by then and has to be
 refused. With the switch off the three are named as not registered and are not called.
 
+With ``NC_MCP_FILES_UPDATE=on`` the same holds for ``files_update``: it replaces the text of the
+file uploaded in step one with the ETag ``files_upload`` handed back, and a second call with
+that first ETag, stale by then, has to be refused. With the switch off it is named as not
+registered and is not called.
+
 ``fetch`` is called once per id kind that needs an object of this instance, and every one of
 those ids comes out of a read of the same run: a ``fetch("mail:<number>")`` on a guessed number
 would be a request about somebody's mail, and ``message:`` and ``table:`` are no different. A
@@ -94,6 +99,9 @@ REQUIRED_ENV = ("NC_MCP_URL", "NC_MCP_USER", "NC_MCP_APP_PASSWORD")
 
 #: Switches handed on to the server when they are set here; nothing else of this environment is.
 FORWARDED_SWITCHES = ("NC_MCP_FILES_UPDATE", "NC_MCP_TASKS_UPDATE")
+
+#: The one modifying file tool, registered only behind ``NC_MCP_FILES_UPDATE``.
+FILES_UPDATE = "files_update"
 
 #: The modifying task tools, registered only behind ``NC_MCP_TASKS_UPDATE`` (TMOD-05).
 MODIFY_TASK_TOOLS = ("tasks_update", "tasks_complete", "tasks_move")
@@ -218,7 +226,7 @@ async def run(client: Client, report: Report) -> set[str]:
 
     # --- files ------------------------------------------------------------------------
     path = f"/{marker}-{stamp}.md"
-    await call(
+    upload = await call(
         client,
         report,
         "files_upload",
@@ -251,6 +259,7 @@ async def run(client: Client, report: Report) -> set[str]:
     await call(client, report, "files_list", {"path": "/"})
     await call(client, report, "files_read", {"path": path})
     await call(client, report, "files_download", {"path": path})
+    await _update_file(client, report, marker, path, loads(upload), registered=set(names))
 
     # files_read_as_markdown refuses text by design, so it needs a document of its own. The
     # smallest Word file goes up through the binary path of files_upload and is read back
@@ -454,6 +463,48 @@ async def run(client: Client, report: Report) -> set[str]:
 #: Part of the refusal of ``tasks_create`` without ``list`` when the account has more than one
 #: own task list to write to. On the test instance that is a broken prerequisite of this run.
 TASKS_MORE_THAN_ONE = "more than one task list"
+
+
+async def _update_file(
+    client: Client,
+    report: Report,
+    marker: str,
+    path: str,
+    uploaded: dict[str, Any],
+    *,
+    registered: set[str],
+) -> None:
+    """files_update with the ETag of files_upload, then that ETag once more, which is stale.
+
+    The first call replaces the text of the file this run uploaded and has to answer with a new
+    ETag; the second call names the ETag of the upload again. The file changed since, so
+    anything but a refusal is a ``FAIL``. With ``NC_MCP_FILES_UPDATE`` off the tool is not
+    registered and is named as such, not called.
+    """
+    if FILES_UPDATE not in registered:
+        print(f"  {'-':<7} {FILES_UPDATE:<22} not registered (switch off)", flush=True)
+        return
+    first_etag = str(uploaded.get("etag") or "")
+    if not first_etag:
+        report.add(FILES_UPDATE, "FAIL", "files_upload handed back no etag to update the file with")
+        return
+    content = f"# {marker}\nAbnahmelauf Phase 1, geändert.\n"
+    updated = loads(
+        await call(
+            client, report, FILES_UPDATE, {"path": path, "content": content, "etag": first_etag}
+        )
+    )
+    if not updated:
+        return
+    if str(updated.get("etag") or "") in ("", first_etag):
+        report.add(FILES_UPDATE, "FAIL", f"the update handed back no new etag: {updated}")
+    stale = await client.call_tool(
+        FILES_UPDATE, {"path": path, "content": f"# {marker}\nveraltet\n", "etag": first_etag}
+    )
+    if stale.is_error:
+        report.add(FILES_UPDATE, "OK", f"stale etag refused: {text_of(stale)}")
+    else:
+        report.add(FILES_UPDATE, "FAIL", f"a stale etag was accepted: {text_of(stale)}")
 
 
 async def _tasks(client: Client, report: Report, marker: str, *, registered: set[str]) -> None:
