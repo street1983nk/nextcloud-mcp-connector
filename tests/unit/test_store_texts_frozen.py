@@ -6,7 +6,10 @@ the Nextcloud App Store with the next release. Phase 29 kept them byte-identical
 to ca157b4; release 0.4.0 renewed the pin with the owner's decision of 2026-10-01
 (the kein-ki bullet and Office and PDF in the tools bullet, in all three languages);
 release 0.6.0 renewed it with the owner's decision of 2026-10-18 (the files_update
-bullet, and the summary now says read, search, create and edit as the signed-in user).
+bullet, and the summary now says read, search, create and edit as the signed-in user);
+release 0.8.0 renewed it with the owner's decision of 2026-11-14 (tasks in the tools
+bullet, the delete limit names tasks and moving names the one task exception, the new
+folder and task bullets, and the ChatGPT upload bullet kept without a version number).
 
 Why a hash instead of ``git show ca157b4:appinfo/info.xml``: the CI job
 ``unit`` checks out with depth 1, the reference commit is not available there.
@@ -34,8 +37,8 @@ from mcp_connector.nextcloud.clients.xml import hardened_parser
 ROOT = Path(__file__).resolve().parents[2]
 INFO_XML = ROOT / "appinfo" / "info.xml"
 
-FROZEN_AT = "release 0.7.0"
-EXPECTED_SHA256 = "bc1dbc16ae2bbbb796ef1565540205520f0e29096d053285b01713ee02a8b96a"
+FROZEN_AT = "release 0.8.0"
+EXPECTED_SHA256 = "4e510fec45ca96e341b53968a31c6cc5c84fd2d3d683a7135122381b281ba902"
 EXPECTED_COUNT = 6
 
 _STORE_TAGS = ("summary", "description")

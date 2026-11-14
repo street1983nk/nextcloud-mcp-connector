@@ -143,3 +143,7 @@ Variante B (falls die Fähigkeit sichtbar bleiben soll), als normaler Punkt ohne
 Das Runbook (docs/store-submission.md, Zeile 0.7.0) sah den `<discussion>`-Link für 0.8.0 vor: "travels with 0.8.0 once the forum thread exists". Laut Owner-Entscheid vom 12.11. ist der Forum-Post zurückgestellt (erst nach PII Redaction und Audio & Video Search). Frage an den Owner: Gibt es eine Forum-URL für `<discussion>`, oder bleibt es bei "kein Link"? Ohne URL vom Owner kommt kein `<discussion>`-Element in info.xml.
 
 Antwortform: `freigabe`, `aenderung: ...` oder `nein`; dazu `discussion=<url>` oder `discussion=kein`.
+
+## 7. Freigabe (2026-11-14)
+
+Freigegeben mit Änderung (raw/34-freigaben.txt): DE Zeile 89 "kein Löschen, auch nicht von Aufgaben" statt "auch keiner Aufgabe"; EN und FR unverändert. Der Punkt 0.7.0 bleibt als Variante B ohne Versionsnummer, direkt nach dem Punkt zum Ändern von Aufgaben. Kein discussion-Element. summaries unverändert.
