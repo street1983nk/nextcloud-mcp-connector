@@ -8,24 +8,13 @@ Ein schlankes MCP-only-ExApp für Nextcloud: Nutzer installieren es per Klick au
 
 Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer. Seit v1.7 auf Wunsch weniger: was das System-Tag `kein-ki` trägt, sieht er gar nicht.
 
-## Current Milestone: v1.8 Tasks-Bundle und Ordner anlegen (Release 0.8.0)
+## Current Milestone
 
-**Goal:** Der Connector kann Nextcloud-Aufgaben suchen, lesen, anlegen, abhaken, wieder öffnen, ändern und in eine andere Liste verschieben (Issue #32) und Ordner anlegen, wahlweise mit fehlenden Elternordnern (Issue #44). Am Ende steht EIN Release 0.8.0 im Store (Submit nur mit Owner-Freigabe); ein 0.8.1 ist nicht eingeplant (Owner-Entscheid 11.11.2026).
-
-**Stand 11.11.2026:** Im Milestone-Zeitraum sind drei Releases erschienen: 0.7.0 (28.10., native ChatGPT-Dateianhänge in `files_upload` aus PR #17 von ivankhokhryakov, Dependency-Bumps), 0.7.1 (02.11., Security-Release: pypdf 6.21.4 und weitere Patch-Stände) und 0.7.2 (06.11., die zehn `NC_MCP_EXCHANGE_*`-Variablen in `appinfo/info.xml` deklariert, Issue #42). Das Tasks-Bundle reist als 0.8.0, zusammen mit dem Ordner-Werkzeug aus #44 (Owner-Entscheid 11.11.2026). Recherche: `.planning/research/v1.8-tasks-080-RESEARCH.md` (Commit 5ddaddf); Anforderungen: `.planning/REQUIREMENTS.md` (34 Requirements); Roadmap: Phasen 30 bis 34.
-
-**Target features (Release 0.8.0):**
-- Ordner anlegen (Issue #44): `files_create_folder`, wahlweise mit fehlenden Elternordnern (höchstens 10 neue Ordner je Aufruf), hinter Ausschluss `kein-ki`, Sandbox, Paartest, Kanarie und Audit; Phase 31, allein releasefähig
-- Tasks-Bundle (Issue #32) als zehnte Familie `tasks`: `tasks_search`, `tasks_read`, `tasks_create` über CalDAV VTODO (Titel, Liste, Beschreibung, Fälligkeit, Startdatum, Priorität, Tags, Zeitzone, Elternaufgabe), dazu die `task:`-Id über `fetch`; Phase 32
-- Aufgaben ändern: eine einzelne Aufgabe abhaken und wieder öffnen (`tasks_complete`, Arbeitsname), in Titel, Beschreibung, Fälligkeit, Startdatum, Priorität, Tags und Elternaufgabe ändern (`tasks_update`) und in eine andere Liste verschieben, jeweils nur mit gelesener ETag; Phase 33. Kein Löschen in 0.8.0 (E13, Owner 12.11.2026)
-- Vorab ein Mess-Spike (Phase 30) gegen echte Instanzen, weil die Recherche nichts live gemessen hat; zuerst `MKCOL` unter AppAPI-Impersonation, mit Abbruchkriterien
-- Doku, Store-Text (drei Sprachen, Entwurf vorab an den Owner) und Release 0.8.0; Phase 34
-
-**Schreibzusage:** Seit 0.8.0 hat die Zusage "create-only, keine destruktiven Writes" genau zwei eng benannte Ausnahmen, beide ab Werk aus und beide nur mit dem zuvor gelesenen ETag: Mit `NC_MCP_TASKS_UPDATE` darf ein Assistent eine einzelne Aufgabe abhaken, wieder öffnen, in den genannten Feldern ändern und samt Unteraufgaben in eine andere eigene oder mit Schreibrecht geteilte Liste verschieben (`tasks_complete`, `tasks_update`, `tasks_move`); mit `NC_MCP_FILES_UPDATE` ersetzt `files_update` eine bestehende UTF-8-Textdatei. Löschen bleibt ausgeschlossen, auch für Aufgaben (E13, Owner 12.11.2026), und außer `tasks_move` verschiebt nichts. Kalendertermine, Notizen und alle übrigen Familien bleiben unberührt. READMEs, Server-Instruktion und Doku sagen das seit Phase 34 (DOC-05); der Store-Text folgt nach Owner-Freigabe (EXAPP-13).
-
-**Key context:** Owner-Ansage 28.10.: Connector-Release vor Findling 1.6 vor Gameworld Phase 6. Öffentliche Zusagen des Owners vom 08.11.2026 in #32 ("They're coming in 0.8.0 (search, read and create)") und #44 (`files_create_folder`, "optionally creating missing parent folders, in the next release"). Der Melder von #44 arbeitet fast nur mit Gruppenordnern und ACL, deshalb wird dieser Fall gemessen (E12). Issue-Antworten erst nach dem Store-Release. Die v1.7-Phasenordner 25-29 bleiben in .planning/phases/ liegen (docs/exclusion*.md, Tests und src/ verlinken darauf, Entscheid beim v1.7-Abschluss).
+Keiner aktiv. v1.8 wurde am 2026-11-14 abgeschlossen, Release 0.8.0 steht im Store. Der nächste Zyklus startet mit `/gsd:new-milestone`, sobald das Owner-Thema feststeht (Kandidaten unter Next Milestone Goals). Die Phasenordner 25 bis 34 bleiben in .planning/phases/ liegen, weil Doku, Tests und Skripte auf sie verweisen (Entscheid beim v1.7-Abschluss, beim v1.8-Abschluss beibehalten).
 
 ## Current State
+
+**v1.8 shipped 2026-11-14, Release 0.8.0 im Store** (kein separates Milestone-Audit, wie v1.5 bis v1.7; 33/33 Requirements, TMOD-07 seit 12.11. Out of Scope; Phasen 31 bis 33 goal-backward verifiziert, Phase 34 mit 48/48 must-haves, Phase 30 als Mess-Spike mit Messbericht docs/spike-tasks.md; 8217 Unit- und Contract-Tests, CI-Lauf 43580117707 auf main 00525cb grün inkl. canary-nc35): Ein Assistent legt mit `files_create_folder` Ordner an, wahlweise mit fehlenden Elternordnern (höchstens 10 je Aufruf), hinter Ausschluss `kein-ki`, Sandbox, Paartest, Kanarie und Audit (#44). Die zehnte Familie `tasks` sucht, liest und legt Aufgaben über CalDAV VTODO an, mit `task:`-Id über `fetch` und Suchprovider, ohne je still in eine fremdsichtbare Liste zu schreiben und ohne Deck-Karten (#32). Hinter `NC_MCP_TASKS_UPDATE` (ab Werk aus) hakt `tasks_complete` eine einzelne Aufgabe ab oder öffnet sie wieder, ändert `tasks_update` ihre Felder und verschiebt `tasks_move` sie samt Unteraufgaben in eine andere Liste, jeweils nur mit gelesener ETag; nichts löscht, auch keine Aufgabe. Die Schreibzusage ist in READMEs, Server-Instruktion, Doku und Store-Text darauf präzisiert und von einem Test gegen die Registry gehalten. 27 Werkzeuge im Standard (18770 Bytes), 31 mit allen Schaltern (22198 Bytes), Budget 26000. Release: Tag v0.8.0 auf b4b6518, store-submit HTTP 201; #32 und #44 beantwortet und geschlossen. Nebenläufig im Milestone-Zeitraum: Releases 0.7.0 (28.10.), 0.7.1 (02.11.), 0.7.2 (06.11.) und 0.7.3 (13.11.).
 
 **v1.7 shipped 2026-10-01** (kein separates Milestone-Audit, wie v1.5 und v1.6; 14/14 Requirements, alle fünf Phasen goal-backward verifiziert, fünf secure-phase-Läufe mit threats_open 0, 5312 Unit- und Contract-Tests, CI-Lauf 36861555478 auf 5a89219 grün inkl. canary-nc35 und SBX-01 gegen echten Findling): Eine Datei oder ein Ordner mit dem kollaborativen System-Tag `kein-ki` (Groß-/Kleinschreibung egal, alle gleichnamigen Varianten, Subtree über die Segmentregel) erscheint in keiner Tool-Antwort mehr, weder als Treffer noch als Inhalt, Ausschnitt, Digest oder eingesetzter Dateiname. Getaggt antwortet byte-gleich wie nicht existent; ist die Prüfung nicht beantwortbar, hält jede Familie ihre dateitragenden Einträge zurück und meldet genau einen degraded-Eintrag, im Erfolgsfall ohne Zähler. Ein REPORT je Antwort (Single-Flight), Fail-closed hängt am REPORT-Ausgang, nicht an der Capability. Pfadlose Findling-, Notes- und comments-Treffer laufen durch dieselbe Sandbox. Die Grenze ist ein Gate: Klassifikations-Freeze 12/3/7, Kanarie über alle 22 Werkzeuge in vier Modi, 14 byte-gleiche Live-Paare, AST-Nadeln gegen jeden Tag-Schreibpfad. `occ mcp_connector:exclusion:check` prüft Existenz, Sichtbarkeit und Varianten nur lesend; docs/exclusion.md (EN/DE/FR) nennt 17 ehrliche Grenzen mit Befundlinks. NICHT released: der Filter reist mit 0.4.0 (geplant nach PR #14), die Store-Texte sind per SHA-256-Pin unverändert. Nebenläufig im Milestone-Zeitraum: Releases 0.3.0 (26.09., Exchange-Pfad und PR-#8-Features), 0.3.1 und 0.3.2 (Hotfixes zu Issues #10, #11, #12), PR #13 gemergt.
 
@@ -50,9 +39,10 @@ BL-12 MUCGPT-Verprobung wartet auf it@M-Antwort).
 
 ## Next Milestone Goals
 
-Kandidaten nach v1.7 (Stand 2026-10-01):
-- **Release 0.4.0 (geplant, nur mit Owner-Freigabe):** nach dem Merge von PR #14 (andrewyager, files_read_as_markdown); bündelt den kein-ki-Filter aus v1.7, die Store-Text-Erwähnung des Tags in drei Sprachen (EXCL-F02) und den Inhalt von PR #14
-- **files_update / Schreibzugriff mit harten Schienen:** Community-PR nach Design-Issue #9, extern getaktet; der Klassifikations-Freeze aus Phase 28 macht ein neues Werkzeug ohne Eintrag rot
+Kandidaten nach v1.8 (Stand 2026-11-14):
+- **Tag-Alias `no-ai` neben `kein-ki`:** eigene kleine Phase nach 0.8.0 (Entscheid 13.11.2026); die Schreibweise beim Owner erfragen, bevor geplant wird. Berührt D-v1.7-01 (fester Tag-Name, keine Konfiguration), deshalb ein fester zweiter Name, kein Konfigurationswert
+- **Audit-Grund "unspecified" bei veraltetem ETag:** offen aus Phase 34 (34-11): ein mit veralteter ETag abgelehnter Schreibversuch trägt im Audit heute den Grund "unspecified"
+- **Forum-Post zu 0.8.0:** zurückgestellt, bis PII Redaction und Audio & Video Search fertig sind; der Owner postet
 - **Enterprise-Governance auf dem Tag (EXCL-F01):** instanzweite Policies, Allow-Mode, Blocked-Access-Beweis im Audit-Log, Vier-Augen; bezahlte Schicht, erst nach dem Fabrice-Call
 - **F13-Wiederaufnahme**, sobald Denny Mattern antwortet: EXCH-F01, EXCH-F02, CLIENT-02
 - Enterprise-/ISV-Spur: Fake-Door-Auswertung ab Oktober, Findling-Pro-Entscheid vertagt auf 03.11.
@@ -98,16 +88,18 @@ Kandidaten nach v1.7 (Stand 2026-10-01):
 - ✓ Sandbox-Parität für pfadlose Findling-Treffer und Notes , v1.7 (SBX-01, SBX-02; SBX-01 im CI gegen echten Findling)
 - ✓ Die Grenze als Gate: Klassifikations-Freeze, Kanarie über alle Werkzeuge, byte-gleiche Paare auch im Ausfall, AST-Nadeln gegen Tag-Schreibpfade , v1.7 (GATE-01 bis GATE-03, EXCL-07)
 - ✓ Prüfkommando `occ mcp_connector:exclusion:check` und dreisprachige Betreiberdoku mit ehrlichen Grenzen , v1.7 (OPS-01, DOC-03)
+- ✓ Store-Text-Erwähnung des Tags `kein-ki` in drei Sprachen , Release 0.4.0 (EXCL-F02; `appinfo/info.xml` des Tags v0.4.0 nennt das Tag in EN, DE und FR)
+- ✓ Mess-Spike für Aufgaben und Ordner gegen echte Instanzen, kein Abbruchkriterium ausgelöst , v1.8 (MESS-01 bis MESS-06; Messbericht docs/spike-tasks.md)
+- ✓ Ordner anlegen über `files_create_folder` hinter der v1.7-Kette, live auf Nextcloud 35 und 32 unter Impersonation , v1.8 (FOLD-01 bis FOLD-06; docs/folder-evidence.md)
+- ✓ Tasks-Bundle suchen, lesen, anlegen als zehnte Familie, `task:`-Id über `fetch` und Suchprovider , v1.8 (TASK-01 bis TASK-09; docs/tasks-evidence.md)
+- ✓ Eine einzelne Aufgabe abhaken, wieder öffnen, ändern und verschieben, nur mit gelesener ETag und hinter `NC_MCP_TASKS_UPDATE`; kein Löschen , v1.8 (TMOD-01 bis TMOD-06, TMOD-08; TMOD-07 per Owner-Entscheid 12.11.2026 gestrichen)
+- ✓ Doku, präzisierte Schreibzusage, dreisprachiger Store-Text und Release 0.8.0 im Store , v1.8 (DOC-04, DOC-05, EXAPP-13 bis EXAPP-15)
 
 ### Active
 
-- [ ] Store-Text-Erwähnung des Tags `kein-ki` in drei Sprachen (EXCL-F02, reist mit Release 0.4.0)
 - [ ] Enterprise-Governance auf dem Tag (EXCL-F01, bezahlte Schicht, nach dem Fabrice-Call)
-- [ ] Mess-Spike für Aufgaben und Ordner gegen echte Instanzen, mit Abbruchkriterien (MESS-01 bis MESS-06, v1.8 Phase 30)
-- [ ] Ordner anlegen über `files_create_folder` hinter der v1.7-Kette (FOLD-01 bis FOLD-06, v1.8 Phase 31)
-- [ ] Tasks-Bundle suchen, lesen, anlegen als zehnte Familie (TASK-01 bis TASK-09, v1.8 Phase 32)
-- [ ] Eine einzelne Aufgabe abhaken, wieder öffnen, ändern und verschieben, nur mit gelesener ETag; kein Löschen (TMOD-01 bis TMOD-06 und TMOD-08, v1.8 Phase 33)
-- [ ] Doku, präzisierte Schreibzusage, Store-Text und Release 0.8.0 (DOC-04, DOC-05, EXAPP-13 bis EXAPP-15, v1.8 Phase 34)
+- [ ] Tag-Alias `no-ai` neben `kein-ki` (eigene kleine Phase nach 0.8.0, Schreibweise beim Owner erfragen)
+- [ ] Audit-Grund "unspecified" bei veraltetem ETag klären (offen aus 34-11)
 
 (Weiter extern getaktet: MUCGPT/F13/BaerGPT-Verprobungen, files_update via Community-PR nach Design-Issue #9.)
 
@@ -215,4 +207,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-12, Owner-Entscheid: Löschen einer Aufgabe aus 0.8.0 gestrichen (E13 geändert)*
+*Last updated: 2026-11-14 nach Abschluss von Milestone v1.8 (Release 0.8.0 im Store)*

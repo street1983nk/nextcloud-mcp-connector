@@ -1,5 +1,30 @@
 # Milestones
 
+## v1.8 Tasks-Bundle und Ordner anlegen (Shipped: 2026-11-14)
+
+**Phases completed:** 5 phases (30 bis 34), 50 plans, 163 tasks
+**Umfang:** 364 Commits (davon ein Merge von main mit 0.7.3), 373 Dateien, +92.674/-541 Zeilen, 2026-10-28 bis 2026-11-14 (18 Tage; gezählt ab ddb3602, dem Commit, der v1.8 aufsetzte, bis 442fc83)
+**Endstand:** 8217 Unit- und Contract-Tests grün (35 skipped) auf dem Baum des Tags v0.8.0, dazu ruff, pyright 0, vulture und Budget (18770 Bytes für 27 Werkzeuge im Standard, 22198 für 31 mit allen Schaltern an, Budget 26000, kein Werkzeug über 1400); Phasen 31, 32 und 33 goal-backward verifiziert (passed), Phase 34 mit 48/48 must-haves (human_needed nur für eine Runbook-Zeile, keine Lücke im Ziel), Phase 30 als Mess-Spike mit Messbericht docs/spike-tasks.md statt Verifikation; CI auf main 00525cb grün: CI-Lauf 43580117707 (unit, exapp, integration, canary-nc35, image), Security 43580117724, Scorecard 43580117713; vor dem Tag CI-Lauf 43577902065 grün
+
+**Key accomplishments:**
+
+- Ein Assistent kann Ordner anlegen und Nextcloud-Aufgaben suchen, lesen, anlegen, abhaken, wieder öffnen, ändern und verschieben, ohne dass eine bestehende Grenze aufweicht: Rechte-Durchgriff, Ausschluss `kein-ki`, Sandbox `NC_MCP_FILES_ROOT` und Audit gelten für jedes neue Werkzeug; gelöscht wird nichts, auch keine Aufgabe (Owner, 12.11.2026, TMOD-07 Out of Scope).
+- Phase 30: Mess-Spike gegen echte Instanzen vor dem ersten Produktcode: `MKCOL` unter AppAPI-Impersonation liefert 201 (Abbruchkriterium MESS-01 nicht ausgelöst), Gruppenordner mit ACL samt Negativtest (403 ohne Schreibrecht), `PUT` mit `If-Match` und Erhalt fremder Eigenschaften, `MOVE` mit `Overwrite: F`, Löschen mit dem Ergebniswort "wiederherstellbar"; jede Annahme A1 bis A19 und A21 mit Status, Owner-Entscheid E15 (eigener Schalter für ändernde Aufgaben-Werkzeuge, ab Werk aus).
+- Phase 31: `files_create_folder` mit `parents=true`, höchstens 10 neue Ordner je Aufruf, vorhandener Ordner als Erfolg mit `created: false`, Abbruch nennt das Angelegte; `kein-ki` byte-gleich zu "Elternordner fehlt" (Unit- und Live-Paar), MKCOL-Nadel mit gepflanzten Umgehungen, Kanarie mit `MUST_REFUSE`; live auf Nextcloud 35 und 32 unter Impersonation (docs/folder-evidence.md).
+- Phase 32: zehnte Familie `tasks` mit `tasks_search`, `tasks_read` und `tasks_create` über CalDAV VTODO, `task:`-Id über `fetch` und Suchprovider; kein Schreiben in fremdsichtbare Listen ohne Nennung (auch für Gruppenfreigaben gemessen), keine Deck-Karte, geteilte Listen ohne Namen der teilenden Person, Termin-Werkzeuge byte-gleich zu vorher; live auf 35 und 32 je ohne und mit Tasks-App (docs/tasks-evidence.md).
+- Phase 33: `tasks_complete`, `tasks_update` und `tasks_move` hinter `NC_MCP_TASKS_UPDATE` (ab Werk aus), nur mit gelesener ETag; Zeilen-Editor erhält jede unberührte Zeile samt `VALARM` und `X-`Eigenschaften (Rundlauf über 16 Tasks-App-Fixtures), Unteraufgaben ziehen beim Abhaken und Verschieben mit, wiederkehrende Aufgaben und Deck abgelehnt; `EXPECTED_PUT_CALLS` 7 und MOVE je mit genau einer Aufrufstelle und Gegenproben; Zwei-Konten-Negativbeweis live unter Impersonation.
+- Phase 34: Schreibzusage in READMEs, Server-Instruktion, Doku und Store-Text auf das Ausgelieferte präzisiert und von einem Test gegen die Registry gehalten; Store-Text dreisprachig nach Owner-Freigabe mit neuem SHA-256-Pin; Volltest aller Funktionen und Meldungen DE/EN/FR auf Nextcloud 35; Release 0.8.0 mit Owner-Freigabe je Schritt.
+
+**Released:** 0.8.0 im Store am 2026-11-14: PR #48 per Fast-Forward in main, Tag v0.8.0 auf b4b6518, Signatur über das heruntergeladene Asset Verified OK, store-submit HTTP 201 (Workflow-Lauf 43578762697), Katalog nach der Regeneration mit 0.8.0 an erster Stelle; #32 und #44 beantwortet und geschlossen (gepostet von Claude per Owner-Anweisung). Nebenläufig im Milestone-Zeitraum: 0.7.0 (28.10., native ChatGPT-Dateianhänge aus PR #17), 0.7.1 (02.11., Security-Release), 0.7.2 (06.11., `NC_MCP_EXCHANGE_*` in info.xml, Issue #42) und 0.7.3 (13.11., opentelemetry-api 1.45.2 gegen CVE-2026-126360).
+
+**Offen für später:** Tag-Alias `no-ai` neben `kein-ki` als eigene kleine Phase (Schreibweise beim Owner erfragen); Audit-Grund "unspecified" bei veraltetem ETag; Forum-Post zurückgestellt, bis PII Redaction und Audio & Video Search fertig sind.
+
+**Hinweis Audit:** Ein separates Milestone-Audit wurde wie bei v1.5, v1.6 und v1.7 nicht gefahren; die Aussagen stammen aus den Phase-Verifikationen 31 bis 34, dem Messbericht der Phase 30, den Rohprotokollen der Phasen und den CI-Läufen auf main. secure-phase-Läufe gab es in v1.8 nicht.
+
+**Hinweis Archiv:** Wie bei v1.7 bleiben die Phasenordner 30 bis 34 unter .planning/phases/: docs/, tests/ und scripts/ verweisen 42-mal in 9 Dateien auf sie (docs/folder-evidence.md, docs/tasks-evidence.md, docs/spike-tasks.md, docs/exapp-install.md, tests/unit/test_docs_exclusion_truth.py, tests/unit/test_ics_edit.py, tests/fixtures/tasks_app/PROVENANCE.md, scripts/tasks_spike.py, scripts/bootstrap_exapp.sh), dazu ein Eintrag in .gitattributes. Ein Umzug nach milestones/v1.8-phases/ bräuchte eine eigene Änderung an Doku und Tests.
+
+---
+
 ## v1.7 Ausschluss-Tag kein-ki (Shipped: 2026-10-01)
 
 **Phases completed:** 5 phases (25 bis 29), 38 plans, 92 tasks

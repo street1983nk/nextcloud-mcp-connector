@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
-status: milestone_complete
-stopped_at: "Phase 34 abgeschlossen (11/11 Pläne, Verifikation passed); 0.8.0 im Store (Tag v0.8.0 auf b4b6518, store-submit HTTP 201, Katalog 0.8.0); #32 und #44 beantwortet und geschlossen; Milestone v1.8 fertig"
-last_updated: "2026-11-14T10:00:00.000Z"
-last_activity: 2026-11-14
+status: Awaiting next milestone
+stopped_at: "Milestone v1.8 complete und archiviert (Phasenordner 30-34 bleiben in .planning/phases/, weil docs/, tests/ und scripts/ darauf verweisen); Release 0.8.0 im Store"
+last_updated: "2026-11-14T10:45:00.000Z"
+last_activity: 2026-11-14, Milestone v1.8 abgeschlossen und archiviert; vorher Release 0.8.0 im Store (Tag v0.8.0 auf b4b6518, store-submit HTTP 201, Katalog 0.8.0), CI-Lauf 43580117707 auf main 00525cb grün, #32 und #44 beantwortet und geschlossen
 progress:
   total_phases: 5
   completed_phases: 5
@@ -18,17 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-11-12)
+See: .planning/PROJECT.md (updated 2026-11-14)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** Milestone v1.8 abgeschlossen: Release 0.8.0 (Ordner anlegen nach #44, Tasks-Bundle samt ändernden Zugriffen hinter Schalter nach #32, kein Löschen) ist seit 14.11.2026 im Nextcloud App Store. Nächster Milestone noch nicht geplant.
+**Current focus:** Kein aktiver Milestone. v1.8 ist archiviert, Release 0.8.0 steht seit 14.11.2026 im Store. Nächster Milestone nicht geplant; Start mit /gsd:new-milestone, sobald das Owner-Thema feststeht.
 
 ## Current Position
 
-Phase: 34 (abgeschlossen)
-Plan: 11/11
-Status: Milestone v1.8 abgeschlossen: Release 0.8.0 im Nextcloud App Store (14.11.2026), PR #48 per Fast-Forward in main, Tag v0.8.0, Signatur Verified OK, store-submit HTTP 201; Issues #32 und #44 beantwortet und geschlossen. Offen für später: Tag-Alias no-ai neben kein-ki als eigene Phase (Schreibweise fragen), Audit-Grund "unspecified" bei veraltetem ETag, Forum-Post zurückgestellt
-Last activity: 2026-11-14
+Phase: Milestone v1.8 complete (Phasen 30-34)
+Plan: keiner
+Status: Awaiting next milestone
+Last activity: 2026-11-14, Milestone v1.8 abgeschlossen und archiviert
 
 ## Performance Metrics
 
@@ -889,12 +889,18 @@ Recent decisions affecting current work:
 
 ## Deferred Items
 
-Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
+Items acknowledged and deferred at milestone close on 2026-11-14 (v1.8):
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| quick_task | 260926-ktw-24-review-infos-in-01-bis-in-07-abraeume | missing (Fehlalarm: SUMMARY vorhanden, Arbeit erledigt, Commits in Quick-Tasks-Tabelle) | v1.7-Abschluss |
-| quick_task | 260930-ty7-ci-kanarie-auf-nc-35 | missing (Fehlalarm: SUMMARY mit status complete, CI-Job canary-nc35 im Lauf 36861555478 grün) | v1.7-Abschluss |
+| quick_task | 260926-ktw-24-review-infos-in-01-bis-in-07-abraeume | missing (Fehlalarm wie beim v1.7-Abschluss: SUMMARY vorhanden, Arbeit erledigt) | v1.7-Abschluss, erneut v1.8-Abschluss |
+| quick_task | 260930-ty7-ci-kanarie-auf-nc-35 | missing (Fehlalarm wie beim v1.7-Abschluss: SUMMARY mit status complete) | v1.7-Abschluss, erneut v1.8-Abschluss |
+| quick_task | 261005-95h-issue-15-tool-buendel-abschaltbar | missing (Fehlalarm: SUMMARY mit Self-Check PASSED, Commits in der Quick-Tasks-Tabelle) | v1.8-Abschluss |
+| quick_task | 261019-ojn-bootstrap-validators-newline-safe-and-bs | missing (Fehlalarm: SUMMARY mit Self-Check PASSED, Merge 7282738 in der Quick-Tasks-Tabelle) | v1.8-Abschluss |
+| follow_up | Tag-Alias `no-ai` neben `kein-ki` | eigene kleine Phase nach 0.8.0, Schreibweise beim Owner erfragen | v1.8-Abschluss |
+| follow_up | Audit-Grund "unspecified" bei veraltetem ETag | offen aus 34-11 | v1.8-Abschluss |
+| follow_up | Forum-Post zu 0.8.0 | zurückgestellt, bis PII Redaction und Audio & Video Search fertig sind; der Owner postet | v1.8-Abschluss |
+| follow_up | Runbook-Zeile Schritt 8 in docs/store-submission.md nennt die Katalog-Nachmessung noch offen | Fakt geschlossen (raw/34-11-nachweise.txt, Katalog 0.8.0), Textnachtrag beim nächsten Runbook-Eintrag (34-VERIFICATION human_needed) | v1.8-Abschluss |
 
 ## Quick Tasks Completed
 
@@ -913,15 +919,13 @@ Items acknowledged and deferred at milestone close on 2026-10-01 (v1.7):
 
 ## Session Continuity
 
-Last session: 2026-11-13T18:55:00.000Z
-Stopped at: 32-10 ausgeführt bis zur Push-Frage (Task 6); Push-Fragen 32-09 und 32-10 offen; Phase 32 nicht abgeschlossen; kein Container läuft
-Nächster Schritt: Owner-Frage zum Push (raw/32-09-push.txt, raw/32-10-push.txt), dann Phase 32 erneut verifizieren (gsd-verifier), danach Phase 33 planen
+Last session: 2026-11-14T10:45:00.000Z
+Stopped at: Milestone v1.8 abgeschlossen und archiviert (2026-11-14)
+Nächster Schritt: nächsten Milestone mit /gsd:new-milestone starten, sobald das Owner-Thema feststeht
 Resume file: None
 
 ## Operator Next Steps
 
-- Roadmap und Anforderungen für v1.8 prüfen (.planning/ROADMAP.md, .planning/REQUIREMENTS.md); der Branch plan/v1.8-tasks-080 ist nur lokal, Push oder PR nur nach Owner-Entscheid
-- E15 ist entschieden (12.11.2026, eigener Admin-Schalter, ab Werk aus); in der discuss-phase von Phase 33 festlegen, welche Werkzeuge er umfasst
-- Phase 30: 30-01 bis 30-05 sind ausgeführt, Befunde in docs/spike-tasks.md (Abschnitte 1 bis 12, Übergabe je Phase in 9.1 bis 9.3, Entscheid in 10.4) und in den fünf SUMMARY-Dateien. Vor der Planung von Phase 33: Verhalten der Unteraufgaben beim Wiederöffnen klären (Erfolgskriterium 1 ist nach A16 nachgezogen). Aus 30-04 für Phase 32: TASK-01 braucht den resourcetype `calendar` als Bedingung (gelöschte Kalender und Abonnements tragen `VTODO`), der heutige Terminfilter prüft ihn nicht; ein Konto hinter der ExApp kann ganz ohne Kalender sein; Vorschlag für Deckel und Zeitbudget von `tasks_search` steht in Bericht 6 (Untergrenze, Einzelhost). MESS-03 und MESS-04 sind in REQUIREMENTS.md abgehakt (4bf489c)
-- Für 30-02 die Browser-Sitzung in der Tasks-App einplanen (zwölf nummerierte Schritte in zwei Runden, nc35 läuft dabei)
-- Issue-Antworten in #32 und #44 erst nach dem Store-Release von 0.8.0
+- Lokaler Stand: die Abschluss-Commits von v1.8 und die vier Doku-Commits davor (e614dc7 bis 442fc83) liegen nur lokal auf plan/v1.8-tasks-080; Push nur nach Owner-Entscheid
+- Nächster Milestone mit /gsd:new-milestone (Kandidaten in PROJECT.md, Next Milestone Goals); vorgemerkt: Tag-Alias `no-ai` neben `kein-ki` als eigene Phase, vorher die Schreibweise beim Owner erfragen
+- Forum-Post zu 0.8.0 erst, wenn PII Redaction und Audio & Video Search fertig sind (Owner postet)

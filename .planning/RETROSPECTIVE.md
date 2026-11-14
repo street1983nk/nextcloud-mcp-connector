@@ -316,11 +316,42 @@ Eine Datei oder ein Ordner mit dem System-Tag `kein-ki` erscheint in keiner Tool
 - Sessions: 6 Kalendertage (26.09. bis 01.10.), 343 Commits, +57.263/-1.733 Zeilen über 264 Dateien.
 - Notable: parallel liefen zwei Hotfix-Releases (0.3.1, 0.3.2) und PR #13 außerhalb des Milestones, ohne den Phasenplan zu stören.
 
+## Milestone: v1.8 , Tasks-Bundle und Ordner anlegen
+
+**Shipped:** 2026-11-14 (Release 0.8.0 im Store)
+**Phasen:** 5 | **Pläne:** 50 | **Tasks:** 163
+
+### What Was Built
+
+Ein Mess-Spike gegen echte Instanzen vor dem ersten Produktcode (Phase 30), `files_create_folder` hinter der ganzen v1.7-Kette (31), die zehnte Familie `tasks` mit Suchen, Lesen, Anlegen und `task:`-Id über `fetch` (32), Abhaken, Ändern und Verschieben einer einzelnen Aufgabe hinter `NC_MCP_TASKS_UPDATE`, nur mit gelesener ETag (33), präzisierte Schreibzusage, dreisprachiger Store-Text und Release 0.8.0 (34). Kein Löschen: TMOD-07 ist per Owner-Entscheid vom 12.11.2026 gestrichen, obwohl die Messung "wiederherstellbar" ergab.
+
+### What Worked
+
+- Erst messen, dann bauen, wie in v1.7: der Spike belegte `MKCOL` unter Impersonation, `If-Match`, den Erhalt fremder Eigenschaften und `MOVE` mit `Overwrite: F`, bevor ein Werkzeug entstand; kein Abbruchkriterium wurde ausgelöst.
+- Live-Läufe auf Nextcloud 35 und 32, je ohne und mit Tasks-App, fanden Fehler, die kein Unit-Test sah: die subline ohne führendes Leerzeichen auf 35 (32-09), ein zu knappes Budget je Liste bei 2000 offenen Aufgaben (32-10), den Kaltstart-Befund `geteilt-namen` (33-11).
+- Die Gates aus v1.7 trugen die neuen Schreiber ohne neue Grundlage: Kanarie, Paartests, Klassifikations-Freeze, Destruktiv-Gate mit eng benannten Ausnahmen (`EXPECTED_PUT_CALLS` 7, MOVE-Pin) und Budget nach der Hausregel.
+
+### What Was Inefficient
+
+- Der Umfang wuchs nach der Recherche am selben Tag zweimal (E7, E8 am 11.11.2026) und schrumpfte einen Tag später wieder (E13, 12.11.2026); Messungen für das Löschen liefen, bevor es gestrichen wurde.
+- Phase 31 blieb bei der Erstprüfung bei 4/5 (Kriterium 5 ohne CI-Lauf für den Stand); der CI-Gesamtlauf kam erst mit dem Release-Stand in Phase 34.
+- Drei Lücken- oder Zusatzpläne in Phase 31, zwei in Phase 32 und einer in Phase 33 nach den Live-Läufen.
+
+### Key Lessons
+
+- Live-Messung auf mindestens zwei Versionen und mit und ohne Fremd-App gehört in jede Phase, die einen neuen Schreib- oder Lesepfad öffnet; die Befunde aus 32-09, 32-10 und 33-11 kamen nur so ans Licht.
+- Befundlinks der Produktdoku zeigen wieder auf .planning/phases/ (42 Verweise auf die Phasen 30 bis 34); die Lehre aus v1.7 (stabiler Ort wie docs/evidence/) ist noch nicht umgesetzt.
+
+### Cost Observations
+
+- Sessions: 18 Kalendertage (28.10. bis 14.11.), 364 Commits, +92.674/-541 Zeilen über 373 Dateien; die Phasenarbeit 30 bis 34 lag zwischen 11.11. und 14.11.
+- Notable: nebenläufig erschienen 0.7.0 bis 0.7.3; 0.7.3 kam per Merge von main in den 0.8.0-Zweig.
+
 ## Cross-Milestone Trends
 
-| Metrik | v1.0 | v1.1 | v1.2 | v1.3 | v1.4 | v1.5 | v1.6 | v1.7 |
-|--------|------|------|------|------|------|------|------|------|
-| Phasen / Pläne / Tasks | 5 / 50 / 111 | 1 / 11 / 20 | 4 / 28 / 67 | 2 / 10 / 26 | 2 / 6 / 12 | 4 / 32 / n. rek. | 5 / 22 / 59 | 5 / 38 / 92 |
-| Kalenderzeit | 7 Tage | 1 Tag | 5 Tage (21.-25.08.) | 2 Tage (25.-26.08.) | 1 Tag (28.08.) | 4 Tage (28.-31.08.) | 9 Tage (18.-26.09.) | 6 Tage (26.09.-01.10.) |
-| Verifier-Gap-Runden | 1 (Phase 5) | 1 (Phase 6, CLIENT-04) | 0 (alle 4 Phasen passed im ersten Lauf) | 0 (beide Phasen passed im ersten Lauf) | 0 (beide Phasen passed im ersten Lauf) | n. rek. (nachgetragen) | 0 (alle 5 Phasen passed) | 1 (Phase 27, Wanduhr, zwei Lückenpläne; dazu zwei CI-gebundene human_needed bis zum Push) |
-| Live-Releases im Milestone | 3 (0.1.0, 0.1.1, 0.1.2) | 0 (0.1.3-Kandidat wartet auf Owner-Freigabe) | 5 (0.1.4 bis 0.1.8, drei davon vorgezogen) | 1 (0.1.9) | 1 (0.1.10) | 1 (0.1.11) | 0 (Exchange-Pfad reist erst mit 0.3.0) | 0 (Filter reist mit 0.4.0; 0.3.1/0.3.2 nebenläufig außerhalb) |
+| Metrik | v1.0 | v1.1 | v1.2 | v1.3 | v1.4 | v1.5 | v1.6 | v1.7 | v1.8 |
+|--------|------|------|------|------|------|------|------|------|------|
+| Phasen / Pläne / Tasks | 5 / 50 / 111 | 1 / 11 / 20 | 4 / 28 / 67 | 2 / 10 / 26 | 2 / 6 / 12 | 4 / 32 / n. rek. | 5 / 22 / 59 | 5 / 38 / 92 | 5 / 50 / 163 |
+| Kalenderzeit | 7 Tage | 1 Tag | 5 Tage (21.-25.08.) | 2 Tage (25.-26.08.) | 1 Tag (28.08.) | 4 Tage (28.-31.08.) | 9 Tage (18.-26.09.) | 6 Tage (26.09.-01.10.) | 18 Tage (28.10.-14.11.), Phasen 30 bis 34 in 4 Tagen (11.-14.11.) |
+| Verifier-Gap-Runden | 1 (Phase 5) | 1 (Phase 6, CLIENT-04) | 0 (alle 4 Phasen passed im ersten Lauf) | 0 (beide Phasen passed im ersten Lauf) | 0 (beide Phasen passed im ersten Lauf) | n. rek. (nachgetragen) | 0 (alle 5 Phasen passed) | 1 (Phase 27, Wanduhr, zwei Lückenpläne; dazu zwei CI-gebundene human_needed bis zum Push) | 2 (Phase 31 Nachtrag nach 4/5, Phase 32 Re-Verifikation nach 32-09 und 32-10; Phase 34 human_needed nur für eine Runbook-Zeile) |
+| Live-Releases im Milestone | 3 (0.1.0, 0.1.1, 0.1.2) | 0 (0.1.3-Kandidat wartet auf Owner-Freigabe) | 5 (0.1.4 bis 0.1.8, drei davon vorgezogen) | 1 (0.1.9) | 1 (0.1.10) | 1 (0.1.11) | 0 (Exchange-Pfad reist erst mit 0.3.0) | 0 (Filter reist mit 0.4.0; 0.3.1/0.3.2 nebenläufig außerhalb) | 5 (0.8.0 als Ziel; 0.7.0 bis 0.7.3 nebenläufig) |
