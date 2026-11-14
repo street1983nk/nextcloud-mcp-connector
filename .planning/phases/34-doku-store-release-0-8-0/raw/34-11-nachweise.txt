@@ -1,0 +1,32 @@
+# 34-11 Nachweise Runbook Schritt 8 für 0.8.0
+# Datum: 2026-11-14, erster Durchlauf 09:05:41Z
+# Befehle: die fünf Befehle aus docs/store-submission.md Schritt 8 mit <version>=0.8.0, dazu curl auf die Detailseite.
+# Ausgaben zuerst im Scratchpad p34; Geheimnisprüfung gegen alle nicht leeren Werte von .env.exapp und .env.nc35
+# (voll und erste 12 Zeichen) sowie AUTHORIZATION-APP-API: Treffer nur APP_ID (der App-Name mcp_connector) und
+# APP_VERSION (eine Versionsnummer), beides öffentlich; kein Geheimnis. Das ghcr-Pull-Token wurde nicht gespeichert.
+NACHWEIS katalog top=0.7.3 spanne=>=32 <=35 durchlauf=first-pass zeit=09:05:41Z last-modified=08:30:14Z
+  appapi_apps.json listet für mcp_connector als oberste Releases 0.7.3, 0.7.2, 0.7.1 (alle >=32 <=35); bekannter Cache.
+NACHWEIS asset status=302,200 groesse=62491
+  curl -sSIL auf releases/download/v0.8.0/mcp_connector-0.8.0.tar.gz: HTTP 302 (Location release-assets.githubusercontent.com), dann HTTP 200, Content-Length 62491.
+NACHWEIS image index=oci plattformen=linux/amd64,linux/arm64
+  mediaType application/vnd.oci.image.index.v1+json; manifests: linux/amd64, linux/arm64 und zwei Attestierungseinträge unknown/unknown.
+NACHWEIS tags enthaelt=0.8.0
+  tags/list: 32 Tags, 0.8.0 darunter.
+NACHWEIS autor katalog=admin@infranode.dev infoxml=admin@infranode.dev gleich=ja
+  Katalog authors[0].mail von mcp_connector gegen <author mail> in git show v0.8.0:appinfo/info.xml.
+NACHWEIS detailseite nennt=0.8.0
+  apps.nextcloud.com/apps/mcp_connector: 12 Treffer "0.8.0" (darunter der Download-Link v0.8.0), 0 Treffer "0.7.3".
+PIN store-texte sha256=4e510fec45ca96e341b53968a31c6cc5c84fd2d3d683a7135122381b281ba902 frozen_at="release 0.8.0"
+  Gelesen aus tests/unit/test_store_texts_frozen.py (EXPECTED_SHA256, FROZEN_AT); der Test läuft in den Gates grün.
+NACHWEIS katalog top=0.7.3 durchlauf=wiederholung von=09:06Z bis=09:15:08Z versuche=9 last-modified=08:30:14Z
+  until-Schleife mit Zeitgrenze 540 s, ein Abruf je Minute: der Katalog wurde in dieser Zeit nicht neu erzeugt (Last-Modified unverändert), oberste Release blieb 0.7.3. Erneute Messung nach der nächsten Regeneration steht aus.
+GATE pytest-unit-contract exit=0 passed=8217 skipped=35
+  Lauf am 2026-11-14 auf dem Arbeitsbaum dieses Plans; git diff v0.8.0 HEAD außerhalb von .planning/ ist leer, der Code und die Tests sind also die des Tags (Tag v0.8.0 = b4b651898d79292cfed0e165b1a5ae857c96e65f). 34-06 maß 8212 vor den Test-Ergänzungen aus 34-07.
+GATE check_tool_budget exit=0 standard=18770/27 budget=26000
+GATE ruff-check exit=0
+GATE ruff-format exit=0 dateien=408
+GATE pyright exit=0 errors=0 warnings=0
+GATE vulture exit=0
+GATE pytest-unit-contract exit=0 passed=8217 skipped=35 lauf=2
+  Wiederholung nach der zweiten Runbook-Zeile, vor dem Commit; tests/contract enthält den Zähltest IN-04 (tests/contract/test_tool_surface.py).
+DASH docs/store-submission.md raw/34-11-nachweise.txt treffer=0 positivkontrolle=ok
