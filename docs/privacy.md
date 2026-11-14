@@ -182,7 +182,7 @@ protection incident.
   any list the user can write to, and the change is visible to everyone the list is
   shared with. It can never delete a task. Every change needs the ETag the model read
   just before, which stops it from overwriting a newer version but not the injection
-  itself, since the model can read the task first; a read only list, a recurring
+  itself, since the model can read the task first; a read-only list, a recurring
   task and a Deck board are refused.
 - A conditional replacement can change content visible to people who share
   a file. The `versioned` result is true only when Nextcloud's version listing

@@ -158,7 +158,7 @@ decision for the operator, see privacy.md, not a vulnerability).
   `NC_MCP_FILES_UPDATE` on, `files_update` can replace an existing UTF-8
   text file. With `NC_MCP_TASKS_UPDATE` on, `tasks_complete` completes or
   reopens one task (its subtasks first), `tasks_update` edits named fields
-  of one task, and `tasks_move` relocates one. A stale ETag, a read only
+  of one task, and `tasks_move` relocates one. A stale ETag, a read-only
   list, a recurring task and a Deck board are refused before any write.
   `tests/contract/test_no_destructive_calls.py` allows exactly these
   exceptions plus the private chunk assembly of uploads, and `tests/contract/test_tool_classes.py` keeps every tool
@@ -189,7 +189,7 @@ in any list the user can write to, a list shared with write permission
 included. It cannot delete one. The ETag check does not stop such a
 change, since the model can read the task first; it stops a change from
 overwriting what somebody else wrote in between. What bounds it is the
-switch, which ships off, the refusal of read only lists, recurring tasks
+switch, which ships off, the refusal of read-only lists, recurring tasks
 and Deck boards, and the audit log, which records every call with its
 parameter names and outcome, never a value. The `kein-ki` tag does not help
 here: it marks files and folders, not task lists. The live findings for

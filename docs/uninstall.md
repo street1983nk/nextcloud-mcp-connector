@@ -141,7 +141,7 @@ created. Nextcloud answers each request with the identity of that account, so th
 stale strings, they are working credentials. No AppAPI path touches them, on any version.
 
 Check 2 uses a throwaway container with the volume mounted read only and copies the file to
-`/tmp` first, because sqlite3 cannot open a read only mounted database.
+`/tmp` first, because sqlite3 cannot open a read-only mounted database.
 
 Two details of that measurement are worth carrying:
 
@@ -221,7 +221,7 @@ Four counter-checks, all measured:
 A fifth check belongs to the same step, and unlike the four above it is not a
 measurement from 2026-08-19: the audit log did not exist in this app on that day. It is
 the check to run, in the form of check 2, with the same throwaway container and the same
-copy to `/tmp`, because sqlite3 cannot open a read only mounted database:
+copy to `/tmp`, because sqlite3 cannot open a read-only mounted database:
 
 ```
 5 $ docker run --rm -v nc_app_mcp_connector_data:/d:ro alpine:3 sh -c '

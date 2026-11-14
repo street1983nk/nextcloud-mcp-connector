@@ -332,7 +332,7 @@ again; it must not assume one comes back.
   chain. Not measured: the whole chain on Nextcloud 32 (local process at `manual_install`), a
   chain of more than three descendants live (the cap of 50 rests on the measurement of
   plan 33-01c and the unit tests), a cancelled descendant live (unit tests and plan 33-01b),
-  a 403 of the server for a read only share (the server answered 404 to the harness, the tools
+  a 403 of the server for a read-only share (the server answered 404 to the harness, the tools
   refuse before any write), and a stale write through the chain other than `tasks_update`
   (the function level covers all three tools).
 
@@ -737,7 +737,7 @@ and was deleted after every run.
 
 The measurement: on both instances, under the app password and under impersonation,
 `oc:invite` of an own list shared with a group holds exactly one `oc:user` entry whose href
-names `principals/groups/`. The unchanged `parse_task_home` marks it `shared_out` for read only
+names `principals/groups/`. The unchanged `parse_task_home` marks it `shared_out` for read-only
 and read-write and clears the mark once the share is taken back. A list bob shared with a
 group that holds alice looks to alice like a share with a person: `_shared_by_` in the URI,
 `oc:read-only` in the 2xx propstat, `owner-displayname` equal to the display name of bob. No
@@ -773,7 +773,7 @@ ENTSCHEID gruppe_subline=bereinigt (Begründung: auf nc35 enthält die rohe subl
 Live on Nextcloud 35 with the Tasks app. The account of D-32-18 shares its only own list with
 the group (it is no member itself): without `list` nothing is written, also not for a `parent`
 there; taken back, it is written again. As alice, the two group shares of bob carry their name
-without the owner and the right `writable`; they are written only when named, the read only
+without the owner and the right `writable`; they are written only when named, the read-only
 one is refused before any `PUT`, a `parent` there is no naming, `fetch` links the start page of
 the Tasks app only, and the provider subline loses the owner with and without a due date:
 
@@ -924,7 +924,7 @@ LIVE nc32 tasksapp=0.18.1 passed=58 failed=0 lauf=2
 ```
 
 The red first run with the Tasks app on Nextcloud 32 failed in a case of phase 32
-(`geteilt-namen`, the read only list missing from the first search right after the restart of
+(`geteilt-namen`, the read-only list missing from the first search right after the restart of
 the container), not in a case of this plan; all 28 lines `FALL` of that run read `ergebnis=ok`.
 The unchanged second run was green. Baseline per account before equal after in every run.
 
@@ -1006,7 +1006,7 @@ FALL aendern-reich nc=32.0.15.1 werkzeug=tasks_update status=PROPFIND:207,GET:20
 FALL aendern-ohne-unterschied nc=32.0.15.1 werkzeug=tasks_update status=PROPFIND:207,GET:200 ergebnis=ok | kein_put=ja changed_leer=ja sha_gleich=ja sha=e32650042f4c
 ```
 
-### Success criterion 3: Stale ETag, read only share, recurring task, Deck card (TMOD-01, TMOD-05)
+### Success criterion 3: Stale ETag, read-only share, recurring task, Deck card (TMOD-01, TMOD-05)
 
 | Instance | Tasks app | Case | Lines `FALL` with `ergebnis=ok` | Raw protocol |
 |---|---|---|---|---|
@@ -1175,7 +1175,7 @@ KETTE nc32 entfaellt grund=manual-install (wie 32-07: auf 32 läuft die ExApp al
 
 ### Gap closure 33-11: the first search after a cold start
 
-In run 1 of plan 33-10 on Nextcloud 32 the read only shared list was missing from the first
+In run 1 of plan 33-10 on Nextcloud 32 the read-only shared list was missing from the first
 search right after the Tasks app was installed and the container restarted; the unchanged
 repeat was green. Plan 33-11 measured it with `scripts/tasks_coldstart.py`, every request
 timed with its body, the discovery of every call recorded list by list.
@@ -1238,7 +1238,7 @@ MESSWERT per_list_timeout_s=3 regel=max(1,ceil(2*max)) max_s=1.030 quelle=nc32-i
   `test_a_recurring_task_is_one_hit_without_expansion`. What remains: how the Tasks app itself
   checks off one occurrence needs a browser and was not measured.
 - 403 against 404 for a list that can only be read: live, the server answered a direct `PUT`
-  of the harness into the read only share with 404 on both instances, for example
+  of the harness into the read-only share with 404 on both instances, for example
   `AUFGABE geteilt-ro-server nc=35.0.0.10 nutzer=alice status=keine ergebnis=ok | harness PUT with the app password of alice, not the connector; PUT 404; calendarobjects vorher=1 nachher=1`
   from raw/32-07-nc35.txt. The bundle refuses before any `PUT` (`geteilt-ro-vorab`), so the
   branch for a 403 of the server was never reached live; it rests on the unit test

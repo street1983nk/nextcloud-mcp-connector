@@ -111,7 +111,7 @@ of those numbers is in a measurement file in the repository.
 - Sixteen tools in the released 0.1.2, twenty in the development tree. No delete, no share,
   and no move except one task behind a switch that ships off (0.8.0)
 - Upload creates, and refuses a path that exists
-- The assistant sees exactly what the signed in account sees, checked against a read only share
+- The assistant sees exactly what the signed in account sees, checked against a read-only share
 
 **Speaker note (40 s).** Fourth, and this one is about what is missing. A store install of
 0.1.2 lists sixteen tools, and the development tree has twenty; take the number from
@@ -180,7 +180,7 @@ did the ExApp part wrong, that is the most useful five minutes I can have today.
 | 5 | Paused answers 403 with a reason, resumed answers 200, no token reissued | `06-10-MEASUREMENTS.md`, sections 5.1 and 5.2 |
 | 5 | Disconnect answers 401, and the refresh attempt answers 400 | `06-10-MEASUREMENTS.md`, section 6 |
 | 6 | Sixteen tools in 0.1.2 and twenty in the development tree, no delete, no share, no move except `tasks_move` behind `NC_MCP_TASKS_UPDATE` (0.8.0, off by default) | `scripts/check_tool_budget.py`, the tool table contract test and `tests/contract/test_write_promise_truth.py` |
-| 6 | Upload refuses a path that exists, and the read only share boundary | `tests/integration/test_permission_parity_share.py` and the phase 5 measurements |
+| 6 | Upload refuses a path that exists, and the read-only share boundary | `tests/integration/test_permission_parity_share.py` and the phase 5 measurements |
 | 7 | The runbook was walked once, with times | `docs/conference-demo.md` and `06-10-MEASUREMENTS.md` |
 
 ## What this draft does not say, on purpose
