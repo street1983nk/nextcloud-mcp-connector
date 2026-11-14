@@ -1,7 +1,7 @@
 ---
 phase: 34-doku-store-release-0-8-0
 verified: 2026-11-14T09:30:00Z
-status: human_needed
+status: passed
 score: 48/48 must-haves verified (5 Roadmap-Kriterien, 43 Plan-Truths, davon 1 per Override)
 overrides_applied: 1
 overrides:
@@ -136,3 +136,8 @@ Keine Lücke im Phasenziel. Doku, Store-Text und Schreibzusage sind dreisprachig
 
 _Verified: 2026-11-14T09:30:00Z_
 _Verifier: Claude (gsd-verifier)_
+
+## Owner-Entscheide nach der Verifikation (2026-11-14)
+
+- Override zum Issue-Posting: vom Owner bestätigt ("Bestätigt").
+- Runbook-Zeile "Step 8 for 0.8.0": Owner "Jetzt nachziehen"; die Zeile nennt jetzt die Nachmessung nach der Regeneration (Last-Modified 09:15:16Z, top 0.8.0). Human-Verification damit geschlossen, Status passed.
