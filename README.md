@@ -9,8 +9,8 @@
 [![Nextcloud App Store](https://img.shields.io/badge/App_Store-mcp__connector-0082c9)](https://apps.nextcloud.com/apps/mcp_connector)
 [![Licence](https://img.shields.io/badge/Licence-AGPL--3.0--or--later-blue)](LICENSE)
 
-A curated MCP server that connects your Nextcloud (files, calendar, notes, Deck, contacts,
-Tables, Talk and Mail) to AI assistants such as Claude, Cursor, ChatGPT or your own agents.
+A curated MCP server that connects your Nextcloud (files and folders, calendar, tasks, notes,
+Deck, contacts, Tables, Talk and Mail) to AI assistants such as Claude, Cursor, ChatGPT or your own agents.
 Installed as a Nextcloud ExApp, it is its own OAuth 2.1 authorization server as well.
 
 **Findling + Nextcloud MCP Connector = the retrieval layer for your own RAG.**
@@ -51,8 +51,10 @@ You bring the model, and no content leaves your server.
   `tasks_complete` completes it (its subtasks first) or reopens it, `tasks_update` changes its
   title, description, due date, start date, priority, tags or parent task, and `tasks_move`
   moves it with its subtasks into another own or writable shared task list. Recurring tasks
-  and Deck boards are refused. A change of the switch takes effect after you disable and
-  enable this app again.
+  and Deck boards are refused. On a running installation the admin changes the switch with
+  `occ app_api:app:config:set mcp_connector tasks_update --value on --update-only`, see
+  [docs/exapp-install.md](docs/exapp-install.md#write-switches). A change of the switch
+  takes effect after you disable and enable this app again.
 - No moving or renaming of files, folders or other objects; the one exception is `tasks_move`
   for a single task when `NC_MCP_TASKS_UPDATE` is on. No share changes and no permission
   changes; binary uploads use Nextcloud's private chunk assembly and still refuse an existing
@@ -108,6 +110,11 @@ hand: a contract test reads the live registry and fails if a name or a level dis
 | `prepare_context` | read | Files, notes, cards, the next week of events, waiting Talk conversations and unread mail counts in one call |
 | `search` | read | OpenAI compatible search entry point, delegates to unified search |
 | `fetch` | read | OpenAI compatible fetch, resolves an id to a file, note, card, event, mail, Talk message, table or task |
+
+How the folder and task tools answered on real Nextcloud 32 and 35, and what stayed
+unmeasured, for example a new folder on read-only external storage:
+[docs/folder-evidence.md](docs/folder-evidence.md) and
+[docs/tasks-evidence.md](docs/tasks-evidence.md).
 
 `search` and `fetch` exist because the ChatGPT connector profile requires exactly these two
 names and schemas. They are thin wrappers over the tools above, not a second implementation.

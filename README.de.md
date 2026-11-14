@@ -11,8 +11,8 @@
 [![Nextcloud App Store](https://img.shields.io/badge/App_Store-mcp__connector-0082c9)](https://apps.nextcloud.com/apps/mcp_connector)
 [![Lizenz](https://img.shields.io/badge/Lizenz-AGPL--3.0--or--later-blue)](LICENSE)
 
-Ein kuratierter MCP Server, der Ihr Nextcloud (Dateien, Kalender, Notizen, Deck, Kontakte,
-Tables, Talk und Mail) mit KI-Assistenten wie Claude, Cursor, ChatGPT oder Ihren eigenen
+Ein kuratierter MCP Server, der Ihr Nextcloud (Dateien und Ordner, Kalender, Aufgaben, Notizen,
+Deck, Kontakte, Tables, Talk und Mail) mit KI-Assistenten wie Claude, Cursor, ChatGPT oder Ihren eigenen
 Agenten verbindet. Als Nextcloud-ExApp installiert, ist er zugleich sein eigener
 OAuth-2.1-Autorisierungsserver.
 
@@ -30,6 +30,7 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
 - OAuth 2.1 nach der MCP-Autorisierungsspezifikation: dynamische Client-Registrierung,
   PKCE S256, zielgebundene Token, Refresh-Rotation mit Wiederverwendungserkennung und
   sofortigem Entzug. Claude.ai und ChatGPT bekommen eine URL und sehen nie ein Passwort
+  oder App-Passwort
 - Jede Anfrage läuft mit den Rechten des angemeldeten Nutzers, die Nextcloud-Berechtigungen
   gelten unverändert, und der Assistent sieht nie mehr als Sie
 - Verwaltung je Nutzer: Jedes Konto pausiert oder aktiviert seinen eigenen Zugang und trennt
@@ -52,14 +53,18 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
   dann, wenn ihr ETag dem zuvor gelesenen Wert entspricht; geänderte oder gelöschte Dateien
   werden abgelehnt. Der Versionsverlauf hängt vom Speicher-Backend von Nextcloud ab.
 - Bestehende Aufgaben bleiben unverändert, solange der Admin den Schalter
-  "Bestehende Aufgaben ändern erlauben" (`NC_MCP_TASKS_UPDATE`) nicht einschaltet: Ab Werk aus.
+  "Bestehende Aufgaben ändern erlauben" (in der Oberfläche englisch "Allow changing existing
+  tasks", `NC_MCP_TASKS_UPDATE`) nicht einschaltet: Ab Werk aus.
   Ist der Schalter an, können Assistenten jeweils eine Aufgabe ändern, und zwar nur mit dem
   ETag, das `tasks_read` geliefert hat: `tasks_complete` hakt sie ab (zuerst ihre
   Unteraufgaben) oder öffnet sie wieder, `tasks_update` ändert Titel, Beschreibung,
   Fälligkeit, Startdatum, Priorität, Tags oder Elternaufgabe, und `tasks_move` verschiebt sie
-  samt ihren Unteraufgaben in eine andere eigene oder schreibbar geteilte Aufgabenliste.
-  Wiederkehrende Aufgaben und Deck-Boards werden abgelehnt. Eine Änderung des Schalters wirkt,
-  nachdem die App aus- und wieder eingeschaltet wurde.
+  samt ihren Unteraufgaben in eine andere eigene oder mit Schreibrecht geteilte Aufgabenliste.
+  Wiederkehrende Aufgaben und Deck-Boards werden abgelehnt. Auf einer laufenden Installation
+  ändert der Admin den Schalter mit
+  `occ app_api:app:config:set mcp_connector tasks_update --value on --update-only`, siehe
+  [docs/exapp-install.md](docs/exapp-install.md#write-switches). Eine Änderung des Schalters
+  wirkt, nachdem die App aus- und wieder eingeschaltet wurde.
 - Kein Verschieben und kein Umbenennen von Dateien, Ordnern oder anderen Objekten; die einzige
   Ausnahme ist `tasks_move` für eine einzelne Aufgabe bei eingeschaltetem
   `NC_MCP_TASKS_UPDATE`. Keine Änderung von Freigaben oder Berechtigungen; Binärdateien
@@ -93,7 +98,7 @@ abweicht.
 | `files_read` | read | Der Inhalt einer Datei |
 | `files_download` | read | Eine beliebig große Datei in begrenzten eingebetteten Ressourcenblöcken |
 | `files_read_as_markdown` | read | Eine DOCX-, XLSX-, PPTX- oder PDF-Datei, in Markdown umgewandelt, in Abschnitten |
-| `files_upload` | create-only | Eine neue Text- oder Binärdatei in Base64-Blöcken; ein vorhandener Pfad wird abgelehnt, nie überschrieben |
+| `files_upload` | create-only | Eine neue Textdatei oder ein Binär-Upload beliebiger Größe in Base64-Blöcken; ein vorhandener Pfad wird abgelehnt, nie überschrieben |
 | `files_create_folder` | create-only | Ein neuer Ordner, auf Wunsch samt fehlender Elternordner (höchstens 10 je Aufruf); ein vorhandener Ordner antwortet mit created false, nichts wird überschrieben |
 | `files_update` | conditional-update | Ersetzt eine bestehende UTF-8-Textdatei nur mit ihrem zuvor gelesenen ETag; nur verfügbar, wenn der Admin `NC_MCP_FILES_UPDATE` aktiviert |
 | `calendar_list_events` | read | Termine in einem expliziten Zeitraum, mit expliziter Zeitzone |
@@ -103,7 +108,7 @@ abweicht.
 | `tasks_create` | create-only | Eine neue Aufgabe; ohne `list` nur, wenn es genau eine eigene Liste gibt und niemand sonst sie sieht, nie in eine Liste, die andere sehen, außer sie wird genannt |
 | `tasks_complete` | modify | Hakt eine Aufgabe ab oder öffnet sie wieder, nur mit dem ETag aus `tasks_read`; beim Abhaken werden die Unteraufgaben zuerst mit abgehakt, wiederkehrende Aufgaben werden abgelehnt; nur verfügbar, wenn der Admin `NC_MCP_TASKS_UPDATE` aktiviert |
 | `tasks_update` | modify | Ändert oder entfernt die genannten Felder einer Aufgabe (Titel, Beschreibung, Fälligkeit, Start, Priorität, Tags, Elternaufgabe), nur mit dem ETag aus `tasks_read`; alle anderen Zeilen der Aufgabe bleiben, wie sie sind, wiederkehrende Aufgaben werden abgelehnt; nur verfügbar, wenn der Admin `NC_MCP_TASKS_UPDATE` aktiviert |
-| `tasks_move` | modify | Verschiebt eine Aufgabe samt Unteraufgaben in eine genannte beschreibbare Liste, nur mit dem ETag aus `tasks_read`; die Unteraufgaben wandern zuerst, ein belegter Name oder eine belegte UID in der Zielliste wird nie überschrieben, Deck-Boards sind nie ein Ziel, wiederkehrende Aufgaben werden abgelehnt; nur verfügbar, wenn der Admin `NC_MCP_TASKS_UPDATE` aktiviert |
+| `tasks_move` | modify | Verschiebt eine Aufgabe samt Unteraufgaben in eine genannte Liste mit Schreibrecht, nur mit dem ETag aus `tasks_read`; die Unteraufgaben wandern zuerst, ein belegter Name oder eine belegte UID in der Zielliste wird nie überschrieben, Deck-Boards sind nie ein Ziel, wiederkehrende Aufgaben werden abgelehnt; nur verfügbar, wenn der Admin `NC_MCP_TASKS_UPDATE` aktiviert |
 | `notes_search` | read | Notizen nach Titel und Inhalt, über den Notes-Suchprovider von Nextcloud |
 | `notes_read` | read | Eine Notiz |
 | `notes_create` | create-only | Eine neue Notiz; bestehende Notizen werden nie geändert |
@@ -119,6 +124,11 @@ abweicht.
 | `prepare_context` | read | Dateien, Notizen, Karten, die nächste Terminwoche, wartende Talk-Gespräche und ungelesene Mails in einem Aufruf |
 | `search` | read | OpenAI-kompatibler Sucheinstieg, delegiert an die Unified Search |
 | `fetch` | read | OpenAI-kompatibler Abruf, löst eine ID zu Datei, Notiz, Karte, Termin, Mail, Talk-Nachricht, Tabelle oder Aufgabe auf |
+
+Wie die Ordner- und Aufgaben-Tools auf echtem Nextcloud 32 und 35 geantwortet haben und was
+ungemessen blieb, zum Beispiel ein neuer Ordner auf nur lesbarem externem Speicher:
+[docs/folder-evidence.md](docs/folder-evidence.md) und
+[docs/tasks-evidence.md](docs/tasks-evidence.md).
 
 `search` und `fetch` gibt es, weil das ChatGPT-Connector-Profil genau diese zwei Namen und
 Schemata verlangt. Sie sind dünne Hüllen um die Tools darüber, keine zweite Implementierung.
@@ -237,6 +247,8 @@ uv tool install nextcloud-mcp-connector
 export NC_MCP_URL=https://cloud.example.com
 export NC_MCP_USER=alice
 export NC_MCP_APP_PASSWORD=xxxxx-xxxxx-xxxxx-xxxxx-xxxxx
+# Optional: nur dieses Nextcloud-Verzeichnis für die Datei-Tools freigeben
+export NC_MCP_FILES_ROOT=/Documents/AI
 
 nc-mcp
 ```
@@ -247,6 +259,10 @@ Umgebungsvariable und die drei Fehler, die wirklich vorkommen:
 [docs/client-setup.md](docs/client-setup.md). OAuth für die Administration:
 [docs/oauth-setup.md](docs/oauth-setup.md). Automatisierungsplattformen sind auch Clients,
 mit einer OAuth-Verbindung je Person: [docs/n8n-setup.md](docs/n8n-setup.md).
+
+Ist `NC_MCP_FILES_ROOT` gesetzt, wird dieses Verzeichnis für die Datei-Tools zu `/`. So wird
+zum Beispiel `/scan.pdf` unter `/Documents/AI` aufgelöst, und kein Datei-Tool erreicht die
+übergeordneten Ordner.
 
 ![Verbindungsseite mit zwei verbundenen Assistenten](docs/screenshots/connections-page-v2.png)
 
@@ -260,7 +276,7 @@ Zugangsdaten pro Anfrage und werden nie gespeichert. Fragen, die Nutzer stellen:
 ## Enterprise
 
 Das Audit-Log gehört zu dieser App und nicht zu einem Add-on. Eingeschaltet hält es jeden
-Werkzeugaufruf fest: das Konto, für das er lief, das Werkzeug, die Zeit, die aufrufende App
+Tool-Aufruf fest: das Konto, für das er lief, das Tool, die Zeit, die aufrufende App
 und das Ergebnis, nie einen Parameterwert und nie einen Teil eines Ergebnisses. Es ist ab
 Werk aus, die Administration schaltet es in den Admin-Einstellungen dieser App ein, und
 gelesen wird es mit `occ mcp_connector:audit:read`. Jeder Eintrag ist mit dem vorigen
@@ -269,7 +285,11 @@ Stelle, an der eine gebrochen ist.
 
 Die Anmeldung über den Identitätsanbieter, den Ihre Organisation ohnehin betreibt, gibt es
 seit 0.2.0, im Betrieb ohne AppAPI: die Zustimmung wird über die OIDC-Anmeldung bestätigt,
-der Nextcloud über `user_oidc` bereits vertraut. Gruppen-Policies sind weiterhin geplant.
+der Nextcloud über `user_oidc` bereits vertraut. Ein Dienst der Organisation kann außerdem im
+Namen eines Nutzers handeln, mit einem Token, das er bei diesem Anbieter eingetauscht hat;
+Einrichtung, die gemessenen Grenzen dieses Wegs und was daran noch offen ist, stehen in
+[docs/token-exchange.md](docs/token-exchange.md). Auf diesem Weg weiterhin geplant sind
+Gruppen-Policies.
 
 Angebot anfordern: admin@infranode.dev
 

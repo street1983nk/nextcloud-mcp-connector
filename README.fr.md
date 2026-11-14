@@ -11,8 +11,8 @@
 [![Nextcloud App Store](https://img.shields.io/badge/App_Store-mcp__connector-0082c9)](https://apps.nextcloud.com/apps/mcp_connector)
 [![Licence](https://img.shields.io/badge/Licence-AGPL--3.0--or--later-blue)](LICENSE)
 
-Un serveur MCP soigneusement sélectionné qui relie votre Nextcloud (fichiers, agenda, notes,
-Deck, contacts, Tables, Talk et Mail) à des assistants IA tels que Claude, Cursor, ChatGPT ou
+Un serveur MCP soigneusement sélectionné qui relie votre Nextcloud (fichiers et dossiers, agenda,
+tâches, notes, Deck, contacts, Tables, Talk et Mail) à des assistants IA tels que Claude, Cursor, ChatGPT ou
 vos propres agents. Installé comme ExApp Nextcloud, il est en même temps son propre serveur
 d'autorisation OAuth 2.1.
 
@@ -30,7 +30,7 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
 - OAuth 2.1 conforme à la spécification d'autorisation MCP : enregistrement dynamique des
   clients, PKCE S256, jetons liés à leur audience, rotation des jetons de rafraîchissement
   avec détection de réutilisation et révocation immédiate. Claude.ai et ChatGPT reçoivent une
-  URL et ne voient jamais de mot de passe
+  URL et ne voient jamais de mot de passe ni de mot de passe d'application
 - Chaque requête s'exécute avec les droits de l'utilisateur connecté : les permissions
   Nextcloud s'appliquent sans changement, et l'assistant ne voit jamais plus que vous
 - Gestion par utilisateur : chaque compte suspend ou réactive son propre accès et déconnecte
@@ -54,14 +54,18 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
   ou supprimés sont refusés. L'historique des versions dépend du backend de stockage de
   Nextcloud.
 - Les tâches existantes restent inchangées tant que l'administrateur n'active pas
-  l'interrupteur « Autoriser la modification des tâches existantes » (`NC_MCP_TASKS_UPDATE`) :
+  l'interrupteur « Autoriser la modification des tâches existantes » (en anglais dans
+  l'interface : « Allow changing existing tasks », `NC_MCP_TASKS_UPDATE`) :
   Désactivé par défaut. Activé, les assistants peuvent modifier une tâche à la fois, et
   uniquement avec l'ETag renvoyé par `tasks_read` : `tasks_complete` la coche (d'abord ses
   sous-tâches) ou la rouvre, `tasks_update` modifie son titre, sa description, son échéance,
   sa date de début, sa priorité, ses étiquettes ou sa tâche parente, et `tasks_move` la
   déplace avec ses sous-tâches dans une autre liste de tâches propre ou partagée en écriture.
-  Les tâches récurrentes et les tableaux Deck sont refusés. Un changement de l'interrupteur
-  prend effet après avoir désactivé puis réactivé l'application.
+  Les tâches récurrentes et les tableaux Deck sont refusés. Sur une installation en service,
+  l'administrateur change l'interrupteur avec
+  `occ app_api:app:config:set mcp_connector tasks_update --value on --update-only`, voir
+  [docs/exapp-install.md](docs/exapp-install.md#write-switches). Un changement de
+  l'interrupteur prend effet après avoir désactivé puis réactivé l'application.
 - Aucun déplacement ni renommage de fichiers, de dossiers ou d'autres objets ; la seule
   exception est `tasks_move` pour une seule tâche lorsque `NC_MCP_TASKS_UPDATE` est activé.
   Aucune modification de partage ni de permission ; les fichiers binaires passent par
@@ -96,7 +100,7 @@ qu'un nom ou un niveau diverge.
 | `files_read` | read | Le contenu d'un fichier |
 | `files_download` | read | Un fichier de toute taille en blocs de ressource intégrés et limités |
 | `files_read_as_markdown` | read | Un fichier DOCX, XLSX, PPTX ou PDF converti en Markdown, par tranches |
-| `files_upload` | create-only | Un fichier texte ou binaire en blocs Base64 ; un chemin existant est refusé, jamais écrasé |
+| `files_upload` | create-only | Un nouveau fichier texte ou un envoi binaire de toute taille en blocs Base64 ; un chemin existant est refusé, jamais écrasé |
 | `files_create_folder` | create-only | Un nouveau dossier, au besoin avec ses dossiers parents manquants (au plus 10 par appel) ; un dossier existant répond created false, rien n'est écrasé |
 | `files_update` | conditional-update | Remplace un fichier texte UTF-8 existant uniquement avec son ETag lu auparavant ; disponible seulement si l'admin active `NC_MCP_FILES_UPDATE` |
 | `calendar_list_events` | read | Les événements d'une plage de temps explicite, avec un fuseau horaire explicite |
@@ -122,6 +126,11 @@ qu'un nom ou un niveau diverge.
 | `prepare_context` | read | Fichiers, notes, cartes, la semaine d'événements à venir, les conversations Talk en attente et les courriels non lus en un appel |
 | `search` | read | Point d'entrée de recherche compatible OpenAI, délègue à la recherche unifiée |
 | `fetch` | read | Récupération compatible OpenAI, résout un id vers un fichier, une note, une carte, un événement, un courriel, un message Talk, un tableau ou une tâche |
+
+Comment les outils de dossiers et de tâches ont répondu sur de vrais Nextcloud 32 et 35, et ce
+qui n'a pas été mesuré, par exemple un nouveau dossier sur un stockage externe en lecture
+seule : [docs/folder-evidence.md](docs/folder-evidence.md) et
+[docs/tasks-evidence.md](docs/tasks-evidence.md).
 
 `search` et `fetch` existent parce que le profil de connecteur ChatGPT exige exactement ces
 deux noms et schémas. Ce sont de fines enveloppes autour des outils ci-dessus, pas une seconde
@@ -244,6 +253,8 @@ uv tool install nextcloud-mcp-connector
 export NC_MCP_URL=https://cloud.example.com
 export NC_MCP_USER=alice
 export NC_MCP_APP_PASSWORD=xxxxx-xxxxx-xxxxx-xxxxx-xxxxx
+# Facultatif : n'exposer que ce répertoire Nextcloud aux outils de fichiers
+export NC_MCP_FILES_ROOT=/Documents/AI
 
 nc-mcp
 ```
@@ -254,6 +265,10 @@ d'environnement et les trois erreurs qui surviennent vraiment :
 [docs/client-setup.md](docs/client-setup.md). OAuth pour l'administration :
 [docs/oauth-setup.md](docs/oauth-setup.md). Les plateformes d'automatisation sont aussi des
 clients, avec une connexion OAuth par personne : [docs/n8n-setup.md](docs/n8n-setup.md).
+
+Lorsque `NC_MCP_FILES_ROOT` est définie, ce répertoire devient `/` pour les outils de
+fichiers. Par exemple, `/scan.pdf` est résolu sous `/Documents/AI`, et aucun outil de fichiers
+ne peut atteindre ses dossiers parents.
 
 ![Page des connexions avec deux assistants connectés](docs/screenshots/connections-page-v2.png)
 
@@ -277,7 +292,10 @@ parcourt les chaînes et indique le premier endroit où l'une d'elles est rompue
 L'authentification via le fournisseur d'identité que votre organisation exploite déjà est
 arrivée avec la 0.2.0, dans le déploiement sans AppAPI : la décision de consentement est
 confirmée par l'authentification unique OIDC à laquelle Nextcloud fait déjà confiance via
-`user_oidc`. Les politiques de groupe restent prévues.
+`user_oidc`. Un service de l'organisation peut aussi agir au nom d'un utilisateur avec un jeton
+qu'il a échangé auprès de ce fournisseur ; la mise en place, les limites mesurées de cette voie
+et ce qui reste ouvert sont décrits dans [docs/token-exchange.md](docs/token-exchange.md). Les
+politiques de groupe restent prévues sur cette voie.
 
 Demande de devis : admin@infranode.dev
 

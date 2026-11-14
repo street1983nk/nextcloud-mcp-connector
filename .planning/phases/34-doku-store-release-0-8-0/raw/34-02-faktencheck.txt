@@ -1,0 +1,85 @@
+# 34-02 Faktencheck der READMEs EN/DE/FR gegen den Endstand 0.8.0
+# Stand: HEAD 8b4af1d plus Arbeitskopie dieses Plans, 2026-11-14
+# Zeilennummern: alt = vor 34-02, neu = nach 34-02
+# Registry-Abzug: Server-Objekt mit NC_MCP_FILES_UPDATE=on und NC_MCP_TASKS_UPDATE=on, list_tools, Annotationen read_only_hint/destructive_hint/idempotent_hint (Scratchpad p34/registry.txt, 31 Werkzeuge)
+
+## Zahlen und Familien
+FAKT README.md:25 status=stimmt beleg=scripts/check_tool_budget.py "control, standard state: 18770 bytes, 27 tools" und "every switch on: 22198 bytes, 31 tools" | 27 tools across ten app families
+FAKT README.de.md:28 status=stimmt beleg=wie README.md:25 | 27 Tools über zehn App-Familien
+FAKT README.fr.md:28 status=stimmt beleg=wie README.md:25 | 27 outils répartis sur dix familles
+FAKT README.md:25 status=stimmt beleg=server.bundle_names() = calendar, chatgpt, contacts, context, deck, files, mail, notes, search, tables, talk, tasks (12 Bundles; Familien = 12 minus chatgpt und context, die Querschnitt sind) | zehn Familien files, calendar, tasks, notes, Deck, contacts, Tables, Talk, Mail, search
+FAKT README.md:12 status=behoben neu=12 beleg=bundle_names() enthält tasks; files_create_folder in Bundle files | Einleitung ohne Aufgaben und Ordner, jetzt "files and folders, calendar, tasks, ..."
+FAKT README.de.md:14 status=behoben neu=14 beleg=wie README.md:12 | Einleitung jetzt "Dateien und Ordner, Kalender, Aufgaben, ..."
+FAKT README.fr.md:14 status=behoben neu=14 beleg=wie README.md:12 | Einleitung jetzt "fichiers et dossiers, agenda, tâches, ..."
+FAKT README.de.md:32 status=behoben neu=32-33 beleg=README.md:29 | "nie ein Passwort" ohne "oder App-Passwort" (fehlte in DE)
+FAKT README.fr.md:33 status=behoben neu=33 beleg=README.md:29 | "jamais de mot de passe" ohne "ni de mot de passe d'application" (fehlte in FR)
+
+## Was der Server nicht kann
+FAKT README.md:42 status=stimmt beleg=Registry: kein Werkzeug mit Löschfunktion; tests/contract/test_write_promise_truth.py::test_the_delete_limit_names_tasks | kein Löschen, auch keine Aufgabe
+FAKT README.md:44 status=stimmt beleg=Registry files_update destructive_hint=True nur mit NC_MCP_FILES_UPDATE; appinfo/info.xml:566-569 | files_update nur mit ETag
+FAKT README.md:48 status=stimmt beleg=src/mcp_connector/exapp/ui/strings.py:818 "Allow changing existing tasks"; appinfo/info.xml:571-574 | Schalter-Label und NC_MCP_TASKS_UPDATE, ab Werk aus
+FAKT README.de.md:55 status=behoben neu=56-57 beleg=strings.py:5-12 (v1 nur englisch, kein l10n-Verzeichnis), strings.py:818 | DE nannte nur das übersetzte Label, die Oberfläche zeigt "Allow changing existing tasks"; jetzt beide (übersetztes Label bleibt, Test SWITCH_LABELS in test_tool_surface.py)
+FAKT README.fr.md:57 status=behoben neu=57-58 beleg=wie README.de.md:55 | FR jetzt mit « Allow changing existing tasks » als Text der Oberfläche
+FAKT README.md:54 status=behoben neu=54-56 beleg=docs/exapp-install.md:60-75, raw/33-10-nc35.txt; AppAPI SetConfig.php (siehe ZUSATZ 2) | Hinweis occ app_api:app:config:set mcp_connector tasks_update --value on --update-only mit Verweis docs/exapp-install.md#write-switches (fehlte in allen drei)
+FAKT README.de.md:61 status=behoben neu=63-67 beleg=wie README.md:54 | occ-Zeile DE
+FAKT README.fr.md:63 status=behoben neu=64-68 beleg=wie README.md:54 | occ-Zeile FR
+FAKT README.md:53 status=stimmt beleg=Registry tasks_move "Move a task into the named list"; tools/tasks.py Zielprüfung auf schreibbare Liste; docs/tasks-evidence.md:1090 ziel=geteilt-schreibbar | own or writable shared task list
+FAKT README.de.md:60 status=behoben neu=62 beleg=wie README.md:53 | Wortlaut "schreibbar geteilte" -> "mit Schreibrecht geteilte" (ZUSATZ 1)
+FAKT README.md:56 status=stimmt beleg=test_write_promise_truth.py::test_every_point_denying_moving_names_the_tasks_move_exception | kein Verschieben außer tasks_move
+FAKT README.md:60 status=stimmt beleg=Registry mail_browse read_only_hint=True | Mail strikt lesend
+FAKT README.md:65 status=stimmt beleg=tests/contract/test_no_destructive_calls.py | Contract-Test mit den benannten Ausnahmen
+
+## Tools-Tabelle
+FAKT README.md:72 status=stimmt beleg=tests/contract/test_tool_surface.py::test_the_readme_permission_table_matches_the_live_registry (drei Parameter) | Legende read, create-only, conditional-update, modify, Tabelle nicht von Hand gepflegt
+FAKT README.md:86 status=stimmt beleg=tools/files*.py MAX_NEW_FOLDERS = 10; Registry files_create_folder ro=False destr=False idem=True, "an existing folder answers created false" | files_create_folder create-only, höchstens 10, created false
+FAKT README.de.md:96 status=behoben neu=101 beleg=README.md:85, Registry files_upload "Create text/base64 ... never overwrites" | DE ohne "beliebiger Größe" (Punkt 4)
+FAKT README.fr.md:99 status=behoben neu=103 beleg=wie README.de.md:96 | FR ohne "de toute taille" (Punkt 4)
+FAKT README.md:90 status=stimmt beleg=tools/tasks.py:54 PAGE_SIZE = 25; Registry tasks_search "open by default ... own and shared task lists, 25 per page" | tasks_search
+FAKT README.md:91 status=stimmt beleg=tools/tasks.py:96 MAX_DESCRIPTION_BYTES = 4096 | tasks_read Beschreibung gekürzt
+FAKT README.md:92 status=stimmt beleg=tools/tasks.py:965-1003 (vereinfacht, strenger als der Code: der Fall Elternaufgabe in eigener ungeteilter Liste fehlt, ist aber keine falsche Zusage) | tasks_create ohne Liste nur bei genau einer eigenen ungesehenen Liste
+FAKT README.md:93 status=stimmt beleg=Registry tasks_complete ro=False destr=True | tasks_complete modify
+FAKT README.md:94 status=stimmt beleg=Registry tasks_update ro=False destr=True | tasks_update modify
+FAKT README.md:95 status=stimmt beleg=Registry tasks_move ro=False destr=True idem=True; tools/tasks.py:600 und 946 (Deck nie Ziel) | tasks_move modify
+FAKT README.de.md:106 status=behoben neu=111 beleg=wie README.md:53 | "genannte beschreibbare Liste" -> "genannte Liste mit Schreibrecht" (ZUSATZ 1)
+FAKT README.md:110 status=stimmt beleg=src/mcp_connector/tools/chatgpt.py:280 case "task" | fetch löst task-IDs auf
+FAKT README.md:110 status=behoben neu=114-117 beleg=docs/folder-evidence.md:383-386 (externer Speicher nicht gemessen), docs/tasks-evidence.md:1-12 und 1090-1099 (32 und 35) | Grenzen mit Befundlink fehlten in allen drei (34-RULES Abschnitt 8)
+FAKT README.de.md:121 status=behoben neu=128-131 beleg=wie README.md:110 | Befundlink DE
+FAKT README.fr.md:124 status=behoben neu=130-133 beleg=wie README.md:110 | Befundlink FR
+
+## Bundles
+FAKT README.md:136 status=stimmt beleg=server.bundle_names() (12 Namen, gleich der Liste); appinfo/info.xml NC_MCP_DISABLED_TOOLS "Valid names: calendar, chatgpt, contacts, context, deck, files, mail, notes, search, tables, talk, tasks" | Bundle-Liste EN
+FAKT README.md:142 status=stimmt beleg=Registry: files_create_folder immer, files_update nur mit Schalter | Bundle files
+FAKT README.md:150 status=stimmt beleg=Registry: tasks_search, tasks_read, tasks_create immer, drei weitere nur mit NC_MCP_TASKS_UPDATE; test_tool_surface.py::test_each_readme_documents_the_tasks_update_switch | Bundle tasks
+FAKT README.de.md:149 status=stimmt beleg=wie README.md:136 | Bundle-Liste DE gleich
+FAKT README.fr.md:155 status=stimmt beleg=wie README.md:136 | Bundle-Liste FR gleich
+FAKT README.md:152 status=stimmt beleg=src/mcp_connector/config.py:319-343 | unbekannter Name oder alle Namen stoppen den Start
+FAKT README.md:154 status=stimmt beleg=config.py:323 | keine Zugriffskontrolle
+
+## kein-ki, Installation, Clients, Enterprise
+FAKT README.md:162 status=stimmt beleg=docs/exclusion.md (unverändert seit 31-06) | kein-ki
+FAKT README.md:198 status=stimmt beleg=appinfo/info.xml:182 min-version 32 max-version 35 | Nextcloud 32 bis 35
+FAKT README.md:222 status=stimmt beleg=appinfo/info.xml NC_MCP_FILES_ROOT | NC_MCP_FILES_ROOT im Clients-Beispiel und Erklärung (EN)
+FAKT README.de.md:239 status=behoben neu=250-251,263-265 beleg=README.md:222-223 und 234-235 | DE ohne NC_MCP_FILES_ROOT im Beispiel und ohne Erklärung (Punkt 3)
+FAKT README.fr.md:246 status=behoben neu=256-257,269-271 beleg=wie README.de.md:239 | FR ohne NC_MCP_FILES_ROOT (Punkt 3)
+FAKT README.md:255 status=stimmt beleg=docs/token-exchange.md vorhanden | Token-Austausch mit Verweis
+FAKT README.de.md:272 status=behoben neu=286-292 beleg=README.md:257-261, docs/token-exchange.md | DE ohne Token-Austausch-Satz und Link
+FAKT README.fr.md:280 status=behoben neu=294-298 beleg=wie README.de.md:272 | FR ohne Token-Austausch-Satz und Link
+FAKT README.de.md:263 status=behoben neu=279 beleg=Punkt 7 | "Werkzeugaufruf" und "das Werkzeug" -> "Tool-Aufruf" und "das Tool"
+FAKT README.md:35 status=stimmt beleg=tools/tasks.py:67 PER_LIST_TIMEOUT = 3.0 | READMEs nennen kein Zeitbudget der Aufgabensuche, nur das von prepare_context; nicht neu eingeführt
+
+## Neun Punkte aus 31-06
+PUNKT 1 status=erledigt-vorher beleg=test_the_readme_permission_table_matches_the_live_registry läuft über README.md, README.de.md, README.fr.md (33-09), drei Parameter grün
+PUNKT 2 status=erledigt-vorher beleg=Legende in allen drei mit read, create-only, conditional-update, modify (33-09); files_create_folder ist create-only (legt nur an, ändert nie), die Legende deckt das idempotente Anlegen ab
+PUNKT 3 status=zu-tun beleg=in 34-02 behoben, README.de.md:250-251,263-265 und README.fr.md:256-257,269-271
+PUNKT 4 status=zu-tun beleg=in 34-02 behoben, README.de.md:101 und README.fr.md:103
+PUNKT 5 status=erledigt-vorher beleg=34-01 (Überschreib- und Verschiebe-Punkt in DE/FR wie EN)
+PUNKT 6 status=erledigt-vorher beleg=34-01 hat README.fr.md auf gerade Apostrophe gebracht; grep "’" README.fr.md = 0 Treffer
+PUNKT 7 status=zu-tun beleg=in 34-02 behoben, README.de.md:279 "Tool-Aufruf", "das Tool"; danach 0 Treffer "Werkzeug"
+PUNKT 8 status=uebergabe-34-06 beleg=CHANGELOG.de.md und CHANGELOG.fr.md ohne Linkzeile [Unreleased]
+PUNKT 9 status=uebergabe-34-06 beleg=test_changelog_translations.py zählt [Unreleased] nicht
+UEBERGABE 34-06 punkte=8,9 grund=betreffen CHANGELOGs und deren Test, nicht die READMEs
+
+## Zusatzpunkte der Hauptsitzung
+ZUSATZ 1 status=behoben beleg=README.de.md:62 "mit Schreibrecht geteilte Aufgabenliste", README.de.md:111 "genannte Liste mit Schreibrecht"; EN "writable shared" (README.md:53, docs/privacy.md:198, docs/threat-model.md:154) und FR "partagée en écriture"/"accessible en écriture" sind natürlich und gleichbedeutend, unverändert; keine weitere DE-Fundstelle in docs/ außer Rohprotokollen in docs/spike-tasks.md (Marker, keine Prosa)
+ZUSATZ 2 status=stimmt beleg=nextcloud/app_api lib/Command/ExAppConfig/SetConfig.php: stable32 514f8e4 und stable33 a1230aa Zeilen 57-63, stable34 747c8c6 Zeilen 57-63, stable35 918fcc1 Zeilen 56-62 (ohne --update-only: vorhandener Schlüssel -> "already exists. Use --update-only flag.", Exit 1; fehlender Schlüssel -> setAppConfigValue legt ihn an); lib/Service/ExAppConfigService.php setAppConfigValue: stable32 bis stable34 mapper->insert bei fehlendem Eintrag (Zeile 69), stable35 appConfig->setValueString (Zeile 82) | Satz in docs/exapp-install.md:73-74 bleibt
+ZUSATZ 3 status=stimmt beleg=Werkzeugzahl 27/31, zehn Familien, zwölf Bundle-Namen, Rechtetabelle (Test drei Parameter), Schalterabschnitt mit occ-Zeile, PER_LIST_TIMEOUT nicht genannt, "das ETag" (grep "die ETag|der ETag" README.de.md leer)
