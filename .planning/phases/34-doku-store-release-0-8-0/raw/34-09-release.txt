@@ -16,3 +16,4 @@ IMAGE ghcr.io/street1983nk/mcp_connector:0.8.0 platforms=linux/amd64,linux/arm64
 ASSET mcp_connector-0.8.0.tar.gz size=62491 release_draft=false
 NOTIZ gesetzt aus raw/34-08-release-notes.md, Abgleich mit gh release view: gleich bis auf eine Leerzeile am Ende
 SIGNATUR asset=mcp_connector-0.8.0.tar.gz size=62491 sha256=88ded7c3ab7a500c... sig=512B verify=Verified-OK gegenprobe=Verification-failure hochgeladen=ja
+SUBMIT weg=workflow run=43578762697 http=201 datum=2026-11-14

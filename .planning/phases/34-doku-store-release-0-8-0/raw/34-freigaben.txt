@@ -22,3 +22,5 @@ FREIGABE tag-v0.8.0 antwort=tag datum=2026-11-14
   Owner-Antwort: "Tag setzen (Empfohlen)" per AskUserQuestion; Tag auf main b4b6518.
 FREIGABE signatur antwort=signieren-und-hochladen datum=2026-11-14
   Owner-Antwort: "Signieren und hochladen (Empfohlen)" per AskUserQuestion.
+FREIGABE submit antwort=workflow datum=2026-11-14
+  Owner-Antwort: "Workflow einreichen (Empfohlen)" per AskUserQuestion.
