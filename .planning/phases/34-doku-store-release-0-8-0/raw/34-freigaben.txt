@@ -12,3 +12,5 @@ FREIGABE label-files-update antwort=allow-editing-existing-text-files datum=2026
   Owner-Antwort: "Allow editing existing text files" gilt überall; Label-Änderung, keine Änderung der Store-Beschreibung.
 FREIGABE store-text-2 antwort=entfaellt datum=2026-11-14
   raw/34-07-volltest.txt trägt STORETEXT unveraendert; der Pin deckt das geänderte display-name nicht.
+FREIGABE volltest antwort=abgenommen datum=2026-11-14
+  Owner-Antwort: "Abgenommen (Empfohlen)" per AskUserQuestion, über die Hauptsitzung übermittelt; dazu Stilhinweise A und B "Jetzt ändern" (umgesetzt in 9025f17 und 23189a5).
