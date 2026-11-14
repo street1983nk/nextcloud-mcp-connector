@@ -58,10 +58,13 @@ PAGE_SIZE = 25
 #: capped; above it the budget is the cap. Plan 32-02 measured the REPORT of 2000 tasks of which
 #: 100 were open (at most 0.113 s, budget 1 s). Plan 32-10 measured a whole call with 2000 OPEN
 #: tasks in one list (discovery, REPORT and parsing): at most 0.831 s, and with 1 s the first
-#: page on Nextcloud 35 was cut off, so the budget follows the rule again.
-#: MESSWERT per_list_timeout_s=2 regel=max(1,ceil(2*max)) max_s=0.831 quelle=nc32-impersonation
-#: (plan 32-10, 2026-11-13, aufgaben=2000 offen, raw/32-10-messung.txt, docs/tasks-evidence.md)
-PER_LIST_TIMEOUT = 2.0
+#: page on Nextcloud 35 was cut off, so the budget follows the rule again. Plan 33-11 measured
+#: the first search right after an install of the Tasks app and a restart, seven lists at
+#: once: one list took 1.030 s on Nextcloud 32 (a plain restart: at most 0.373 s).
+#: MESSWERT per_list_timeout_s=3 regel=max(1,ceil(2*max)) max_s=1.030 quelle=nc32-impersonation
+#: (plan 33-11, 2026-11-14, erste Suche nach Installation, raw/33-11-kaltstart.txt,
+#: docs/tasks-evidence.md)
+PER_LIST_TIMEOUT = 3.0
 
 #: Wall clock budget of the subtask query and the parent lookup of ``tasks_read`` (D-32-03).
 #: MESSWERT subtask_timeout_s=1 regel=max(1,ceil(2*max)) max_s=0.107 quelle=nc35-impersonation

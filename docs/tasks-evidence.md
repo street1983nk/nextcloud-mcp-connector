@@ -1173,6 +1173,37 @@ Nextcloud 32 has no whole chain (the app runs as a local process at the daemon
 KETTE nc32 entfaellt grund=manual-install (wie 32-07: auf 32 läuft die ExApp als lokaler Prozess am Daemon manual_install, eine Kette über ein Image gibt es dort nicht)
 ```
 
+### Gap closure 33-11: the first search after a cold start
+
+In run 1 of plan 33-10 on Nextcloud 32 the read only shared list was missing from the first
+search right after the Tasks app was installed and the container restarted; the unchanged
+repeat was green. Plan 33-11 measured it with `scripts/tasks_coldstart.py`, every request
+timed with its body, the discovery of every call recorded list by list.
+
+A plain restart is not the cause: 9 restarts on each instance, the list was always in the
+discovery, every answer 207, one list at most 0.120 s (35) and 0.096 s (32), seven parallel
+`REPORT`s at most 0.377 s. The setup of run 1 rebuilt on Nextcloud 32 (Tasks app 0.18.1
+installed, restart, seven lists with two group shares, then the first search; four more
+cycles of removal, install and restart, each also after a plain restart) dropped no list
+either, but one list of the first call took up to 1.030 s:
+
+```
+NACH nc32 zyklus=1 art=wie-lauf1 budget_s=2 ram_gb=4.30 gesamt_ms=1090 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein trefferlisten=a,b,gro,grw,ro,rw | a:n=1,status=207,max_ms=84 b:n=1,status=207,max_ms=70 eigen:n=1,status=207,max_ms=60 gro:n=1,status=207,max_ms=87 grw:n=1,status=207,max_ms=78 home:n=1,status=207,max_ms=52 ro:n=1,status=207,max_ms=82 rw:n=1,status=207,max_ms=1030
+NACH nc32 zyklus=5 art=neu-installiert budget_s=2 ram_gb=4.37 gesamt_ms=1026 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein trefferlisten=a,b,gro,grw,ro,rw | a:n=1,status=207,max_ms=98 b:n=1,status=207,max_ms=96 eigen:n=1,status=207,max_ms=65 gro:n=1,status=207,max_ms=109 grw:n=1,status=207,max_ms=111 home:n=1,status=207,max_ms=252 ro:n=1,status=207,max_ms=111 rw:n=1,status=207,max_ms=769
+```
+
+Each first call has one list that pays a one time cost of 0.23 s to 1.03 s, not always the same one.
+Run 1 of 33-10 ran with less free memory (its RAM gate was red at first), where such a cost can
+pass 2 s. The rule `max(1, ceil(2 * max))` gives 3 s for 1.030 s, so the budget of 2 s was
+below the margin of the house rule. RED first (`test_limit_policy_constants_are_the_measured_values`
+expecting 3), then `PER_LIST_TIMEOUT = 3.0` with its measuring line. A list that still misses
+the budget is named under `degraded` with its reason (negative control: the `REPORT` of the
+list held back 3 s in the client, the answer named it on both instances); nothing is retried.
+
+```
+MESSWERT per_list_timeout_s=3 regel=max(1,ceil(2*max)) max_s=1.030 quelle=nc32-impersonation
+```
+
 ## Not reproducible or not measured
 
 - Nextcloud 32 has no whole chain: the app runs there as a local process at the daemon
