@@ -17,7 +17,7 @@
 
 ### Not included
 
-- No deleting of tasks. Nothing in the connector deletes.
+- No deleting of tasks. No tool deletes anything.
 
 ### Fixed
 

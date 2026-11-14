@@ -14,3 +14,5 @@ FREIGABE store-text-2 antwort=entfaellt datum=2026-11-14
   raw/34-07-volltest.txt trägt STORETEXT unveraendert; der Pin deckt das geänderte display-name nicht.
 FREIGABE volltest antwort=abgenommen datum=2026-11-14
   Owner-Antwort: "Abgenommen (Empfohlen)" per AskUserQuestion, über die Hauptsitzung übermittelt; dazu Stilhinweise A und B "Jetzt ändern" (umgesetzt in 9025f17 und 23189a5).
+FREIGABE push-branch antwort=push datum=2026-11-14
+  Owner-Antwort: "Ja, Texte ok und pushen (Empfohlen)" per AskUserQuestion, über die Hauptsitzung übermittelt; eine Korrektur der Release-Notiz ("No tool deletes anything."). Push führt die Hauptsitzung aus.

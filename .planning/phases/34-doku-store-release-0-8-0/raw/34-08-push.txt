@@ -1,0 +1,4 @@
+PRUEFUNG commits=46 autor_committer_fremd=0 trailer=0 closes_woerter=0
+  Bereich origin/plan/v1.8-tasks-080..HEAD (origin f464455, HEAD cbbbbc4), Stand 2026-11-14 vor der Push-Frage.
+  Positivkontrolle: gepflanzte Zeilen "Co-Authored-By: a" und "fixes #3" werden von denselben Mustern gefunden (2 Treffer).
+  origin/main ist Vorfahr von HEAD.
