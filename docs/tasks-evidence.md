@@ -38,6 +38,9 @@ rather than believed. Every quoted line is copied from the raw protocol:
   [raw/32-09-messung.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-09-messung.txt),
   [raw/32-09-nc35.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-09-nc35.txt),
   [raw/32-09-nc32.txt](../.planning/phases/32-tasks-bundle-suchen-lesen-anlegen/raw/32-09-nc32.txt)
+- the live proof of the modifying tools of plan 33-10:
+  [raw/33-10-nc35.txt](../.planning/phases/33-aufgaben-aendern/raw/33-10-nc35.txt),
+  [raw/33-10-nc32.txt](../.planning/phases/33-aufgaben-aendern/raw/33-10-nc32.txt)
 
 The number of tools is not held by this page; `tests/contract/test_tool_surface.py` holds it.
 
@@ -324,6 +327,14 @@ again; it must not assume one comes back.
   behaviour of the Tasks app and the ETag after an altered text (M-4) were measured on
   Nextcloud 35 only; the cost of a chain on both. The chains ran on loopback, a real network
   adds latency per write, which the budget of 8 s against the limit of 30 s absorbs.
+- Live proof of the modifying tools (plan 33-10): nothing fell away through the owner releases,
+  both instances ran each without and with the Tasks app, and Nextcloud 35 over the whole
+  chain. Not measured: the whole chain on Nextcloud 32 (local process at `manual_install`), a
+  chain of more than three descendants live (the cap of 50 rests on the measurement of
+  plan 33-01c and the unit tests), a cancelled descendant live (unit tests and plan 33-01b),
+  a 403 of the server for a read only share (the server answered 404 to the harness, the tools
+  refuse before any write), and a stale write through the chain other than `tasks_update`
+  (the function level covers all three tools).
 
 ## Nextcloud 35 without the Tasks app
 
@@ -885,6 +896,282 @@ AUFGABE keine-kennung nc=32.0.15.1 nutzer=alice status=keine ergebnis=ok | 62 an
 ANZEIGENAME bob gesetzt=nein zurueck=entfaellt gleich_vorher=ja
 ```
 
+
+## Modifying tools on Nextcloud 35 and 32
+
+Plan 33-10: `tasks_complete`, `tasks_update` and `tasks_move` called as functions under AppAPI
+impersonation (`tests/integration/test_tasks_live.py`, `NC_MCP_REQUIRE_LIVE=1`), on both standing
+instances, each without and with the Tasks app 0.18.1; on Nextcloud 35 also over the whole chain
+through the installed app with the switch `NC_MCP_TASKS_UPDATE` on. Owner releases:
+
+```
+FREIGABE zustand=option-a datum=2026-11-13 umfang=nc35+nc32 quelle=owner-antwort-checkpoint-33-01-task-3
+FREIGABE owner=option-a datum=2026-11-14 quelle=owner-antwort-checkpoint-33-10-task-2 (ExApp auf nc35 neu registrieren, Schalter tasks_update vorübergehend an, altes Image vorher als 0.7.2-vor33 sichern, danach Schalter aus und App neu gestartet)
+```
+
+Raw protocols: [raw/33-10-nc35.txt](../.planning/phases/33-aufgaben-aendern/raw/33-10-nc35.txt),
+[raw/33-10-nc32.txt](../.planning/phases/33-aufgaben-aendern/raw/33-10-nc32.txt). Every case writes one
+line `FALL <case> nc=<version> werkzeug=<tool> status=<calls> ergebnis=<ok|befund> | <marks>` with
+yes/no marks and the first 12 hex digits of the sha256 of the column `calendardata`, read by PHP
+in the container; "unchanged" always means the same hash, never a status code. The runs:
+
+```
+LIVE nc35 tasksapp=keine passed=58 failed=0
+LIVE nc35 tasksapp=0.18.1 passed=58 failed=0
+LIVE nc32 tasksapp=keine passed=58 failed=0
+LIVE-ROT nc32 tasksapp=0.18.1 passed=57 failed=1 lauf=1
+LIVE nc32 tasksapp=0.18.1 passed=58 failed=0 lauf=2
+```
+
+The red first run with the Tasks app on Nextcloud 32 failed in a case of phase 32
+(`geteilt-namen`, the read only list missing from the first search right after the restart of
+the container), not in a case of this plan; all 28 lines `FALL` of that run read `ergebnis=ok`.
+The unchanged second run was green. Baseline per account before equal after in every run.
+
+### Success criterion 1: Completing, reopening, already done, subtasks (TMOD-03, D-33-00b)
+
+| Instance | Tasks app | Case | Lines `FALL` with `ergebnis=ok` | Raw protocol |
+|---|---|---|---|---|
+| Nextcloud 35 | none | `aendern-abhaken` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | none | `aendern-wiederoeffnen` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | none | `aendern-schon-erledigt` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | none | `aendern-kinder` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `aendern-abhaken` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `aendern-wiederoeffnen` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `aendern-schon-erledigt` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `aendern-kinder` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 32 | none | `aendern-abhaken` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | none | `aendern-wiederoeffnen` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | none | `aendern-schon-erledigt` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | none | `aendern-kinder` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `aendern-abhaken` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `aendern-wiederoeffnen` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `aendern-schon-erledigt` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `aendern-kinder` | 1 of 1 | raw/33-10-nc32.txt |
+
+Quoted from the run on Nextcloud 35 without the Tasks app:
+
+```
+FALL aendern-abhaken nc=35.0.0.10 werkzeug=tasks_complete status=PROPFIND:207,GET:200,REPORT:207,PUT:204 ergebnis=ok | felder_wie_phase30=ja form_wie_completed_ics=ja eine_sekunde=ja ein_put=ja crlf=ja antwort=ja sha_vorher=31750f1ad5d1 sha_nachher=1aa9c9c29b09
+FALL aendern-wiederoeffnen nc=35.0.0.10 werkzeug=tasks_complete status=PROPFIND:207,GET:200,PUT:204 ergebnis=ok | felder=ja form_wie_reopened_ics=ja ein_put=ja antwort=ja sha_vorher=18c62111a3c1 sha_nachher=1e0cbc46fe0f
+FALL aendern-schon-erledigt nc=35.0.0.10 werkzeug=tasks_complete status=PROPFIND:207,GET:200 ergebnis=ok | kein_put=ja already=ja sha_gleich=ja sha=30ffa7ec4244
+FALL aendern-kinder nc=35.0.0.10 werkzeug=tasks_complete status=PROPFIND:207,GET:200,REPORT:207,PUT:204,PUT:204,PUT:204,PUT:204 ergebnis=ok | puts_nachordnung=ja alle_erledigt=ja changed_nachordnung=ja kinder_crlf=ja eltern_crlf=ja puts=4
+```
+
+And from the run on Nextcloud 32 with the Tasks app 0.18.1:
+
+```
+FALL aendern-abhaken nc=32.0.15.1 werkzeug=tasks_complete status=PROPFIND:207,GET:200,REPORT:207,PUT:204 ergebnis=ok | felder_wie_phase30=ja form_wie_completed_ics=ja eine_sekunde=ja ein_put=ja crlf=ja antwort=ja sha_vorher=9aacfee2c4c4 sha_nachher=8d6ff9b126bf
+FALL aendern-wiederoeffnen nc=32.0.15.1 werkzeug=tasks_complete status=PROPFIND:207,GET:200,PUT:204 ergebnis=ok | felder=ja form_wie_reopened_ics=ja ein_put=ja antwort=ja sha_vorher=480263394fc0 sha_nachher=98f48ce2f3d2
+FALL aendern-schon-erledigt nc=32.0.15.1 werkzeug=tasks_complete status=PROPFIND:207,GET:200 ergebnis=ok | kein_put=ja already=ja sha_gleich=ja sha=1c46fed989ad
+FALL aendern-kinder nc=32.0.15.1 werkzeug=tasks_complete status=PROPFIND:207,GET:200,REPORT:207,PUT:204,PUT:204,PUT:204,PUT:204 ergebnis=ok | puts_nachordnung=ja alle_erledigt=ja changed_nachordnung=ja kinder_crlf=ja eltern_crlf=ja puts=4
+```
+
+### Success criterion 2: Exactly the named fields, nothing written without a difference (TMOD-02, TMOD-04)
+
+| Instance | Tasks app | Case | Lines `FALL` with `ergebnis=ok` | Raw protocol |
+|---|---|---|---|---|
+| Nextcloud 35 | none | `aendern-felder` | 4 of 4 | raw/33-10-nc35.txt |
+| Nextcloud 35 | none | `aendern-reich` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | none | `aendern-ohne-unterschied` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `aendern-felder` | 4 of 4 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `aendern-reich` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `aendern-ohne-unterschied` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 32 | none | `aendern-felder` | 4 of 4 | raw/33-10-nc32.txt |
+| Nextcloud 32 | none | `aendern-reich` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | none | `aendern-ohne-unterschied` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `aendern-felder` | 4 of 4 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `aendern-reich` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `aendern-ohne-unterschied` | 1 of 1 | raw/33-10-nc32.txt |
+
+Quoted from the run on Nextcloud 35 without the Tasks app:
+
+```
+FALL aendern-felder nc=35.0.0.10 werkzeug=tasks_update status=PROPFIND:207,GET:200,PUT:204 ergebnis=ok | schritt=setzen felder_wie_app=ja antwort_changed=ja ein_put=ja due_form_wie_with_time_ics=ja tags_eine_zeile_wie_tags_ics=ja sha_vorher=da0ae0c8eeef sha_nachher=6eb3c0b67abc
+FALL aendern-felder nc=35.0.0.10 werkzeug=tasks_update status=PROPFIND:207,GET:200,PUT:204 ergebnis=ok | schritt=due-entfernen felder_wie_app=ja antwort_changed=ja ein_put=ja form_zeile_weg_wie_app=ja sha_vorher=6eb3c0b67abc sha_nachher=f19ec50446c8
+FALL aendern-felder nc=35.0.0.10 werkzeug=tasks_update status=PROPFIND:207,GET:200,PUT:204 ergebnis=ok | schritt=tags-entfernen felder_wie_app=ja antwort_changed=ja ein_put=ja sha_vorher=f19ec50446c8 sha_nachher=75b0caf5ed8b
+FALL aendern-felder nc=35.0.0.10 werkzeug=tasks_update status=PROPFIND:207,GET:200,PUT:204 ergebnis=ok | schritt=beschreibung-entfernen felder_wie_app=ja antwort_changed=ja ein_put=ja sha_vorher=75b0caf5ed8b sha_nachher=c66246834b24
+FALL aendern-reich nc=35.0.0.10 werkzeug=tasks_update status=PROPFIND:207,GET:200,PUT:204 ergebnis=ok | vorher_gefaltet=ja felder=ja unberuehrte_zeilen_woertlich=ja valarm_gleich=ja vtimezone_gleich=ja x_zeilen_gleich=ja parameter_summary=ja antwort=ja sha_vorher=8eb376e276bc sha_nachher=2515e6f8c444
+FALL aendern-ohne-unterschied nc=35.0.0.10 werkzeug=tasks_update status=PROPFIND:207,GET:200 ergebnis=ok | kein_put=ja changed_leer=ja sha_gleich=ja sha=550288e93330
+```
+
+And from the run on Nextcloud 32 with the Tasks app 0.18.1:
+
+```
+FALL aendern-felder nc=32.0.15.1 werkzeug=tasks_update status=PROPFIND:207,GET:200,PUT:204 ergebnis=ok | schritt=setzen felder_wie_app=ja antwort_changed=ja ein_put=ja due_form_wie_with_time_ics=ja tags_eine_zeile_wie_tags_ics=ja sha_vorher=74a81deb844f sha_nachher=875fd524a0ab
+FALL aendern-felder nc=32.0.15.1 werkzeug=tasks_update status=PROPFIND:207,GET:200,PUT:204 ergebnis=ok | schritt=due-entfernen felder_wie_app=ja antwort_changed=ja ein_put=ja form_zeile_weg_wie_app=ja sha_vorher=875fd524a0ab sha_nachher=84ac0ebc941e
+FALL aendern-felder nc=32.0.15.1 werkzeug=tasks_update status=PROPFIND:207,GET:200,PUT:204 ergebnis=ok | schritt=tags-entfernen felder_wie_app=ja antwort_changed=ja ein_put=ja sha_vorher=84ac0ebc941e sha_nachher=e545733a0ea1
+FALL aendern-felder nc=32.0.15.1 werkzeug=tasks_update status=PROPFIND:207,GET:200,PUT:204 ergebnis=ok | schritt=beschreibung-entfernen felder_wie_app=ja antwort_changed=ja ein_put=ja sha_vorher=e545733a0ea1 sha_nachher=4308d0f86d4b
+FALL aendern-reich nc=32.0.15.1 werkzeug=tasks_update status=PROPFIND:207,GET:200,PUT:204 ergebnis=ok | vorher_gefaltet=ja felder=ja unberuehrte_zeilen_woertlich=ja valarm_gleich=ja vtimezone_gleich=ja x_zeilen_gleich=ja parameter_summary=ja antwort=ja sha_vorher=d4ae451be2e6 sha_nachher=89430ddb3d02
+FALL aendern-ohne-unterschied nc=32.0.15.1 werkzeug=tasks_update status=PROPFIND:207,GET:200 ergebnis=ok | kein_put=ja changed_leer=ja sha_gleich=ja sha=e32650042f4c
+```
+
+### Success criterion 3: Stale ETag, read only share, recurring task, Deck card (TMOD-01, TMOD-05)
+
+| Instance | Tasks app | Case | Lines `FALL` with `ergebnis=ok` | Raw protocol |
+|---|---|---|---|---|
+| Nextcloud 35 | none | `aendern-veraltet` | 3 of 3 | raw/33-10-nc35.txt |
+| Nextcloud 35 | none | `aendern-nur-lesend` | 3 of 3 | raw/33-10-nc35.txt |
+| Nextcloud 35 | none | `aendern-nur-lesend-server` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | none | `aendern-wiederkehrend` | 3 of 3 | raw/33-10-nc35.txt |
+| Nextcloud 35 | none | `aendern-deck` | 3 of 3 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `aendern-veraltet` | 3 of 3 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `aendern-nur-lesend` | 3 of 3 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `aendern-nur-lesend-server` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `aendern-wiederkehrend` | 3 of 3 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `aendern-deck` | 3 of 3 | raw/33-10-nc35.txt |
+| Nextcloud 32 | none | `aendern-veraltet` | 3 of 3 | raw/33-10-nc32.txt |
+| Nextcloud 32 | none | `aendern-nur-lesend` | 3 of 3 | raw/33-10-nc32.txt |
+| Nextcloud 32 | none | `aendern-nur-lesend-server` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | none | `aendern-wiederkehrend` | 3 of 3 | raw/33-10-nc32.txt |
+| Nextcloud 32 | none | `aendern-deck` | 3 of 3 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `aendern-veraltet` | 3 of 3 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `aendern-nur-lesend` | 3 of 3 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `aendern-nur-lesend-server` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `aendern-wiederkehrend` | 3 of 3 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `aendern-deck` | 3 of 3 | raw/33-10-nc32.txt |
+
+Quoted from the run on Nextcloud 35 without the Tasks app:
+
+```
+FALL aendern-veraltet nc=35.0.0.10 werkzeug=tasks_complete status=PROPFIND:207,GET:200 ergebnis=ok | harness_aenderung=ja abgelehnt=ja kein_schreiben=ja sha_gleich_nach_harness=ja nicht_im_ziel=ja sha=4ed1c1096a37
+FALL aendern-veraltet nc=35.0.0.10 werkzeug=tasks_update status=PROPFIND:207,GET:200 ergebnis=ok | harness_aenderung=ja abgelehnt=ja kein_schreiben=ja sha_gleich_nach_harness=ja nicht_im_ziel=ja sha=a41bf2f8e2d2
+FALL aendern-veraltet nc=35.0.0.10 werkzeug=tasks_move status=PROPFIND:207,GET:200 ergebnis=ok | harness_aenderung=ja abgelehnt=ja kein_schreiben=ja sha_gleich_nach_harness=ja nicht_im_ziel=ja sha=fedd8e124936
+FALL aendern-nur-lesend nc=35.0.0.10 werkzeug=tasks_complete status=PROPFIND:207 ergebnis=ok | abgelehnt_nur_lesend=ja kein_schreiben=ja sha_beim_eigentuemer_gleich=ja sha=1864bac09f9b
+FALL aendern-nur-lesend nc=35.0.0.10 werkzeug=tasks_update status=PROPFIND:207 ergebnis=ok | abgelehnt_nur_lesend=ja kein_schreiben=ja sha_beim_eigentuemer_gleich=ja sha=1bd11e32b22c
+FALL aendern-nur-lesend nc=35.0.0.10 werkzeug=tasks_move status=PROPFIND:207 ergebnis=ok | abgelehnt_nur_lesend=ja kein_schreiben=ja sha_beim_eigentuemer_gleich=ja sha=035e1b9c3641
+FALL aendern-nur-lesend-server nc=35.0.0.10 werkzeug=harness status=keine ergebnis=ok | get_lesbar=ja put_abgelehnt=ja move_abgelehnt=ja sha_beim_eigentuemer_gleich=ja nicht_im_ziel=ja put_status=404 move_status=404
+FALL aendern-wiederkehrend nc=35.0.0.10 werkzeug=tasks_complete status=PROPFIND:207,GET:200 ergebnis=ok | abgelehnt_wiederkehrend=ja kein_schreiben=ja sha_gleich=ja sha=c473bcb83740
+FALL aendern-wiederkehrend nc=35.0.0.10 werkzeug=tasks_update status=PROPFIND:207,GET:200 ergebnis=ok | abgelehnt_wiederkehrend=ja kein_schreiben=ja sha_gleich=ja sha=c473bcb83740
+FALL aendern-wiederkehrend nc=35.0.0.10 werkzeug=tasks_move status=PROPFIND:207,GET:200 ergebnis=ok | abgelehnt_wiederkehrend=ja kein_schreiben=ja sha_gleich=ja sha=c473bcb83740
+FALL aendern-deck nc=35.0.0.10 werkzeug=tasks_complete status=keine ergebnis=ok | wie_unbekannt=ja keine_anfrage=ja keine_deck_marke=ja
+FALL aendern-deck nc=35.0.0.10 werkzeug=tasks_update status=keine ergebnis=ok | wie_unbekannt=ja keine_anfrage=ja keine_deck_marke=ja
+FALL aendern-deck nc=35.0.0.10 werkzeug=tasks_move status=keine ergebnis=ok | wie_unbekannt=ja keine_anfrage=ja keine_deck_marke=ja deck_ziel_abgelehnt=ja deck_ziel_keine_marke=ja
+```
+
+And from the run on Nextcloud 32 with the Tasks app 0.18.1:
+
+```
+FALL aendern-veraltet nc=32.0.15.1 werkzeug=tasks_complete status=PROPFIND:207,GET:200 ergebnis=ok | harness_aenderung=ja abgelehnt=ja kein_schreiben=ja sha_gleich_nach_harness=ja nicht_im_ziel=ja sha=e3df2488514c
+FALL aendern-veraltet nc=32.0.15.1 werkzeug=tasks_update status=PROPFIND:207,GET:200 ergebnis=ok | harness_aenderung=ja abgelehnt=ja kein_schreiben=ja sha_gleich_nach_harness=ja nicht_im_ziel=ja sha=3271937fab51
+FALL aendern-veraltet nc=32.0.15.1 werkzeug=tasks_move status=PROPFIND:207,GET:200 ergebnis=ok | harness_aenderung=ja abgelehnt=ja kein_schreiben=ja sha_gleich_nach_harness=ja nicht_im_ziel=ja sha=a0324ecc86d4
+FALL aendern-nur-lesend nc=32.0.15.1 werkzeug=tasks_complete status=PROPFIND:207 ergebnis=ok | abgelehnt_nur_lesend=ja kein_schreiben=ja sha_beim_eigentuemer_gleich=ja sha=b65686804d87
+FALL aendern-nur-lesend nc=32.0.15.1 werkzeug=tasks_update status=PROPFIND:207 ergebnis=ok | abgelehnt_nur_lesend=ja kein_schreiben=ja sha_beim_eigentuemer_gleich=ja sha=dec9f968d33f
+FALL aendern-nur-lesend nc=32.0.15.1 werkzeug=tasks_move status=PROPFIND:207 ergebnis=ok | abgelehnt_nur_lesend=ja kein_schreiben=ja sha_beim_eigentuemer_gleich=ja sha=2055277546b6
+FALL aendern-nur-lesend-server nc=32.0.15.1 werkzeug=harness status=keine ergebnis=ok | get_lesbar=ja put_abgelehnt=ja move_abgelehnt=ja sha_beim_eigentuemer_gleich=ja nicht_im_ziel=ja put_status=404 move_status=404
+FALL aendern-wiederkehrend nc=32.0.15.1 werkzeug=tasks_complete status=PROPFIND:207,GET:200 ergebnis=ok | abgelehnt_wiederkehrend=ja kein_schreiben=ja sha_gleich=ja sha=5ef20612599d
+FALL aendern-wiederkehrend nc=32.0.15.1 werkzeug=tasks_update status=PROPFIND:207,GET:200 ergebnis=ok | abgelehnt_wiederkehrend=ja kein_schreiben=ja sha_gleich=ja sha=5ef20612599d
+FALL aendern-wiederkehrend nc=32.0.15.1 werkzeug=tasks_move status=PROPFIND:207,GET:200 ergebnis=ok | abgelehnt_wiederkehrend=ja kein_schreiben=ja sha_gleich=ja sha=5ef20612599d
+FALL aendern-deck nc=32.0.15.1 werkzeug=tasks_complete status=keine ergebnis=ok | wie_unbekannt=ja keine_anfrage=ja keine_deck_marke=ja
+FALL aendern-deck nc=32.0.15.1 werkzeug=tasks_update status=keine ergebnis=ok | wie_unbekannt=ja keine_anfrage=ja keine_deck_marke=ja
+FALL aendern-deck nc=32.0.15.1 werkzeug=tasks_move status=keine ergebnis=ok | wie_unbekannt=ja keine_anfrage=ja keine_deck_marke=ja deck_ziel_abgelehnt=ja deck_ziel_keine_marke=ja
+```
+
+### Success criterion 4: Relocating into a named list (TMOD-08)
+
+| Instance | Tasks app | Case | Lines `FALL` with `ergebnis=ok` | Raw protocol |
+|---|---|---|---|---|
+| Nextcloud 35 | none | `verschieben-genannt` | 2 of 2 | raw/33-10-nc35.txt |
+| Nextcloud 35 | none | `verschieben-belegt` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | none | `verschieben-kinder` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `verschieben-genannt` | 2 of 2 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `verschieben-belegt` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `verschieben-kinder` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 32 | none | `verschieben-genannt` | 2 of 2 | raw/33-10-nc32.txt |
+| Nextcloud 32 | none | `verschieben-belegt` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | none | `verschieben-kinder` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `verschieben-genannt` | 2 of 2 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `verschieben-belegt` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `verschieben-kinder` | 1 of 1 | raw/33-10-nc32.txt |
+
+Quoted from the run on Nextcloud 35 without the Tasks app:
+
+```
+FALL verschieben-genannt nc=35.0.0.10 werkzeug=tasks_move status=PROPFIND:207,GET:200,REPORT:207,REPORT:207,MOVE:201 ergebnis=ok | ziel=geteilt-schreibbar quelle_leer=ja im_ziel=ja text_gleich=ja gleiche_uid=ja neue_id=ja ein_move=ja sha=324fe49d1252
+FALL verschieben-genannt nc=35.0.0.10 werkzeug=tasks_move status=PROPFIND:207,GET:200,REPORT:207,REPORT:207,MOVE:201 ergebnis=ok | ziel=eigene quelle_leer=ja im_ziel=ja text_gleich=ja gleiche_uid=ja neue_id=ja ein_move=ja sha=b37c40d0b1de
+FALL verschieben-belegt nc=35.0.0.10 werkzeug=tasks_move status=PROPFIND:207,GET:200,REPORT:207,REPORT:207 ergebnis=ok | abgelehnt=ja kein_move=ja quelle_gleich=ja ziel_gleich=ja sha_quelle=e35f1a383cff sha_ziel=db398a1e4de9
+FALL verschieben-kinder nc=35.0.0.10 werkzeug=tasks_move status=PROPFIND:207,GET:200,REPORT:207,REPORT:207,MOVE:201,MOVE:201,MOVE:201 ergebnis=ok | quelle_leer=ja alle_im_ziel_unveraendert=ja moves_nachordnung=ja moved=ja moves=3
+```
+
+And from the run on Nextcloud 32 with the Tasks app 0.18.1:
+
+```
+FALL verschieben-genannt nc=32.0.15.1 werkzeug=tasks_move status=PROPFIND:207,GET:200,REPORT:207,REPORT:207,MOVE:201 ergebnis=ok | ziel=geteilt-schreibbar quelle_leer=ja im_ziel=ja text_gleich=ja gleiche_uid=ja neue_id=ja ein_move=ja sha=f001936169b6
+FALL verschieben-genannt nc=32.0.15.1 werkzeug=tasks_move status=PROPFIND:207,GET:200,REPORT:207,REPORT:207,MOVE:201 ergebnis=ok | ziel=eigene quelle_leer=ja im_ziel=ja text_gleich=ja gleiche_uid=ja neue_id=ja ein_move=ja sha=c3ae598e8a96
+FALL verschieben-belegt nc=32.0.15.1 werkzeug=tasks_move status=PROPFIND:207,GET:200,REPORT:207,REPORT:207 ergebnis=ok | abgelehnt=ja kein_move=ja quelle_gleich=ja ziel_gleich=ja sha_quelle=9cbfae958c0d sha_ziel=050bf9db46e3
+FALL verschieben-kinder nc=32.0.15.1 werkzeug=tasks_move status=PROPFIND:207,GET:200,REPORT:207,REPORT:207,MOVE:201,MOVE:201,MOVE:201 ergebnis=ok | quelle_leer=ja alle_im_ziel_unveraendert=ja moves_nachordnung=ja moved=ja moves=3
+```
+
+### Success criterion 5: A chain that meets 412 at its second descendant (D-33-09)
+
+| Instance | Tasks app | Case | Lines `FALL` with `ergebnis=ok` | Raw protocol |
+|---|---|---|---|---|
+| Nextcloud 35 | none | `kette-teilfehler` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 35 | 0.18.1 | `kette-teilfehler` | 1 of 1 | raw/33-10-nc35.txt |
+| Nextcloud 32 | none | `kette-teilfehler` | 1 of 1 | raw/33-10-nc32.txt |
+| Nextcloud 32 | 0.18.1 | `kette-teilfehler` | 1 of 1 | raw/33-10-nc32.txt |
+
+Quoted from the run on Nextcloud 35 without the Tasks app:
+
+```
+FALL kette-teilfehler nc=35.0.0.10 werkzeug=tasks_complete status=PROPFIND:207,GET:200,REPORT:207,PUT:204,PUT:412 ergebnis=ok | harness_aenderte_den_zweiten=ja gestoppt=ja grund_412=ja changed_genau_erster=ja puts=ja eltern_sha_gleich=ja zweiter_sha_wie_harness=ja dritter_sha_gleich=ja erster_erledigt=ja sha_eltern=819d97fe0518
+```
+
+And from the run on Nextcloud 32 with the Tasks app 0.18.1:
+
+```
+FALL kette-teilfehler nc=32.0.15.1 werkzeug=tasks_complete status=PROPFIND:207,GET:200,REPORT:207,PUT:204,PUT:412 ergebnis=ok | harness_aenderte_den_zweiten=ja gestoppt=ja grund_412=ja changed_genau_erster=ja puts=ja eltern_sha_gleich=ja zweiter_sha_wie_harness=ja dritter_sha_gleich=ja erster_erledigt=ja sha_eltern=e5d0bd687e79
+```
+
+### Whole chain through the installed app on Nextcloud 35
+
+The ExApp was unregistered without `--rm-data` and registered again with an image of this
+branch (`bootstrap_exapp.sh --nc35`); the version in `appinfo/info.xml` stayed 0.7.2. The image
+before is kept locally under its own tag as the way back. Then the switch went on, one OAuth
+connection called the chain create, read, update, complete, relocate and an update with the
+first ETag, and every call left exactly one audit entry with parameter names only:
+
+```
+RUECKWEG image=0.7.2-vor33 image_id=sha256:00a2e4b0bfb7f283a22c944c14141b8de6b27f1faf64902ae2c23f9498782c02
+SCHALTER an app_neu_gestartet=ja
+WERKZEUGE anzahl=30 tasks=ja familien=10 aendernd=tasks_complete,tasks_update,tasks_move
+AUDIT werkzeug=tasks_create parameter=due,list,priority,tags ergebnis=rejected anzahl=1
+AUDIT werkzeug=tasks_create parameter=due,list,priority,tags ergebnis=ok anzahl=1
+AUDIT werkzeug=tasks_read parameter=task_id ergebnis=ok anzahl=1
+AUDIT werkzeug=tasks_update parameter=etag,tags,task_id ergebnis=ok anzahl=1
+AUDIT werkzeug=tasks_complete parameter=completed,etag,task_id ergebnis=ok anzahl=1
+AUDIT werkzeug=tasks_move parameter=etag,list,task_id ergebnis=ok anzahl=1
+AUDIT werkzeug=tasks_update parameter=etag,task_id ergebnis=rejected anzahl=1
+```
+
+The last call was refused (`changed since it was read`) and the stored object stayed as it was
+(`HARNESS GET` before and after in the raw protocol). `description` is not in the audit
+allowlist, so it never shows among the parameter names. The audit records the refusal of the
+stale ETag with the reason `unspecified`.
+
+Afterwards the switch went off again. The first attempt did not take: `occ app_api:app:config:set`
+without `--update-only` leaves an existing key as it is, so the tools stayed registered. With
+`--update-only`, and the app disabled and enabled, the three tools are gone:
+
+```
+SCHALTER aus-versuch-1 wirkung=keine (config:set ohne --update-only, Wert blieb on; nicht gezählt)
+WERKZEUGE nach_aus anzahl=30 tasks=ja familien=10 aendernd=tasks_complete,tasks_update,tasks_move
+SCHALTER aus app_neu_gestartet=ja wert=off
+WERKZEUGE nach_aus anzahl=27 tasks=ja familien=10 aendernd=keine
+```
+
+The canary ran against Nextcloud 35 with the switch on and the Tasks app 0.18.1:
+
+```
+KANARIE nc35 passed=4 schalter=an tasksapp=0.18.1
+```
+
+Nextcloud 32 has no whole chain (the app runs as a local process at the daemon
+`manual_install`):
+
+```
+KETTE nc32 entfaellt grund=manual-install (wie 32-07: auf 32 läuft die ExApp als lokaler Prozess am Daemon manual_install, eine Kette über ein Image gibt es dort nicht)
+```
 
 ## Not reproducible or not measured
 
