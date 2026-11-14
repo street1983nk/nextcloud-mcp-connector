@@ -449,13 +449,14 @@ async def test_the_ceiling_stops_paging_with_an_honest_note(
 
 def test_limit_policy_constants_are_the_measured_values() -> None:
     """Page 25 (D-32-08) and the ceiling from plan 32-02, the budget of one list from plan
-    32-10 (2000 open tasks, raw/32-10-messung.txt), each with its measuring line."""
+    33-11 (first search after a Tasks app install, one list 1.030 s on Nextcloud 32,
+    raw/33-11-kaltstart.txt), each with its measuring line."""
     assert tasks_tools.PAGE_SIZE == 25
     assert tasks_tools.MAX_RESULTS == 500
-    assert tasks_tools.PER_LIST_TIMEOUT == 2
+    assert tasks_tools.PER_LIST_TIMEOUT == 3
     assert tasks_tools.SUBTASK_TIMEOUT == 1
     source = inspect.getsource(tasks_tools)
-    assert "MESSWERT per_list_timeout_s=2" in source
+    assert "MESSWERT per_list_timeout_s=3" in source
     assert "MESSWERT subtask_timeout_s=1" in source
     assert "MESSWERT max_results=500" in source
     assert tasks_tools.SEARCH_CAP_NOTE == (
