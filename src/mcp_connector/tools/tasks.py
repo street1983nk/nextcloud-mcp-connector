@@ -367,12 +367,7 @@ def _resolve_list(lists: list[tasks_client.TaskList], wanted: str) -> tasks_clie
     Only against the discovery, never as a URL: the parameter selects from what the server
     sent. The URI of a shared list does not resolve, and no message carries it.
     """
-    needle = wanted.strip().casefold()
-    matches = [
-        entry
-        for entry in lists
-        if entry.key.casefold() == needle or _list_name(entry).casefold() == needle
-    ]
+    matches = _list_matches(lists, wanted)
     if len(matches) == 1:
         return matches[0]
     if not matches:
@@ -386,6 +381,16 @@ def _resolve_list(lists: list[tasks_client.TaskList], wanted: str) -> tasks_clie
         message=f"{_quoted(wanted)} matches more than one task list.",
         hint=f"Pass the key of one of them as list: {candidates}.",
     )
+
+
+def _list_matches(lists: list[tasks_client.TaskList], wanted: str) -> list[tasks_client.TaskList]:
+    """Every list whose key or name equals ``wanted``, casefolded and stripped."""
+    needle = wanted.strip().casefold()
+    return [
+        entry
+        for entry in lists
+        if entry.key.casefold() == needle or _list_name(entry).casefold() == needle
+    ]
 
 
 def _candidate(entry: tasks_client.TaskList) -> str:
@@ -1284,6 +1289,13 @@ _CHAIN_STOPS = {
     "refused": "the change was refused",
     "server_error": "Nextcloud reported an error, so the outcome of that write is not known",
     "outcome_unknown": "Nextcloud did not answer, so the outcome of that write is not known",
+    "changed_or_name_taken": (
+        "it changed since it was read or its name is already taken in the target list (412)"
+    ),
+    "replaced": (
+        "Nextcloud reports that it replaced an object of the same name in the target list "
+        "(204), although this server forbids that with Overwrite: F"
+    ),
 }
 
 
@@ -1473,10 +1485,18 @@ class _Stored:
     todo: dict[str, Any]
     text: str
     facts: ics_edit.TodoFacts
+    #: The ETag of the GET, empty when the server sent none (then the one of the caller
+    #: was never compared and must not be echoed as known).
+    etag: str = ""
 
 
 async def _read_for_change(
-    clients: NcClients, task_id: str, list_key: str, object_name: str, wanted: str
+    clients: NcClients,
+    task_id: str,
+    list_key: str,
+    object_name: str,
+    wanted: str,
+    lists: list[tasks_client.TaskList] | None = None,
 ) -> _Stored:
     """Discovery, write permission, GET, ETag comparison and the check before the edit.
 
@@ -1485,8 +1505,11 @@ async def _read_for_change(
     the one just read (the ETag still goes out as ``If-Match``, so the window after the
     comparison stays covered), a text that is not UTF-8, several VTODO, any text
     ``ics_edit.inspect`` refuses and a recurring task (D-33-00a, D-33-03, D-33-11).
+    ``lists`` is the discovery of the caller when it already holds one, so a call never
+    asks twice.
     """
-    lists = await tasks_client.discover_task_lists(clients.client, clients.creds)
+    if lists is None:
+        lists = await tasks_client.discover_task_lists(clients.client, clients.creds)
     matches = [entry for entry in lists if entry.key == list_key]
     if len(matches) != 1:
         raise _unknown_task(task_id)
@@ -1524,7 +1547,7 @@ async def _read_for_change(
             f"The task {own_id} is a recurring task; this server does not change recurring tasks.",
             "Nothing was changed. Change it in the Nextcloud Tasks app.",
         )
-    return _Stored(task_list, own_id, object_name, todo, text, facts)
+    return _Stored(task_list, own_id, object_name, todo, text, facts, stored.etag)
 
 
 def _in_target_state(status: str, completed: bool) -> bool:
@@ -1918,4 +1941,226 @@ async def update_task(
         result["etag"] = new_etag
     else:
         result["note"] = NEW_ETAG_NOTE
+    return result
+
+
+# --- Relocating a task with its subtasks into a named list (plan 33-08) ---------------------
+
+_TARGET_HINT = "Pass the name or key of a writable task list from tasks_search as list."
+
+#: Stop reasons after which the task that failed is known to be where it was.
+_STAYED_ON_STOP = frozenset(
+    {"changed_or_name_taken", "uid_conflict", "not_found_or_read_only", "refused"}
+)
+
+
+def _target_wanted(target: Any) -> str:
+    """The named target list, refused before any request when empty or a Deck key."""
+    if not isinstance(target, str) or not target.strip():
+        raise _refused("list must name the task list to relocate the task into.", _TARGET_HINT)
+    if target.strip().startswith(tasks_client.DECK_PREFIX):
+        # A Deck board is never a task list and never asked (E9).
+        raise _refused(f"This account has no task list called {_quoted(target)}.", _TARGET_HINT)
+    return target
+
+
+def _relocation_target(lists: list[tasks_client.TaskList], wanted: str) -> tasks_client.TaskList:
+    """The one writable task list ``wanted`` names, resolved like tasks_search does.
+
+    Never positional and never a guess: a name that matches an own and a shared list is an
+    ambiguity with keys, and a shared list is only a target when it is named uniquely
+    (D-32-18). A calendar without tasks is not in the discovery and so unknown.
+    """
+    if not _list_matches(lists, wanted):
+        raise ToolError(
+            message=f"This account has no task list called {_quoted(wanted)}.",
+            hint=_writable_hint(lists),
+        )
+    target = _resolve_list(lists, wanted)
+    if not target.writable:
+        raise _refused(
+            f"The task list {_list_name(target)!r} is read only for this account.",
+            _writable_hint(lists),
+        )
+    return target
+
+
+async def _target_holdings(
+    clients: NcClients, target: tasks_client.TaskList
+) -> tuple[set[str], set[str]]:
+    """Object names and UIDs the target list holds, from one REPORT under the list budget.
+
+    A name counts even when its object cannot be read: the server refuses a relocation onto
+    any taken name (412), so the check has to see them all.
+    """
+    try:
+        async with asyncio.timeout(PER_LIST_TIMEOUT):
+            objects = await tasks_client.query_todos(
+                clients.client, clients.creds, target, tasks_client.build_todo_query(None)
+            )
+    except (TimeoutError, httpx.TimeoutException):
+        raise ToolError(
+            message=(
+                f"The task list {_list_name(target)} did not answer in time "
+                f"({_seconds(PER_LIST_TIMEOUT)}): nothing was relocated."
+            ),
+            hint="Try again in a moment; the task and its subtasks are where they were.",
+            reason=REASON_TIMEOUT,
+        ) from None
+    names = {item.object_name for item in objects}
+    uids: set[str] = set()
+    for item in objects:
+        todo = _read_todo(item.ics)
+        if todo is not None and todo["uid"]:
+            uids.add(todo["uid"])
+    return names, uids
+
+
+def _check_free(
+    target: tasks_client.TaskList,
+    holdings: tuple[set[str], set[str]],
+    tasks: list[tuple[str, str, str]],
+) -> None:
+    """Refuse before the first relocation when the target holds a name or UID already.
+
+    ``tasks`` holds (id, object name, UID) of everything that would be relocated. This
+    turns the two answers of the server that leave nothing relocated (412 on a taken name,
+    409 on a taken UID) into a refusal before the chain starts, so a later 412 almost
+    always means "changed since read" (pitfall 2).
+    """
+    names, uids = holdings
+    hint = "Nothing was relocated. Pick another list, or tidy up the target list first."
+    for task_id, object_name, uid in tasks:
+        if object_name in names:
+            raise _refused(
+                f"The task list {_list_name(target)} already holds an object with the name "
+                f"of the task {task_id}.",
+                hint,
+            )
+        if uid and uid in uids:
+            raise _refused(
+                f"The task list {_list_name(target)} already holds a task with the UID of "
+                f"the task {task_id}.",
+                hint,
+            )
+
+
+def _relocation_payload(entry: dict[str, Any]) -> bytes:
+    """A relocation sends no text: every object goes as it is stored."""
+    return b""
+
+
+async def move_task(
+    clients: NcClients, *, task_id: str, etag: str, list_name: str
+) -> dict[str, Any]:
+    """Relocate one task with all its subtasks into the named task list (TMOD-08).
+
+    Refused before any request: an id that is not a task id, a Deck key of the task
+    (answered like an unknown task, E9), an ETag that is not one strong validator, an empty
+    target and a target with the Deck prefix. Refused after the discovery and before any
+    relocation: an unknown target (the hint names the writable task lists), an ambiguous
+    one (the hint names the keys), a read only target, and everything
+    :func:`_read_for_change` refuses on the source (read only list, stale ETag, recurring,
+    several VTODO, not UTF-8). The same list is a success without a relocation.
+
+    Then one REPORT of the source finds the descendants (D-33-00c) and the check of the
+    chain refuses more than :data:`CHAIN_CAP` or a recurring or unreadable one (D-33-10,
+    D-33-11); one REPORT of the target refuses when it already holds the object name or the
+    UID of anything to relocate (pitfall 2). Only then the chain of plan 33-05 relocates the
+    descendants in post-order and the named task last, each under its own name with
+    ``Overwrite: F`` and ``If-Match`` (D-33-09), and stops at the first failure.
+
+    UID, object name and text stay; so does the ETag (spike 4.1), which the answer repeats
+    only after a full success and only when the GET had sent it. The answer names old and
+    new task ids and the target list, never a URI or an owner.
+    """
+    list_key, object_name = _task_key(task_id)
+    wanted_etag = dav.normalize_etag(etag)
+    wanted_list = _target_wanted(list_name)
+
+    lists = await tasks_client.discover_task_lists(clients.client, clients.creds)
+    if len([entry for entry in lists if entry.key == list_key]) != 1:
+        raise _unknown_task(task_id)
+    target = _relocation_target(lists, wanted_list)
+    loaded = await _read_for_change(
+        clients, task_id, list_key, object_name, wanted_etag, lists=lists
+    )
+    source, own_id = loaded.task_list, loaded.own_id
+    if target.key == source.key:
+        return {"id": own_id, "list": _list_info(target), "already": True}
+
+    entries, skipped = await read_chain_list(clients, source)
+    descendants = descendants_post_order(loaded.todo["uid"], entries)
+    check_chain(source, descendants)
+    root: dict[str, Any] = {"id": own_id, "object_name": object_name, "uid": loaded.todo["uid"]}
+    everything = [root, *descendants]
+    _check_free(
+        target,
+        await _target_holdings(clients, target),
+        [(entry["id"], entry["object_name"], entry["uid"] or "") for entry in everything],
+    )
+
+    errors: list[ToolError] = []
+
+    async def write(entry: dict[str, Any], payload: bytes, entry_etag: str) -> str:
+        try:
+            await tasks_client.move_todo(
+                clients.client, clients.creds, source, target, entry["object_name"], entry_etag
+            )
+        except ToolError as exc:
+            errors.append(exc)
+            raise
+        return entry_etag
+
+    report = await run_chain(
+        source, root, wanted_etag, descendants, _relocation_payload, write, skipped=skipped
+    )
+    new_ids = {
+        entry["id"]: ids.encode_task(target.key, entry["object_name"]) for entry in everything
+    }
+    moved = [new_ids[entry_id] for entry_id in report.changed if entry_id != own_id]
+    result: dict[str, Any]
+    if report.failed is None:
+        result = {
+            "id": new_ids[own_id],
+            "previous_id": own_id,
+            "list": _list_info(target),
+            "moved": moved,
+        }
+        if skipped:
+            result["skipped"] = skipped
+        if loaded.etag:
+            result["etag"] = loaded.etag
+        else:
+            result["note"] = NEW_ETAG_NOTE
+        return result
+
+    reason = report.reason or "refused"
+    if reason == "conflict":
+        reason = "changed_or_name_taken"
+    elif reason == "server_error" and errors and "(status 204)" in errors[-1].message:
+        reason = "replaced"
+    sentence = f"Stopped at {report.failed}: {_CHAIN_STOPS[reason]}."
+    if report.failed != own_id:
+        sentence += (
+            f" {len(moved)} subtasks listed in moved were relocated into "
+            f"{_list_name(target)} and stay there; the named task {own_id} was not relocated."
+        )
+    if reason not in _STAYED_ON_STOP:
+        sentence += (
+            f" If {report.failed} was relocated after all, its id is now {new_ids[report.failed]}."
+        )
+    sentence += (
+        " Nothing was retried or undone: read the task again with tasks_read before the next call."
+    )
+    result = {
+        "id": own_id,
+        "list": _list_info(target),
+        "moved": moved,
+        "failed": report.failed,
+        "reason": reason,
+        "message": sentence,
+    }
+    if skipped:
+        result["skipped"] = skipped
     return result

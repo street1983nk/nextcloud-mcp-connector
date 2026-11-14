@@ -384,10 +384,8 @@ background
 # tasks_complete behind it.
 
 # --- The two conditional writers of the tasks bundle, plan 33-03 ----------------------------
-# Temporary: the client layer lands before the tools that call it. move_todo is used by
-# tasks_move (33-08) and leaves this list with that plan. put_existing_todo left with plan
-# 33-06, whose complete_task writes with it.
-move_todo
+# Empty again: put_existing_todo left with plan 33-06, whose complete_task writes with it,
+# and move_todo with plan 33-08, whose move_task relocates with it.
 
 # --- The line editor of the tasks bundle, plan 33-04 ---------------------------------------
 # Empty again: apply and verify left with plan 33-06, whose complete_task edits with them.
@@ -403,3 +401,8 @@ move_todo
 # --- Tool logic ahead of its registration, plan 33-07 --------------------------------------
 # Empty again: update_task sat here between task 1 and task 2 and left with tasks_update,
 # which calls it.
+
+# --- Tool logic ahead of its registration, plan 33-08 --------------------------------------
+# Temporary: move_task sits here between task 1 and task 2 and leaves with tasks_move, which
+# calls it.
+move_task

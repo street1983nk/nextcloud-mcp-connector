@@ -160,7 +160,7 @@ async def call(
     target: Any = "Ziel",
 ) -> dict[str, Any]:
     used = etag if etag is not None else source.etag("root.ics")
-    return await tasks_tools.move_task(clients, task_id=task_id, etag=used, list=target)
+    return await tasks_tools.move_task(clients, task_id=task_id, etag=used, list_name=target)
 
 
 def moves(store: task_store.TaskStore) -> list[str]:
@@ -186,12 +186,12 @@ def no_leak(value: Any) -> None:
         {"etag": "*"},
         {"etag": 'W/"abc"'},
         {"etag": '"a", "b"'},
-        {"list": ""},
-        {"list": "   "},
-        {"list": None},
-        {"list": 3},
-        {"list": "app-generated--deck--board-1"},
-        {"list": "  app-generated--deck--board-1 "},
+        {"list_name": ""},
+        {"list_name": "   "},
+        {"list_name": None},
+        {"list_name": 3},
+        {"list_name": "app-generated--deck--board-1"},
+        {"list_name": "  app-generated--deck--board-1 "},
     ],
     ids=[
         "not-a-task",
@@ -213,7 +213,7 @@ def no_leak(value: Any) -> None:
 async def test_bad_input_is_refused_before_any_request(
     clients: NcClients, kwargs: dict[str, Any]
 ) -> None:
-    arguments: dict[str, Any] = {"task_id": ROOT, "etag": '"e-1"', "list": "Ziel", **kwargs}
+    arguments: dict[str, Any] = {"task_id": ROOT, "etag": '"e-1"', "list_name": "Ziel", **kwargs}
     with respx.mock(assert_all_called=False) as mock:
         with pytest.raises(ToolError) as caught:
             await tasks_tools.move_task(clients, **arguments)
@@ -226,7 +226,7 @@ async def test_a_deck_task_gets_the_answer_of_an_unknown_task(clients: NcClients
     deck_id = ids.encode_task("app-generated--deck--board-1", "card-1.ics")
     with respx.mock(assert_all_called=False) as mock:
         with pytest.raises(ToolError) as caught:
-            await tasks_tools.move_task(clients, task_id=deck_id, etag='"e"', list="Ziel")
+            await tasks_tools.move_task(clients, task_id=deck_id, etag='"e"', list_name="Ziel")
         assert mock.calls.call_count == 0
     assert caught.value.reason == REASON_UNKNOWN_ID
 
@@ -236,7 +236,7 @@ async def test_a_deck_target_is_refused_as_guard(clients: NcClients) -> None:
     with respx.mock(assert_all_called=False) as mock:
         with pytest.raises(ToolError) as caught:
             await tasks_tools.move_task(
-                clients, task_id=ROOT, etag='"e"', list="app-generated--deck--board-1"
+                clients, task_id=ROOT, etag='"e"', list_name="app-generated--deck--board-1"
             )
         assert mock.calls.call_count == 0
     assert caught.value.reason == REASON_GUARD_TRIPPED
@@ -339,7 +339,7 @@ async def test_an_unknown_source_gets_the_answer_of_an_unknown_task(clients: NcC
         mount(mock, source, dest)
         for task_id in cases:
             with pytest.raises(ToolError) as caught:
-                await tasks_tools.move_task(clients, task_id=task_id, etag='"e"', list="Ziel")
+                await tasks_tools.move_task(clients, task_id=task_id, etag='"e"', list_name="Ziel")
             assert caught.value.reason == REASON_UNKNOWN_ID
             assert caught.value.message == tasks_tools._unknown_task(task_id).message
     assert source.writes == []
