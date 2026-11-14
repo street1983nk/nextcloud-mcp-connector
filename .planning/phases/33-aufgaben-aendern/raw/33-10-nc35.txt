@@ -1,0 +1,2 @@
+BASIS 02bf368e6582c7e403ce8c38d845c43ef27d68f2
+FREIGABE owner=option-a datum=2026-11-14 quelle=owner-antwort-checkpoint-33-10-task-2 (ExApp auf nc35 neu registrieren, Schalter tasks_update vorübergehend an, altes Image vorher als 0.7.2-vor33 sichern, danach Schalter aus und App neu gestartet)
