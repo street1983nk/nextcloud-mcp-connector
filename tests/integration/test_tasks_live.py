@@ -53,22 +53,32 @@ list of bob with 520 open tasks for the cap of 500 (case ``deckel-500``, otherwi
 and puts the old one back before the closing baseline (line ``ANZEIGENAME``), so the scan for
 the owner also covers a display name other than the account id.
 
+Plan 33-10 adds the live proof of the modifying tools ``tasks_complete``, ``tasks_update`` and
+``tasks_move`` (TMOD-06), called as functions under the same impersonation, so the switch
+``NC_MCP_TASKS_UPDATE`` plays no part here. Their objects carry the head ``p3310-<stamp>``,
+live in the lists of the run and go with them. Each of those cases writes one more line
+``FALL <case> nc=<version> werkzeug=<tool> status=<calls> ergebnis=<ok|befund> | <marks>``
+with yes/no marks and short sha256 values of the column ``calendardata`` only, never an
+object, list or account name, so the evidence can quote it as it stands.
+
 The env files are only ever loaded with ``set -a``, never read or quoted. Without that
 environment the module skips; with ``NC_MCP_REQUIRE_LIVE=1`` it fails instead (W3 of phase
 31), which is how the CI steps run it.
 """
 
 import asyncio
+import base64
 import dataclasses
 import json
 import os
+import re
 import secrets
 import statistics
 import subprocess
 import sys
 import time
 import uuid
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -99,6 +109,8 @@ pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 STAMP = uuid.uuid4().hex[:8]
 #: Every list, task, board and account of this run carries this head.
 P = f"p32live-{STAMP}"
+#: Every task object of plan 33-10 (the modifying tools) carries this head instead.
+M = f"p3310-{STAMP}"
 WRONG_SECRET = "0" * 64
 ENV_EXPECT_TASKS_APP = "NC_MCP_EXPECT_TASKS_APP"
 REQUIRED = {
@@ -633,7 +645,7 @@ def _purge_calendar_trash(harness: cw.Harness) -> tuple[int, int]:
         data = "".join(str(part) for part in entry.itertext())
         data = data.replace("\r\n ", "").replace("\n ", "")
         href = entry.findtext("{DAV:}href") or ""
-        if P in data and href:
+        if (P in data or M in data) and href:
             gone = harness.request(
                 "DELETE", str(origin.copy_with(path=href, query=None)), headers=NO_TRASHBIN
             )
@@ -839,13 +851,20 @@ class Case:
 
 
 def appapi_clients(
-    run: Run, user: str, seen: list[Seen], secret: str = "", slow_uri: str = ""
+    run: Run,
+    user: str,
+    seen: list[Seen],
+    secret: str = "",
+    slow_uri: str = "",
+    on_request: Callable[[httpx.Request], Awaitable[None]] | None = None,
 ) -> NcClients:
     """Impersonating clients for one call: ``APP_SECRET`` is the only credential.
 
     The response hook notes the method, the path below the calendar home and the status of
     every answer. With ``slow_uri`` it holds back the REPORT answer of that one list longer
     than the budget of a list: the outage is made in the client, the server is real.
+    ``on_request`` runs before a request leaves (plan 33-10, a change made by the harness
+    between the read of the chain and one of its writes).
     """
     prefix = f"{caldav.DAV_CALENDARS_PREFIX}{user}"
 
@@ -861,10 +880,11 @@ def appapi_clients(
         if slow_uri and method == "REPORT" and f"/{slow_uri}/" in path:
             await asyncio.sleep(SLOW_SECONDS)
 
+    hooks: dict[str, list[Any]] = {"response": [hook]}
+    if on_request is not None:
+        hooks["request"] = [on_request]
     return NcClients(
-        client=httpx.AsyncClient(
-            follow_redirects=False, timeout=30.0, event_hooks={"response": [hook]}
-        ),
+        client=httpx.AsyncClient(follow_redirects=False, timeout=30.0, event_hooks=hooks),
         creds=Credentials(
             base_url=run.env["base_url"],
             user=user,
@@ -878,11 +898,16 @@ def appapi_clients(
 
 
 @asynccontextmanager
-async def measured(case: Case, secret: str = "", slow_uri: str = "") -> AsyncIterator[NcClients]:
+async def measured(
+    case: Case,
+    secret: str = "",
+    slow_uri: str = "",
+    on_request: Callable[[httpx.Request], Awaitable[None]] | None = None,
+) -> AsyncIterator[NcClients]:
     """The clients of one tool call: fresh caches, calls into ``case``."""
     exclusion_core.clear_cache()
     capabilities.clear_cache()
-    clients = appapi_clients(case.run, case.user, case.seen, secret, slow_uri)
+    clients = appapi_clients(case.run, case.user, case.seen, secret, slow_uri, on_request)
     async with clients.client:
         yield clients
 
@@ -1794,6 +1819,955 @@ async def test_the_cap_of_500_holds_live_with_an_honest_note(run: Run) -> None:
         case.expect("next" not in last, "no next on the last page")
         case.expect(last.get("note") == tasks_tools.SEARCH_CAP_NOTE, f"note {last.get('note')!r}")
         case.expect(not any(page.get("degraded") for page in pages), "no degraded list")
+
+
+# --- plan 33-10: the modifying tools, live under impersonation ---------------------------
+#
+# Every case below writes its AUFGABE line (with the account, for the raw protocol) and one
+# line ``FALL <case> nc=<version> werkzeug=<tool> status=<calls> ergebnis=<ok|befund> | ...``
+# that carries yes/no marks, field names and hashes only, never an object, list or account
+# name, so docs/tasks-evidence.md can quote it as it stands. "Unchanged" is always the
+# sha256 of the column ``calendardata`` read by PHP in the container (33-RULES.md section 7),
+# never a status code.
+
+FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "tasks_app"
+#: The care fields every change brings to the same UTC second (ENTSCHEID pflegefelder_entfernen).
+CARE_FIELDS = ("DTSTAMP", "LAST-MODIFIED")
+#: The raw line of the Tasks app 0.18.1 completing a task (phase 30, raw/ui-sitzung.txt,
+#: line ``ABHAKEN FELDER``): the field set a completion through the connector must match.
+ABHAKEN_PHASE30 = (
+    "hinzu=COMPLETED,PERCENT-COMPLETE,STATUS entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED"
+)
+REOPEN_FIELDS = (
+    "hinzu=keine entfernt=COMPLETED,PERCENT-COMPLETE geaendert=DTSTAMP,LAST-MODIFIED,STATUS"
+)
+_DONE = ("STATUS:COMPLETED", "PERCENT-COMPLETE:100", "COMPLETED:20261113T080000Z")
+_UTC_STAMP = re.compile(r"\d{8}T\d{6}Z")
+#: A strong validator for calls that are refused before any request (Deck keys).
+ANY_ETAG = '"p3310-etag"'
+
+#: One live object of one list of one owner: count, sha256 and the column ``calendardata``
+#: (base64, so the line ends survive the way through stdout).
+PHP_OBJECT = (
+    _PHP_BOOT
+    + r"""
+$db = \OCP\Server::get(\OCP\IDBConnection::class);
+$qb = $db->getQueryBuilder();
+$qb->select('o.calendardata')->from('calendarobjects', 'o')
+    ->join('o', 'calendars', 'c', $qb->expr()->eq('o.calendarid', 'c.id'))
+    ->where($qb->expr()->eq(
+        'c.principaluri', $qb->createNamedParameter('principals/users/' . $argv[1])
+    ))
+    ->andWhere($qb->expr()->eq('c.uri', $qb->createNamedParameter($argv[2])))
+    ->andWhere($qb->expr()->eq('o.uri', $qb->createNamedParameter($argv[3])))
+    ->andWhere($qb->expr()->eq('o.calendartype', $qb->createNamedParameter(0)))
+    ->andWhere($qb->expr()->isNull('o.deleted_at'));
+$rows = $qb->executeQuery()->fetchAll();
+if (count($rows) === 1) {
+    $data = $rows[0]['calendardata'];
+    if (is_resource($data)) {
+        $data = stream_get_contents($data);
+    }
+    echo '1 ', hash('sha256', (string)$data), ' ', base64_encode((string)$data), "\n";
+} else {
+    echo count($rows), " - -\n";
+}
+"""
+)
+
+
+@dataclasses.dataclass(frozen=True)
+class Obj:
+    """One harness task of plan 33-10: list role, object name, UID and the id alice uses."""
+
+    role: str
+    name: str
+    uid: str
+    ident: str
+
+
+@dataclasses.dataclass(frozen=True)
+class Row:
+    """One object as the database holds it: live rows, sha256 and the stored text."""
+
+    count: int
+    sha: str
+    text: str
+
+    @property
+    def short(self) -> str:
+        return self.sha[:12] if self.sha else "fehlt"
+
+
+def list_key(run: Run, role: str) -> str:
+    """The key alice sees for a list: the URI of an own list, the hash of a shared one."""
+    shared = {"rw": run.rw_key, "ro": run.ro_key, "grw": run.grw_key, "gro": run.gro_key}
+    return shared.get(role, LISTS[role][1])
+
+
+def owner_of(run: Run, role: str) -> str:
+    return run.alice if LISTS[role][0] == "alice" else run.bob
+
+
+def app_form(uid: str, title: str, extra: tuple[str, ...] = ()) -> bytes:
+    """A plain task in the shape the Tasks app 0.18.1 writes (CREATED, LAST-MODIFIED, CRLF)."""
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//nc-mcp-connector//harness 33//EN",
+        "BEGIN:VTODO",
+        f"UID:{uid}",
+        "CREATED:20261113T080000Z",
+        "LAST-MODIFIED:20261113T080000Z",
+        "DTSTAMP:20261113T080000Z",
+        f"SUMMARY:{title}",
+        *extra,
+        "END:VTODO",
+        "END:VCALENDAR",
+    ]
+    return ("\r\n".join(lines) + "\r\n").encode("utf-8")
+
+
+def fixture(name: str) -> str:
+    return (FIXTURES / name).read_bytes().decode("utf-8")
+
+
+def with_time_form(uid: str, title: str) -> bytes:
+    """``with_time.ics`` of the Tasks app (due and start with a time) under a new UID."""
+    lines = fixture("with_time.ics").split("\r\n")
+    swapped = [
+        f"UID:{uid}"
+        if line.startswith("UID:")
+        else (f"SUMMARY:{title}" if line.startswith("SUMMARY:") else line)
+        for line in lines
+    ]
+    return "\r\n".join(swapped).encode("utf-8")
+
+
+def _fold(line: str) -> list[str]:
+    """RFC 5545 folding of an ASCII line at 75 octets."""
+    parts = [line[:75]]
+    rest = line[75:]
+    while rest:
+        parts.append(" " + rest[:74])
+        rest = rest[74:]
+    return parts
+
+
+def rich_form(uid: str, title: str) -> bytes:
+    """The rich probe of ``scripts/tasks_spike.py`` (plan 30-04): VTIMEZONE, VALARM with its own
+    DESCRIPTION, three X- properties, a parameter on SUMMARY and a folded DESCRIPTION."""
+    description = (
+        "DESCRIPTION:Eine Beschreibung mit mehr als fuenfundsiebzig Zeichen\\, damit die "
+        "Zeile gefaltet werden muss und der Server sie beim Speichern nicht neu umbrechen darf."
+    )
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//nc-mcp-connector//harness 33//EN",
+        "CALSCALE:GREGORIAN",
+        "BEGIN:VTIMEZONE",
+        "TZID:Europe/Berlin",
+        "BEGIN:DAYLIGHT",
+        "TZOFFSETFROM:+0100",
+        "TZOFFSETTO:+0200",
+        "TZNAME:CEST",
+        "DTSTART:19700329T020000",
+        "RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU",
+        "END:DAYLIGHT",
+        "BEGIN:STANDARD",
+        "TZOFFSETFROM:+0200",
+        "TZOFFSETTO:+0100",
+        "TZNAME:CET",
+        "DTSTART:19701025T030000",
+        "RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU",
+        "END:STANDARD",
+        "END:VTIMEZONE",
+        "BEGIN:VTODO",
+        f"UID:{uid}",
+        "DTSTAMP:20261111T100000Z",
+        "CREATED:20261111T100000Z",
+        "LAST-MODIFIED:20261111T100000Z",
+        f"SUMMARY;X-P3310-PARAM=abc:{title}",
+        *_fold(description),
+        "DTSTART;TZID=Europe/Berlin:20261119T090000",
+        "DUE;TZID=Europe/Berlin:20261120T101500",
+        "CATEGORIES:p3310,wichtig",
+        "CLASS:CONFIDENTIAL",
+        "PRIORITY:1",
+        "X-P3310-FOO:bar",
+        "X-APPLE-SORT-ORDER:123",
+        "X-OC-HIDESUBTASKS:1",
+        "BEGIN:VALARM",
+        "ACTION:DISPLAY",
+        "DESCRIPTION:p3310 Erinnerung",
+        "TRIGGER:-PT15M",
+        "END:VALARM",
+        "END:VTODO",
+        "END:VCALENDAR",
+    ]
+    return ("\r\n".join(lines) + "\r\n").encode("utf-8")
+
+
+def new_task(
+    run: Run,
+    role: str,
+    label: str,
+    extra: tuple[str, ...] = (),
+    *,
+    name: str = "",
+    form: Callable[[str, str], bytes] | None = None,
+) -> Obj:
+    """One task put by the owner of the list with the app password, create-only."""
+    uid = f"{M}-{label}-{uuid.uuid4().hex[:6]}"
+    object_name = name or f"{uid}.ics"
+    title = f"{M}-{label}"
+    body = form(uid, title) if form is not None else app_form(uid, title, extra)
+    response = owner_harness(run, role).request(
+        "PUT",
+        f"{list_url(run, role)}{quote(object_name, safe='')}",
+        headers={"Content-Type": "text/calendar; charset=utf-8", "If-None-Match": "*"},
+        content=body,
+    )
+    assert response.status_code == 201, f"PUT {label}: {response.status_code}"
+    return Obj(role, object_name, uid, ids.encode_task(list_key(run, role), object_name))
+
+
+def row(run: Run, role: str, object_name: str) -> Row:
+    """The object as the database of the owner holds it (independent of the connector)."""
+    raw = php(PHP_OBJECT, owner_of(run, role), LISTS[role][1], object_name).split(" ")
+    assert len(raw) == 3, f"no row answer: {' '.join(raw)[:120]}"
+    assert raw[0].isdigit(), f"no row count: {raw[0][:40]}"
+    if raw[0] != "1":
+        return Row(int(raw[0]), "", "")
+    return Row(1, raw[1], base64.b64decode(raw[2]).decode("utf-8"))
+
+
+async def etag_of(run: Run, identifier: str) -> str:
+    """The ETag tasks_read hands out, read outside the measured calls of a case."""
+    reader = Case(run, "etag")
+    async with measured(reader) as clients:
+        answer = keep(run, await tasks_tools.read_task(clients, task_id=identifier))
+    etag = str(answer.get("etag") or "")
+    assert etag, f"tasks_read sent no etag: {answered(answer)}"
+    return etag
+
+
+def touch(run: Run, role: str, object_name: str) -> int:
+    """A change by the owner between tasks_read and the tool: SUMMARY gets a suffix."""
+    harness = owner_harness(run, role)
+    url = f"{list_url(run, role)}{quote(object_name, safe='')}"
+    got = harness.request("GET", url)
+    assert got.status_code == 200, f"GET for the change of the harness: {got.status_code}"
+    lines = got.content.decode("utf-8").split("\r\n")
+    changed = [f"{line}-geaendert" if line.startswith("SUMMARY") else line for line in lines]
+    return harness.request(
+        "PUT",
+        url,
+        headers={
+            "Content-Type": "text/calendar; charset=utf-8",
+            "If-Match": got.headers.get("ETag", ""),
+        },
+        content="\r\n".join(changed).encode("utf-8"),
+    ).status_code
+
+
+def _unfold(text: str) -> list[str]:
+    plain = text.replace("\r\n", "\n").replace("\r", "\n")
+    return [line for line in re.sub(r"\n[ \t]", "", plain).split("\n") if line.strip()]
+
+
+def _prop(line: str) -> str:
+    return re.split(r"[;: ]", line.strip(), maxsplit=1)[0].upper()
+
+
+def _value(line: str) -> str:
+    quoted = False
+    for index, char in enumerate(line):
+        if char == '"':
+            quoted = not quoted
+        elif char == ":" and not quoted:
+            return line[index + 1 :]
+    return ""
+
+
+def todo_lines(text: str) -> dict[str, list[str]]:
+    """Logical lines directly inside ``VCALENDAR/VTODO`` by property name, as ``line_diff``
+    of ``scripts/tasks_modify_measure.py`` reads them (copied: a test loads no measuring
+    program)."""
+    stack: list[str] = []
+    found: dict[str, list[str]] = {}
+    for line in _unfold(text):
+        upper = line.strip().upper()
+        if upper.startswith("BEGIN:"):
+            stack.append(upper[6:])
+        elif upper.startswith("END:"):
+            if stack:
+                stack.pop()
+        elif stack == ["VCALENDAR", "VTODO"]:
+            found.setdefault(_prop(line), []).append(line.rstrip())
+    return {name: sorted(lines) for name, lines in found.items()}
+
+
+def field_diff(before: str, after: str) -> str:
+    """``hinzu=... entfernt=... geaendert=...`` (and ``leer=...`` when a value went empty),
+    in the form of the raw line ``ABHAKEN FELDER`` of phase 30."""
+    old, new = todo_lines(before), todo_lines(after)
+    parts: dict[str, list[str]] = {"hinzu": [], "entfernt": [], "geaendert": [], "leer": []}
+    for name in sorted(old.keys() | new.keys()):
+        was, now = old.get(name, []), new.get(name, [])
+        if was == now:
+            continue
+        if not was:
+            parts["hinzu"].append(name)
+        elif not now:
+            parts["entfernt"].append(name)
+        elif all(not _value(line).strip() for line in now) and any(
+            _value(line).strip() for line in was
+        ):
+            parts["leer"].append(name)
+        else:
+            parts["geaendert"].append(name)
+    text = " ".join(
+        f"{key}={','.join(parts[key]) or 'keine'}" for key in ("hinzu", "entfernt", "geaendert")
+    )
+    return f"{text} leer={','.join(parts['leer'])}" if parts["leer"] else text
+
+
+def shape(text: str, names: tuple[str, ...]) -> list[str]:
+    """The lines of ``names`` with every UTC stamp replaced: the written form, not the time."""
+    lines = todo_lines(text)
+    return [_UTC_STAMP.sub("<utc>", line) for name in names for line in lines.get(name, [])]
+
+
+def crlf_only(text: str) -> bool:
+    return text.endswith("\r\n") and "\n" not in text.replace("\r\n", "")
+
+
+def physical_kept(text: str, touched: set[str]) -> list[str]:
+    """The physical lines of every logical line whose property is not in ``touched``."""
+    groups: list[list[str]] = []
+    for line in text.split("\r\n"):
+        if line.startswith((" ", "\t")) and groups:
+            groups[-1].append(line)
+        elif line:
+            groups.append([line])
+    return [line for group in groups if _prop(group[0]) not in touched for line in group]
+
+
+def block(text: str, component: str) -> list[str]:
+    """The physical lines from ``BEGIN:<component>`` to its ``END``, as stored."""
+    lines = text.split("\r\n")
+    try:
+        first = lines.index(f"BEGIN:{component}")
+        last = lines.index(f"END:{component}", first)
+    except ValueError:
+        return []
+    return lines[first : last + 1]
+
+
+def flag(value: bool) -> str:
+    return "ja" if value else "nein"
+
+
+class Fall(Case):
+    """A case of plan 33-10: the AUFGABE line plus one quotable FALL line."""
+
+    def __init__(self, run: Run, label: str, tool: str) -> None:
+        super().__init__(run, label)
+        self.tool = tool
+        self.marks: list[str] = []
+
+    def __enter__(self) -> "Fall":
+        return self
+
+    def mark(self, name: str, value: bool | int | str) -> None:
+        shown = flag(value) if isinstance(value, bool) else str(value)
+        self.marks.append(f"{name}={shown}")
+
+    def check(self, name: str, ok: bool, note: str) -> None:
+        """A yes/no mark that is also an expectation of the case."""
+        self.mark(name, ok)
+        self.expect(ok, note)
+
+    def __exit__(self, kind: object, exc: BaseException | None, trace: object) -> None:
+        verdict = "ok" if self.ok and exc is None else "befund"
+        record(
+            f"FALL {self.label} nc={self.run.version} werkzeug={self.tool} "
+            f"status={calls(self.seen)} ergebnis={verdict} | {' '.join(self.marks)}"
+        )
+        super().__exit__(kind, exc, trace)
+
+
+def writes(seen: list[Seen]) -> list[int]:
+    return methods(seen, "PUT") + methods(seen, "MOVE")
+
+
+# --- success criterion 1: completing and reopening -------------------------------------
+
+
+async def test_p3310_completing_writes_the_field_set_of_the_tasks_app(run: Run) -> None:
+    task = new_task(run, "a", "abhaken")
+    etag = await etag_of(run, task.ident)
+    before = row(run, "a", task.name)
+    with Fall(run, "aendern-abhaken", "tasks_complete") as case:
+        async with measured(case) as clients:
+            answer = keep(
+                run,
+                await tasks_tools.complete_task(
+                    clients, task_id=task.ident, etag=etag, completed=True
+                ),
+            )
+        after = row(run, "a", task.name)
+        got = field_diff(before.text, after.text)
+        names = ("STATUS", "PERCENT-COMPLETE", "COMPLETED")
+        stamps = {
+            _value(todo_lines(after.text).get(name, [""])[0])
+            for name in (*CARE_FIELDS, "COMPLETED")
+        }
+        case.note(f"felder {got}")
+        case.check("felder_wie_phase30", got == ABHAKEN_PHASE30, f"{got} / {ABHAKEN_PHASE30}")
+        case.check(
+            "form_wie_completed_ics",
+            shape(after.text, names) == shape(fixture("completed.ics"), names),
+            f"{shape(after.text, names)}",
+        )
+        case.check("eine_sekunde", len(stamps) == 1, f"COMPLETED, DTSTAMP, LAST-MODIFIED {stamps}")
+        case.check("ein_put", len(writes(case.seen)) == 1, f"writes {writes(case.seen)}")
+        case.check("crlf", crlf_only(after.text), "the stored text keeps CRLF")
+        case.check("antwort", answer.get("status") == "completed", answered(answer))
+        case.mark("sha_vorher", before.short)
+        case.mark("sha_nachher", after.short)
+
+
+async def test_p3310_reopening_writes_the_field_set_of_the_tasks_app(run: Run) -> None:
+    task = new_task(run, "a", "oeffnen", _DONE)
+    etag = await etag_of(run, task.ident)
+    before = row(run, "a", task.name)
+    with Fall(run, "aendern-wiederoeffnen", "tasks_complete") as case:
+        async with measured(case) as clients:
+            answer = keep(
+                run,
+                await tasks_tools.complete_task(
+                    clients, task_id=task.ident, etag=etag, completed=False
+                ),
+            )
+        after = row(run, "a", task.name)
+        got = field_diff(before.text, after.text)
+        names = ("STATUS", "PERCENT-COMPLETE", "COMPLETED")
+        case.note(f"felder {got}")
+        case.check("felder", got == REOPEN_FIELDS, f"{got} / {REOPEN_FIELDS}")
+        case.check(
+            "form_wie_reopened_ics",
+            shape(after.text, names) == shape(fixture("reopened.ics"), names),
+            f"{shape(after.text, names)}",
+        )
+        case.check("ein_put", len(writes(case.seen)) == 1, f"writes {writes(case.seen)}")
+        case.check("antwort", answer.get("status") == "open", answered(answer))
+        case.mark("sha_vorher", before.short)
+        case.mark("sha_nachher", after.short)
+
+
+async def test_p3310_completing_a_completed_task_sends_no_put(run: Run) -> None:
+    task = new_task(run, "a", "schon", _DONE)
+    etag = await etag_of(run, task.ident)
+    before = row(run, "a", task.name)
+    with Fall(run, "aendern-schon-erledigt", "tasks_complete") as case:
+        async with measured(case) as clients:
+            answer = keep(
+                run,
+                await tasks_tools.complete_task(
+                    clients, task_id=task.ident, etag=etag, completed=True
+                ),
+            )
+        after = row(run, "a", task.name)
+        case.check("kein_put", not writes(case.seen), f"writes {writes(case.seen)}")
+        case.check("already", answer.get("already") is True, answered(answer))
+        case.check("sha_gleich", before.sha == after.sha, f"{before.short} / {after.short}")
+        case.mark("sha", after.short)
+
+
+async def test_p3310_completing_a_parent_completes_its_subtasks_first(run: Run) -> None:
+    parent = new_task(run, "a", "kinder-eltern")
+    first = new_task(run, "a", "kinder-k1", (f"RELATED-TO:{parent.uid}",))
+    grandchild = new_task(run, "a", "kinder-k1a", (f"RELATED-TO:{first.uid}",))
+    second = new_task(run, "a", "kinder-k2", (f"RELATED-TO:{parent.uid}",))
+    order = [grandchild, first, second, parent]
+    etag = await etag_of(run, parent.ident)
+    with Fall(run, "aendern-kinder", "tasks_complete") as case:
+        async with measured(case) as clients:
+            answer = keep(
+                run,
+                await tasks_tools.complete_task(
+                    clients, task_id=parent.ident, etag=etag, completed=True
+                ),
+            )
+        rows = [row(run, "a", task.name) for task in order]
+        put_paths = [below for method, below, _ in case.seen if method == "PUT"]
+        in_order = len(put_paths) == len(order) and all(
+            path.endswith(f"/{task.name}") for path, task in zip(put_paths, order, strict=False)
+        )
+        done = all("STATUS:COMPLETED" in todo_lines(item.text).get("STATUS", []) for item in rows)
+        case.check("puts_nachordnung", in_order, f"PUT order {len(put_paths)} of {len(order)}")
+        case.check("alle_erledigt", done, "parent, children and grandchild STATUS:COMPLETED")
+        case.check(
+            "changed_nachordnung",
+            answer.get("changed") == [task.ident for task in order],
+            answered(answer),
+        )
+        case.check(
+            "kinder_crlf", all(crlf_only(item.text) for item in rows[:-1]), "CRLF after REPORT"
+        )
+        case.check("eltern_crlf", crlf_only(rows[-1].text), "CRLF of the parent")
+        case.mark("puts", len(methods(case.seen, "PUT")))
+
+
+# --- success criterion 2: exactly the named fields --------------------------------------
+
+
+async def _update_step(
+    run: Run, task: Obj, label: str, step: str, fields: dict[str, Any]
+) -> tuple[Row, Row, dict[str, Any], list[Seen]]:
+    etag = await etag_of(run, task.ident)
+    before = row(run, task.role, task.name)
+    case = Case(run, label)
+    async with measured(case) as clients:
+        answer = keep(
+            run, await tasks_tools.update_task(clients, task_id=task.ident, etag=etag, **fields)
+        )
+    after = row(run, task.role, task.name)
+    case.note(step)
+    return before, after, answer, case.seen
+
+
+async def test_p3310_update_changes_exactly_the_named_fields_like_the_tasks_app(
+    run: Run,
+) -> None:
+    task = new_task(run, "a", "felder", form=with_time_form)
+    tags = [f"{M}-eins", f"{M}-zwei"]
+    app_tags = field_diff(fixture("cleared_priority.ics"), fixture("cleared_tags.ics"))
+    app_description = field_diff(fixture("cleared_start.ics"), fixture("cleared_description.ics"))
+    app_due_gone = "DUE" not in todo_lines(fixture("cleared_due.ics"))
+    steps: list[tuple[str, dict[str, Any], str, list[str]]] = [
+        (
+            "setzen",
+            {"due": "2026-12-05T10:30:00Z", "tags": tags, "description": f"{M} beschreibung"},
+            "hinzu=CATEGORIES,DESCRIPTION entfernt=keine geaendert=DTSTAMP,DUE,LAST-MODIFIED",
+            ["description", "due", "tags"],
+        ),
+        (
+            "due-entfernen",
+            {"due": ""},
+            "hinzu=keine entfernt=DUE geaendert=DTSTAMP,LAST-MODIFIED",
+            ["due"],
+        ),
+        ("tags-entfernen", {"tags": []}, app_tags, ["tags"]),
+        ("beschreibung-entfernen", {"description": ""}, app_description, ["description"]),
+    ]
+    for number, (step, fields, expected, changed) in enumerate(steps):
+        if number:
+            # A new UTC second, so the care fields of two steps can never coincide.
+            await asyncio.sleep(1.1)
+        with Fall(run, "aendern-felder", "tasks_update") as case:
+            case.mark("schritt", step)
+            before, after, answer, seen = await _update_step(
+                run, task, "aendern-felder-schritt", step, fields
+            )
+            case.seen.extend(seen)
+            got = field_diff(before.text, after.text)
+            case.note(f"felder {got}")
+            case.check("felder_wie_app", got == expected, f"{got} / {expected}")
+            case.check("antwort_changed", answer.get("changed") == changed, answered(answer))
+            case.check("ein_put", len(writes(seen)) == 1, f"writes {writes(seen)}")
+            if step == "setzen":
+                due_form = shape(after.text, ("DUE",)) == shape(fixture("with_time.ics"), ("DUE",))
+                categories = todo_lines(after.text).get("CATEGORIES", [])
+                one_line = categories == [f"CATEGORIES:{','.join(tags)}"]
+                tags_form = len(todo_lines(fixture("tags.ics")).get("CATEGORIES", [])) == 1
+                case.check("due_form_wie_with_time_ics", due_form, f"{shape(after.text, ('DUE',))}")
+                case.check("tags_eine_zeile_wie_tags_ics", one_line and tags_form, f"{categories}")
+            if step == "due-entfernen":
+                case.check("form_zeile_weg_wie_app", app_due_gone, "cleared_due.ics has no DUE")
+            case.mark("sha_vorher", before.short)
+            case.mark("sha_nachher", after.short)
+
+
+async def test_p3310_update_keeps_every_untouched_line_of_a_rich_object(run: Run) -> None:
+    task = new_task(run, "a", "reich", form=rich_form)
+    etag = await etag_of(run, task.ident)
+    before = row(run, "a", task.name)
+    touched = {"SUMMARY", "PRIORITY", *CARE_FIELDS}
+    with Fall(run, "aendern-reich", "tasks_update") as case:
+        async with measured(case) as clients:
+            answer = keep(
+                run,
+                await tasks_tools.update_task(
+                    clients, task_id=task.ident, etag=etag, summary=f"{M}-reich-neu", priority=2
+                ),
+            )
+        after = row(run, "a", task.name)
+        got = field_diff(before.text, after.text)
+        expected = "hinzu=keine entfernt=keine geaendert=DTSTAMP,LAST-MODIFIED,PRIORITY,SUMMARY"
+        folded = [line for line in before.text.split("\r\n") if line.startswith(" ")]
+        x_before = [line for line in before.text.split("\r\n") if line.startswith("X-")]
+        x_after = [line for line in after.text.split("\r\n") if line.startswith("X-")]
+        summary = todo_lines(after.text).get("SUMMARY", [])
+        case.note(f"felder {got}")
+        case.check("vorher_gefaltet", bool(folded), "the probe really holds a folded line")
+        case.check("felder", got == expected, f"{got} / {expected}")
+        case.check(
+            "unberuehrte_zeilen_woertlich",
+            physical_kept(before.text, touched) == physical_kept(after.text, touched),
+            "every physical line of an untouched property as stored",
+        )
+        case.check(
+            "valarm_gleich",
+            block(before.text, "VALARM") == block(after.text, "VALARM") != [],
+            "VALARM",
+        )
+        case.check(
+            "vtimezone_gleich",
+            block(before.text, "VTIMEZONE") == block(after.text, "VTIMEZONE") != [],
+            "VTIMEZONE",
+        )
+        case.check("x_zeilen_gleich", x_before == x_after and len(x_before) == 3, f"{x_after}")
+        case.check(
+            "parameter_summary",
+            summary == [f"SUMMARY;X-P3310-PARAM=abc:{M}-reich-neu"],
+            f"{summary}",
+        )
+        case.check("antwort", answer.get("changed") == ["summary", "priority"], answered(answer))
+        case.mark("sha_vorher", before.short)
+        case.mark("sha_nachher", after.short)
+
+
+async def test_p3310_update_without_a_difference_writes_nothing(run: Run) -> None:
+    task = new_task(run, "a", "gleich")
+    etag = await etag_of(run, task.ident)
+    before = row(run, "a", task.name)
+    with Fall(run, "aendern-ohne-unterschied", "tasks_update") as case:
+        async with measured(case) as clients:
+            answer = keep(
+                run,
+                await tasks_tools.update_task(
+                    clients, task_id=task.ident, etag=etag, summary=f"{M}-gleich", priority=0
+                ),
+            )
+        after = row(run, "a", task.name)
+        case.check("kein_put", not writes(case.seen), f"writes {writes(case.seen)}")
+        case.check("changed_leer", answer.get("changed") == [], answered(answer))
+        case.check("sha_gleich", before.sha == after.sha, f"{before.short} / {after.short}")
+        case.mark("sha", after.short)
+
+
+# --- success criterion 3: stale, read only, recurring, Deck ------------------------------
+
+ToolCall = Callable[[NcClients, str, str], Awaitable[dict[str, Any]]]
+
+
+def _complete(clients: NcClients, identifier: str, etag: str) -> Awaitable[dict[str, Any]]:
+    return tasks_tools.complete_task(clients, task_id=identifier, etag=etag, completed=True)
+
+
+def _update(clients: NcClients, identifier: str, etag: str) -> Awaitable[dict[str, Any]]:
+    return tasks_tools.update_task(clients, task_id=identifier, etag=etag, summary=f"{M}-neu")
+
+
+def _move(clients: NcClients, identifier: str, etag: str) -> Awaitable[dict[str, Any]]:
+    return tasks_tools.move_task(clients, task_id=identifier, etag=etag, list_name=LISTS["b"][2])
+
+
+MODIFYING: dict[str, ToolCall] = {
+    "tasks_complete": _complete,
+    "tasks_update": _update,
+    "tasks_move": _move,
+}
+
+
+@pytest.mark.parametrize("tool", list(MODIFYING))
+async def test_p3310_a_change_between_read_and_write_is_refused(run: Run, tool: str) -> None:
+    task = new_task(run, "a", f"veraltet-{tool}")
+    etag = await etag_of(run, task.ident)
+    changed_by_owner = touch(run, "a", task.name)
+    between = row(run, "a", task.name)
+    with Fall(run, "aendern-veraltet", tool) as case:
+        async with measured(case) as clients:
+            exc = await refusal(run, MODIFYING[tool](clients, task.ident, etag))
+        after = row(run, "a", task.name)
+        elsewhere = row(run, "b", task.name)
+        case.note(told(exc))
+        case.check("harness_aenderung", changed_by_owner == 204, f"PUT {changed_by_owner}")
+        case.check("abgelehnt", "changed since it was read" in exc.message, told(exc))
+        case.check("kein_schreiben", not writes(case.seen), f"writes {writes(case.seen)}")
+        case.check(
+            "sha_gleich_nach_harness", between.sha == after.sha, f"{between.short} {after.short}"
+        )
+        case.check("nicht_im_ziel", elsewhere.count == 0, f"target rows {elsewhere.count}")
+        case.mark("sha", after.short)
+
+
+@pytest.mark.parametrize("tool", list(MODIFYING))
+async def test_p3310_a_read_only_shared_list_is_refused_by_every_tool(run: Run, tool: str) -> None:
+    task = new_task(run, "ro", f"nurlesend-{tool}")
+    etag = await etag_of(run, task.ident)
+    before = row(run, "ro", task.name)
+    with Fall(run, "aendern-nur-lesend", tool) as case:
+        async with measured(case) as clients:
+            exc = await refusal(run, MODIFYING[tool](clients, task.ident, etag))
+        after = row(run, "ro", task.name)
+        case.note(told(exc))
+        case.check("abgelehnt_nur_lesend", "read only" in exc.message, told(exc))
+        case.check("kein_schreiben", not writes(case.seen), f"writes {writes(case.seen)}")
+        case.check("sha_beim_eigentuemer_gleich", before.sha == after.sha, after.short)
+        case.mark("sha", after.short)
+
+
+async def test_p3310_the_server_refuses_a_conditional_put_and_move_in_the_read_only_list(
+    run: Run,
+) -> None:
+    """The guard of the tools is not the only wall: the same writes by the harness of alice."""
+    task = new_task(run, "ro", "nurlesend-server")
+    before = row(run, "ro", task.name)
+    url = run.harness.task_url(run.ro_key, task.name)
+    got = run.harness.request("GET", url)
+    etag = got.headers.get("ETag", "")
+    with Fall(run, "aendern-nur-lesend-server", "harness") as case:
+        put = run.harness.request(
+            "PUT",
+            url,
+            headers={"Content-Type": "text/calendar; charset=utf-8", "If-Match": etag},
+            content=got.content.replace(b"SUMMARY:", b"SUMMARY:x"),
+        )
+        move = run.harness.request(
+            "MOVE",
+            url,
+            headers={
+                "Destination": f"{list_url(run, 'a')}{quote(task.name, safe='')}",
+                "Overwrite": "F",
+                "If-Match": etag,
+            },
+        )
+        after = row(run, "ro", task.name)
+        moved = row(run, "a", task.name)
+        case.check("get_lesbar", got.status_code == 200 and bool(etag), f"GET {got.status_code}")
+        case.check("put_abgelehnt", put.status_code in (403, 404), f"PUT {put.status_code}")
+        case.check("move_abgelehnt", move.status_code in (403, 404), f"MOVE {move.status_code}")
+        case.check("sha_beim_eigentuemer_gleich", before.sha == after.sha, after.short)
+        case.check("nicht_im_ziel", moved.count == 0, f"target rows {moved.count}")
+        case.mark("put_status", put.status_code)
+        case.mark("move_status", move.status_code)
+
+
+@pytest.mark.parametrize("tool", list(MODIFYING))
+async def test_p3310_a_recurring_task_is_refused_by_every_tool(run: Run, tool: str) -> None:
+    object_name = run.objects["wieder-app"]
+    identifier = ids.encode_task(LISTS["b"][1], object_name)
+    etag = await etag_of(run, identifier)
+    before = row(run, "b", object_name)
+    with Fall(run, "aendern-wiederkehrend", tool) as case:
+        async with measured(case) as clients:
+            call = MODIFYING[tool]
+            if tool == "tasks_move":
+                exc = await refusal(
+                    run,
+                    tasks_tools.move_task(
+                        clients, task_id=identifier, etag=etag, list_name=LISTS["a"][2]
+                    ),
+                )
+            else:
+                exc = await refusal(run, call(clients, identifier, etag))
+        after = row(run, "b", object_name)
+        case.note(told(exc))
+        case.check("abgelehnt_wiederkehrend", "recurring" in exc.message, told(exc))
+        case.check("kein_schreiben", not writes(case.seen), f"writes {writes(case.seen)}")
+        case.check("sha_gleich", before.sha == after.sha, after.short)
+        case.mark("sha", after.short)
+
+
+@pytest.mark.parametrize("tool", list(MODIFYING))
+async def test_p3310_a_deck_card_is_unknown_to_every_tool(run: Run, tool: str) -> None:
+    deck_uri = f"{tasks_client.DECK_PREFIX}deck--board-{run.board_id}"
+    card = f"task:{deck_uri}:card-{run.card_id}.ics"
+    with Fall(run, "aendern-deck", tool) as case:
+        async with measured(case) as clients:
+            exc = await refusal(run, MODIFYING[tool](clients, card, ANY_ETAG))
+        text = f"{exc.message} {exc.hint}"
+        case.note(told(exc))
+        case.check("wie_unbekannt", exc.reason == REASON_UNKNOWN_ID, told(exc))
+        case.check("keine_anfrage", not case.seen, f"requests {calls(case.seen)}")
+        case.check("keine_deck_marke", run.deck_marker not in text, "marker in no answer")
+        if tool == "tasks_move":
+            task = new_task(run, "a", "deck-ziel")
+            target = Case(run, "deck-ziel")
+            async with measured(target) as clients:
+                exc = await refusal(
+                    run,
+                    tasks_tools.move_task(
+                        clients, task_id=task.ident, etag=ANY_ETAG, list_name=deck_uri
+                    ),
+                )
+            target_seen = target.seen
+            case.check("deck_ziel_abgelehnt", not target_seen, f"requests {calls(target_seen)}")
+            case.check(
+                "deck_ziel_keine_marke",
+                run.deck_marker not in f"{exc.message} {exc.hint}",
+                told(exc),
+            )
+
+
+# --- success criterion 4: relocating into a named list ---------------------------------
+
+
+async def test_p3310_relocating_into_a_named_list_keeps_uid_and_text(run: Run) -> None:
+    for target in ("rw", "b"):
+        task = new_task(run, "a", f"verschieben-{target}")
+        etag = await etag_of(run, task.ident)
+        before = row(run, "a", task.name)
+        with Fall(run, "verschieben-genannt", "tasks_move") as case:
+            case.mark("ziel", "geteilt-schreibbar" if target == "rw" else "eigene")
+            async with measured(case) as clients:
+                answer = keep(
+                    run,
+                    await tasks_tools.move_task(
+                        clients, task_id=task.ident, etag=etag, list_name=LISTS[target][2]
+                    ),
+                )
+            source, landed = row(run, "a", task.name), row(run, target, task.name)
+            new_id = ids.encode_task(list_key(run, target), task.name)
+            case.check("quelle_leer", source.count == 0, f"source rows {source.count}")
+            case.check("im_ziel", landed.count == 1, f"target rows {landed.count}")
+            case.check("text_gleich", landed.sha == before.sha, f"{before.short} {landed.short}")
+            case.check("gleiche_uid", f"UID:{task.uid}" in _unfold(landed.text), "UID")
+            case.check("neue_id", answer.get("id") == new_id, answered(answer))
+            case.check("ein_move", methods(case.seen, "MOVE") == [201], calls(case.seen))
+            case.mark("sha", landed.short)
+
+
+async def test_p3310_a_taken_name_in_the_target_is_refused_and_both_stay(run: Run) -> None:
+    task = new_task(run, "a", "belegt")
+    occupant = new_task(run, "b", "belegt-ziel", name=task.name)
+    etag = await etag_of(run, task.ident)
+    source_before, target_before = row(run, "a", task.name), row(run, "b", task.name)
+    with Fall(run, "verschieben-belegt", "tasks_move") as case:
+        async with measured(case) as clients:
+            exc = await refusal(
+                run,
+                tasks_tools.move_task(
+                    clients, task_id=task.ident, etag=etag, list_name=LISTS["b"][2]
+                ),
+            )
+        source_after, target_after = row(run, "a", task.name), row(run, "b", task.name)
+        case.note(f"{told(exc)} occupant uid differs={occupant.uid != task.uid}")
+        case.check("abgelehnt", "already holds" in exc.message, told(exc))
+        case.check("kein_move", not writes(case.seen), f"writes {writes(case.seen)}")
+        case.check("quelle_gleich", source_before.sha == source_after.sha, source_after.short)
+        case.check("ziel_gleich", target_before.sha == target_after.sha, target_after.short)
+        case.mark("sha_quelle", source_after.short)
+        case.mark("sha_ziel", target_after.short)
+
+
+async def test_p3310_relocating_a_parent_takes_its_subtasks_along(run: Run) -> None:
+    parent = new_task(run, "a", "zug-eltern")
+    first = new_task(run, "a", "zug-k1", (f"RELATED-TO:{parent.uid}",))
+    second = new_task(run, "a", "zug-k2", (f"RELATED-TO:{parent.uid}",))
+    order = [first, second, parent]
+    before = {task.name: row(run, "a", task.name).sha for task in order}
+    etag = await etag_of(run, parent.ident)
+    with Fall(run, "verschieben-kinder", "tasks_move") as case:
+        async with measured(case) as clients:
+            answer = keep(
+                run,
+                await tasks_tools.move_task(
+                    clients, task_id=parent.ident, etag=etag, list_name=LISTS["b"][2]
+                ),
+            )
+        sources = [row(run, "a", task.name).count for task in order]
+        landed = [row(run, "b", task.name) for task in order]
+        move_paths = [below for method, below, _ in case.seen if method == "MOVE"]
+        in_order = len(move_paths) == len(order) and all(
+            path.endswith(f"/{task.name}") for path, task in zip(move_paths, order, strict=False)
+        )
+        case.check("quelle_leer", sources == [0, 0, 0], f"source rows {sources}")
+        case.check(
+            "alle_im_ziel_unveraendert",
+            [item.sha for item in landed] == [before[task.name] for task in order],
+            "texts as before",
+        )
+        case.check("moves_nachordnung", in_order, f"MOVE order {len(move_paths)}")
+        case.check(
+            "moved",
+            answer.get("moved")
+            == [ids.encode_task(LISTS["b"][1], task.name) for task in (first, second)],
+            answered(answer),
+        )
+        case.mark("moves", len(move_paths))
+
+
+# --- success criterion 5: a chain that meets 412 at its second descendant ---------------
+
+
+async def test_p3310_a_chain_stops_at_the_second_descendant_and_keeps_the_parent(
+    run: Run,
+) -> None:
+    parent = new_task(run, "a", "kette-eltern")
+    children = [
+        new_task(run, "a", f"kette-k{number}", (f"RELATED-TO:{parent.uid}",))
+        for number in (1, 2, 3)
+    ]
+    etag = await etag_of(run, parent.ident)
+    before = {task.name: row(run, "a", task.name) for task in (parent, *children)}
+    puts = 0
+    touched: dict[str, str] = {}
+
+    async def change_the_second(request: httpx.Request) -> None:
+        nonlocal puts
+        if request.method != "PUT":
+            return
+        puts += 1
+        if puts == 2:
+            name = unquote(request.url.path.rsplit("/", 1)[-1])
+            touched["status"] = str(touch(run, "a", name))
+            touched["name"] = name
+            touched["sha"] = row(run, "a", name).sha
+
+    with Fall(run, "kette-teilfehler", "tasks_complete") as case:
+        async with measured(case, on_request=change_the_second) as clients:
+            answer = keep(
+                run,
+                await tasks_tools.complete_task(
+                    clients, task_id=parent.ident, etag=etag, completed=True
+                ),
+            )
+        after = {task.name: row(run, "a", task.name) for task in (parent, *children)}
+        first, second, third = children
+        statuses = methods(case.seen, "PUT")
+        case.note(answered(answer))
+        case.check(
+            "harness_aenderte_den_zweiten",
+            touched.get("name") == second.name and touched.get("status") == "204",
+            f"harness PUT {touched.get('status')}",
+        )
+        case.check("gestoppt", answer.get("failed") == second.ident, answered(answer))
+        case.check("grund_412", answer.get("reason") == "conflict", f"{answer.get('reason')}")
+        case.check("changed_genau_erster", answer.get("changed") == [first.ident], "changed")
+        case.check(
+            "puts", len(statuses) == 2 and statuses[0] < 300 and statuses[1] == 412, f"{statuses}"
+        )
+        case.check(
+            "eltern_sha_gleich",
+            before[parent.name].sha == after[parent.name].sha,
+            after[parent.name].short,
+        )
+        case.check(
+            "zweiter_sha_wie_harness", after[second.name].sha == touched.get("sha"), "second"
+        )
+        case.check("dritter_sha_gleich", before[third.name].sha == after[third.name].sha, "third")
+        case.check(
+            "erster_erledigt",
+            "STATUS:COMPLETED" in todo_lines(after[first.name].text).get("STATUS", []),
+            "first",
+        )
+        case.mark("sha_eltern", after[parent.name].short)
 
 
 # --- last: nobody else's name in any answer (D-32-06, D-32-14) ---------------------------

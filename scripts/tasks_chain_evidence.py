@@ -45,7 +45,11 @@ from types import ModuleType
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-TASK_TOOLS = frozenset({"tasks_search", "tasks_read", "tasks_create"})
+#: The three tools of the tasks bundle that are always there.
+READING_TASK_TOOLS = frozenset({"tasks_search", "tasks_read", "tasks_create"})
+#: The modifying tools of phase 33, registered only with NC_MCP_TASKS_UPDATE on (D-33-01).
+MODIFYING_TASK_TOOLS = ("tasks_complete", "tasks_update", "tasks_move")
+TASK_TOOLS = READING_TASK_TOOLS | frozenset(MODIFYING_TASK_TOOLS)
 
 #: The app families of the README. A tool whose prefix is none of them belongs to the cloud
 #: wide search family (unified_search, search, fetch, prepare_context).
@@ -134,8 +138,13 @@ def tools(args: argparse.Namespace) -> int:
     base, token, user = _connection(args)
     flow_check = _load_flow_check()
     names = asyncio.run(flow_check.list_tools(base, token))
-    has_tasks = "ja" if set(names) >= TASK_TOOLS else "nein"
-    print(f"WERKZEUGE anzahl={len(names)} tasks={has_tasks} familien={len(families_of(names))}")
+    has_tasks = "ja" if set(names) >= READING_TASK_TOOLS else "nein"
+    modifying = ",".join(tool for tool in MODIFYING_TASK_TOOLS if tool in names) or "keine"
+    print(
+        f"WERKZEUGE anzahl={len(names)} tasks={has_tasks} familien={len(families_of(names))} "
+        f"aendernd={modifying}"
+    )
+    print(f"WERKZEUGE tasks_bundle={','.join(sorted(set(names) & TASK_TOOLS))}")
     print(f"WERKZEUGE nutzer={user} namen={','.join(sorted(names))}")
     return 0
 
