@@ -60,7 +60,10 @@ Four stations, in this order, each one carrying one of the four claims this proj
 Two more steps frame them: an opener that walks the whole authorization flow in printed
 steps, and a closer that calls every tool of the curated set once. The closer is where the
 fourth claim of the talk becomes visible, the one about not being able to destroy anything:
-the tool list has no delete and no move, and the upload tool refuses a path that exists.
+the tool list has no delete, and the upload tool refuses a path that exists. It has no move
+either as long as `NC_MCP_TASKS_UPDATE` stays at its default, off; since 0.8.0 that switch
+adds `tasks_move`, which moves one task with its subtasks and only with a fresh ETag, and
+nothing ever deletes a task.
 
 ## One time setup
 
@@ -268,8 +271,10 @@ tools it calls. On the bootstrap topology exactly two are `SKIP`, the writes tha
 object this server cannot create: `deck_create_card` wants a Deck stack, `tables_create_row`
 a table with a text column. `talk_send` is not among them: `scripts/bootstrap_exapp.sh`
 leaves alice a conversation she may write into, so the tool posts into it and answers `OK`,
-and that run leaves a message behind. Read the names out: there is no delete, no move and no
-share, and no way to edit or remove a message that was sent. The upload tool creates and
+and that run leaves a message behind. Read the names out: there is no delete and no share,
+no way to edit or remove a message that was sent, and no move as long as
+`NC_MCP_TASKS_UPDATE` is off (the default); with it on, `tasks_move` is the one tool that
+moves something, a single task. The upload tool creates and
 refuses a path that exists.
 
 **Read the matrix, not the summary line.** The script expects exactly the number the

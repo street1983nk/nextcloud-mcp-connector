@@ -42,6 +42,48 @@ occ app_api:app:register mcp_connector \
 
 The other switches, all optional, are in [oauth-setup.md](./oauth-setup.md).
 
+### Write switches
+
+Two switches decide whether an assistant may change something that already exists. Both ship
+off. Nothing deletes, with or without them, and `tasks_move` is the only tool that moves
+anything.
+
+| Variable | Config key | Label in the admin settings | Tools it adds |
+|---|---|---|---|
+| `NC_MCP_FILES_UPDATE` | `files_update` | Allow editing existing text files | `files_update`: replaces an existing UTF-8 text file, only with the ETag read before |
+| `NC_MCP_TASKS_UPDATE` | `tasks_update` | Allow changing existing tasks | `tasks_complete`, `tasks_update`, `tasks_move`: complete or reopen, edit and move one existing task, only with the ETag from `tasks_read` |
+
+- **Installed from the app store:** tick the box in Nextcloud, under Administration settings,
+  MCP Connector.
+- **Registered with occ:** pass `--env "NC_MCP_TASKS_UPDATE=on"` (or
+  `NC_MCP_FILES_UPDATE=on`) at registration time, like the public address above.
+- **Changing a running installation with occ:** the value lives under the config key, and a
+  key that exists already is only changed with `--update-only`:
+
+```
+occ app_api:app:config:set mcp_connector tasks_update --value off --update-only
+occ app_api:app:config:get mcp_connector tasks_update
+occ app_api:app:disable mcp_connector
+occ app_api:app:enable mcp_connector
+```
+
+Without `--update-only`, occ answers
+`ExApp mcp_connector config tasks_update already exists. Use --update-only flag.` and the old
+value stays, while the following disable and enable still run, so the switch looks changed
+and is not. A key that was never set is created by the same command without
+`--update-only`. Every change takes effect only after the app was disabled and enabled
+again.
+
+Check the result in the tool list of a connected client, not in the form. With both switches
+off it holds no `tasks_complete`, `tasks_update`, `tasks_move` or `files_update`; with
+`tasks_update` on the three task tools appear, with `files_update` on `files_update`
+appears. With the other switches at their defaults that is 27 tools with both off and 31
+with both on; the counts are held by `tests/contract/test_tool_surface.py` and
+`scripts/check_tool_budget.py`. A value set in the form or with occ wins over the
+registration variable. Measured on Nextcloud 35 on 2026-11-14, both the attempt
+without `--update-only` that left the switch on and the one with it
+([raw/33-10-nc35.txt](../.planning/phases/33-aufgaben-aendern/raw/33-10-nc35.txt)).
+
 Check that it came up:
 
 ```
@@ -242,6 +284,13 @@ data: {"jsonrpc":"2.0","id":1,"result":{"capabilities":{...},"instructions":"Rea
 
 `Server: uvicorn` is the proof that the answer came out of the ExApp container. HaRP resolved
 the app password to the user `alice` and signed the request with the AppAPI headers.
+
+The instruction in this answer is the one of 0.1.0, recorded on 2026-08-15 and left as it was
+recorded. Since 0.8.0 it says that files are never deleted, moved, renamed or
+unconditionally overwritten and that tasks are never deleted, and with a write switch on it
+names `files_update` or `tasks_complete`, `tasks_update` and `tasks_move`, each only with an
+ETag (see [Write switches](#write-switches)); `tests/contract/test_tool_surface.py` holds
+the current wording.
 
 ### 6. The lifecycle paths are not reachable from outside
 

@@ -24,6 +24,12 @@ filled in, no mail was written and nobody was contacted.
 a claim depends on a version, the version is on the slide too. That is the whole style of
 this talk: facts with a source, and no superlative without a number.
 
+**The write promise since 0.8.0.** The slides were written for 0.1.2. Since 0.8.0 the promise
+has one narrow exception: with the switch `NC_MCP_TASKS_UPDATE` on (it ships off),
+`tasks_complete`, `tasks_update` and `tasks_move` change one existing task, only with the
+ETag from `tasks_read`, and `tasks_move` is the one tool that moves anything. Nothing
+deletes, a task included. Whoever gives this talk for 0.8.0 or later says so on slide 6.
+
 ## Slide 1, title
 
 - MCP for Nextcloud: one click, real OAuth, per user control
@@ -102,14 +108,16 @@ of those numbers is in a measurement file in the repository.
 
 ## Slide 6, four, it cannot destroy anything
 
-- Sixteen tools in the released 0.1.2, twenty in the development tree. No delete, no move, no
-  share
+- Sixteen tools in the released 0.1.2, twenty in the development tree. No delete, no share,
+  and no move except one task behind a switch that ships off (0.8.0)
 - Upload creates, and refuses a path that exists
 - The assistant sees exactly what the signed in account sees, checked against a read only share
 
 **Speaker note (40 s).** Fourth, and this one is about what is missing. A store install of
 0.1.2 lists sixteen tools, and the development tree has twenty; take the number from
-whichever version you install. There is no delete, there is no move, and there is no share.
+whichever version you install. There is no delete and there is no share. In 0.1.2 there is
+no move either; from 0.8.0 on an administrator can allow moving a single task, and that
+switch ships off.
 Upload creates a file and
 refuses a path that already exists. This is not a setting you can turn off, it is the tool set,
 and a test in the repository fails if that ever stops being true. The other half of the same
@@ -171,7 +179,7 @@ did the ExApp part wrong, that is the most useful five minutes I can have today.
 | 4 | Three runs, three different loopback ports | `06-09-MEASUREMENTS.md`: 45157, 47608, 41977, plus 34567 with the override |
 | 5 | Paused answers 403 with a reason, resumed answers 200, no token reissued | `06-10-MEASUREMENTS.md`, sections 5.1 and 5.2 |
 | 5 | Disconnect answers 401, and the refresh attempt answers 400 | `06-10-MEASUREMENTS.md`, section 6 |
-| 6 | Sixteen tools in 0.1.2 and twenty in the development tree, no delete, no move, no share | `scripts/check_tool_budget.py` and the tool table contract test |
+| 6 | Sixteen tools in 0.1.2 and twenty in the development tree, no delete, no share, no move except `tasks_move` behind `NC_MCP_TASKS_UPDATE` (0.8.0, off by default) | `scripts/check_tool_budget.py`, the tool table contract test and `tests/contract/test_write_promise_truth.py` |
 | 6 | Upload refuses a path that exists, and the read only share boundary | `tests/integration/test_permission_parity_share.py` and the phase 5 measurements |
 | 7 | The runbook was walked once, with times | `docs/conference-demo.md` and `06-10-MEASUREMENTS.md` |
 
@@ -205,7 +213,8 @@ whose data it is gets no page, no switch and no list. This talk shows a small AG
 does it the other way around: installable from the app store, its own OAuth 2.1 authorization
 server to the MCP authorization specification, and one page per account that lists every
 connected assistant, pauses all of them and ends any single one. It also shows what the tool
-set deliberately cannot do: there is no delete, no move and no share, and the assistant sees
+set deliberately cannot do: there is no delete and no share, nothing moves except a single
+task when an administrator allows it, and the assistant sees
 exactly what the signed in account sees. Every number in the talk comes from a measurement
 in the repository, including the two places where the measurement contradicted what I
 expected.

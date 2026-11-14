@@ -149,10 +149,15 @@ outwards, and prompt injection has no known cure, so the channel is the part tha
 can actually be removed.
 
 One honest remainder stays with the switch off: the create-only writes (a file, a
-card, a row) cannot address anyone, but they can land in a folder, a board or a
-table that is shared with other people, and content written there is visible to
-everyone the container is shared with. Closing that path is not a setting of this
-app; it is a review of what the connected accounts share.
+card, a row, a task) cannot address anyone, but they can land in a folder, a board,
+a table or a task list that is shared with other people, and content written there
+is visible to everyone the container is shared with. The same holds for a text file
+replaced with `NC_MCP_FILES_UPDATE` on and for a task completed, edited or moved
+with `NC_MCP_TASKS_UPDATE` on. Both switches ship off, every such change needs the
+ETag read just before, nothing is ever deleted, a task included, and `tasks_move`
+is the only tool that moves anything. Leaving the two switches off closes the
+changes; closing the create-only path is not a setting of this app, it is a review
+of what the connected accounts share.
 
 Mail stays readable with the switch off, and that is the point rather than an
 oversight. Mail has no outgoing channel of its own: it is read only in this app,

@@ -870,12 +870,16 @@ the root of my Nextcloud". A correct answer means credentials, transport and per
 all in place. If the assistant answers with a plausible but invented list, the tool was not
 called at all: check the tool list in the client first.
 
-Remember what the tools cannot do. Nothing here deletes, moves or re-shares
-anything. `files_upload` refuses existing paths. When `NC_MCP_FILES_UPDATE`
-is enabled, `files_update` can replace an existing UTF-8 text file only with
-a matching ETag. One honest limit of that guard: on common storage backends
-the ETag changes at most once per second, so two writers inside the same
-second cannot be told apart by their ETags. `files_search` matches names,
+Remember what the tools cannot do. Nothing here deletes or re-shares
+anything, a task included, and nothing moves except `tasks_move`, which
+relocates one task with its subtasks when the administrator has turned on
+`NC_MCP_TASKS_UPDATE` (off by default). `files_upload` refuses existing
+paths. When `NC_MCP_FILES_UPDATE` is enabled, `files_update` can replace an
+existing UTF-8 text file only with a matching ETag, and the three task tools
+`tasks_complete`, `tasks_update` and `tasks_move` likewise only work with
+the ETag from `tasks_read`. One honest limit of the file guard: on common
+storage backends the ETag of a file changes at most once per second, so two
+writers inside the same second cannot be told apart by their ETags. `files_search` matches names,
 not the text inside documents. See the "What this server cannot do" section
 of the [README](../README.md).
 
