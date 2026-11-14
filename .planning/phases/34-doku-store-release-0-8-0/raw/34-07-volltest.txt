@@ -1,4 +1,4 @@
-# 34-07 Volltest 0.8.0 auf Nextcloud 35, Lauf 1 (2026-11-14)
+# 34-07 Volltest 0.8.0 auf Nextcloud 35 (2026-11-14). Lauf 1 ist durch Lauf 2 ersetzt; seine Werkzeugzeilen tragen das Präfix LAUF1 und zählen nicht.
 BASIS 83a6b9d4111517fc047173c59ba1f8604e09f6aa
 FREIGABE volltest-nc35 antwort=option-a datum=2026-11-14
 KORREKTUR changelog-label commit=70e7d05 (DE/FR nennen das englische Admin-Label "Allow changing existing tasks" mit Glosse)
@@ -35,37 +35,37 @@ WERKZEUGE tasks_bundle=tasks_complete,tasks_create,tasks_move,tasks_read,tasks_s
 
 == stdio mit beiden Schaltern an (NC_MCP_FILES_UPDATE=on NC_MCP_TASKS_UPDATE=on, Konto alice, NC_MCP_USER/NC_MCP_APP_PASSWORD aus den Testvariablen der .env.nc35)
 STDIO schalter=an tools_list=31 exit=1 grund="FAIL: never called: files_update"
-VOLLTEST calendar_create_event schalter=an urteil=OK aufrufe=1 | {"id":"event:personal:9dc8420b-8d2e-421a-a8e9-1cfdc51feedf.ics","uid":"9dc8420b-8d2e-421a-a8e9-1cfdc51feedf","
-VOLLTEST calendar_list_events schalter=an urteil=OK aufrufe=1 | {"range":{"start":"2026-11-15T06:49:34+00:00","end":"2026-11-15T09:49:34+00:00","timezone":"UTC"},"count":1,"e
-VOLLTEST contacts_search schalter=an urteil=OK aufrufe=1 | {"query":"a","count":0,"contacts":[]}
-VOLLTEST deck_browse schalter=an urteil=OK aufrufe=2 | {"level":"boards","count":13,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_edit":true},{"id":2,
-VOLLTEST deck_create_card schalter=an urteil=OK aufrufe=1 | {"id":"card:1:1:166","title":"Abnahme abnahme8b5860466f","url":"http://127.0.0.1:8082/index.php/apps/deck/card
-VOLLTEST fetch schalter=an urteil=OK aufrufe=5 | { "id": "task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics", "title": "Abnahme abnahme8b5860466f", "text"
-VOLLTEST files_create_folder schalter=an urteil=OK aufrufe=2 | {"path":"/abnahme8b5860466f-20261114-084932-ordner/a/b","created":true,"id":"file:26191","created_folders":["/
-VOLLTEST files_download schalter=an urteil=OK aufrufe=1 | {"path":"/abnahme8b5860466f-20261114-084932.md","size":54,"content_type":"text/markdown","offset":0,"bytes":54
-VOLLTEST files_list schalter=an urteil=OK aufrufe=1 | {"path":"/","count":100,"items":[{"path":"/abnahme8b5860466f-20261114-084932-ordner","name":"abnahme8b5860466f
-VOLLTEST files_read schalter=an urteil=OK aufrufe=1 | {"path":"/abnahme8b5860466f-20261114-084932.md","content":"# abnahme8b5860466f\nAbnahmelauf Phase 1, Straßenba
-VOLLTEST files_read_as_markdown schalter=an urteil=OK aufrufe=1 | {"path":"/abnahme8b5860466f-20261114-084932.docx","content":"Abnahmelauf abnahme8b5860466f\n","content_type":"
-VOLLTEST files_search schalter=an urteil=OK aufrufe=1 | {"query":"abnahme8b5860466f","folder":"/","count":2,"items":[{"path":"/abnahme8b5860466f-20261114-084932-ordne
-VOLLTEST files_update schalter=an urteil=FAIL aufrufe=0 | never called: das Abnahmeskript hat keinen Schritt für files_update
-VOLLTEST files_upload schalter=an urteil=OK aufrufe=2 | {"path":"/abnahme8b5860466f-20261114-084932.md","etag":"\"0723d36ca925562ab1ecb97f76b8186a\"","created":true}
-VOLLTEST mail_browse schalter=an urteil=OK aufrufe=3 | {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]}
-VOLLTEST notes_create schalter=an urteil=OK aufrufe=1 | {"id":"note:26195","title":"Abnahme abnahme8b5860466f","category":"","modified":1794642576,"url":"http://127.0
-VOLLTEST notes_read schalter=an urteil=OK aufrufe=1 | {"id":"note:26195","title":"Abnahme abnahme8b5860466f","content":"Abnahmelauf abnahme8b5860466f","category":""
-VOLLTEST notes_search schalter=an urteil=OK aufrufe=1 | {"count":1,"results":[{"id":"note:26195","title":"Abnahme abnahme8b5860466f","excerpt":"Abnahmelauf abnahme8b5
-VOLLTEST prepare_context schalter=an urteil=OK aufrufe=1 | {"query":"abnahme8b5860466f","window":{"start":"2026-11-14T07:49:40+00:00","end":"2026-11-21T07:49:40+00:00"},
-VOLLTEST search schalter=an urteil=OK aufrufe=1 | { "results": [ { "id": "note:26195", "title": "Abnahme abnahme8b5860466f", "url": "http://127.0.0.1:8082/apps/
-VOLLTEST tables_browse schalter=an urteil=OK aufrufe=2 | {"level":"tables","count":3,"results":[{"id":1,"title":"Welcome to Nextcloud Tables!","rowsCount":8,"columnsCo
-VOLLTEST tables_create_row schalter=an urteil=OK aufrufe=1 | {"id":253,"table_id":"1","url":"http://127.0.0.1:8082/index.php/apps/tables/#/table/1","values_written":{"What
-VOLLTEST talk_browse schalter=an urteil=OK aufrufe=2 | {"level":"conversations","count":5,"results":[{"token":"2uqkjpn2","name":"<raum>","t
-VOLLTEST talk_send schalter=an urteil=OK aufrufe=1 | {"sent":true,"id":601,"token":"2uqkjpn2","conversation":"<raum>","timestamp":1794642
-VOLLTEST tasks_complete schalter=an urteil=OK aufrufe=1 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","already":false,"status":"completed","list":{"n
-VOLLTEST tasks_create schalter=an urteil=OK aufrufe=1 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","summary":"Abnahme abnahme8b5860466f","list":{"
-VOLLTEST tasks_move schalter=an urteil=OK aufrufe=1 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","list":{"name":"personal","shared":false,"writa
-VOLLTEST tasks_read schalter=an urteil=OK aufrufe=1 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","summary":"Abnahme abnahme8b5860466f","status":
-VOLLTEST tasks_search schalter=an urteil=OK aufrufe=1 | {"tasks":[{"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","summary":"Abnahme abnahme8b5860466f"
-VOLLTEST tasks_update schalter=an urteil=OK aufrufe=2 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","list":{"name":"personal","shared":false,"writa
-VOLLTEST unified_search schalter=an urteil=OK aufrufe=1 | {"query":"abnahme8b5860466f","count":7,"results":[{"id":"note:26195","title":"Abnahme abnahme8b5860466f","subl
+LAUF1 VOLLTEST calendar_create_event schalter=an urteil_lauf1=OK aufrufe=1 | {"id":"event:personal:9dc8420b-8d2e-421a-a8e9-1cfdc51feedf.ics","uid":"9dc8420b-8d2e-421a-a8e9-1cfdc51feedf","
+LAUF1 VOLLTEST calendar_list_events schalter=an urteil_lauf1=OK aufrufe=1 | {"range":{"start":"2026-11-15T06:49:34+00:00","end":"2026-11-15T09:49:34+00:00","timezone":"UTC"},"count":1,"e
+LAUF1 VOLLTEST contacts_search schalter=an urteil_lauf1=OK aufrufe=1 | {"query":"a","count":0,"contacts":[]}
+LAUF1 VOLLTEST deck_browse schalter=an urteil_lauf1=OK aufrufe=2 | {"level":"boards","count":13,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_edit":true},{"id":2,
+LAUF1 VOLLTEST deck_create_card schalter=an urteil_lauf1=OK aufrufe=1 | {"id":"card:1:1:166","title":"Abnahme abnahme8b5860466f","url":"http://127.0.0.1:8082/index.php/apps/deck/card
+LAUF1 VOLLTEST fetch schalter=an urteil_lauf1=OK aufrufe=5 | { "id": "task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics", "title": "Abnahme abnahme8b5860466f", "text"
+LAUF1 VOLLTEST files_create_folder schalter=an urteil_lauf1=OK aufrufe=2 | {"path":"/abnahme8b5860466f-20261114-084932-ordner/a/b","created":true,"id":"file:26191","created_folders":["/
+LAUF1 VOLLTEST files_download schalter=an urteil_lauf1=OK aufrufe=1 | {"path":"/abnahme8b5860466f-20261114-084932.md","size":54,"content_type":"text/markdown","offset":0,"bytes":54
+LAUF1 VOLLTEST files_list schalter=an urteil_lauf1=OK aufrufe=1 | {"path":"/","count":100,"items":[{"path":"/abnahme8b5860466f-20261114-084932-ordner","name":"abnahme8b5860466f
+LAUF1 VOLLTEST files_read schalter=an urteil_lauf1=OK aufrufe=1 | {"path":"/abnahme8b5860466f-20261114-084932.md","content":"# abnahme8b5860466f\nAbnahmelauf Phase 1, Straßenba
+LAUF1 VOLLTEST files_read_as_markdown schalter=an urteil_lauf1=OK aufrufe=1 | {"path":"/abnahme8b5860466f-20261114-084932.docx","content":"Abnahmelauf abnahme8b5860466f\n","content_type":"
+LAUF1 VOLLTEST files_search schalter=an urteil_lauf1=OK aufrufe=1 | {"query":"abnahme8b5860466f","folder":"/","count":2,"items":[{"path":"/abnahme8b5860466f-20261114-084932-ordne
+LAUF1 VOLLTEST files_update schalter=an urteil_lauf1=FAIL aufrufe=0 | never called: das Abnahmeskript hat keinen Schritt für files_update
+LAUF1 VOLLTEST files_upload schalter=an urteil_lauf1=OK aufrufe=2 | {"path":"/abnahme8b5860466f-20261114-084932.md","etag":"\"0723d36ca925562ab1ecb97f76b8186a\"","created":true}
+LAUF1 VOLLTEST mail_browse schalter=an urteil_lauf1=OK aufrufe=3 | {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]}
+LAUF1 VOLLTEST notes_create schalter=an urteil_lauf1=OK aufrufe=1 | {"id":"note:26195","title":"Abnahme abnahme8b5860466f","category":"","modified":1794642576,"url":"http://127.0
+LAUF1 VOLLTEST notes_read schalter=an urteil_lauf1=OK aufrufe=1 | {"id":"note:26195","title":"Abnahme abnahme8b5860466f","content":"Abnahmelauf abnahme8b5860466f","category":""
+LAUF1 VOLLTEST notes_search schalter=an urteil_lauf1=OK aufrufe=1 | {"count":1,"results":[{"id":"note:26195","title":"Abnahme abnahme8b5860466f","excerpt":"Abnahmelauf abnahme8b5
+LAUF1 VOLLTEST prepare_context schalter=an urteil_lauf1=OK aufrufe=1 | {"query":"abnahme8b5860466f","window":{"start":"2026-11-14T07:49:40+00:00","end":"2026-11-21T07:49:40+00:00"},
+LAUF1 VOLLTEST search schalter=an urteil_lauf1=OK aufrufe=1 | { "results": [ { "id": "note:26195", "title": "Abnahme abnahme8b5860466f", "url": "http://127.0.0.1:8082/apps/
+LAUF1 VOLLTEST tables_browse schalter=an urteil_lauf1=OK aufrufe=2 | {"level":"tables","count":3,"results":[{"id":1,"title":"Welcome to Nextcloud Tables!","rowsCount":8,"columnsCo
+LAUF1 VOLLTEST tables_create_row schalter=an urteil_lauf1=OK aufrufe=1 | {"id":253,"table_id":"1","url":"http://127.0.0.1:8082/index.php/apps/tables/#/table/1","values_written":{"What
+LAUF1 VOLLTEST talk_browse schalter=an urteil_lauf1=OK aufrufe=2 | {"level":"conversations","count":5,"results":[{"token":"2uqkjpn2","name":"<raum>","t
+LAUF1 VOLLTEST talk_send schalter=an urteil_lauf1=OK aufrufe=1 | {"sent":true,"id":601,"token":"2uqkjpn2","conversation":"<raum>","timestamp":1794642
+LAUF1 VOLLTEST tasks_complete schalter=an urteil_lauf1=OK aufrufe=1 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","already":false,"status":"completed","list":{"n
+LAUF1 VOLLTEST tasks_create schalter=an urteil_lauf1=OK aufrufe=1 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","summary":"Abnahme abnahme8b5860466f","list":{"
+LAUF1 VOLLTEST tasks_move schalter=an urteil_lauf1=OK aufrufe=1 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","list":{"name":"personal","shared":false,"writa
+LAUF1 VOLLTEST tasks_read schalter=an urteil_lauf1=OK aufrufe=1 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","summary":"Abnahme abnahme8b5860466f","status":
+LAUF1 VOLLTEST tasks_search schalter=an urteil_lauf1=OK aufrufe=1 | {"tasks":[{"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","summary":"Abnahme abnahme8b5860466f"
+LAUF1 VOLLTEST tasks_update schalter=an urteil_lauf1=OK aufrufe=2 | {"id":"task:personal:0ba9b3a8-d11d-40d2-ad1b-7403d4d7c74d.ics","list":{"name":"personal","shared":false,"writa
+LAUF1 VOLLTEST unified_search schalter=an urteil_lauf1=OK aufrufe=1 | {"query":"abnahme8b5860466f","count":7,"results":[{"id":"note:26195","title":"Abnahme abnahme8b5860466f","subl
 MELDUNG tasks_update veraltet: "The task task:personal:<id>.ics changed since it was read. Hint: Nothing was changed: read the task again with tasks_read and use its new etag." (Englisch korrekt, kein Host, kein Token)
 
 BEFUND files_update: scripts/acceptance_all_tools.py reicht NC_MCP_FILES_UPDATE seit 33-09 durch, hat aber keinen Schritt für files_update; mit Schalter an meldet es das Werkzeug als nie aufgerufen (Exit 1). Kein Produktfehler belegt, Lücke im Abnahmeskript. Nach 34-RULES Abschnitt 11 angehalten, nicht nachgebessert; der Lauf ohne Schalter ist deshalb nicht gelaufen.
@@ -80,3 +80,91 @@ BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=
 DOCKER ende eigene=0 (nc35-nc, nc35-harp, nc35-caddy, nc35-greenmail, nc_app_mcp_connector, nc-mcp-exapp-registry per docker stop; fremde Container: keine)
 PROZESS nc-mcp=0
 SCAN gesamt treffer=0 (Talk-Raumname maskiert als <raum>)
+
+== Owner-Entscheid nach Lauf 1 (2026-11-14, AskUserQuestion über die Hauptsitzung)
+FREIGABE luecke-files-update antwort=option-a datum=2026-11-14 (Schritt im Abnahmeskript ergänzen, beide stdio-Läufe neu)
+FREIGABE label-files-update antwort="Allow editing existing text files" datum=2026-11-14 (gilt überall; info.xml display-name angeglichen)
+COMMIT e37a3fb test(34-07): Label-Test RED (nur der neue Fall NC_MCP_FILES_UPDATE rot)
+COMMIT c223311 docs(34-07): info.xml display-name = Formular-Label; Store-Text-Pin deckt nur summary/description direkt unter info, daher unverändert
+COMMIT 098f699 test(34-07): Abnahmeskript ruft files_update mit frischem und veraltetem ETag
+
+== Lauf 2 (stdio, Konto alice, ExApp 0.8.0 unverändert registriert, Schalter der ExApp aus)
+DOCKER fremd=0 laufend=0 (vor dem Start)
+RAM frei_host_gb=4.49 schwelle=4.0 ergebnis=ok
+docker start nc35-nc -> nc35-nc
+docker start nc35-harp -> nc35-harp
+docker start nc35-caddy -> nc35-caddy
+nc35-nc: installed (attempt 1)
+docker start nc35-greenmail
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+STDIO schalter=an tools_list=31 exit=3 grund=PREREQ Mail-Volltext (GreenMail ist nach dem Neustart leer; die Mail-App selbst antwortet HTTP 500 für mail:1)
+VOLLTEST calendar_create_event schalter=an urteil=OK aufrufe=1 | {"id":"event:personal:4fff42c9-dd70-40b1-beff-c834ab2976aa.ics","uid":"4fff42c9-dd70-40b1-beff-c834ab2976aa","
+VOLLTEST calendar_list_events schalter=an urteil=OK aufrufe=1 | {"range":{"start":"2026-11-15T07:13:28+00:00","end":"2026-11-15T10:13:28+00:00","timezone":"UTC"},"count":1,"e
+VOLLTEST contacts_search schalter=an urteil=OK aufrufe=1 | {"query":"a","count":0,"contacts":[]}
+VOLLTEST deck_browse schalter=an urteil=OK aufrufe=2 | {"level":"boards","count":13,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_edit":true},{"id":2,
+VOLLTEST deck_create_card schalter=an urteil=OK aufrufe=1 | {"id":"card:1:1:167","title":"Abnahme abnahme26ef3d116f","url":"http://127.0.0.1:8082/index.php/apps/deck/card
+VOLLTEST fetch schalter=an urteil=OK,PREREQ aufrufe=5 | { "id": "task:personal:9a6c6c64-7ce5-42c9-a5f6-f77ab20a47b4.ics", "title": "Abnahme abnahme26ef3d116f", "text"
+VOLLTEST files_create_folder schalter=an urteil=OK aufrufe=2 | {"path":"/abnahme26ef3d116f-20261114-091326-ordner/a/b","created":true,"id":"file:26199","created_folders":["/
+VOLLTEST files_download schalter=an urteil=OK aufrufe=1 | {"path":"/abnahme26ef3d116f-20261114-091326.md","size":54,"content_type":"text/markdown","offset":0,"bytes":54
+VOLLTEST files_list schalter=an urteil=OK aufrufe=1 | {"path":"/","count":100,"items":[{"path":"/abnahme26ef3d116f-20261114-091326-ordner","name":"abnahme26ef3d116f
+VOLLTEST files_read schalter=an urteil=OK aufrufe=1 | {"path":"/abnahme26ef3d116f-20261114-091326.md","content":"# abnahme26ef3d116f\nAbnahmelauf Phase 1, Straßenba
+VOLLTEST files_read_as_markdown schalter=an urteil=OK aufrufe=1 | {"path":"/abnahme26ef3d116f-20261114-091326.docx","content":"Abnahmelauf abnahme26ef3d116f\n","content_type":"
+VOLLTEST files_search schalter=an urteil=OK aufrufe=1 | {"query":"abnahme26ef3d116f","folder":"/","count":2,"items":[{"path":"/abnahme26ef3d116f-20261114-091326-ordne
+VOLLTEST files_update schalter=an urteil=OK aufrufe=2 | {"path":"/abnahme26ef3d116f-20261114-091326.md","etag":"\"259ebe99a4d35d5452176a91486ebdbb\"","size":52,"versi
+VOLLTEST files_upload schalter=an urteil=OK aufrufe=2 | {"path":"/abnahme26ef3d116f-20261114-091326.md","etag":"\"e6df48552fff99432cc6be7808ceb170\"","created":true}
+VOLLTEST mail_browse schalter=an urteil=OK aufrufe=3 | {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]}
+VOLLTEST notes_create schalter=an urteil=OK aufrufe=1 | {"id":"note:26204","title":"Abnahme abnahme26ef3d116f","category":"","modified":1794644010,"url":"http://127.0
+VOLLTEST notes_read schalter=an urteil=OK aufrufe=1 | {"id":"note:26204","title":"Abnahme abnahme26ef3d116f","content":"Abnahmelauf abnahme26ef3d116f","category":""
+VOLLTEST notes_search schalter=an urteil=OK aufrufe=1 | {"count":1,"results":[{"id":"note:26204","title":"Abnahme abnahme26ef3d116f","excerpt":"Abnahmelauf abnahme26e
+VOLLTEST prepare_context schalter=an urteil=OK aufrufe=1 | {"query":"abnahme26ef3d116f","window":{"start":"2026-11-14T08:13:35+00:00","end":"2026-11-21T08:13:35+00:00"},
+VOLLTEST search schalter=an urteil=OK aufrufe=1 | { "results": [ { "id": "note:26204", "title": "Abnahme abnahme26ef3d116f", "url": "http://127.0.0.1:8082/apps/
+VOLLTEST tables_browse schalter=an urteil=OK aufrufe=2 | {"level":"tables","count":3,"results":[{"id":1,"title":"Welcome to Nextcloud Tables!","rowsCount":9,"columnsCo
+VOLLTEST tables_create_row schalter=an urteil=OK aufrufe=1 | {"id":254,"table_id":"1","url":"http://127.0.0.1:8082/index.php/apps/tables/#/table/1","values_written":{"What
+VOLLTEST talk_browse schalter=an urteil=OK aufrufe=2 | {"level":"conversations","count":5,"results":[{"token":"2uqkjpn2","name":"<raum>","t
+VOLLTEST talk_send schalter=an urteil=OK aufrufe=1 | {"sent":true,"id":602,"token":"2uqkjpn2","conversation":"<raum>","timestamp":1794644
+VOLLTEST tasks_complete schalter=an urteil=OK aufrufe=1 | {"id":"task:personal:9a6c6c64-7ce5-42c9-a5f6-f77ab20a47b4.ics","already":false,"status":"completed","list":{"n
+VOLLTEST tasks_create schalter=an urteil=OK aufrufe=1 | {"id":"task:personal:9a6c6c64-7ce5-42c9-a5f6-f77ab20a47b4.ics","summary":"Abnahme abnahme26ef3d116f","list":{"
+VOLLTEST tasks_move schalter=an urteil=OK aufrufe=1 | {"id":"task:personal:9a6c6c64-7ce5-42c9-a5f6-f77ab20a47b4.ics","list":{"name":"personal","shared":false,"writa
+VOLLTEST tasks_read schalter=an urteil=OK aufrufe=1 | {"id":"task:personal:9a6c6c64-7ce5-42c9-a5f6-f77ab20a47b4.ics","summary":"Abnahme abnahme26ef3d116f","status":
+VOLLTEST tasks_search schalter=an urteil=OK aufrufe=1 | {"tasks":[{"id":"task:personal:9a6c6c64-7ce5-42c9-a5f6-f77ab20a47b4.ics","summary":"Abnahme abnahme26ef3d116f"
+VOLLTEST tasks_update schalter=an urteil=OK aufrufe=2 | {"id":"task:personal:9a6c6c64-7ce5-42c9-a5f6-f77ab20a47b4.ics","list":{"name":"personal","shared":false,"writa
+VOLLTEST unified_search schalter=an urteil=OK aufrufe=1 | {"query":"abnahme26ef3d116f","count":7,"results":[{"id":"note:26204","title":"Abnahme abnahme26ef3d116f","subl
+STDIO schalter=aus tools_list=27 exit=3 grund=PREREQ Mail-Volltext (wie oben); files_update, tasks_update, tasks_complete, tasks_move: not registered (switch off)
+VOLLTEST calendar_create_event schalter=aus urteil=OK aufrufe=1 | {"id":"event:personal:1ce62801-4ea8-48fd-99e8-af788bf7e70c.ics","uid":"1ce62801-4ea8-48fd-99e8-af788bf7e70c","
+VOLLTEST calendar_list_events schalter=aus urteil=OK aufrufe=1 | {"range":{"start":"2026-11-15T07:13:41+00:00","end":"2026-11-15T10:13:41+00:00","timezone":"UTC"},"count":2,"e
+VOLLTEST contacts_search schalter=aus urteil=OK aufrufe=1 | {"query":"a","count":0,"contacts":[]}
+VOLLTEST deck_browse schalter=aus urteil=OK aufrufe=2 | {"level":"boards","count":13,"results":[{"id":1,"title":"Welcome to Nextcloud Deck!","can_edit":true},{"id":2,
+VOLLTEST deck_create_card schalter=aus urteil=OK aufrufe=1 | {"id":"card:1:1:168","title":"Abnahme abnahme92e5c68c53","url":"http://127.0.0.1:8082/index.php/apps/deck/card
+VOLLTEST fetch schalter=aus urteil=OK,PREREQ aufrufe=5 | { "id": "task:personal:ca83bebb-aa94-42d9-a586-a63663030950.ics", "title": "Abnahme abnahme92e5c68c53", "text"
+VOLLTEST files_create_folder schalter=aus urteil=OK aufrufe=2 | {"path":"/abnahme92e5c68c53-20261114-091339-ordner/a/b","created":true,"id":"file:26208","created_folders":["/
+VOLLTEST files_download schalter=aus urteil=OK aufrufe=1 | {"path":"/abnahme92e5c68c53-20261114-091339.md","size":54,"content_type":"text/markdown","offset":0,"bytes":54
+VOLLTEST files_list schalter=aus urteil=OK aufrufe=1 | {"path":"/","count":100,"items":[{"path":"/abnahme26ef3d116f-20261114-091326-ordner","name":"abnahme26ef3d116f
+VOLLTEST files_read schalter=aus urteil=OK aufrufe=1 | {"path":"/abnahme92e5c68c53-20261114-091339.md","content":"# abnahme92e5c68c53\nAbnahmelauf Phase 1, Straßenba
+VOLLTEST files_read_as_markdown schalter=aus urteil=OK aufrufe=1 | {"path":"/abnahme92e5c68c53-20261114-091339.docx","content":"Abnahmelauf abnahme92e5c68c53\n","content_type":"
+VOLLTEST files_search schalter=aus urteil=OK aufrufe=1 | {"query":"abnahme92e5c68c53","folder":"/","count":2,"items":[{"path":"/abnahme92e5c68c53-20261114-091339-ordne
+VOLLTEST files_upload schalter=aus urteil=OK aufrufe=2 | {"path":"/abnahme92e5c68c53-20261114-091339.md","etag":"\"0490b331db33e95c161e7f399a00fa5e\"","created":true}
+VOLLTEST mail_browse schalter=aus urteil=OK aufrufe=3 | {"level":"accounts","count":1,"results":[{"id":1,"email":"alice@example.test"}]}
+VOLLTEST notes_create schalter=aus urteil=OK aufrufe=1 | {"id":"note:26212","title":"Abnahme abnahme92e5c68c53","category":"","modified":1794644021,"url":"http://127.0
+VOLLTEST notes_read schalter=aus urteil=OK aufrufe=1 | {"id":"note:26212","title":"Abnahme abnahme92e5c68c53","content":"Abnahmelauf abnahme92e5c68c53","category":""
+VOLLTEST notes_search schalter=aus urteil=OK aufrufe=1 | {"count":1,"results":[{"id":"note:26212","title":"Abnahme abnahme92e5c68c53","excerpt":"Abnahmelauf abnahme92e
+VOLLTEST prepare_context schalter=aus urteil=OK aufrufe=1 | {"query":"abnahme92e5c68c53","window":{"start":"2026-11-14T08:13:44+00:00","end":"2026-11-21T08:13:44+00:00"},
+VOLLTEST search schalter=aus urteil=OK aufrufe=1 | { "results": [ { "id": "note:26212", "title": "Abnahme abnahme92e5c68c53", "url": "http://127.0.0.1:8082/apps/
+VOLLTEST tables_browse schalter=aus urteil=OK aufrufe=2 | {"level":"tables","count":3,"results":[{"id":1,"title":"Welcome to Nextcloud Tables!","rowsCount":10,"columnsC
+VOLLTEST tables_create_row schalter=aus urteil=OK aufrufe=1 | {"id":255,"table_id":"1","url":"http://127.0.0.1:8082/index.php/apps/tables/#/table/1","values_written":{"What
+VOLLTEST talk_browse schalter=aus urteil=OK aufrufe=2 | {"level":"conversations","count":5,"results":[{"token":"2uqkjpn2","name":"<raum>","t
+VOLLTEST talk_send schalter=aus urteil=OK aufrufe=1 | {"sent":true,"id":603,"token":"2uqkjpn2","conversation":"<raum>","timestamp":1794644
+VOLLTEST tasks_create schalter=aus urteil=OK aufrufe=1 | {"id":"task:personal:ca83bebb-aa94-42d9-a586-a63663030950.ics","summary":"Abnahme abnahme92e5c68c53","list":{"
+VOLLTEST tasks_read schalter=aus urteil=OK aufrufe=1 | {"id":"task:personal:ca83bebb-aa94-42d9-a586-a63663030950.ics","summary":"Abnahme abnahme92e5c68c53","status":
+VOLLTEST tasks_search schalter=aus urteil=OK aufrufe=1 | {"tasks":[{"id":"task:personal:ca83bebb-aa94-42d9-a586-a63663030950.ics","summary":"Abnahme abnahme92e5c68c53"
+VOLLTEST unified_search schalter=aus urteil=OK aufrufe=1 | {"query":"abnahme92e5c68c53","count":7,"results":[{"id":"note:26212","title":"Abnahme abnahme92e5c68c53","subl
+MELDUNG files_update veraltet: "The file '/<pfad>.md' changed or was deleted before it could be updated. Hint: Re-read the file and decide whether to retry."
+MELDUNG tasks_update veraltet: "The task task:personal:<id>.ics changed since it was read. Hint: Nothing was changed: read the task again with tasks_read and use its new etag."
+MELDUNG fetch PREREQ: "the Mail app of this instance itself answers HTTP 500 for mail:1: its mail server does not hand out a message it lists" (Skripttext, kein Werkzeugtext)
+RUECKBAU kalenderobjekte_alice=4 (2 Termine, 2 Aufgaben beider Läufe) DELETE 204, Papierkorb geleert 4x 204; deck-kalenderobjekte=2 status=403 (app-generated, nicht in der BASELINE)
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+ZAEHLUNG an=31 erwartet_an=31 aus=27 erwartet_aus=27 gleich=ja (31 = WERKZEUGE der ExApp in Lauf 1, 27 = WERKZEUGE nach_aus)
+DOCKER ende eigene=0 (nc35-nc, nc35-harp, nc35-caddy, nc35-greenmail per docker stop; fremde Container: keine)
+PROZESS nc-mcp=0
+SCAN gesamt treffer=0 (Talk-Raumname maskiert)
