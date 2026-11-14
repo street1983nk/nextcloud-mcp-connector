@@ -6,3 +6,9 @@ FREIGABE store-text antwort=freigabe-mit-aenderung discussion=kein datum=2026-11
   Quelle: Owner-Antwort per AskUserQuestion, über die Hauptsitzung übermittelt.
 FREIGABE volltest-nc35 antwort=option-a datum=2026-11-14
   Owner-Antwort: "Ja, NC 35 komplett (Empfohlen)" per AskUserQuestion, über die Hauptsitzung übermittelt.
+FREIGABE luecke-files-update antwort=option-a datum=2026-11-14
+  Owner-Antwort: "Schritt ergänzen, neu laufen (Empfohlen)" per AskUserQuestion, über die Hauptsitzung übermittelt.
+FREIGABE label-files-update antwort=allow-editing-existing-text-files datum=2026-11-14
+  Owner-Antwort: "Allow editing existing text files" gilt überall; Label-Änderung, keine Änderung der Store-Beschreibung.
+FREIGABE store-text-2 antwort=entfaellt datum=2026-11-14
+  raw/34-07-volltest.txt trägt STORETEXT unveraendert; der Pin deckt das geänderte display-name nicht.
