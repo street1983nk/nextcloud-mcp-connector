@@ -62,16 +62,19 @@ single most tempting misreading of this server's configuration.
 
 ## 6. Prompt injection: the honest remainder
 
-A mail or a Talk message is written by somebody else, a document may be too,
-and a language model does not reliably separate data from instructions. There
-is no known complete defence. What this server does instead is bound the
-damage:
+A mail or a Talk message is written by somebody else, a document or a task in
+a shared list may be too, and a language model does not reliably separate data
+from instructions. There is no known complete defence. What this server does
+instead is bound the damage:
 
-- no tool deletes, moves, renames or changes shares or
-  permissions; `files_upload` remains create-only. When
-  `NC_MCP_FILES_UPDATE` is enabled, `files_update` can replace an
-  existing UTF-8 text file only with a matching ETag; contract tests
-  require conditional headers on file PUT routes,
+- no tool deletes anything, tasks included, and none renames or changes
+  shares or permissions; nothing moves except `tasks_move`, which relocates
+  one task with its subtasks; `files_upload` remains create-only,
+- every change to something existing sits behind a switch that ships off and
+  needs the ETag read just before: `NC_MCP_FILES_UPDATE` for `files_update`
+  (existing UTF-8 text files), `NC_MCP_TASKS_UPDATE` for `tasks_complete`,
+  `tasks_update` and `tasks_move`. Leave both off unless the assistant needs
+  them; a contract test fails on any other destructive call,
 - content is returned with its origin as structured fields, so the client can
   tell where text came from,
 - the outgoing channel can be closed instance-wide (section 4).

@@ -1,0 +1,17 @@
+# 34-03: abgearbeitete Inventarzeilen aus raw/33-01-inventar.txt (ZUORDNUNG ... plan=34), DOC-04, DOC-05
+# alte Zeile = Stand Commit 37790830 (33-01), neue Zeile = Stand nach 34-03
+ERLEDIGT docs/threat-model.md:148 plan=34-03 neu=151 | - No tool deletes anything, and that includes tasks: deleting a task is deliberately not offered. ... nothing moves except `tasks_move` ...
+ERLEDIGT docs/threat-model.md:149 plan=34-03 neu=156 | - Every tool that changes something existing sits behind a switch that ships off and needs the ETag read just before. ... `NC_MCP_TASKS_UPDATE` ...
+ERLEDIGT docs/threat-model.md:162 plan=34-03 neu=174 | the blast radius instead: ... no tool that deletes anything (tasks included), ... no move except `tasks_move` for a single task ...
+ERLEDIGT docs/threat-model.md:173 plan=34-03 neu=202 | can still misuse read tools ... When `NC_MCP_TASKS_UPDATE` is enabled, it can complete, reopen, edit or move one task at a time ... It cannot delete anything.
+ERLEDIGT docs/hardening.md:70 plan=34-03 neu=70 | - no tool deletes anything, tasks included, and none renames or changes shares or permissions;
+ERLEDIGT docs/hardening.md:71 plan=34-03 neu=71 | nothing moves except `tasks_move`, which relocates one task with its subtasks; `files_upload` remains create-only,
+ERLEDIGT docs/hardening.md:74 plan=34-03 neu=77 | - every change to something existing sits behind a switch that ships off ... a contract test fails on any other destructive call,
+ERLEDIGT docs/hardening.de.md:74 plan=34-03 neu=74 | - kein Werkzeug löscht etwas, auch keine Aufgabe, und keines benennt um oder ändert Freigaben oder Rechte;
+ERLEDIGT docs/hardening.de.md:75 plan=34-03 neu=75 | verschoben wird nur mit `tasks_move`, und zwar eine einzelne Aufgabe samt ihren Unteraufgaben; `files_upload` legt nur neu an,
+ERLEDIGT docs/hardening.de.md:76 plan=34-03 neu=83 | - jede Änderung an Bestehendem steht hinter einem Schalter, der ab Werk aus ist ... ein Contract-Test schlägt bei jedem anderen destruktiven Aufruf fehl,
+ERLEDIGT docs/hardening.fr.md:74 plan=34-03 neu=74 | - aucun outil ne supprime quoi que ce soit, pas même une tâche, ... seul `tasks_move` déplace, et uniquement une tâche avec ses sous-tâches ;
+ERLEDIGT docs/hardening.fr.md:76 plan=34-03 neu=83 | - toute modification d'un élément existant passe par un interrupteur désactivé par défaut ... un test de contrat échoue à tout autre appel destructif,
+ERLEDIGT docs/privacy.md:171 plan=34-03 neu=171 | - The create-only writes (`files_upload`, `deck_create_card`, `tables_create_row`, `tasks_create`) ... plus neuer Punkt zu `NC_MCP_TASKS_UPDATE` und Fremdtext geteilter Listen
+ERLEDIGT docs/privacy.md:187 plan=34-03 neu=196 | - No tool deletes anything, tasks included, and none re-shares. Nothing moves except `tasks_move` ...
+ERLEDIGT docs/privacy.md:208 plan=34-03 neu=220 | Disabling `NC_MCP_FILES_UPDATE` closes the replacement path and disabling `NC_MCP_TASKS_UPDATE` closes every change to an existing task, but neither closes the create-only path.

@@ -66,14 +66,21 @@ la plus tentante de la configuration de ce serveur.
 
 ## 6. Injection de prompt : le reste honnête
 
-Un courriel ou un message Talk est écrit par quelqu'un d'autre, un document
-peut l'être aussi, et un modèle de langage ne sépare pas de façon fiable les
-données des instructions. Aucune défense complète n'est connue. Ce serveur
-borne le dégât à la place :
+Un courriel ou un message Talk est écrit par quelqu'un d'autre, un document ou
+une tâche d'une liste partagée peut l'être aussi, et un modèle de langage ne
+sépare pas de façon fiable les données des instructions. Aucune défense
+complète n'est connue. Ce serveur borne le dégât à la place :
 
-- aucun outil ne supprime, n'écrase, ne déplace, ne renomme ni ne modifie
-  des partages ou des droits ; l'écriture est création seule, et un test de
-  contrat échoue au premier appel destructif,
+- aucun outil ne supprime quoi que ce soit, pas même une tâche, et aucun ne
+  renomme ni ne modifie des partages ou des droits ; seul `tasks_move`
+  déplace, et uniquement une tâche avec ses sous-tâches ; `files_upload` ne
+  fait que créer,
+- toute modification d'un élément existant passe par un interrupteur
+  désactivé par défaut et exige l'ETag lu juste avant : `NC_MCP_FILES_UPDATE`
+  pour `files_update` (fichiers texte UTF-8 existants), `NC_MCP_TASKS_UPDATE`
+  pour `tasks_complete`, `tasks_update` et `tasks_move`. Les laisser
+  désactivés tant que l'assistant n'en a pas besoin ; un test de contrat
+  échoue à tout autre appel destructif,
 - les contenus reviennent avec leur origine en champs structurés, le client
   peut voir d'où vient un texte,
 - le canal sortant peut être fermé pour toute l'instance (section 4).

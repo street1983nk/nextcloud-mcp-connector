@@ -66,14 +66,21 @@ Fehllesart der Konfiguration dieses Servers ist.
 
 ## 6. Prompt Injection: der ehrliche Rest
 
-Eine Mail oder eine Talk-Nachricht schreibt jemand anderes, ein Dokument
-womöglich auch, und ein Sprachmodell trennt Daten nicht zuverlässig von
-Anweisungen. Eine vollständige Abwehr ist nicht bekannt. Dieser Server
-begrenzt stattdessen den Schaden:
+Eine Mail oder eine Talk-Nachricht schreibt jemand anderes, ein Dokument oder
+eine Aufgabe in einer geteilten Liste womöglich auch, und ein Sprachmodell
+trennt Daten nicht zuverlässig von Anweisungen. Eine vollständige Abwehr ist
+nicht bekannt. Dieser Server begrenzt stattdessen den Schaden:
 
-- kein Werkzeug löscht, überschreibt, verschiebt, benennt um oder ändert
-  Freigaben oder Rechte; Schreiben ist nur Anlegen, und ein Contract-Test
-  fällt beim ersten destruktiven Aufruf durch,
+- kein Werkzeug löscht etwas, auch keine Aufgabe, und keines benennt um oder
+  ändert Freigaben oder Rechte; verschoben wird nur mit `tasks_move`, und
+  zwar eine einzelne Aufgabe samt ihren Unteraufgaben; `files_upload` legt
+  nur neu an,
+- jede Änderung an Bestehendem steht hinter einem Schalter, der ab Werk aus
+  ist, und braucht das unmittelbar zuvor gelesene ETag: `NC_MCP_FILES_UPDATE`
+  für `files_update` (bestehende UTF-8-Textdateien), `NC_MCP_TASKS_UPDATE`
+  für `tasks_complete`, `tasks_update` und `tasks_move`. Beide aus lassen,
+  solange der Assistent sie nicht braucht; ein Contract-Test schlägt bei
+  jedem anderen destruktiven Aufruf fehl,
 - Inhalte kommen mit ihrer Herkunft als Strukturfeldern zurück, der Client
   kann sehen, woher ein Text stammt,
 - der Ausgang lässt sich instanzweit schließen (Abschnitt 4).

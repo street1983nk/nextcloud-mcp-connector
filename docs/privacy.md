@@ -168,13 +168,22 @@ protection incident.
   conversations is not affected. That switch closes the one channel that can address
   other people directly; it does not close every conceivable way out, and the next
   bullet names the remainder rather than leaving it to be discovered.
-- The create-only writes (`files_upload`, `deck_create_card`, `tables_create_row`)
-  cannot address anyone, but a file, a card or a row can land in a folder, a board
-  or a table that is shared with other people, and content written there is visible
-  to everyone the container is shared with, activity notifications included. That is
-  a narrower and less reliable way out than a message, and it is one. An operator
-  who needs every path closed also reviews which folders, boards and tables the
-  connected accounts share.
+- The create-only writes (`files_upload`, `deck_create_card`, `tables_create_row`,
+  `tasks_create`) cannot address anyone, but a file, a card, a row or a task can land
+  in a folder, a board, a table or a task list that is shared with other people, and
+  content written there is visible to everyone the container is shared with,
+  activity notifications included. That is a narrower and less reliable way out than
+  a message, and it is one. An operator who needs every path closed also reviews
+  which folders, boards, tables and task lists the connected accounts share.
+- With `NC_MCP_TASKS_UPDATE` on (it ships off), `tasks_complete`, `tasks_update` and
+  `tasks_move` change existing tasks, and the text of a task in a list another
+  account shares is untrusted content as much as a mail. An instruction planted in a
+  title, a description or a tag can make the model complete, edit or move a task in
+  any list the user can write to, and the change is visible to everyone the list is
+  shared with. It can never delete a task. Every change needs the ETag the model read
+  just before, which stops it from overwriting a newer version but not the injection
+  itself, since the model can read the task first; a read only list, a recurring
+  task and a Deck board are refused.
 - A conditional replacement can change content visible to people who share
   a file. The `versioned` result is true only when Nextcloud's version listing
   shows one more retained version after the write; null means the listing
@@ -184,10 +193,13 @@ protection incident.
   draft, to move, flag or delete a message, and the attachment route of the Mail app
   is never called. The new family adds reach into private data and untrusted
   content, and it deliberately adds no second way out.
-- No tool deletes, moves or re-shares files. Uploads remain create-only.
+- No tool deletes anything, tasks included, and none re-shares. Nothing moves except
+  `tasks_move`, which relocates one task with its subtasks into another own or
+  writable shared list when `NC_MCP_TASKS_UPDATE` is on. Uploads remain create-only.
   When `NC_MCP_FILES_UPDATE` is enabled, `files_update` can replace an
   existing UTF-8 text file only with a matching ETag. Stale or deleted
-  targets are refused as conflicts.
+  targets are refused as conflicts, and the task tools refuse a stale ETag the
+  same way.
 - The assistant never sees more than the signed in user. Every request runs under
   that identity, so Nextcloud's own permissions decide what an injection could
   reach at most.
@@ -205,7 +217,9 @@ modules on every run. An operator who wants the direct messaging channel closed 
 `NC_MCP_TALK_SEND` to off; one who needs every way out closed also reviews what the
 connected accounts share, because creating a file or conditionally replacing
 its content in a shared container remains a path outwards. Disabling
-`NC_MCP_FILES_UPDATE` closes the replacement path, but not the create-only path.
+`NC_MCP_FILES_UPDATE` closes the replacement path and disabling
+`NC_MCP_TASKS_UPDATE` closes every change to an existing task, but neither closes
+the create-only path.
 
 ## Deletion and user control
 

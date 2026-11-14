@@ -23,9 +23,11 @@ this page missed.
 
 ## Assets
 
-1. **User content in Nextcloud**: files, mail, calendar entries, notes, Deck
-   cards, contacts, Tables rows, Talk history. The connector stores none of
-   it; it reads per request and the asset stays where it was.
+1. **User content in Nextcloud**: files, mail, calendar entries, tasks (in
+   the user's own task lists and in lists other accounts share with the
+   user), notes, Deck cards, contacts, Tables rows, Talk history. The
+   connector stores none of it; it reads per request and the asset stays
+   where it was.
 2. **Credentials**: per-connection Nextcloud app passwords (AES-GCM
    encrypted at rest, key held in Nextcloud's app configuration, outside the
    database file), OAuth refresh and access tokens and client secrets
@@ -45,7 +47,8 @@ this page missed.
   authorization decision; the connector deliberately has no second one.
 - **Content authors ↔ the model.** A mail is written by somebody with no
   account on the instance, a Talk message by any co-user, a shared document
-  by its collaborators. Whatever they wrote is handed to a language model
+  by its collaborators, a task in a shared list by the accounts that share
+  it. Whatever they wrote is handed to a language model
   that does not reliably separate data from instructions.
 - **Identity provider ↔ connector** (token exchange path, off in the
   factory state): tokens presented here are untrusted until the signature,
@@ -56,7 +59,7 @@ this page missed.
 | | Who | Position |
 |---|-----|----------|
 | A1 | An outsider who can send the user a mail | no account anywhere, puts text in front of the model through `mail_browse` |
-| A2 | A co-user of the instance | can send Talk messages, share folders into the account, and set or unset collaborative tags |
+| A2 | A co-user of the instance | can send Talk messages, share folders and task lists into the account, and set or unset collaborative tags |
 | A3 | A malicious or compromised MCP client | holds a real OAuth grant a user once approved |
 | A4 | The model itself, following injected instructions | holds whatever tools and rights the connection has |
 | A5 | Whoever holds a stolen token or database copy | offline position, no live session |
@@ -145,11 +148,21 @@ decision for the operator, see privacy.md, not a vulnerability).
 
 - There is no admin surface: the connector acts as one user, and a
   connection made by a restricted account stays restricted.
-- No tool deletes, moves, renames, re-shares or changes permissions.
-  `files_upload` remains create-only. When `NC_MCP_FILES_UPDATE` is
-  enabled, `files_update` can replace existing UTF-8 text files only
-  with a matching ETag. Contract tests guard conditional file writes,
-  and `tests/contract/test_tool_classes.py` keeps every tool classified.
+- No tool deletes anything, and that includes tasks: deleting a task is
+  deliberately not offered. No tool renames, re-shares or changes
+  permissions, and nothing moves except `tasks_move`, which relocates one
+  task with its subtasks into another own or writable shared list.
+  `files_upload` remains create-only.
+- Every tool that changes something existing sits behind a switch that
+  ships off and needs the ETag read just before. With
+  `NC_MCP_FILES_UPDATE` on, `files_update` can replace an existing UTF-8
+  text file. With `NC_MCP_TASKS_UPDATE` on, `tasks_complete` completes or
+  reopens one task (its subtasks first), `tasks_update` edits named fields
+  of one task, and `tasks_move` relocates one. A stale ETag, a read only
+  list, a recurring task and a Deck board are refused before any write.
+  `tests/contract/test_no_destructive_calls.py` allows exactly these
+  exceptions plus the private chunk assembly of uploads, and `tests/contract/test_tool_classes.py` keeps every tool
+  classified.
 - Mail is strictly read only, asserted the same way: the family that adds
   the widest untrusted input adds no capability in return.
 
@@ -158,25 +171,46 @@ decision for the operator, see privacy.md, not a vulnerability).
 A1 through A4 meet here: untrusted content carries an instruction, the
 model follows it, and the question is only what the instruction can reach.
 No known method prevents the injection itself. This project bounds
-the blast radius instead: the user's own rights as ceiling, no tool
-for deleting, moving, renaming or re-sharing files, optional `files_update`
-replacements protected by a matching ETag, the one direct outgoing channel
-(`talk_send`) switchable off instance-wide, mail with deliberately no outgoing
-channel, and provenance returned as structured fields. The full chain,
-including the honest remainder about writes into shared containers and
-conditional replacements, is in privacy.md; the operator's checklist
-against it is hardening.md.
+the blast radius instead: the user's own rights as ceiling, no tool that
+deletes anything (tasks included), no tool for renaming or re-sharing, no
+move except `tasks_move` for a single task, optional `files_update`
+replacements and task changes that need a fresh ETag and a switch that
+ships off, the one direct outgoing channel (`talk_send`) switchable off
+instance-wide, mail with deliberately no outgoing channel, and provenance
+returned as structured fields. The full chain, including the honest
+remainder about writes into shared containers and conditional changes, is
+in privacy.md; the operator's checklist against it is hardening.md.
+
+**Text from shared task lists.** The title, description and tags of a task
+in a list another account shares with the user are untrusted input, just
+like a mail: an A2 co-user wrote them. With `NC_MCP_TASKS_UPDATE` on, an
+instruction planted there can make the model complete, edit or move a task
+in any list the user can write to, a list shared with write permission
+included. It cannot delete one. The ETag check does not stop such a
+change, since the model can read the task first; it stops a change from
+overwriting what somebody else wrote in between. What bounds it is the
+switch, which ships off, the refusal of read only lists, recurring tasks
+and Deck boards, and the audit log, which records every call with its
+parameter names and outcome, never a value. The `kein-ki` tag does not help
+here: it marks files and folders, not task lists. The live findings for
+the three tools are in
+[tasks-evidence.md](tasks-evidence.md#modifying-tools-on-nextcloud-35-and-32).
 
 ## Residual risks, in plain sentences
 
 1. **Prompt injection is reduced, not removed.** A model with a live grant
    can still misuse read tools and create-only writes within the user's
    rights. When `NC_MCP_FILES_UPDATE` is enabled, it can also request
-   ETag-protected replacement of existing UTF-8 text files.
+   ETag-protected replacement of existing UTF-8 text files. When
+   `NC_MCP_TASKS_UPDATE` is enabled, it can complete, reopen, edit or move
+   one task at a time, with its subtasks, in every list the user can write
+   to. It cannot delete anything.
 2. **Writes into shared containers can expose content.** Created files and
-   conditionally replaced file content may be visible to other people with
-   access. Review which folders, boards and tables the connected accounts
-   share, and disable `NC_MCP_FILES_UPDATE` when replacements are not needed.
+   tasks, conditionally replaced file content and changed tasks may be
+   visible to other people with access. Review which folders, boards,
+   tables and task lists the connected accounts share, and leave
+   `NC_MCP_FILES_UPDATE` and `NC_MCP_TASKS_UPDATE` off when the assistant
+   does not need them.
 3. **A tag above a share root does not protect the recipient's view.**
    Measured, documented, and testable per instance, but it stays the
    deployment mistake this design permits.
