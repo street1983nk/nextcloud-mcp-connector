@@ -16,3 +16,5 @@ FREIGABE volltest antwort=abgenommen datum=2026-11-14
   Owner-Antwort: "Abgenommen (Empfohlen)" per AskUserQuestion, über die Hauptsitzung übermittelt; dazu Stilhinweise A und B "Jetzt ändern" (umgesetzt in 9025f17 und 23189a5).
 FREIGABE push-branch antwort=push datum=2026-11-14
   Owner-Antwort: "Ja, Texte ok und pushen (Empfohlen)" per AskUserQuestion, über die Hauptsitzung übermittelt; eine Korrektur der Release-Notiz ("No tool deletes anything."). Push führt die Hauptsitzung aus.
+FREIGABE merge-pr48 antwort=vorab quelle=owner-vorabfreigabe-phase34 datum=2026-11-14
+  Owner 14.11. "Freigegeben" (Merge PR #48 nach Phase 33 verifiziert, kalte Suche fertig, Phase 34 bis 34-08 fertig, CI grün). Über origin/plan/v1.8-tasks-080 nur Dateien unter .planning/ (34-08-SUMMARY.md, raw/34-08-push.txt).
