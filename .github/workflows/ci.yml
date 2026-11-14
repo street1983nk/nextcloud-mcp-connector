@@ -254,9 +254,13 @@ jobs:
         # NC_MCP_REQUIRE_LIVE turns every missing prerequisite (variable, docker, container,
         # second account) into a failure instead of a skip (review WR-04): a green check
         # here has to mean the gates ran, not that they found nothing to run against.
+        # NC_MCP_TASKS_UPDATE turns the three modifying task tools on (plan 33-09): the
+        # canary calls each of them for real and with a Deck key, and the server reads the
+        # switch on import, so it stands here and not inside the test.
         env:
           PYTHONUTF8: "1"
           NC_MCP_REQUIRE_LIVE: "1"
+          NC_MCP_TASKS_UPDATE: "on"
         run: |
           set -a && . ./.env.exapp && set +a
           uv run pytest tests/integration/test_canary.py tests/integration/test_pair_equality_live.py tests/integration/test_provider_classes_live.py -m integration -s

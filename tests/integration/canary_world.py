@@ -930,6 +930,7 @@ class World:
     deck_attachment: str = ""
     task_list_uri: str = ""
     task_object: str = ""
+    second_list_uri: str = ""
     tag_id: str = ""
     proof: dict[str, str] = dataclasses.field(default_factory=dict)
     writes_ledger: list[str] = dataclasses.field(default_factory=list)
@@ -1014,6 +1015,16 @@ class World:
     @property
     def task_id(self) -> str:
         return ids.encode_task(ids.task_list_key(self.task_list_uri), self.task_object)
+
+    @property
+    def second_list_key(self) -> str:
+        """The key of the second task list, the target of ``tasks_move`` (plan 33-09)."""
+        return ids.task_list_key(self.second_list_uri)
+
+    @property
+    def moved_task_id(self) -> str:
+        """The id of the task of the world after its move: same object name, second list."""
+        return ids.encode_task(self.second_list_key, self.task_object)
 
     @property
     def deck_calendar_uri(self) -> str:
@@ -1406,6 +1417,32 @@ def _build_tasks(world: World, cleanup: Cleanup) -> tuple[str, str]:
     return uri, object_name
 
 
+def _build_second_task_list(world: World, cleanup: Cleanup) -> str:
+    """An empty second task list (VTODO only), the target of ``tasks_move`` (plan 33-09).
+
+    Its name is not the name of the first list, so ``tasks_create`` with the name of the world
+    still finds exactly one list. Removed without trash bin like the first one; a task that a
+    failed run left in it goes with it.
+    """
+    harness = world.harness
+    uri = f"{world.stamm}-ziel"
+    url = harness.calendar_url(uri)
+    status = harness.mk_task_list(uri, f"{world.stamm}-ziel")
+    assert status == 201, f"MKCALENDAR {uri}: {status}"
+    cleanup.add(
+        f"aufgabenliste {uri}",
+        lambda: harness.delete_calendar_url(url),
+        lambda: str(harness.status_of(url)),
+    )
+    mine = [entry for entry in harness.task_lists() if entry.uri == uri]
+    assert len(mine) == 1, f"the task discovery shows {len(mine)} lists {uri}"
+    assert mine[0].own, f"{uri} is not an own list: {mine[0]}"
+    assert mine[0].writable, f"{uri} is not writable: {mine[0]}"
+    assert harness.home_components().get(uri) == {"VTODO"}, f"{uri} is not VTODO only"
+    world.proof["zweite-liste"] = f"MKCALENDAR {status} {uri} (nur VTODO), eigen, schreibbar"
+    return uri
+
+
 def _build_deck(world: World, cleanup: Cleanup) -> tuple[str, str, str, str]:
     harness = world.harness
     board_id = harness.deck_created("/boards", {"title": world.stamm, "color": "0082c9"})
@@ -1516,6 +1553,7 @@ def canary_world(env: LiveEnv, raw: Path) -> Iterator[World]:
         table_id, column_id, row_ids = _build_table(base, cleanup)
         event_uid = _build_calendar(base, cleanup)
         task_list_uri, task_object = _build_tasks(base, cleanup)
+        second_list_uri = _build_second_task_list(base, cleanup)
         board_id, stack_id, card_id, attachment = _build_deck(base, cleanup)
         tag_id = _tag_world(base, cleanup, created_notes)
         world = dataclasses.replace(
@@ -1536,6 +1574,7 @@ def canary_world(env: LiveEnv, raw: Path) -> Iterator[World]:
             deck_attachment=attachment,
             task_list_uri=task_list_uri,
             task_object=task_object,
+            second_list_uri=second_list_uri,
             tag_id=tag_id,
         )
         yield world

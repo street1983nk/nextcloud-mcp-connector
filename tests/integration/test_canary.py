@@ -13,7 +13,9 @@ Four rules make a green run mean something:
 *   **The marker is never an argument (D-28-06).** Every argument set is asserted free of the
     marker before its call, so a marker in an answer can only come from the instance.
 *   **The registry is the plan.** ``set(PLAN) == registry`` against ``list_tools()``, and the
-    output says ``KANARIE <mode> geprüft <n> von <registry>`` with ``n == 27``.
+    output says ``KANARIE <mode> geprüft <n> von <registry>`` with ``n == 30``: the 27
+    standard tools plus the three modifying task tools, because the canary runs with
+    ``NC_MCP_TASKS_UPDATE=on`` (plan 33-09).
 *   **The control marker must show.** The untagged control file and note carry a second
     marker; in the normal state every reader answer that has to show them must show it, or an
     empty index or a wrong container would end in a green canary (T-28-101).
@@ -28,16 +30,25 @@ and ``fetch`` of its id must show it. The Deck card of the world carries a marke
 in its description; Deck shows the card as a VTODO, and no answer of the three task tools may
 carry that marker (``DECK`` lines), with the positive control in the world's build proof.
 
+The three modifying task tools (TMOD-05, plan 33-09) are called for real on the task of the
+world, each with the ETag of a ``tasks_read`` made just before the call: ``tasks_complete``
+completes and reopens it, ``tasks_update`` sets a tag, ``tasks_move`` moves it into the second
+list of the world and back. Each of them is also called with a Deck key (as task id, and for
+``tasks_move`` as target list) and has to refuse; no answer of theirs may carry the Deck
+marker either (``AENDERN`` and ``DECK`` lines). Changing leaves no new object behind, so
+``WRITE_KINDS`` stays as it is.
+
 The outage runs through ``respx`` with ``pass_through`` for every other request, never through
 ``occ app:disable``, which does not produce an outage (phase 25, K1).
 
 Run it against nc35 with the environment of ``.env.nc35`` plus the ``NC_MCP_E2E_*`` exports
 of ``topology.py``::
 
-    PYTHONUTF8=1 .venv/Scripts/python.exe -m pytest tests/integration/test_canary.py \\
-        -m integration -s
+    PYTHONUTF8=1 NC_MCP_TASKS_UPDATE=on .venv/Scripts/python.exe -m pytest \\
+        tests/integration/test_canary.py -m integration -s
 
-Without that environment it skips.
+Without that environment it skips; without the switch it fails, because the registry would
+lack the three modifying task tools.
 """
 
 import dataclasses
@@ -54,7 +65,7 @@ from mcp import Client
 from mcp.types import CallToolResult, TextContent
 from result_shapes import leaks, surfaces
 
-from mcp_connector import paging
+from mcp_connector import config, ids, paging
 from mcp_connector.server import mcp
 from mcp_connector.tools import files as files_tools
 from mcp_connector.tools import mail as mail_tools
@@ -66,11 +77,13 @@ from mcp_connector.tools import withhold
 pytestmark = [pytest.mark.integration, pytest.mark.anyio]
 
 RAW = cw.RAW_DIR / "28-10-canary.txt"
-EXPECTED_TOOLS = 27
+#: The 27 standard tools plus tasks_complete, tasks_update and tasks_move, with
+#: NC_MCP_TASKS_UPDATE on (plan 33-09); files_update stays off in this run.
+EXPECTED_TOOLS = 30
 MAX_PAGES = 50
 COMMAND = (
-    "PYTHONUTF8=1 .venv/Scripts/python.exe -m pytest tests/integration/test_canary.py "
-    "-m integration -s"
+    "PYTHONUTF8=1 NC_MCP_TASKS_UPDATE=on .venv/Scripts/python.exe -m pytest "
+    "tests/integration/test_canary.py -m integration -s"
 )
 
 #: The limit each paging tool is called with: its maximum, so few pages cover everything.
@@ -92,8 +105,18 @@ WRITE_KINDS: dict[str, str] = {
     "tasks_create": "task",
 }
 
+#: The modifying task tools behind NC_MCP_TASKS_UPDATE (TMOD-05).
+MODIFY_TOOLS = ("tasks_complete", "tasks_update", "tasks_move")
+
 #: The tools of the tasks bundle: none of their answers may carry the Deck marker (E9).
-TASK_TOOLS = ("tasks_search", "tasks_read", "tasks_create")
+TASK_TOOLS = ("tasks_search", "tasks_read", "tasks_create", *MODIFY_TOOLS)
+
+#: Stands for "the ETag of a tasks_read of this task, made just before the call"; the sweep
+#: replaces it, so the plan stays a plain table and every call carries a current ETag.
+FRESH_ETAG = "<etag of tasks_read>"
+
+#: Any ETag for a call that has to be refused before its first request (a Deck key).
+DECK_ETAG = '"canary-deck"'
 
 #: The write tools that aim at a tagged target and therefore have to refuse.
 MUST_REFUSE = ("files_upload", "files_create_folder", "notes_create", "talk_send")
@@ -162,6 +185,8 @@ def plan(world: cw.World) -> dict[str, list[dict[str, Any]]]:
     fileid = world.fileids["tagged_file"]
     card = f"card:{world.board_id}:{world.stack_id}:{world.card_id}"
     event = f"event:{world.calendar_uri}:{world.event_uid}.ics"
+    deck_task = f"task:{world.deck_calendar_uri}:card-{world.card_id}.ics"
+    home_key = ids.task_list_key(world.task_list_uri)
     return {
         "files_search": [{"query": world.stamm}],
         "files_list": [{"path": world.root}, {"path": world.locked_dir}],
@@ -247,6 +272,23 @@ def plan(world: cw.World) -> dict[str, list[dict[str, Any]]]:
             {"task_id": f"task:{world.deck_calendar_uri}:card-{world.card_id}.ics"},
         ],
         "tasks_create": [{"summary": f"{world.stamm}-neu", "list": world.task_list_name}],
+        # The modifying tools on the task of the world, each with a fresh ETag, and each once
+        # with a Deck key that has to be refused before any request (E9, TMOD-05).
+        "tasks_complete": [
+            {"task_id": world.task_id, "etag": FRESH_ETAG, "completed": True},
+            {"task_id": world.task_id, "etag": FRESH_ETAG, "completed": False},
+            {"task_id": deck_task, "etag": DECK_ETAG, "completed": True},
+        ],
+        "tasks_update": [
+            {"task_id": world.task_id, "etag": FRESH_ETAG, "tags": [f"{world.stamm}-tag"]},
+            {"task_id": deck_task, "etag": DECK_ETAG, "tags": [f"{world.stamm}-tag"]},
+        ],
+        "tasks_move": [
+            {"task_id": world.task_id, "etag": FRESH_ETAG, "list": world.second_list_key},
+            {"task_id": world.moved_task_id, "etag": FRESH_ETAG, "list": home_key},
+            {"task_id": deck_task, "etag": DECK_ETAG, "list": world.second_list_key},
+            {"task_id": world.task_id, "etag": FRESH_ETAG, "list": world.deck_calendar_uri},
+        ],
     }
 
 
@@ -363,6 +405,23 @@ async def call_and_scan(
             f"is_error={[bool(r.is_error) for r in pages]} gebucht={booked} "
             f"befund={[p for p in problems if p]}",
         )
+    if tool in MODIFY_TOOLS:
+        refuse = deck_aimed(world, args)
+        problems = [
+            ("no error" if not r.is_error else "")
+            if refuse
+            else (f"error: {' '.join(surfaces(r))[:160]}" if r.is_error else "")
+            for r in pages
+        ]
+        cw.check(
+            RAW,
+            "AENDERN",
+            tool,
+            case,
+            not any(problems),
+            f"{'abweisung' if refuse else 'echt'} is_error={[bool(r.is_error) for r in pages]} "
+            f"befund={[p for p in problems if p]}",
+        )
     if mode == "normal" and control_expected(world, tool, args):
         seen = any(world.control_marker in s for r in pages for s in surfaces(r))
         cw.check(
@@ -378,6 +437,30 @@ async def call_and_scan(
     return pages
 
 
+def deck_aimed(world: cw.World, args: dict[str, Any]) -> bool:
+    """Whether a modifying call names the Deck calendar, as task or as target list."""
+    deck = world.deck_calendar_uri
+    return deck in str(args.get("task_id") or "") or str(args.get("list") or "") == deck
+
+
+async def with_fresh_etag(world: cw.World, args: dict[str, Any]) -> dict[str, Any]:
+    """``args`` with the ETag of a ``tasks_read`` of its task, made right now."""
+    if args.get("etag") != FRESH_ETAG:
+        return args
+    read = await cw.call("tasks_read", {"task_id": args["task_id"]})
+    etag = payload(read).get("etag")
+    cw.check(
+        RAW,
+        "ETAG",
+        "tasks_read",
+        args_short({"task_id": args["task_id"]}),
+        not read.is_error and isinstance(etag, str) and bool(etag),
+        f"is_error={read.is_error} etag={'da' if etag else 'fehlt'}",
+    )
+    assert world.marker not in str(etag), "the marker is in an ETag"
+    return {**args, "etag": str(etag)}
+
+
 def first_ids(data: dict[str, Any]) -> list[str]:
     results = data.get("results")
     entries: Iterable[Any] = results if isinstance(results, list) else []
@@ -386,6 +469,11 @@ def first_ids(data: dict[str, Any]) -> list[str]:
 
 async def sweep(world: cw.World, mode: str) -> Sweep:
     """Every tool of the registry, every argument set, every page, scanned."""
+    if not config.tasks_update_enabled():
+        pytest.fail(
+            "the canary runs with NC_MCP_TASKS_UPDATE=on (plan 33-09); set it before pytest "
+            "starts, because the server reads it on import"
+        )
     async with Client(mcp) as client:
         listed = await client.list_tools()
     registry = {tool.name for tool in listed.tools}
@@ -397,7 +485,8 @@ async def sweep(world: cw.World, mode: str) -> Sweep:
 
     result = Sweep()
     for tool, sets in calls.items():
-        for args in sets:
+        for planned in sets:
+            args = await with_fresh_etag(world, planned)
             pages = await call_and_scan(world, mode, tool, args, result)
             if tool == "mail_browse" and args.get("level") == "accounts":
                 await _mail_levels(world, mode, pages, result)

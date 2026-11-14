@@ -57,6 +57,14 @@ Tasks are created without naming a list (the test account has one own task list)
 their id with ``tasks_search``, and read twice, with ``tasks_read`` and with ``fetch``; the two
 readers have to agree on id, title and status.
 
+With ``NC_MCP_TASKS_UPDATE=on`` in the environment of this script the server is started with
+it, and the chain goes on with the three modifying task tools: ``tasks_update`` with the ETag
+of ``tasks_read``, ``tasks_complete`` with the ETag that answer handed back, ``tasks_move``
+into the list the task is in (the test account has one own list, so this is the success
+without a relocation; the real relocation between two lists is the canary's), and at the end
+``tasks_update`` once more with the very first ETag, which is stale by then and has to be
+refused. With the switch off the three are named as not registered and are not called.
+
 ``fetch`` is called once per id kind that needs an object of this instance, and every one of
 those ids comes out of a read of the same run: a ``fetch("mail:<number>")`` on a guessed number
 would be a request about somebody's mail, and ``message:`` and ``table:`` are no different. A
@@ -83,6 +91,12 @@ from mcp.client.stdio import stdio_client
 from mcp.types import TextContent
 
 REQUIRED_ENV = ("NC_MCP_URL", "NC_MCP_USER", "NC_MCP_APP_PASSWORD")
+
+#: Switches handed on to the server when they are set here; nothing else of this environment is.
+FORWARDED_SWITCHES = ("NC_MCP_FILES_UPDATE", "NC_MCP_TASKS_UPDATE")
+
+#: The modifying task tools, registered only behind ``NC_MCP_TASKS_UPDATE`` (TMOD-05).
+MODIFY_TASK_TOOLS = ("tasks_update", "tasks_complete", "tasks_move")
 
 #: The one tool of the mail family, called at three levels in a row. The name lives in a
 #: constant because the chain below would otherwise carry the same string five times, and five
@@ -295,7 +309,7 @@ async def run(client: Client, report: Report) -> set[str]:
     )
 
     # --- tasks ------------------------------------------------------------------------
-    await _tasks(client, report, marker)
+    await _tasks(client, report, marker, registered=set(names))
 
     # --- notes ------------------------------------------------------------------------
     created = loads(
@@ -442,7 +456,7 @@ async def run(client: Client, report: Report) -> set[str]:
 TASKS_MORE_THAN_ONE = "more than one task list"
 
 
-async def _tasks(client: Client, report: Report, marker: str) -> None:
+async def _tasks(client: Client, report: Report, marker: str, *, registered: set[str]) -> None:
     """Create a task, find it by its id, read it with ``tasks_read`` and ``fetch``, compare.
 
     ``tasks_create`` names no list on purpose: the account of the test instance holds exactly
@@ -499,6 +513,83 @@ async def _tasks(client: Client, report: Report, marker: str) -> None:
     differing = [f"{name} {left!r} != {right!r}" for name, left, right in pairs if left != right]
     if differing:
         report.add("fetch", "FAIL", f"tasks_read and fetch disagree: {'; '.join(differing)}")
+
+    await _modify_tasks(client, report, marker, task_id, read, registered=registered)
+
+
+async def _modify_tasks(
+    client: Client,
+    report: Report,
+    marker: str,
+    task_id: str,
+    read: dict[str, Any],
+    *,
+    registered: set[str],
+) -> None:
+    """update, complete and move with the ETag chain, then a stale ETag that must be refused.
+
+    Each step takes the ETag the step before handed back, and reads the task again only when
+    an answer carries none. The last call uses the ETag of the very first ``tasks_read``; the
+    task changed three times since, so anything but a refusal is a ``FAIL``.
+    """
+    missing = [tool for tool in MODIFY_TASK_TOOLS if tool not in registered]
+    if missing:
+        for tool in missing:
+            print(f"  {'-':<7} {tool:<22} not registered (switch off)", flush=True)
+        return
+    first_etag = str(read.get("etag") or "")
+    if not first_etag:
+        for tool in MODIFY_TASK_TOOLS:
+            report.add(tool, "FAIL", "tasks_read handed back no etag to change the task with")
+        return
+
+    async def etag_after(answer: dict[str, Any]) -> str:
+        if answer.get("etag"):
+            return str(answer["etag"])
+        again = loads(await call(client, report, "tasks_read", {"task_id": task_id}))
+        return str(again.get("etag") or "")
+
+    updated = loads(
+        await call(
+            client,
+            report,
+            "tasks_update",
+            {"task_id": task_id, "etag": first_etag, "tags": [f"{marker}-tag"]},
+        )
+    )
+    if not updated:
+        return
+    if updated.get("tags") not in (None, [f"{marker}-tag"]):
+        report.add("tasks_update", "FAIL", f"the tag was not set: {updated.get('tags')!r}")
+    completed = loads(
+        await call(
+            client,
+            report,
+            "tasks_complete",
+            {"task_id": task_id, "etag": await etag_after(updated), "completed": True},
+        )
+    )
+    if not completed:
+        return
+    list_name = str((read.get("list") or {}).get("name") or "")
+    moved = loads(
+        await call(
+            client,
+            report,
+            "tasks_move",
+            {"task_id": task_id, "etag": await etag_after(completed), "list": list_name},
+        )
+    )
+    if moved and moved.get("already") is not True:
+        report.add("tasks_move", "FAIL", f"the move into its own list was not a no-op: {moved}")
+
+    stale = await client.call_tool(
+        "tasks_update", {"task_id": task_id, "etag": first_etag, "tags": [f"{marker}-alt"]}
+    )
+    if stale.is_error:
+        report.add("tasks_update", "OK", f"stale etag refused: {text_of(stale)}")
+    else:
+        report.add("tasks_update", "FAIL", f"a stale etag was accepted: {text_of(stale)}")
 
 
 def _writable_tables(payload: dict[str, Any]) -> list[str]:
@@ -745,7 +836,11 @@ async def main() -> int:
     parameters = StdioServerParameters(
         command=command,
         args=[],
-        env={name: os.environ[name] for name in REQUIRED_ENV},
+        env={
+            name: os.environ[name]
+            for name in (*REQUIRED_ENV, *FORWARDED_SWITCHES)
+            if name in os.environ
+        },
     )
 
     print(f"starting {command} over stdio against {os.environ['NC_MCP_URL']}\n")

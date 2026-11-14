@@ -50,6 +50,8 @@ def test_the_ci_step_of_the_gates_sets_the_switch() -> None:
     assert len(gate_steps) == 1, "exactly one CI step runs the canary"
     step = gate_steps[0]
     assert f'{cw.ENV_REQUIRE_LIVE}: "1"' in step
+    # Plan 33-09: the canary calls the modifying task tools, which register only behind it.
+    assert 'NC_MCP_TASKS_UPDATE: "on"' in step
     assert "test_pair_equality_live.py" in step
     assert "test_provider_classes_live.py" in step
 
