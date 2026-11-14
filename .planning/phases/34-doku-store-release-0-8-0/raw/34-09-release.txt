@@ -1,0 +1,2 @@
+PRUEFUNG vor=push-main bereich=origin/main..HEAD commits=334 autor_committer_fremd=0 trailer=0 closes_woerter=0
+  origin/main a91ae39; 333 Commits bis zum Freigabe-Commit geprüft, dieser Protokoll-Commit ist der 334. und wurde nach dem Commit erneut geprüft. Positivkontrolle ("Co-Authored-By: a", "resolved #3"): 2 Treffer. HEAD..origin/main = 0.
