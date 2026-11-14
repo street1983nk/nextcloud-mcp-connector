@@ -1,0 +1,6 @@
+DOWNLOAD groesse=62491 sha256=88ded7c3ab7a500c061a9cd9510498e3e74af499c9195bffa756a528a4da05cd
+SIGNATUR verify=Verified OK groesse=512
+  Gegenprobe: dasselbe Archiv mit einem angehängten Byte ergibt "Verification failure" (Exit 1).
+SIG-UPLOAD ja
+SUBMIT weg=workflow run=43578762697 http=201 datum=2026-11-14
+  store-submit.yml in street1983nk/nextcloud-search, direkter Modus; die Download-URL liefert dieselben Bytes wie das signierte Archiv (cmp). Store-Seite apps.nextcloud.com/apps/mcp_connector nennt 0.8.0.
