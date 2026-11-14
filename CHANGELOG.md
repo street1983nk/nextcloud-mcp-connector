@@ -47,6 +47,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Tasks app. Like `tasks_read`, `fetch` marks a cut description and a time without a zone.
 - Measured on Nextcloud 32 and 35 under AppAPI impersonation, see
   `docs/tasks-evidence.md`.
+- Three tools that change existing tasks, behind the new admin switch
+  `NC_MCP_TASKS_UPDATE` ("Allow changing existing tasks"), off by default:
+  `tasks_complete` completes or reopens a task, `tasks_update` changes its fields,
+  `tasks_move` moves it with its subtasks into another list. All three belong to the
+  `tasks` bundle.
+- `tasks_read` returns the task's ETag, and each of the three works only with it; a stale
+  ETag is refused. Recurring tasks are refused.
 
 ### Fixed
 

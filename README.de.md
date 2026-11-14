@@ -53,6 +53,12 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
   `NC_MCP_FILES_UPDATE`, ersetzt `files_update` eine bestehende UTF-8-Textdatei nur dann, wenn
   ihr ETag dem zuvor gelesenen Wert entspricht; geänderte oder gelöschte Dateien werden
   abgelehnt, und der Versionsverlauf hängt vom Speicher-Backend ab
+- Bestehende Aufgaben bleiben unverändert, solange der Admin den Schalter
+  "Bestehende Aufgaben ändern erlauben" (`NC_MCP_TASKS_UPDATE`) nicht einschaltet: Ab Werk aus.
+  Ist der Schalter an, können Assistenten bestehende Aufgaben mit `tasks_complete`,
+  `tasks_update` und `tasks_move` abhaken, wieder öffnen, ändern und verschieben, und zwar nur
+  mit dem ETag, das `tasks_read` geliefert hat. Eine Änderung wirkt, nachdem die App aus- und
+  wieder eingeschaltet wurde.
 - Kein Verschieben, kein Umbenennen, keine Änderung von Freigaben oder Berechtigungen
 - Mail ist strikt lesend: kein Senden, kein Entwurf, kein Verschieben, kein Markieren, kein
   Löschen, kein Anhang-Download
@@ -66,7 +72,10 @@ liest die Module und wird beim ersten zerstörenden Aufruf rot,
 ## Tools
 
 **read** heißt, das Tool liest nur, **create-only** heißt, es kann neue Objekte anlegen, aber
-bestehende nie ändern oder entfernen. Die Tabelle wird nicht von Hand gepflegt: Ein
+bestehende nie ändern oder entfernen, **conditional-update** heißt, es ersetzt ein bestehendes
+Objekt nur, solange dessen ETag noch passt, und **modify** heißt, es ändert eine bestehende
+Aufgabe, nur mit dem ETag aus `tasks_read` und nur, wenn der Admin es einschaltet. Die Tabelle
+wird nicht von Hand gepflegt: Ein
 Contract-Test liest die laufende Registry und wird rot, sobald ein Name oder eine Stufe
 abweicht.
 
@@ -144,7 +153,8 @@ Satz beantwortet, nie mit einem leeren Ergebnis.
   - `search`: `unified_search`
   - `tables`: `tables_browse`, `tables_create_row`
   - `talk`: `talk_browse`, `talk_send`
-  - `tasks`: `tasks_search`, `tasks_read`, `tasks_create`
+  - `tasks`: `tasks_search`, `tasks_read`, `tasks_create` sowie `tasks_complete`,
+    `tasks_update`, `tasks_move` (nur wenn aktiviert)
 - Ein unbekannter Name oder alle Namen auf einmal stoppen den Server beim Start mit einer
   Meldung, die die gültigen Namen auflistet.
 - Keine Zugriffskontrolle: `search`, `fetch` und `prepare_context` erreichen weiterhin die

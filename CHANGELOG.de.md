@@ -51,6 +51,13 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
   Beschreibung und eine Zeit ohne Zeitzone.
 - Gemessen auf Nextcloud 32 und 35 unter AppAPI-Impersonation, siehe
   `docs/tasks-evidence.md`.
+- Drei Werkzeuge, die bestehende Aufgaben ändern, hinter dem neuen Admin-Schalter
+  `NC_MCP_TASKS_UPDATE` ("Bestehende Aufgaben ändern erlauben"), ab Werk aus:
+  `tasks_complete` hakt eine Aufgabe ab oder öffnet sie wieder, `tasks_update` ändert ihre
+  Felder, `tasks_move` verschiebt sie samt Unteraufgaben in eine andere Liste. Alle drei
+  gehören zum Bundle `tasks`.
+- `tasks_read` liefert das ETag der Aufgabe, und jedes der drei Werkzeuge arbeitet nur mit
+  ihm; ein veraltetes ETag wird abgelehnt. Wiederkehrende Aufgaben werden abgelehnt.
 
 ### Behoben
 

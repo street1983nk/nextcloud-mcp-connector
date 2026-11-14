@@ -54,6 +54,12 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
   active `NC_MCP_FILES_UPDATE`, `files_update` ne remplace un fichier texte UTF-8 existant
   que si son ETag correspond à la valeur lue auparavant ; les fichiers modifiés ou supprimés
   sont refusés, et l’historique des versions dépend du backend de stockage
+- Les tâches existantes restent inchangées tant que l’administrateur n’active pas
+  l’interrupteur « Autoriser la modification des tâches existantes » (`NC_MCP_TASKS_UPDATE`) :
+  Désactivé par défaut. Activé, les assistants peuvent cocher, rouvrir, modifier et déplacer
+  des tâches existantes avec `tasks_complete`, `tasks_update` et `tasks_move`, et uniquement
+  avec l'ETag renvoyé par `tasks_read`. Le changement prend effet après avoir désactivé puis
+  réactivé l'application.
 - Aucun déplacement, aucun renommage, aucune modification de partage ni de permission
 - Mail est strictement en lecture seule : aucun envoi, aucun brouillon, aucun déplacement,
   aucun marquage, aucune suppression, aucun téléchargement de pièce jointe
@@ -69,7 +75,10 @@ contrat lit les modules et échoue au premier appel destructeur,
 ## Outils
 
 **read** signifie que l'outil ne fait que lire, **create-only** signifie qu'il peut créer de
-nouveaux objets mais ne modifie ni ne supprime jamais ceux qui existent. Le tableau n'est pas
+nouveaux objets mais ne modifie ni ne supprime jamais ceux qui existent, **conditional-update**
+signifie qu'il ne remplace un objet existant que si son ETag correspond encore, et **modify**
+signifie qu'il modifie une tâche existante, uniquement avec l'ETag de `tasks_read` et
+seulement si l'admin l'active. Le tableau n'est pas
 maintenu à la main : un test de contrat lit le registre en cours d'exécution et échoue dès
 qu'un nom ou un niveau diverge.
 
@@ -88,7 +97,7 @@ qu'un nom ou un niveau diverge.
 | `tasks_search` | read | Par défaut les tâches ouvertes, des listes de tâches propres et partagées ; 25 par page |
 | `tasks_read` | read | Une tâche avec sa description (tronquée) et ses sous-tâches directes |
 | `tasks_create` | create-only | Une nouvelle tâche ; sans `list` seulement s'il existe exactement une liste propre et que personne d'autre ne la voit, jamais dans une liste que d'autres voient sauf si elle est nommée |
-| `tasks_complete` | modify | Marque une tâche comme terminée ou la rouvre, uniquement avec l'ETag de `tasks_read` ; en la terminant, ses sous-tâches sont terminées d'abord, les tâches récurrentes sont refusées ; disponible seulement si l'admin active `NC_MCP_TASKS_UPDATE` |
+| `tasks_complete` | modify | Marque une tâche comme terminée ou la rouvre, uniquement avec l'ETag de `tasks_read` ; si elle est terminée, ses sous-tâches le sont d'abord, les tâches récurrentes sont refusées ; disponible seulement si l'admin active `NC_MCP_TASKS_UPDATE` |
 | `tasks_update` | modify | Modifie ou efface les champs nommés d'une tâche (titre, description, échéance, début, priorité, étiquettes, tâche parente), uniquement avec l'ETag de `tasks_read` ; toutes les autres lignes de la tâche restent telles quelles, les tâches récurrentes sont refusées ; disponible seulement si l'admin active `NC_MCP_TASKS_UPDATE` |
 | `tasks_move` | modify | Déplace une tâche avec ses sous-tâches dans une liste nommée accessible en écriture, uniquement avec l'ETag de `tasks_read` ; les sous-tâches sont déplacées d'abord, un nom ou un UID déjà pris dans la liste cible n'est jamais écrasé, les tableaux Deck ne sont jamais une cible, les tâches récurrentes sont refusées ; disponible seulement si l'admin active `NC_MCP_TASKS_UPDATE` |
 | `notes_search` | read | Des notes par titre et contenu, via le fournisseur de recherche de notes Nextcloud |
@@ -150,7 +159,8 @@ manquante reçoit une réponse en une phrase, jamais un résultat vide.
   - `search` : `unified_search`
   - `tables` : `tables_browse`, `tables_create_row`
   - `talk` : `talk_browse`, `talk_send`
-  - `tasks` : `tasks_search`, `tasks_read`, `tasks_create`
+  - `tasks` : `tasks_search`, `tasks_read`, `tasks_create` et `tasks_complete`,
+    `tasks_update`, `tasks_move` (seulement si activé)
 - Un nom inconnu, ou tous les noms à la fois, arrête le serveur au démarrage avec un message
   qui énumère les noms valides.
 - Ce n'est pas un contrôle d'accès : `search`, `fetch` et `prepare_context` atteignent toujours

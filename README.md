@@ -44,6 +44,11 @@ You bring the model, and no content leaves your server.
   `NC_MCP_FILES_UPDATE`, `files_update` can replace an existing UTF-8 text file only when its
   ETag matches the value read earlier; stale or deleted files are rejected. Version history
   depends on the Nextcloud storage backend.
+- Existing tasks stay unchanged unless the admin turns on the switch
+  "Allow changing existing tasks" (`NC_MCP_TASKS_UPDATE`): Off by default. When on, assistants
+  can complete, reopen, edit and move existing tasks with `tasks_complete`, `tasks_update` and
+  `tasks_move`, and only with the ETag returned by `tasks_read`. A change takes effect after
+  you disable and enable this app again.
 - No user-visible moving or renaming, no share changes and no permission changes; binary
   uploads use Nextcloud's private chunk assembly and still refuse an existing destination
 - Mail is strictly read only: no sending, no draft, no move, no flag, no delete, and no
@@ -58,8 +63,10 @@ modules and fails on the first destructive call,
 ## Tools
 
 **read** means the tool only reads, **create-only** means it can create new objects but never
-modifies or removes existing ones. The table is not maintained by hand: a contract test reads
-the live registry and fails if a name or a level disagrees with it.
+modifies or removes existing ones, **conditional-update** means it replaces an existing object
+only when its ETag still matches, and **modify** means it changes an existing task, only with
+the ETag from `tasks_read` and only when the admin enables it. The table is not maintained by
+hand: a contract test reads the live registry and fails if a name or a level disagrees with it.
 
 | Tool | Permission | What it does |
 |------|------------|--------------|
@@ -133,7 +140,8 @@ missing app is answered in one sentence, never with an empty result.
   - `search`: `unified_search`
   - `tables`: `tables_browse`, `tables_create_row`
   - `talk`: `talk_browse`, `talk_send`
-  - `tasks`: `tasks_search`, `tasks_read`, `tasks_create`
+  - `tasks`: `tasks_search`, `tasks_read`, `tasks_create`, and `tasks_complete`,
+    `tasks_update`, `tasks_move` (only when enabled)
 - An unknown name, or every name at once, stops the server at start with a message that
   lists the valid names.
 - Not an access control: `search`, `fetch` and `prepare_context` still reach the content
