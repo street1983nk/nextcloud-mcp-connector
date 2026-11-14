@@ -69,10 +69,10 @@ la plus tentante de la configuration de ce serveur.
 Un courriel ou un message Talk est écrit par quelqu'un d'autre, un document ou
 une tâche d'une liste partagée peut l'être aussi, et un modèle de langage ne
 sépare pas de façon fiable les données des instructions. Aucune défense
-complète n'est connue. Ce serveur borne le dégât à la place :
+complète n'est connue. Ce serveur limite plutôt les dégâts :
 
 - aucun outil ne supprime quoi que ce soit, pas même une tâche, et aucun ne
-  renomme ni ne modifie des partages ou des droits ; seul `tasks_move`
+  renomme quoi que ce soit ni ne modifie les partages ou les droits ; seul `tasks_move`
   déplace, et uniquement une tâche avec ses sous-tâches ; `files_upload` ne
   fait que créer,
 - toute modification d'un élément existant passe par un interrupteur

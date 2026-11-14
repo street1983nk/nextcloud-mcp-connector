@@ -54,7 +54,7 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
   werden abgelehnt. Der Versionsverlauf hängt vom Speicher-Backend von Nextcloud ab.
 - Bestehende Aufgaben bleiben unverändert, solange der Admin den Schalter
   "Bestehende Aufgaben ändern erlauben" (in der Oberfläche englisch "Allow changing existing
-  tasks", `NC_MCP_TASKS_UPDATE`) nicht einschaltet: Ab Werk aus.
+  tasks", `NC_MCP_TASKS_UPDATE`) nicht einschaltet; ab Werk ist er aus.
   Ist der Schalter an, können Assistenten jeweils eine Aufgabe ändern, und zwar nur mit dem
   ETag, das `tasks_read` geliefert hat: `tasks_complete` hakt sie ab (zuerst ihre
   Unteraufgaben) oder öffnet sie wieder, `tasks_update` ändert Titel, Beschreibung,

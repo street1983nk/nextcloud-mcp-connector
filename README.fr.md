@@ -56,7 +56,8 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
 - Les tâches existantes restent inchangées tant que l'administrateur n'active pas
   l'interrupteur « Autoriser la modification des tâches existantes » (en anglais dans
   l'interface : « Allow changing existing tasks », `NC_MCP_TASKS_UPDATE`) :
-  Désactivé par défaut. Activé, les assistants peuvent modifier une tâche à la fois, et
+  désactivé par défaut. Une fois l'interrupteur activé, les assistants peuvent modifier
+  une tâche à la fois, et
   uniquement avec l'ETag renvoyé par `tasks_read` : `tasks_complete` la coche (d'abord ses
   sous-tâches) ou la rouvre, `tasks_update` modifie son titre, sa description, son échéance,
   sa date de début, sa priorité, ses étiquettes ou sa tâche parente, et `tasks_move` la
@@ -65,7 +66,7 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
   l'administrateur change l'interrupteur avec
   `occ app_api:app:config:set mcp_connector tasks_update --value on --update-only`, voir
   [docs/exapp-install.md](docs/exapp-install.md#write-switches). Un changement de
-  l'interrupteur prend effet après avoir désactivé puis réactivé l'application.
+  l'interrupteur prend effet une fois l'application désactivée puis réactivée.
 - Aucun déplacement ni renommage de fichiers, de dossiers ou d'autres objets ; la seule
   exception est `tasks_move` pour une seule tâche lorsque `NC_MCP_TASKS_UPDATE` est activé.
   Aucune modification de partage ni de permission ; les fichiers binaires passent par
