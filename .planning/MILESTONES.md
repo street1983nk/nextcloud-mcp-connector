@@ -4,7 +4,7 @@
 
 **Phases completed:** 5 phases (30 bis 34), 50 plans, 163 tasks
 **Umfang:** 364 Commits (davon ein Merge von main mit 0.7.3), 373 Dateien, +92.674/-541 Zeilen, 2026-10-28 bis 2026-11-14 (18 Tage; gezählt ab ddb3602, dem Commit, der v1.8 aufsetzte, bis 442fc83)
-**Endstand:** 8217 Unit- und Contract-Tests grün (35 skipped) auf dem Baum des Tags v0.8.0, dazu ruff, pyright 0, vulture und Budget (18770 Bytes für 27 Werkzeuge im Standard, 22198 für 31 mit allen Schaltern an, Budget 26000, kein Werkzeug über 1400); Phasen 31, 32 und 33 goal-backward verifiziert (passed), Phase 34 mit 48/48 must-haves (human_needed nur für eine Runbook-Zeile, keine Lücke im Ziel), Phase 30 als Mess-Spike mit Messbericht docs/spike-tasks.md statt Verifikation; CI auf main 00525cb grün: CI-Lauf 43580117707 (unit, exapp, integration, canary-nc35, image), Security 43580117724, Scorecard 43580117713; vor dem Tag CI-Lauf 43577902065 grün
+**Endstand:** 8217 Unit- und Contract-Tests grün (35 skipped) auf dem Baum des Tags v0.8.0, dazu ruff, pyright 0, vulture und Budget (18770 Bytes für 27 Werkzeuge im Standard, 22198 für 31 mit allen Schaltern an, Budget 26000, kein Werkzeug über 1400); Phasen 31, 32 und 33 goal-backward verifiziert (passed), Phase 34 mit 48/48 must-haves passed (die eine Runbook-Zeile auf Owner-Wort nachgezogen, 1d2914f), Phase 30 als Mess-Spike mit Messbericht docs/spike-tasks.md statt Verifikation; CI auf main 00525cb grün: CI-Lauf 43580117707 (unit, exapp, integration, canary-nc35, image), Security 43580117724, Scorecard 43580117713; vor dem Tag CI-Lauf 43577902065 grün
 
 **Key accomplishments:**
 

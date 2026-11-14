@@ -900,7 +900,6 @@ Items acknowledged and deferred at milestone close on 2026-11-14 (v1.8):
 | follow_up | Tag-Alias `no-ai` neben `kein-ki` | eigene kleine Phase nach 0.8.0, Schreibweise beim Owner erfragen | v1.8-Abschluss |
 | follow_up | Audit-Grund "unspecified" bei veraltetem ETag | offen aus 34-11 | v1.8-Abschluss |
 | follow_up | Forum-Post zu 0.8.0 | zurückgestellt, bis PII Redaction und Audio & Video Search fertig sind; der Owner postet | v1.8-Abschluss |
-| follow_up | Runbook-Zeile Schritt 8 in docs/store-submission.md nennt die Katalog-Nachmessung noch offen | Fakt geschlossen (raw/34-11-nachweise.txt, Katalog 0.8.0), Textnachtrag beim nächsten Runbook-Eintrag (34-VERIFICATION human_needed) | v1.8-Abschluss |
 
 ## Quick Tasks Completed
 
