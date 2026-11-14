@@ -1,0 +1,182 @@
+Rohprotokoll Plan 33-11: erster tasks_search nach kaltem Neustart, je Liste gemessen (Gap Closure zu 33-10 Lauf 1)
+BASIS 72625e4d31749105ab0f9ba026d031e1a42ddb0f
+FREIGABE kaltstart=ja datum=2026-11-14 umfang=nc35+nc32
+    Owner-Freigabe vom 14.11.2026 per AskUserQuestion ("Ja"), übermittelt durch die Hauptsitzung: auf nc32 und nc35
+    vorübergehend eine Testliste von bob, nur lesbar an alice geteilt; Container mehrmals neu starten; vollständiger
+    Rückbau, BASELINE vorher gleich nachher. Nicht freigegeben und nicht getan: Tasks-App installieren, weitere Listen,
+    Gruppenfreigaben, Neuregistrierung der ExApp.
+Messprogramm scripts/tasks_coldstart.py (Helfer aus scripts/tasks_measure.py). Kopf der Impersonation = registrierte
+    Version 0.7.2 (info.xml steht seit dem Merge f464455 auf 0.7.3); so bleibt die Registrierung unverändert.
+Zyklusarten: wahr = Produktsuche mit Messbudget 60 s (echte Dauer je Liste); produkt = Budget unverändert 2 s;
+    parallel7 = Produkt-Discovery, dann 7 gleichzeitige REPORTs der ro-Liste (Last der 7 Listen aus Lauf 1).
+    Je kaltem Zyklus vorher: docker restart des Nextcloud-Containers, warten auf status.php 200 und occ status.
+    Dauer je Anfrage inklusive Körper, im Transport gemessen; Rollen home/ro/eigen, nie die URI der geteilten Liste.
+Docker-Gate vor jedem Block: docker ps leer (kein fremder Container, kein avs-*), RAM siehe Zeilen RAM.
+Geheimnis-Scan (scripts/tasks_measure.py scan, beide Env-Dateien): Treffer nur auf APP_ID, APP_VERSION und die
+    Kontonamen alice/bob (keine Geheimnisse, wie in allen Rohprotokollen der Phase); kein Treffer auf APP_SECRET,
+    Passwörter oder Schlüssel; der Scan von write_protocol (Geheimnisse) war sauber.
+
+# tasks_coldstart.py up 2026-11-14T05:13:27Z
+
+== up nc35 ==
+RAM frei_host_gb=4.97 schwelle=4.0 ergebnis=ok
+(no running container)
+docker start nc35-nc -> nc35-nc
+docker start nc35-harp -> nc35-harp
+docker start nc35-caddy -> nc35-caddy
+nc35-nc: installed (attempt 1)
+# tasks_coldstart.py run 2026-11-14T05:13:37Z
+
+== kaltstart nc35 zyklen=9, start 2026-11-14T05:13:37Z ==
+EXAPP nc35 info_xml=0.7.3 kopf=0.7.2 registriert=mcp_connector (MCP Connector): 0.7.2 [enabled]
+VERSION nc35 nc=35.0.0.10
+TASKSAPP nc35 zustand=keine (unveraendert)
+KONTROLLE impersonation status=200 gleich=ja
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+SETUP MKCALENDAR liste=p3311-ro status=201
+SETUP PUT aufgabe liste=ro status=201
+SETUP FREIGABE ro an=alice nur_lesen=ja status=200
+KONTROLLE warm budget_s=2 gesamt_ms=100 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=47 home:n=1,status=207,max_ms=45 ro:n=1,status=207,max_ms=48
+GEGENPROBE ro_gehalten_s=3 budget_s=2 gesamt_ms=2050 ro_gelistet=ja ro_treffer=nein status_5xx=0 degraded=p3311-ro=The task list did not answer within 2 seconds. verweigert=nein | eigen:n=1,status=207,max_ms=31 home:n=1,status=207,max_ms=37 ro:n=1,status=abgebrochen,max_ms=2011
+GEGENPROBE erkannt=ja degraded_nennt_ro=ja
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+KALT nc35 zyklus=1 art=wahr budget_s=60 gesamt_ms=381 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=58 home:n=1,status=207,max_ms=310 ro:n=1,status=207,max_ms=68
+WARM nc35 zyklus=1 budget_s=2 gesamt_ms=90 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=37 home:n=1,status=207,max_ms=50 ro:n=1,status=207,max_ms=37
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+KALT nc35 zyklus=2 art=produkt budget_s=2 gesamt_ms=431 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=111 home:n=1,status=207,max_ms=318 ro:n=1,status=207,max_ms=78
+WARM nc35 zyklus=2 budget_s=2 gesamt_ms=90 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=38 home:n=1,status=207,max_ms=50 ro:n=1,status=207,max_ms=35
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+KALT nc35 zyklus=3 art=parallel7 gesamt_ms=561 ro_gelistet=ja listen=2 status_5xx=0 | home:n=1,status=207,max_ms=365 ro:n=7,status=207,max_ms=193
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+KALT nc35 zyklus=4 art=wahr budget_s=60 gesamt_ms=480 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=74 home:n=1,status=207,max_ms=387 ro:n=1,status=207,max_ms=90
+WARM nc35 zyklus=4 budget_s=2 gesamt_ms=113 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=47 home:n=1,status=207,max_ms=61 ro:n=1,status=207,max_ms=48
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+KALT nc35 zyklus=5 art=produkt budget_s=2 gesamt_ms=570 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=110 home:n=1,status=207,max_ms=446 ro:n=1,status=207,max_ms=120
+WARM nc35 zyklus=5 budget_s=2 gesamt_ms=140 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=62 home:n=1,status=207,max_ms=73 ro:n=1,status=207,max_ms=62
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+KALT nc35 zyklus=6 art=parallel7 gesamt_ms=693 ro_gelistet=ja listen=2 status_5xx=0 | home:n=1,status=207,max_ms=311 ro:n=7,status=207,max_ms=377
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+KALT nc35 zyklus=7 art=wahr budget_s=60 gesamt_ms=486 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=69 home:n=1,status=207,max_ms=397 ro:n=1,status=207,max_ms=85
+WARM nc35 zyklus=7 budget_s=2 gesamt_ms=122 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=54 home:n=1,status=207,max_ms=66 ro:n=1,status=207,max_ms=51
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+KALT nc35 zyklus=8 art=produkt budget_s=2 gesamt_ms=464 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=69 home:n=1,status=207,max_ms=369 ro:n=1,status=207,max_ms=81
+WARM nc35 zyklus=8 budget_s=2 gesamt_ms=106 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=44 home:n=1,status=207,max_ms=58 ro:n=1,status=207,max_ms=45
+docker restart nc35-nc -> nc35-nc
+nc35-nc: installed (attempt 1)
+KALT nc35 zyklus=9 art=parallel7 gesamt_ms=559 ro_gelistet=ja listen=2 status_5xx=0 | home:n=1,status=207,max_ms=316 ro:n=7,status=207,max_ms=238
+
+== rueckbau nc35 ==
+RUECKBAU freigabe_entfernt liste=ro status=200
+PAPIERKORB nc35 konto=alice gefunden=0 geleert=0
+RUECKBAU reste konto=alice listen_mit_praefix=0
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+PAPIERKORB nc35 konto=bob gefunden=0 geleert=0
+RUECKBAU reste konto=bob listen_mit_praefix=0
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc35 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE-VERGLEICH nc35 konto=alice gleich=ja
+BASELINE-VERGLEICH nc35 konto=bob gleich=ja
+BASELINE-VERGLEICH nc35 konto=p3202frisch gleich=ja
+BASELINE-VERGLEICH nc35 konto=p3202nie gleich=ja
+# tasks_coldstart.py stop 2026-11-14T05:14:40Z
+
+== stop nc35 ==
+docker stop nc35-nc -> nc35-nc | laeuft=false
+docker stop nc35-harp -> nc35-harp | laeuft=false
+docker stop nc35-caddy -> nc35-caddy | laeuft=false
+
+# tasks_coldstart.py up 2026-11-14T05:14:49Z
+
+== up nc32 ==
+RAM frei_host_gb=4.50 schwelle=4.0 ergebnis=ok
+(no running container)
+docker start nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+docker start nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy
+nc-mcp-exapp-nc: installed (attempt 1)
+# tasks_coldstart.py run 2026-11-14T05:14:53Z
+
+== kaltstart nc32 zyklen=9, start 2026-11-14T05:14:53Z ==
+EXAPP nc32 info_xml=0.7.3 kopf=0.7.2 registriert=mcp_connector (MCP Connector): 0.7.2 [enabled]
+VERSION nc32 nc=32.0.15.1
+TASKSAPP nc32 zustand=keine (unveraendert)
+KONTROLLE impersonation status=200 gleich=ja
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc32 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+SETUP MKCALENDAR liste=p3311-ro status=201
+SETUP PUT aufgabe liste=ro status=201
+SETUP FREIGABE ro an=alice nur_lesen=ja status=200
+KONTROLLE warm budget_s=2 gesamt_ms=132 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=66 home:n=1,status=207,max_ms=58 ro:n=1,status=207,max_ms=66
+GEGENPROBE ro_gehalten_s=3 budget_s=2 gesamt_ms=2109 ro_gelistet=ja ro_treffer=nein status_5xx=0 degraded=p3311-ro=The task list did not answer within 2 seconds. verweigert=nein | eigen:n=1,status=207,max_ms=42 home:n=1,status=207,max_ms=104 ro:n=1,status=abgebrochen,max_ms=2002
+GEGENPROBE erkannt=ja degraded_nennt_ro=ja
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+KALT nc32 zyklus=1 art=wahr budget_s=60 gesamt_ms=449 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=68 home:n=1,status=207,max_ms=351 ro:n=1,status=207,max_ms=93
+WARM nc32 zyklus=1 budget_s=2 gesamt_ms=158 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=49 home:n=1,status=207,max_ms=81 ro:n=1,status=207,max_ms=67
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+KALT nc32 zyklus=2 art=produkt budget_s=2 gesamt_ms=394 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=60 home:n=1,status=207,max_ms=293 ro:n=1,status=207,max_ms=96
+WARM nc32 zyklus=2 budget_s=2 gesamt_ms=107 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=55 home:n=1,status=207,max_ms=49 ro:n=1,status=207,max_ms=46
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+KALT nc32 zyklus=3 art=parallel7 gesamt_ms=477 ro_gelistet=ja listen=2 status_5xx=0 | home:n=1,status=207,max_ms=333 ro:n=7,status=207,max_ms=136
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+KALT nc32 zyklus=4 art=wahr budget_s=60 gesamt_ms=307 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=37 home:n=1,status=207,max_ms=249 ro:n=1,status=207,max_ms=55
+WARM nc32 zyklus=4 budget_s=2 gesamt_ms=84 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=32 home:n=1,status=207,max_ms=43 ro:n=1,status=207,max_ms=38
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+KALT nc32 zyklus=5 art=produkt budget_s=2 gesamt_ms=362 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=52 home:n=1,status=207,max_ms=282 ro:n=1,status=207,max_ms=76
+WARM nc32 zyklus=5 budget_s=2 gesamt_ms=119 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=42 home:n=1,status=207,max_ms=53 ro:n=1,status=207,max_ms=62
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+KALT nc32 zyklus=6 art=parallel7 gesamt_ms=494 ro_gelistet=ja listen=2 status_5xx=0 | home:n=1,status=207,max_ms=306 ro:n=7,status=207,max_ms=182
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+KALT nc32 zyklus=7 art=wahr budget_s=60 gesamt_ms=301 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=36 home:n=1,status=207,max_ms=248 ro:n=1,status=207,max_ms=50
+WARM nc32 zyklus=7 budget_s=2 gesamt_ms=85 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=33 home:n=1,status=207,max_ms=45 ro:n=1,status=207,max_ms=38
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+KALT nc32 zyklus=8 art=produkt budget_s=2 gesamt_ms=308 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=36 home:n=1,status=207,max_ms=253 ro:n=1,status=207,max_ms=53
+WARM nc32 zyklus=8 budget_s=2 gesamt_ms=82 ro_gelistet=ja ro_treffer=ja status_5xx=0 degraded=keine verweigert=nein | eigen:n=1,status=207,max_ms=33 home:n=1,status=207,max_ms=44 ro:n=1,status=207,max_ms=36
+docker restart nc-mcp-exapp-nc -> nc-mcp-exapp-nc
+nc-mcp-exapp-nc: installed (attempt 1)
+KALT nc32 zyklus=9 art=parallel7 gesamt_ms=538 ro_gelistet=ja listen=2 status_5xx=0 | home:n=1,status=207,max_ms=250 ro:n=7,status=207,max_ms=283
+
+== rueckbau nc32 ==
+RUECKBAU freigabe_entfernt liste=ro status=200
+PAPIERKORB nc32 konto=alice gefunden=0 geleert=0
+RUECKBAU reste konto=alice listen_mit_praefix=0
+RUECKBAU liste_geloescht konto=bob status=204 no_trashbin=1
+PAPIERKORB nc32 konto=bob gefunden=0 geleert=0
+RUECKBAU reste konto=bob listen_mit_praefix=0
+BASELINE nc32 konto=alice calendars=1 objekte=3 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=p3202frisch calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE nc32 konto=p3202nie calendars=0 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher
+BASELINE-VERGLEICH nc32 konto=alice gleich=ja
+BASELINE-VERGLEICH nc32 konto=bob gleich=ja
+BASELINE-VERGLEICH nc32 konto=p3202frisch gleich=ja
+BASELINE-VERGLEICH nc32 konto=p3202nie gleich=ja
+# tasks_coldstart.py stop 2026-11-14T05:16:36Z
+
+== stop nc32 ==
+docker stop nc-mcp-exapp-nc -> nc-mcp-exapp-nc | laeuft=false
+docker stop nc-mcp-exapp-caddy -> nc-mcp-exapp-caddy | laeuft=false
+
+DOCKER nachher laufend=   (docker ps leer)
+PROZESS nc-mcp-exapp lokal=keiner port_23001=frei (in dieser Sitzung nie gestartet)
