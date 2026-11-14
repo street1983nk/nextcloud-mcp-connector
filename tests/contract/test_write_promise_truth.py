@@ -16,11 +16,15 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+from lxml import etree
+
+from mcp_connector.nextcloud.clients.xml import hardened_parser
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -233,3 +237,72 @@ def test_counter_check_a_section_without_the_task_tools_is_reported() -> None:
 def test_counter_check_an_unknown_modifying_tool_has_no_switch() -> None:
     with pytest.raises(AssertionError):
         switch_of("contacts_update")
+
+
+# The store descriptions of appinfo/info.xml (EXAPP-13, plan 34-05): the delete limit names
+# tasks, and a point that denies moving names the task as its one exception. Matched case
+# insensitively, because German writes "Löschen" as a noun at the start of a clause.
+
+#: lang attribute, word for task, stem for deleting, pattern for a point about moving.
+STORE_LANGS = [
+    (None, "task", "delet", re.compile(r"\bmov(?:e|es|ed|ing)\b")),
+    ("de", "aufgabe", "lösch", re.compile(r"verschieb")),
+    ("fr", "tâche", "suppr", re.compile(r"déplac")),
+]
+STORE_IDS = ["en", "de", "fr"]
+
+
+def store_description(lang: str | None) -> str:
+    root = etree.fromstring((ROOT / "appinfo" / "info.xml").read_bytes(), hardened_parser())
+    found = [
+        child.text or ""
+        for child in root
+        if child.tag == "description" and child.get("lang") == lang
+    ]
+    assert len(found) == 1, f"expected one store description for {lang or 'en'}"
+    return found[0]
+
+
+def store_delete_problems(text: str, task_word: str, delete_stem: str) -> list[str]:
+    """No point names deleting together with tasks."""
+    if any(task_word in p.casefold() and delete_stem in p.casefold() for p in points(text)):
+        return []
+    return [f"no point names {delete_stem!r} together with {task_word!r}"]
+
+
+def store_move_problems(text: str, task_word: str, move: re.Pattern[str]) -> list[str]:
+    """Points that speak about moving without naming the task as the exception."""
+    return [p for p in points(text) if move.search(p.casefold()) and task_word not in p.casefold()]
+
+
+@pytest.mark.parametrize(("lang", "task_word", "delete_stem", "move"), STORE_LANGS, ids=STORE_IDS)
+def test_the_store_description_names_the_task_delete_limit(
+    lang: str | None, task_word: str, delete_stem: str, move: re.Pattern[str]
+) -> None:
+    assert store_delete_problems(store_description(lang), task_word, delete_stem) == []
+
+
+@pytest.mark.parametrize(("lang", "task_word", "delete_stem", "move"), STORE_LANGS, ids=STORE_IDS)
+def test_every_store_point_about_moving_names_the_task_exception(
+    lang: str | None, task_word: str, delete_stem: str, move: re.Pattern[str]
+) -> None:
+    text = store_description(lang)
+    assert any(move.search(p.casefold()) for p in points(text)), (
+        "positive control: the description must have a point about moving"
+    )
+    assert store_move_problems(text, task_word, move) == []
+
+
+OLD_STORE_POINT = (
+    "- Nothing destructive: no delete, no move, no share; nothing in the background, no telemetry\n"
+)
+
+
+def test_counter_check_the_old_store_point_misses_the_task_delete_limit() -> None:
+    assert store_delete_problems(OLD_STORE_POINT, "task", "delet") != []
+
+
+def test_counter_check_the_old_store_point_denies_moving_without_the_task() -> None:
+    problems = store_move_problems(OLD_STORE_POINT, "task", STORE_LANGS[0][3])
+    assert len(problems) == 1
+    assert problems[0].startswith("Nothing destructive")

@@ -1,0 +1,6 @@
+FREIGABE store-text antwort=freigabe-mit-aenderung discussion=kein datum=2026-11-14
+  Store-Text: "Freigegeben (Empfohlen)" mit einer Korrektur: DE Zeile 89 "kein Löschen, auch nicht von Aufgaben" statt "kein Löschen, auch keiner Aufgabe"; EN "no delete, tasks included" und FR "pas de suppression, tâches comprises" bleiben.
+  Punkt 0.7.0: "Behalten ohne Version (Empfohlen)", Variante B des Entwurfs in EN, DE und FR als normaler Punkt ohne Versionsnummer.
+  discussion: "Kein Link (Empfohlen)", kein discussion-Element.
+  summary: alle drei unverändert.
+  Quelle: Owner-Antwort per AskUserQuestion, über die Hauptsitzung übermittelt.
