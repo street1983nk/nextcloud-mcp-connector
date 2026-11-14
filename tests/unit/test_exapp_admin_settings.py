@@ -393,8 +393,12 @@ def _manifest_display_name(variable: str) -> str:
     info_xml = Path(__file__).resolve().parents[2] / "appinfo" / "info.xml"
     parser = etree.XMLParser(resolve_entities=False, no_network=True)
     root = etree.fromstring(info_xml.read_bytes(), parser)
-    names = root.xpath(f"//variable[name='{variable}']/display-name/text()")
-    return str(names[0]) if len(names) == 1 else ""
+    names = [
+        element.findtext("display-name") or ""
+        for element in root.iter("variable")
+        if element.findtext("name") == variable
+    ]
+    return names[0] if len(names) == 1 else ""
 
 
 @pytest.mark.parametrize(

@@ -570,7 +570,7 @@ Prérequis :
 				<description>A Nextcloud path such as /Documents/AI, the same for every account of this installation. Unset means the whole files area. When set, the file tools and the file results of search treat this directory as / and cannot reach its parent folders; Notes, Mail, Talk, calendars and the other tools keep their own permissions. A path with a parent reference, a backslash or without a leading slash stops the app at start.</description>			</variable>
 			<variable>
 				<name>NC_MCP_FILES_UPDATE</name>
-				<display-name>Allow updating existing files</display-name>
+				<display-name>Allow editing existing text files</display-name>
 				<description>Off unless set to on. When enabled, the files_update tool can replace existing UTF-8 text files only when their current ETag matches the supplied ETag.</description>
 			</variable>
 			<variable>
