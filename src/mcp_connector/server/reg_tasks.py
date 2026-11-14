@@ -156,3 +156,21 @@ if config.tasks_update_enabled():
                 parent=parent,
             )
         )
+
+    @mcp.tool(annotations=MODIFY_EXISTING, structured_output=False)
+    @graceful
+    async def tasks_move(
+        task_id: Annotated[str, Field(description="Task id from tasks_search")],
+        etag: Annotated[str, Field(description="etag from tasks_read")],
+        list: Annotated[  # noqa: A002 - the wire name of E7, handed on as list_name
+            str, Field(description="Target list name or key from tasks_search")
+        ],
+        ctx: Context | None = None,
+    ) -> str:
+        """Move a task into the named list; needs its etag from tasks_read. Its subtasks
+        move along. A taken name in the target is never overwritten. Recurring tasks are
+        refused."""
+        clients = deps.resolve_clients(ctx)
+        return compact(
+            await tasks_tools.move_task(clients, task_id=task_id, etag=etag, list_name=list)
+        )

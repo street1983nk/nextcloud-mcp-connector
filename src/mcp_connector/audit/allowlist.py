@@ -68,6 +68,7 @@ PARAM_ALLOWLIST: Mapping[str, frozenset[str]] = {
     "tables_create_row": frozenset({"table_id"}),
     "tasks_complete": frozenset({"completed", "etag", "task_id"}),
     "tasks_create": frozenset({"due", "list", "parent", "priority", "start", "tags", "timezone"}),
+    "tasks_move": frozenset({"etag", "list", "task_id"}),
     "tasks_read": frozenset({"task_id"}),
     "tasks_search": frozenset({"cursor", "due_by", "list", "query", "status"}),
     "tasks_update": frozenset({"due", "etag", "parent", "priority", "start", "tags", "task_id"}),

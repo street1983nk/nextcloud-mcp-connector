@@ -164,7 +164,13 @@ print(json.dumps(asyncio.run(main())))
 #   Budget      21587 + 15 percent = 24825.05, rounded up to the next 500 = 25000 bytes,
 #               re-anchored by the house rule; plan 33-08 re-anchors for tasks_move and plan
 #               33-09 anchors on the end state.
-BUDGET_BYTES = 25_000
+#
+#   Measurement 2026-11-14, with tasks_move, every switch on: 22198 bytes, 31 tools;
+#               standard state 18770 bytes, 27 tools. tasks_move is 611 bytes, below the
+#               per tool ceiling, which stays where it is (plan 33-08).
+#   Budget      22198 + 15 percent = 25527.7, rounded up to the next 500 = 26000 bytes,
+#               re-anchored by the house rule; plan 33-09 anchors on the end state.
+BUDGET_BYTES = 26_000
 
 # The second claim, and the one that actually reports a regression. A total with headroom
 # says nothing about a single tool: today's outlier ``calendar_create_event`` sits at 1351

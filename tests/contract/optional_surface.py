@@ -30,6 +30,7 @@ OPTIONAL_TOOLS: dict[str, str] = {
     "files_update": "NC_MCP_FILES_UPDATE",
     "tasks_complete": "NC_MCP_TASKS_UPDATE",
     "tasks_update": "NC_MCP_TASKS_UPDATE",
+    "tasks_move": "NC_MCP_TASKS_UPDATE",
 }
 
 #: The variable of the modifying task tools (D-33-01). Named here as well as through

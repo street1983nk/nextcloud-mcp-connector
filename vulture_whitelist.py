@@ -42,6 +42,7 @@ tasks_read
 tasks_create
 tasks_complete
 tasks_update
+tasks_move
 
 # --- Tool logic ahead of its registration (plan 31-02, dissolved in plan 31-03) ---------
 # Empty on purpose: plan 31-02 parked create_folder here, because the tool logic was written
@@ -403,6 +404,5 @@ background
 # which calls it.
 
 # --- Tool logic ahead of its registration, plan 33-08 --------------------------------------
-# Temporary: move_task sits here between task 1 and task 2 and leaves with tasks_move, which
+# Empty again: move_task sat here between task 1 and task 2 and left with tasks_move, which
 # calls it.
-move_task

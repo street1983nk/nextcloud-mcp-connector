@@ -78,6 +78,7 @@ the live registry and fails if a name or a level disagrees with it.
 | `tasks_create` | create-only | A new task; without list only when there is exactly one own list and nobody else can see it, never into a list others can see unless it is named |
 | `tasks_complete` | modify | Completes or reopens one task, only with the ETag from `tasks_read`; completing also completes its subtasks first, recurring tasks are refused; available only when the admin enables `NC_MCP_TASKS_UPDATE` |
 | `tasks_update` | modify | Changes or clears the named fields of one task (title, description, due, start, priority, tags, parent), only with the ETag from `tasks_read`; every other line of the task stays as it is, recurring tasks are refused; available only when the admin enables `NC_MCP_TASKS_UPDATE` |
+| `tasks_move` | modify | Moves one task with its subtasks into a named writable list, only with the ETag from `tasks_read`; the subtasks move first, a taken name or UID in the target list is never overwritten, Deck boards are never a target, recurring tasks are refused; available only when the admin enables `NC_MCP_TASKS_UPDATE` |
 | `notes_search` | read | Notes by title and content, via the Nextcloud notes search provider |
 | `notes_read` | read | One note |
 | `notes_create` | create-only | A new note; existing notes are never changed |

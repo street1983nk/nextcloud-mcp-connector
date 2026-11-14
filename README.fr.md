@@ -90,6 +90,7 @@ qu'un nom ou un niveau diverge.
 | `tasks_create` | create-only | Une nouvelle tâche ; sans `list` seulement s'il existe exactement une liste propre et que personne d'autre ne la voit, jamais dans une liste que d'autres voient sauf si elle est nommée |
 | `tasks_complete` | modify | Marque une tâche comme terminée ou la rouvre, uniquement avec l'ETag de `tasks_read` ; en la terminant, ses sous-tâches sont terminées d'abord, les tâches récurrentes sont refusées ; disponible seulement si l'admin active `NC_MCP_TASKS_UPDATE` |
 | `tasks_update` | modify | Modifie ou efface les champs nommés d'une tâche (titre, description, échéance, début, priorité, étiquettes, tâche parente), uniquement avec l'ETag de `tasks_read` ; toutes les autres lignes de la tâche restent telles quelles, les tâches récurrentes sont refusées ; disponible seulement si l'admin active `NC_MCP_TASKS_UPDATE` |
+| `tasks_move` | modify | Déplace une tâche avec ses sous-tâches dans une liste nommée accessible en écriture, uniquement avec l'ETag de `tasks_read` ; les sous-tâches sont déplacées d'abord, un nom ou un UID déjà pris dans la liste cible n'est jamais écrasé, les tableaux Deck ne sont jamais une cible, les tâches récurrentes sont refusées ; disponible seulement si l'admin active `NC_MCP_TASKS_UPDATE` |
 | `notes_search` | read | Des notes par titre et contenu, via le fournisseur de recherche de notes Nextcloud |
 | `notes_read` | read | Une note |
 | `notes_create` | create-only | Une nouvelle note ; les notes existantes ne sont jamais modifiées |
