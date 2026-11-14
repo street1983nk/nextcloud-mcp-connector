@@ -111,10 +111,10 @@ IDEMPOTENT_CREATE_TOOLS = {"files_create_folder"}
 # caller names, so destructive in the words of the MCP specification ("false" means "only
 # additive updates"), and idempotent, because the second identical call finds the target
 # state and changes nothing. Empty in plan 33-02; plan 33-06 entered tasks_complete, plan
-# 33-07 tasks_update, plan 33-08 enters tasks_move. Every member is optional, so the live
+# 33-07 tasks_update, plan 33-08 tasks_move. Every member is optional, so the live
 # registry this file freezes never lists one: they are checked on the switched-on surface
 # below.
-MODIFY_TOOLS: frozenset[str] = frozenset({"tasks_complete", "tasks_update"})
+MODIFY_TOOLS: frozenset[str] = frozenset({"tasks_complete", "tasks_update", "tasks_move"})
 
 # The documented exception to the schema diet: ChatGPT reads structured content (D-14).
 STRUCTURED_TOOLS = {"search", "fetch"}
@@ -962,11 +962,11 @@ def test_the_gate_refuses_a_planted_class_for_a_modifying_tool(
     [READ_ONLY, CREATE_ONLY, CREATE_IDEMPOTENT, UPDATE_EXISTING],
     ids=["read_only", "create_only", "create_idempotent", "update_existing"],
 )
-@pytest.mark.parametrize("tool", ["tasks_complete", "tasks_update"])
+@pytest.mark.parametrize("tool", ["tasks_complete", "tasks_update", "tasks_move"])
 def test_a_modifying_task_tool_with_a_planted_class_turns_the_gate_red(
     tool: str, planted: ToolAnnotations
 ) -> None:
-    """Plans 33-06 and 33-07: the tool stands in MODIFY_TOOLS, so only MODIFY_EXISTING
+    """Plans 33-06 to 33-08: the tool stands in MODIFY_TOOLS, so only MODIFY_EXISTING
     passes; the positive control is the live class, which the switched-on gate above
     accepts."""
     assert tool in MODIFY_TOOLS

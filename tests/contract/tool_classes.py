@@ -129,11 +129,15 @@ UNAFFECTED: dict[str, str] = {
     ),
     "tasks_complete": (
         "Answers task ids, status, the list name, counts and an ETag of its own task and takes "
-        "no file argument (tools/tasks.py:1306-1320, :1572, :1609-1619)."
+        "no file argument (tools/tasks.py:1318-1332, :1595, :1632-1642)."
     ),
     "tasks_update": (
         "Answers the task id, the list name, the names of the changed fields and an ETag of "
-        "its own task and takes no file argument (tools/tasks.py:1871-1875, :1913-1921)."
+        "its own task and takes no file argument (tools/tasks.py:1894-1898, :1935-1944)."
+    ),
+    "tasks_move": (
+        "Answers old and new task ids, the target list name, a stop reason and an ETag of its "
+        "own task and takes no file argument (tools/tasks.py:2090, :2124-2136, :2156-2166)."
     ),
 }
 
