@@ -69,6 +69,13 @@ modules, allows exactly the named exceptions (`files_update` and the three task 
 only with an ETag, the MOVE of the private chunk assembly and one MOVE in `move_todo`) and fails on any other destructive call,
 [tests/contract/test_no_destructive_calls.py](tests/contract/test_no_destructive_calls.py).
 
+## Optional Profile Fields integration
+
+Set `NC_MCP_PROFILE_FIELDS_READ=on` to enable an additional read-only
+`profile_fields_browse` tool for authorized Nextcloud administrators.
+It reads selected fields via the native Profile Fields OCS API without
+service credentials or write operations.
+
 ## Tools
 
 **read** means the tool only reads, **create-only** means it can create new objects but never

@@ -20,7 +20,7 @@ from typing import Any
 
 #: The switches the authoritative measurement turns on; held equal to the ones of the
 #: contract gates by ``tests/contract/test_tool_surface.py``.
-SWITCHES = ("NC_MCP_FILES_UPDATE", "NC_MCP_TASKS_UPDATE")
+SWITCHES = ("NC_MCP_FILES_UPDATE", "NC_MCP_TASKS_UPDATE", "NC_MCP_PROFILE_FIELDS_READ")
 
 _MEASURE = """
 import asyncio, json

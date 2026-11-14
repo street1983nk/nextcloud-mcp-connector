@@ -63,6 +63,7 @@ PARAM_ALLOWLIST: Mapping[str, frozenset[str]] = {
     "notes_read": frozenset({"note_id"}),
     "notes_search": frozenset({"limit", "query"}),
     "prepare_context": frozenset({"detail", "query"}),
+    "profile_fields_browse": frozenset({"level"}),
     "search": frozenset({"query"}),
     "tables_browse": frozenset({"cursor", "level", "limit", "table_id"}),
     "tables_create_row": frozenset({"table_id"}),
