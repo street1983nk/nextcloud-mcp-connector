@@ -53,11 +53,16 @@ async def test_own_visible_fields_are_read_without_admin_catalog(clients: NcClie
 @pytest.mark.anyio
 async def test_admin_catalog_only_returns_selected_metadata(clients: NcClients) -> None:
     with respx.mock(assert_all_called=True) as mock:
-        mock.get(ROOT + "/definitions").respond(
-            200,
-            json=payload([{"id": 1, "field_key": "employee_id", "type": "text",
-                           "label": "Sensitive label", "active": True}]),
-        )
+        catalog = [
+            {
+                "id": 1,
+                "field_key": "employee_id",
+                "type": "text",
+                "label": "Sensitive label",
+                "active": True,
+            }
+        ]
+        mock.get(ROOT + "/definitions").respond(200, json=payload(catalog))
         result = await profile_fields.browse(clients, level="definitions")
     assert result["results"] == [
         {"id": 1, "field_key": "employee_id", "type": "text", "active": True}
@@ -67,18 +72,16 @@ async def test_admin_catalog_only_returns_selected_metadata(clients: NcClients) 
 @pytest.mark.anyio
 async def test_admin_user_values_only_include_requested_keys(clients: NcClients) -> None:
     with respx.mock(assert_all_called=True) as mock:
-        mock.get(ROOT + "/definitions").respond(
-            200, json=payload([
-                {"id": 1, "field_key": "mailcow_mailbox"},
-                {"id": 2, "field_key": "cpf"},
-            ])
-        )
-        mock.get(ROOT + "/users/alice/values").respond(
-            200, json=payload([
-                {"field_definition_id": 1, "value": {"value": "alice@example.org"}},
-                {"field_definition_id": 2, "value": {"value": "sensitive-id"}},
-            ])
-        )
+        catalog = [
+            {"id": 1, "field_key": "mailcow_mailbox"},
+            {"id": 2, "field_key": "cpf"},
+        ]
+        values = [
+            {"field_definition_id": 1, "value": {"value": "alice@example.org"}},
+            {"field_definition_id": 2, "value": {"value": "sensitive-id"}},
+        ]
+        mock.get(ROOT + "/definitions").respond(200, json=payload(catalog))
+        mock.get(ROOT + "/users/alice/values").respond(200, json=payload(values))
         result = await profile_fields.browse(
             clients, "values", user_uid="alice", field_keys="mailcow_mailbox"
         )
@@ -92,29 +95,35 @@ async def test_admin_user_values_only_include_requested_keys(clients: NcClients)
 @pytest.mark.anyio
 async def test_admin_search_returns_exact_match_and_pagination(clients: NcClients) -> None:
     with respx.mock(assert_all_called=True) as mock:
-        route = mock.get(ROOT + "/users/search").respond(
-            200,
-            json=payload({
-                "items": [{
+        data = {
+            "items": [
+                {
                     "user_uid": "alice",
                     "display_name": "Alice",
                     "fields": {
                         "region": {
                             "definition": {"field_key": "region"},
-                            "value": {"value": {"value": "LATAM"}, "current_visibility": "private"},
+                            "value": {
+                                "value": {"value": "LATAM"},
+                                "current_visibility": "private",
+                            },
                         }
                     },
-                }],
-                "pagination": {"limit": 1, "offset": 1, "total": 3},
-            }),
-        )
+                }
+            ],
+            "pagination": {"limit": 1, "offset": 1, "total": 3},
+        }
+        route = mock.get(ROOT + "/users/search").respond(200, json=payload(data))
         result = await profile_fields.browse(
             clients, level="search", field_key="region", value="LATAM", limit=1, offset=1
         )
     assert route.called
     assert dict(route.calls[0].request.url.params) == {
-        "fieldKey": "region", "operator": "eq", "value": "LATAM",
-        "limit": "1", "offset": "1",
+        "fieldKey": "region",
+        "operator": "eq",
+        "value": "LATAM",
+        "limit": "1",
+        "offset": "1",
     }
     assert result["results"] == [{"user_uid": "alice", "value": "LATAM"}]
     assert result["total"] == 3
@@ -148,8 +157,13 @@ async def test_invalid_inputs_cause_no_network_request(clients: NcClients) -> No
 @pytest.mark.parametrize(
     ("raw", "expected"),
     [
-        (None, False), ("", False), ("off", False), ("invalid", False),
-        ("on", True), ("true", True), ("YES", True),
+        (None, False),
+        ("", False),
+        ("off", False),
+        ("invalid", False),
+        ("on", True),
+        ("true", True),
+        ("YES", True),
     ],
 )
 def test_opt_in_switch_fails_closed(raw: str | None, expected: bool) -> None:
