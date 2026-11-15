@@ -22,7 +22,7 @@ You bring the model, and no content leaves your server.
 
 ## What it does
 
-- 31 tools across eleven app families: files, calendar, tasks, notes, Deck, contacts, Tables,
+- 27 tools across ten app families: files, calendar, tasks, notes, Deck, contacts, Tables,
   Talk, Mail and cloud wide search
 - OAuth 2.1 to the MCP authorization specification: dynamic client registration, PKCE S256,
   audience bound tokens, refresh rotation with reuse detection and immediate revocation.
@@ -41,14 +41,10 @@ You bring the model, and no content leaves your server.
 
 - No deleting: no tool deletes files, events, tasks, notes, cards or contacts; deleting a task
   is deliberately not offered
-- No unconditional overwriting of files: `files_upload` refuses existing paths. If the admin enables
+- No unconditional overwriting: `files_upload` refuses existing paths. If the admin enables
   `NC_MCP_FILES_UPDATE`, `files_update` can replace an existing UTF-8 text file only when its
   ETag matches the value read earlier; stale or deleted files are rejected. Version history
   depends on the Nextcloud storage backend.
-  Profile Fields is a separate, expressly authorized exception: the
-  `profile_fields_set_value` and `profile_fields_update_definition` tools replace
-  records only when the Profile Fields app authorizes the connected account. They do
-  not provide ETag compare-and-swap; concurrent administrators must coordinate writes.
 - Existing tasks stay unchanged unless the admin turns on the switch
   "Allow changing existing tasks" (`NC_MCP_TASKS_UPDATE`): Off by default. When on, assistants
   can change one task at a time, and only with the ETag returned by `tasks_read`:
@@ -65,7 +61,7 @@ You bring the model, and no content leaves your server.
   destination
 - Mail is strictly read only: no sending, no draft, no move, no flag, no delete, and no
   attachment download
-- No administrator privilege escalation: the server inherits the connected account's rights, including administrator rights only when that account already has them
+- No admin access: the server acts as one user and inherits exactly that user's permissions
 - No full text search inside file contents unless a search app such as Findling is installed
 
 That is a design constraint and not a promise of good behaviour: a contract test reads the
@@ -110,11 +106,6 @@ hand: a contract test reads the live registry and fails if a name or a level dis
 | `talk_send` | create-only | One message into a conversation; never edited or deleted, switchable off instance wide |
 | `mail_browse` | read | Mail accounts, their mailboxes and message envelopes; strictly read only |
 | `contacts_search` | read | Address book contacts |
-| `profile_fields_browse` | read | Reads Profile Fields administrative metadata with the current Nextcloud identity; off unless NC_MCP_PROFILE_FIELDS_READ is on |
-| `profile_fields_browse` | read | Reads own fields and administrator-authorized selected fields or search results |
-| `profile_fields_set_value` | modify | Updates an allowed own field or administrator-authorized user field through Profile Fields OCS |
-| `profile_fields_create_definition` | create-only | Creates one definition as a Nextcloud administrator |
-| `profile_fields_update_definition` | modify | Updates an existing definition as a Nextcloud administrator; never deletes |
 | `unified_search` | read | The Nextcloud unified search across providers, permission aware |
 | `prepare_context` | read | Files, notes, cards, the next week of events, waiting Talk conversations and unread mail counts in one call |
 | `search` | read | OpenAI compatible search entry point, delegates to unified search |

@@ -85,10 +85,6 @@ EXPECTED_TOOLS = {
     "tasks_search",
     "tasks_read",
     "tasks_create",
-    "profile_fields_browse",
-    "profile_fields_set_value",
-    "profile_fields_create_definition",
-    "profile_fields_update_definition",
 }
 
 # The create-only paths. files_update is separately gated and uses conditional overwrite.
@@ -98,7 +94,6 @@ EXPECTED_TOOLS = {
 # moved: the count of PUT call sites in the source did not. EXPECTED_PUT_CALLS is seven since
 # plan 33-03, and the seventh is the overwriting PUT of clients/tasks.py, not a create.
 CREATE_TOOLS = {
-    "profile_fields_create_definition",
     "files_upload",
     "calendar_create_event",
     "notes_create",
@@ -122,12 +117,6 @@ IDEMPOTENT_CREATE_TOOLS = {"files_create_folder"}
 # registry this file freezes never lists one: they are checked on the switched-on surface
 # below.
 MODIFY_TOOLS: frozenset[str] = frozenset({"tasks_complete", "tasks_update", "tasks_move"})
-PROFILE_FIELDS_MODIFY_TOOLS: frozenset[str] = frozenset(
-    {
-        "profile_fields_set_value",
-        "profile_fields_update_definition",
-    }
-)
 
 # The documented exception to the schema diet: ChatGPT reads structured content (D-14).
 STRUCTURED_TOOLS = {"search", "fetch"}
@@ -612,7 +601,7 @@ async def test_the_curated_set_is_complete_and_only_the_chatgpt_profile_has_a_sc
         tools = {tool.name: tool for tool in (await client.list_tools()).tools}
 
     assert set(tools) == EXPECTED_TOOLS
-    assert len(tools) == 31, "the curated set includes four Profile Fields tools"
+    assert len(tools) == 27, "the curated set is twenty-seven tools, no more and no fewer"
 
     with_schema = {name for name, tool in tools.items() if tool.output_schema is not None}
     assert with_schema == STRUCTURED_TOOLS, (
@@ -833,7 +822,7 @@ def _check_annotations(name: str, annotations: ToolAnnotations | None) -> None:
         assert annotations.read_only_hint is False
         assert annotations.destructive_hint is True
         assert annotations.idempotent_hint is False
-    elif name in MODIFY_TOOLS | PROFILE_FIELDS_MODIFY_TOOLS:
+    elif name in MODIFY_TOOLS:
         assert annotations.read_only_hint is False, f"{name} writes and must say so"
         assert annotations.destructive_hint is True, (
             f"{name} overwrites fields of an existing object, which the MCP specification "
@@ -877,7 +866,7 @@ async def test_every_tool_carries_honest_annotations() -> None:
 
     assert set(tools) == EXPECTED_TOOLS, "the curated set is frozen (D-03 to D-09)"
     assert CREATE_TOOLS < EXPECTED_TOOLS, "every write tool must be part of the curated set"
-    assert len(CREATE_TOOLS) == 8, "one additional create-only Profile Fields definition tool"
+    assert len(CREATE_TOOLS) == 7, "the create-only tools are seven; a folder is not an eighth"
     assert IDEMPOTENT_CREATE_TOOLS < EXPECTED_TOOLS, (
         "the idempotent create tool must be part of the curated set"
     )
@@ -894,10 +883,7 @@ def test_every_tool_of_the_switched_on_surface_carries_honest_annotations() -> N
 
     assert surface_findings(surface, EXPECTED_TOOLS) == []
     assert set(surface) == EXPECTED_TOOLS | OPTIONAL_TOOLS.keys()
-    assert (
-        OPTIONAL_TOOLS.keys() | {"profile_fields_set_value", "profile_fields_update_definition"}
-        >= MODIFY_TOOLS
-    )
+    assert OPTIONAL_TOOLS.keys() >= MODIFY_TOOLS, "a modifying tool always hangs on a switch"
     assert not MODIFY_TOOLS & (CREATE_TOOLS | IDEMPOTENT_CREATE_TOOLS | {"files_update"}), (
         "a tool belongs to one class only"
     )
@@ -1079,7 +1065,7 @@ def _expected_level(name: str) -> str:
         "conditional-update"
         if name == "files_update"
         else "modify"
-        if name in MODIFY_TOOLS | PROFILE_FIELDS_MODIFY_TOOLS
+        if name in MODIFY_TOOLS
         else "create-only"
         if name in CREATE_TOOLS or name in IDEMPOTENT_CREATE_TOOLS
         else "read"

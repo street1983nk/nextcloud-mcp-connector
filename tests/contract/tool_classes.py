@@ -87,22 +87,6 @@ FILE_WRITERS: dict[str, str] = {
 
 # Tools whose answer cannot name a Nextcloud file; each sentence says why.
 UNAFFECTED: dict[str, str] = {
-    "profile_fields_set_value": (
-        "Creates or replaces own or administrator-authorized user fields but never reads a "
-        "Nextcloud file (tools/profile_fields.py)."
-    ),
-    "profile_fields_create_definition": (
-        "Creates administrator-authorized Profile Fields definitions without "
-        "reading or writing Nextcloud files (tools/profile_fields.py)."
-    ),
-    "profile_fields_update_definition": (
-        "Creates or updates administrator-only profile field definitions without "
-        "accessing any Nextcloud files (tools/profile_fields.py)."
-    ),
-    "profile_fields_browse": (
-        "Reads Profile Fields metadata and never discloses Nextcloud files or paths "
-        "(tools/profile_fields.py)."
-    ),
     "calendar_list_events": (
         "Answers id, uid, summary, start, end, all_day, calendar and location only; ATTACH and "
         "DESCRIPTION are never parsed (tools/calendar.py:440-455, clients/caldav.py:391-406)."

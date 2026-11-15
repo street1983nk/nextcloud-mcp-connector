@@ -18,12 +18,12 @@ from mcp_connector.server import mcp
 # D-28-14: tables_browse became a reader, which gives 12 / 3 / 7. files_read_as_markdown
 # made it 13 / 3 / 7, and files_create_folder of FOLD-01 is the fourth writer: 13 / 4 / 7.
 # The tasks bundle of TASK-07 adds three tools that name no file: 13 / 4 / 10.
-TOTAL = 31
+TOTAL = 27
 
 # The same registry with every switch on: the default plus every optional tool. 28 in plan
 # 33-02 (files_update), 29 since plan 33-06 (tasks_complete), 30 since plan 33-07
 # (tasks_update), 31 since plan 33-08 (tasks_move), all three behind NC_MCP_TASKS_UPDATE.
-TOTAL_SWITCHED_ON = 35
+TOTAL_SWITCHED_ON = 31
 
 # The optional tools that carry a class entry: tasks_complete since plan 33-06, tasks_update
 # since plan 33-07 and tasks_move since plan 33-08 (all UNAFFECTED). files_update stays
@@ -156,4 +156,4 @@ def test_the_three_classes_add_up_to_the_frozen_surface() -> None:
         len(tool_classes.FILE_READERS),
         len(tool_classes.FILE_WRITERS),
         len(tool_classes.UNAFFECTED),
-    ) == (13, 4, 14 + len(CLASSIFIED_OPTIONAL))
+    ) == (13, 4, 10 + len(CLASSIFIED_OPTIONAL))

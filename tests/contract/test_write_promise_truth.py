@@ -31,7 +31,6 @@ ROOT = Path(__file__).resolve().parents[2]
 SWITCH_BY_PREFIX = {
     "files_": "NC_MCP_FILES_UPDATE",
     "tasks_": "NC_MCP_TASKS_UPDATE",
-    "profile_fields_": "Profile Fields",
 }
 ALL_SWITCHES = ("NC_MCP_FILES_UPDATE", "NC_MCP_TASKS_UPDATE")
 
@@ -156,14 +155,7 @@ def modifying_tools() -> list[str]:
 def test_the_registry_names_exactly_the_four_modifying_tools(modifying_tools: list[str]) -> None:
     assert modifying_tools, "positive control: the registry must report modifying tools"
     assert "files_update" in modifying_tools
-    assert set(modifying_tools) == {
-        "files_update",
-        "tasks_complete",
-        "tasks_update",
-        "tasks_move",
-        "profile_fields_set_value",
-        "profile_fields_update_definition",
-    }
+    assert set(modifying_tools) == {"files_update", "tasks_complete", "tasks_update", "tasks_move"}
 
 
 @pytest.mark.parametrize(
