@@ -1,4 +1,4 @@
-"""Profile Fields tools reuse Nextcloud's own account-specific OCS permissions."""
+"""The optional Profile Fields reader uses Nextcloud's own account-specific OCS permissions."""
 
 from typing import Annotated, Literal
 

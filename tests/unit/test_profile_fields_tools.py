@@ -171,9 +171,11 @@ def test_opt_in_is_the_only_way_to_extend_the_27_tool_registry(
     env = os.environ.copy()
     env.pop(config.ENV_PROFILE_FIELDS_READ, None)
     env.pop("NC_MCP_DISABLED_TOOLS", None)
+    env.pop("NC_MCP_FILES_UPDATE", None)
+    env.pop("NC_MCP_TASKS_UPDATE", None)
     if raw is not None:
         env[config.ENV_PROFILE_FIELDS_READ] = raw
-    proc = subprocess.run(
+    proc = subprocess.run(  # noqa: S603 - fixed interpreter and constant snippet
         [sys.executable, "-c", script],
         capture_output=True,
         text=True,
@@ -185,5 +187,6 @@ def test_opt_in_is_the_only_way_to_extend_the_27_tool_registry(
     names = json.loads(proc.stdout.strip().splitlines()[-1])
     assert len(names) == (28 if enabled else 27)
     assert ("profile_fields_browse" in names) is enabled
-    assert not any(name.startswith("profile_fields_") and name != "profile_fields_browse"
-                   for name in names)
+    assert not any(
+        name.startswith("profile_fields_") and name != "profile_fields_browse" for name in names
+    )
