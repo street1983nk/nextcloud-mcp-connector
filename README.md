@@ -106,6 +106,7 @@ hand: a contract test reads the live registry and fails if a name or a level dis
 | `talk_send` | create-only | One message into a conversation; never edited or deleted, switchable off instance wide |
 | `mail_browse` | read | Mail accounts, their mailboxes and message envelopes; strictly read only |
 | `contacts_search` | read | Address book contacts |
+| `profile_fields_browse` | read | Optional, read-only Profile Fields values and administrator-authorized catalog/search; requires `NC_MCP_PROFILE_FIELDS_READ=on` |
 | `unified_search` | read | The Nextcloud unified search across providers, permission aware |
 | `prepare_context` | read | Files, notes, cards, the next week of events, waiting Talk conversations and unread mail counts in one call |
 | `search` | read | OpenAI compatible search entry point, delegates to unified search |
@@ -128,6 +129,12 @@ missing app is answered in one sentence, never with an empty result.
 ```json
 {"query":"budget","count":2,"results":[{"id":"file:4711","title":"Budget 2026.md","url":"https://cloud.example.org/index.php/f/4711","provider":"files","kind":"file"},{"id":"url:https://cloud.example.org/index.php/call/abc123","title":"Khaled","url":"https://cloud.example.org/index.php/call/abc123","provider":"talk-conversations","kind":"url","resolvable":false}]}
 ```
+
+### Optional Profile Fields integration
+
+The `profile_fields_browse` tool is an independent **read-only, opt-in** bundle. The default registry remains **27 tools**. Install and enable the Nextcloud Profile Fields app, then set `NC_MCP_PROFILE_FIELDS_READ=on` in the MCP Connector deployment environment and restart the connector to make this one additional tool available. Missing, false, or unrecognized switch values leave it disabled.
+
+The tool makes only authenticated OCS GET requests with the connected user's own Nextcloud permissions. `me` returns the account's visible fields; `definitions`, `values` (selected keys for one exact UID), and `search` (exact match and pagination) use the app's administrator-protected endpoints. It cannot create, modify, delete or change field visibility. Write support is deliberately deferred to a separate design and pull request. The opt-in switch is separate from `NC_MCP_DISABLED_TOOLS`.
 
 ## Switching tool bundles off
 

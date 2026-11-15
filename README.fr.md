@@ -123,6 +123,7 @@ qu'un nom ou un niveau diverge.
 | `talk_send` | create-only | Un message dans une conversation ; jamais modifié ni supprimé, désactivable pour toute l'instance |
 | `mail_browse` | read | Les comptes Mail, leurs boîtes aux lettres et les en-têtes de messages ; strictement en lecture seule |
 | `contacts_search` | read | Des contacts dans les carnets d'adresses |
+| `profile_fields_browse` | read | Optionnel, lecture seule : ses champs et les recherches administratives autorisées ; activer `NC_MCP_PROFILE_FIELDS_READ=on` |
 | `unified_search` | read | La recherche unifiée de Nextcloud à travers les fournisseurs, en respectant les permissions |
 | `prepare_context` | read | Fichiers, notes, cartes, la semaine d'événements à venir, les conversations Talk en attente et les courriels non lus en un appel |
 | `search` | read | Point d'entrée de recherche compatible OpenAI, délègue à la recherche unifiée |
@@ -147,6 +148,12 @@ manquante reçoit une réponse en une phrase, jamais un résultat vide.
 ```json
 {"query":"budget","count":2,"results":[{"id":"file:4711","title":"Budget 2026.md","url":"https://cloud.example.org/index.php/f/4711","provider":"files","kind":"file"},{"id":"url:https://cloud.example.org/index.php/call/abc123","title":"Khaled","url":"https://cloud.example.org/index.php/call/abc123","provider":"talk-conversations","kind":"url","resolvable":false}]}
 ```
+
+### Intégration Profile Fields facultative
+
+`profile_fields_browse` est un bundle indépendant, **désactivé par défaut**, en lecture seule. Les **27 outils standard** sont inchangés. L'application Nextcloud Profile Fields doit être installée et activée. Définir `NC_MCP_PROFILE_FIELDS_READ=on` dans l'environnement de déploiement du connecteur et redémarrer celui-ci pour rendre disponible ce seul outil supplémentaire ; une valeur absente ou inconnue ne l'active pas.
+
+L'outil n'utilise que des requêtes OCS GET authentifiées, avec les permissions du compte Nextcloud connecté. `me` lit ses champs visibles ; `definitions`, `values` (clés demandées pour un UID exact) et `search` (égalité exacte et pagination) exigent les permissions administratives de l'application. Aucune création, modification, suppression ni modification de visibilité n'est possible. Les écritures feront l'objet d'un autre PR. Ce commutateur est indépendant de `NC_MCP_DISABLED_TOOLS`.
 
 ## Désactiver des bundles d'outils
 

@@ -120,6 +120,7 @@ abweicht.
 | `talk_send` | create-only | Eine Nachricht in ein Gespräch; nie bearbeitet oder gelöscht, instanzweit abschaltbar |
 | `mail_browse` | read | Mail-Konten, ihre Postfächer und Nachrichtenköpfe; strikt lesend |
 | `contacts_search` | read | Kontakte in den Adressbüchern |
+| `profile_fields_browse` | read | Optional, nur lesend: eigene Felder und berechtigte Admin-Abfragen; mit `NC_MCP_PROFILE_FIELDS_READ=on` |
 | `unified_search` | read | Die Unified Search von Nextcloud über alle Provider, rechtegeprüft |
 | `prepare_context` | read | Dateien, Notizen, Karten, die nächste Terminwoche, wartende Talk-Gespräche und ungelesene Mails in einem Aufruf |
 | `search` | read | OpenAI-kompatibler Sucheinstieg, delegiert an die Unified Search |
@@ -143,6 +144,12 @@ Satz beantwortet, nie mit einem leeren Ergebnis.
 ```json
 {"query":"budget","count":2,"results":[{"id":"file:4711","title":"Budget 2026.md","url":"https://cloud.example.org/index.php/f/4711","provider":"files","kind":"file"},{"id":"url:https://cloud.example.org/index.php/call/abc123","title":"Khaled","url":"https://cloud.example.org/index.php/call/abc123","provider":"talk-conversations","kind":"url","resolvable":false}]}
 ```
+
+### Optionale Profile-Fields-Integration
+
+`profile_fields_browse` ist ein eigenständiges, **standardmäßig deaktiviertes** Bundle für den Lesezugriff. Die **27 Standard-Tools** bleiben unverändert. Die Nextcloud-App Profile Fields muss installiert und aktiviert sein. `NC_MCP_PROFILE_FIELDS_READ=on` in der Deployment-Umgebung und ein Neustart aktivieren genau dieses zusätzliche Tool; ein fehlender oder unbekannter Wert aktiviert es nicht.
+
+Das Tool verwendet ausschließlich authentifizierte OCS-GET-Anfragen mit den Berechtigungen des verbundenen Nextcloud-Kontos. `me` zeigt eigene sichtbare Felder; `definitions`, `values` (nur angeforderte Feldschlüssel einer UID) und `search` (exakter Vergleich mit Paginierung) benötigen die administrativen Berechtigungen der App. Erstellen, Ändern, Löschen und Ändern der Sichtbarkeit sind nicht möglich. Schreibzugriffe sind einem separaten PR vorbehalten. Der Schalter ist unabhängig von `NC_MCP_DISABLED_TOOLS`.
 
 ## Tool-Bundles abschalten
 
