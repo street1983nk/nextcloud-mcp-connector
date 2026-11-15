@@ -120,7 +120,6 @@ abweicht.
 | `talk_send` | create-only | Eine Nachricht in ein Gespräch; nie bearbeitet oder gelöscht, instanzweit abschaltbar |
 | `mail_browse` | read | Mail-Konten, ihre Postfächer und Nachrichtenköpfe; strikt lesend |
 | `contacts_search` | read | Kontakte in den Adressbüchern |
-| `profile_fields_browse` | read | Optional, nur lesend: eigene Felder und berechtigte Admin-Abfragen; mit `NC_MCP_PROFILE_FIELDS_READ=on` |
 | `unified_search` | read | Die Unified Search von Nextcloud über alle Provider, rechtegeprüft |
 | `prepare_context` | read | Dateien, Notizen, Karten, die nächste Terminwoche, wartende Talk-Gespräche und ungelesene Mails in einem Aufruf |
 | `search` | read | OpenAI-kompatibler Sucheinstieg, delegiert an die Unified Search |
