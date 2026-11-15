@@ -763,6 +763,18 @@ def tasks_update_enabled(env: Mapping[str, str] | None = None) -> bool:
     return False
 
 
+def profile_fields_read_enabled(env: Mapping[str, str] | None = None) -> bool:
+    """Expose the read-only Profile Fields tool only after an explicit opt-in."""
+    source = os.environ if env is None else env
+    value = (source.get(ENV_PROFILE_FIELDS_READ) or "").strip().lower()
+    if value in _TRUE_VALUES:
+        return True
+    if not value or value in _FALSE_VALUES:
+        return False
+    logger.warning("%s is invalid; the Profile Fields reader stays disabled.", ENV_PROFILE_FIELDS_READ)
+    return False
+
+
 def exchange_enabled(env: Mapping[str, str] | None = None) -> bool:
     """Whether this installation accepts exchanged tokens of a foreign issuer (CONF-01).
 

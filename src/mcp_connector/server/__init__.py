@@ -277,6 +277,9 @@ def _load_registrations() -> None:
     for name in names:
         if name not in disabled:
             importlib.import_module(f"{__name__}.reg_{name}")
+    # This optional bundle stays outside the frozen 27-tool default registry.
+    if config.profile_fields_read_enabled():
+        importlib.import_module(f"{__name__}.opt_profile_fields")
 
 
 _load_registrations()
