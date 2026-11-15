@@ -51,8 +51,8 @@ async def browse(
         for item in result["items"]:
             if not isinstance(item, dict):
                 continue
-            fields = item.get("fields")
-            record = fields.get(key) if isinstance(fields, dict) else None
+            matched_fields = item.get("fields")
+            record = matched_fields.get(key) if isinstance(matched_fields, dict) else None
             current = record.get("value") if isinstance(record, dict) else None
             users.append(
                 {
@@ -83,6 +83,8 @@ async def browse(
 
     if level not in ("definitions", "values"):
         raise ToolError(message="Unknown level.", hint="Use definitions, me, values or search.")
+    uid = ""
+    keys: list[str] = []
     if level == "values":
         uid = user_uid.strip()
         keys = [key.strip() for key in field_keys.split(",")]
@@ -142,4 +144,3 @@ async def browse(
             "current_visibility": entry.get("current_visibility"),
         }
     return {"level": level, "user_uid": uid, "fields": fields}
-

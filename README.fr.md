@@ -152,7 +152,7 @@ manquante reçoit une réponse en une phrase, jamais un résultat vide.
 
 `profile_fields_browse` est un bundle indépendant, **désactivé par défaut**, en lecture seule. Les **27 outils standard** sont inchangés. L'application Nextcloud Profile Fields doit être installée et activée. Définir `NC_MCP_PROFILE_FIELDS_READ=on` dans l'environnement de déploiement du connecteur et redémarrer celui-ci pour rendre disponible ce seul outil supplémentaire ; une valeur absente ou inconnue ne l'active pas.
 
-L'outil n'utilise que des requêtes OCS GET authentifiées, avec les permissions du compte Nextcloud connecté. `me` lit ses champs visibles ; `definitions`, `values` (clés demandées pour un UID exact) et `search` (égalité exacte et pagination) exigent les permissions administratives de l'application. Aucune création, modification, suppression ni modification de visibilité n'est possible. Les écritures feront l'objet d'un autre PR. Ce commutateur est indépendant de `NC_MCP_DISABLED_TOOLS`.
+L'outil n'utilise que des requêtes OCS GET authentifiées, avec les permissions du compte Nextcloud connecté. `me` lit ses champs visibles ; `definitions`, `values` (clés demandées pour un UID exact) et `search` (égalité exacte et pagination) exigent les permissions administratives de l'application. Aucune création, modification, suppression ni modification de visibilité n'est possible. Les écritures feront l'objet d'un autre PR. Le commutateur opt-in est prioritaire : `NC_MCP_PROFILE_FIELDS_READ=on` active cet outil même si `profile_fields` figure dans `NC_MCP_DISABLED_TOOLS`.
 
 ## Désactiver des bundles d'outils
 

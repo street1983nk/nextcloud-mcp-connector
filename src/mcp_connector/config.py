@@ -772,7 +772,7 @@ def profile_fields_read_enabled(env: Mapping[str, str] | None = None) -> bool:
         return True
     if not value or value in _FALSE_VALUES:
         return False
-    logger.warning("%s is invalid; the Profile Fields reader stays disabled.", ENV_PROFILE_FIELDS_READ)
+    logger.warning("%s is invalid; Profile Fields stays disabled.", ENV_PROFILE_FIELDS_READ)
     return False
 
 

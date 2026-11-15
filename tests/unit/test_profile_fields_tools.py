@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+from typing import Any
 
 import httpx
 import pytest
@@ -142,13 +143,14 @@ async def test_admin_only_endpoint_rejects_regular_user(clients: NcClients) -> N
 @pytest.mark.anyio
 async def test_invalid_inputs_cause_no_network_request(clients: NcClients) -> None:
     with respx.mock() as mock:
-        for opts in (
+        invalid_inputs: tuple[dict[str, Any], ...] = (
             {"level": "values", "user_uid": "../admin", "field_keys": "region"},
             {"level": "values", "user_uid": "alice", "field_keys": "region,"},
             {"level": "search", "field_key": "region", "value": ""},
             {"level": "search", "field_key": "region", "value": "LATAM", "limit": 101},
             {"level": "unknown"},
-        ):
+        )
+        for opts in invalid_inputs:
             with pytest.raises(ToolError):
                 await profile_fields.browse(clients, **opts)
         assert not mock.calls

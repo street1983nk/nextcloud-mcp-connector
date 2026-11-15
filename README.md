@@ -133,7 +133,7 @@ missing app is answered in one sentence, never with an empty result.
 
 The `profile_fields_browse` tool is an independent **read-only, opt-in** bundle. The default registry remains **27 tools**. Install and enable the Nextcloud Profile Fields app, then set `NC_MCP_PROFILE_FIELDS_READ=on` in the MCP Connector deployment environment and restart the connector to make this one additional tool available. Missing, false, or unrecognized switch values leave it disabled.
 
-The tool makes only authenticated OCS GET requests with the connected user's own Nextcloud permissions. `me` returns the account's visible fields; `definitions`, `values` (selected keys for one exact UID), and `search` (exact match and pagination) use the app's administrator-protected endpoints. It cannot create, modify, delete or change field visibility. Write support is deliberately deferred to a separate design and pull request. The opt-in switch is separate from `NC_MCP_DISABLED_TOOLS`.
+The tool makes only authenticated OCS GET requests with the connected user's own Nextcloud permissions. `me` returns the account's visible fields; `definitions`, `values` (selected keys for one exact UID), and `search` (exact match and pagination) use the app's administrator-protected endpoints. It cannot create, modify, delete or change field visibility. Write support is deliberately deferred to a separate design and pull request. The opt-in switch takes precedence: `NC_MCP_PROFILE_FIELDS_READ=on` enables the tool even if `profile_fields` is listed in `NC_MCP_DISABLED_TOOLS`.
 
 ## Switching tool bundles off
 
