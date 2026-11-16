@@ -23,7 +23,8 @@ You bring the model, and no content leaves your server.
 ## What it does
 
 - 27 tools across ten app families: files, calendar, tasks, notes, Deck, contacts, Tables,
-  Talk, Mail and cloud wide search
+  Talk, Mail and cloud wide search; 31 when the admin enables the optional write tools
+  (`files_update`, `tasks_complete`, `tasks_update`, `tasks_move`)
 - OAuth 2.1 to the MCP authorization specification: dynamic client registration, PKCE S256,
   audience bound tokens, refresh rotation with reuse detection and immediate revocation.
   Claude.ai and ChatGPT are given one URL and never see a password or an app password

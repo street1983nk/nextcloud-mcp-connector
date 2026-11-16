@@ -26,7 +26,8 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
 ## Was er kann
 
 - 27 Tools über zehn App-Familien: Dateien, Kalender, Aufgaben (Tasks), Notizen, Deck,
-  Kontakte, Tables, Talk, Mail und die cloud-weite Suche
+  Kontakte, Tables, Talk, Mail und die cloud-weite Suche; 31, wenn der Admin die optionalen
+  Schreib-Tools einschaltet (`files_update`, `tasks_complete`, `tasks_update`, `tasks_move`)
 - OAuth 2.1 nach der MCP-Autorisierungsspezifikation: dynamische Client-Registrierung,
   PKCE S256, zielgebundene Token, Refresh-Rotation mit Wiederverwendungserkennung und
   sofortigem Entzug. Claude.ai und ChatGPT bekommen eine URL und sehen nie ein Passwort

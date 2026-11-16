@@ -26,7 +26,9 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
 ## Ce qu'il sait faire
 
 - 27 outils répartis sur dix familles d'applications : fichiers, agenda, tâches (Tasks),
-  notes, Deck, contacts, Tables, Talk, Mail et la recherche à l'échelle du cloud
+  notes, Deck, contacts, Tables, Talk, Mail et la recherche à l'échelle du cloud ; 31 lorsque
+  l'administrateur active les outils d'écriture optionnels (`files_update`, `tasks_complete`,
+  `tasks_update`, `tasks_move`)
 - OAuth 2.1 conforme à la spécification d'autorisation MCP : enregistrement dynamique des
   clients, PKCE S256, jetons liés à leur audience, rotation des jetons de rafraîchissement
   avec détection de réutilisation et révocation immédiate. Claude.ai et ChatGPT reçoivent une
