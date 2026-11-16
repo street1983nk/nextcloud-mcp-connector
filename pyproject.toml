@@ -32,7 +32,7 @@ documents = [
     "python-docx>=1.2,<2",
     "openpyxl>=3.1,<4",
     "python-pptx>=1.0,<2",
-    "pypdf>=6.19,<7",
+    "pypdf>=6.19,<8",
 ]
 
 [project.scripts]
