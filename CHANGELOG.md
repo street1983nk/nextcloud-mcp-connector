@@ -11,6 +11,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `profile_fields_browse`: an optional read-only tool for the Nextcloud app Profile Fields,
+  off by default. 27 tools by default, 28 with the switch on.
+- The switch "Allow reading Profile Fields" (`NC_MCP_PROFILE_FIELDS_READ`) is in the admin
+  settings of this app and declared as an environment variable, so an installation from the
+  app store can switch the tool on. A change takes effect after you disable and enable this
+  app again.
+- Levels: `me` for the own visible fields; `definitions`, `values` and `search` use routes
+  the app reserves for administrators. Only OCS GET requests with the permissions of the
+  connected account; nothing is created, changed or deleted.
+- The switch steers this tool only. The search (`unified_search`, `search`,
+  `prepare_context`) reaches the search provider of the app with or without it and follows
+  the permissions of the app: an administrator finds private values, every other account
+  only values the app shows it.
+- Measured on Nextcloud 34 with Profile Fields 4.0.0. Not measured on Nextcloud 35: the app
+  store carries only a nightly of the app for 35.
+
 ## [0.8.0] - 2026-11-14
 
 ### Added

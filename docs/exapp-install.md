@@ -84,6 +84,26 @@ registration variable. Measured on Nextcloud 35 on 2026-11-14, both the attempt
 without `--update-only` that left the switch on and the one with it
 ([raw/33-10-nc35.txt](../.planning/phases/33-aufgaben-aendern/raw/33-10-nc35.txt)).
 
+### Profile Fields switch
+
+One more switch ships off, and it adds a read tool: `NC_MCP_PROFILE_FIELDS_READ`, config
+key `profile_fields_read`, label "Allow reading Profile Fields". With it on,
+`profile_fields_browse` reads the fields of the Profile Fields app with the permissions of
+the connected account, which makes 28 tools with the write switches off. It is set the same
+three ways as the write switches above and takes effect after the app was disabled and
+enabled again:
+
+```
+occ app_api:app:config:set mcp_connector profile_fields_read --value on
+occ app_api:app:disable mcp_connector
+occ app_api:app:enable mcp_connector
+```
+
+The switch is not an access control: the search of this connector reaches the search
+provider of that app with or without it and follows the permissions of that app. The tool
+is measured on Nextcloud 34 with Profile Fields 4.0.0 and not on Nextcloud 35, for which
+the app store carries only a nightly of that app.
+
 Check that it came up:
 
 ```
