@@ -91,7 +91,7 @@ angeschaltet lassen, wenn der Client sie anbietet.
 
 ## 7. Das Audit-Log anschalten
 
-Standardmäßig aus, ein Schalter in den Verwaltungseinstellungen dieser App.
+Standardmäßig aus, ein Schalter in den Administrationseinstellungen dieser App.
 Angeschaltet wird jeder Werkzeugaufruf festgehalten mit Konto, Werkzeug,
 Zeit, aufrufender App und Ausgang, nie mit einem Parameterwert oder einem
 Teil eines Ergebnisses. Die Einträge sind Hash-verkettet;
@@ -132,7 +132,7 @@ machen; mit der eigenen Ordnerstruktur testen, nicht nur auf dem Papier.
 `profile_fields_browse` liest die Felder der App Profile Fields. Es ist
 standardmäßig aus und wird nur mit `NC_MCP_PROFILE_FIELDS_READ=on`
 registriert, gesetzt als Deploy-Variable oder über das Kästchen "Allow
-reading Profile Fields" in den Verwaltungseinstellungen dieser App. Eine
+reading Profile Fields" in den Administrationseinstellungen dieser App. Eine
 Änderung wirkt, nachdem die App einmal deaktiviert und wieder aktiviert
 wurde.
 

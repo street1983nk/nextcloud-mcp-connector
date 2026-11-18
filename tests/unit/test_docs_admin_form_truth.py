@@ -68,8 +68,8 @@ PLACE = {
         re.compile(r"Administration settings, Security, MCP Connector"),
     ),
     "de": (
-        re.compile(r"Verwaltungseinstellungen,"),
-        re.compile(r"Verwaltungseinstellungen, Sicherheit, MCP Connector"),
+        re.compile(r"(?:Verwaltungs|Administrations)einstellungen,"),
+        re.compile(r"Administrationseinstellungen, Sicherheit, MCP Connector"),
     ),
     "fr": (
         re.compile(r"Paramètres d'administration,"),
@@ -229,6 +229,18 @@ def test_every_page_names_the_security_section(name: str, path: Path, lang: str)
 
     assert PLACE[lang][0].search(fold(text)), f"{name} no longer names the form's place"
     assert place_problems(text, lang) == [], name
+
+
+#: Nextcloud's German interface calls the area "Administrationseinstellungen" (apps/settings
+#: l10n de and de_DE, measured on 34.0.3); a German page that says otherwise sends the reader
+#: looking for a menu that does not exist.
+GERMAN_PAGES = sorted(ROOT.glob("*.de.md")) + sorted((ROOT / "docs").glob("*.de.md"))
+
+
+@pytest.mark.parametrize("path", GERMAN_PAGES, ids=[path.name for path in GERMAN_PAGES])
+def test_german_pages_use_the_nextcloud_term(path: Path) -> None:
+    text = read(path)
+    assert "Verwaltungseinstellung" not in text, f"{path.name}: use Administrationseinstellungen"
 
 
 def test_the_place_constant_is_the_one_the_pages_use() -> None:
