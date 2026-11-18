@@ -15,7 +15,8 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
 ### Hinzugefügt
 
 - `profile_fields_browse`: ein optionales Tool nur zum Lesen für die Nextcloud-App Profile
-  Fields, ab Werk aus. 27 Tools im Standard, 28 mit eingeschaltetem Schalter.
+  Fields, ab Werk aus. 27 Tools im Standard, 28 mit eingeschaltetem Schalter. Danke an
+  @vitormattos (#49).
 - Der Schalter "Allow reading Profile Fields" (`NC_MCP_PROFILE_FIELDS_READ`) steht in den
   Admin-Einstellungen dieser App und ist als Umgebungsvariable deklariert, damit eine
   Installation aus dem App Store das Tool einschalten kann. Eine Änderung wirkt, nachdem die

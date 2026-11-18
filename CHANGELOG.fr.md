@@ -17,7 +17,7 @@ dans [CHANGELOG.md](CHANGELOG.md).
 
 - `profile_fields_browse` : un outil facultatif en lecture seule pour l'application
   Nextcloud Profile Fields, désactivé par défaut. 27 outils par défaut, 28 avec le
-  commutateur activé.
+  commutateur activé. Merci à @vitormattos (#49).
 - Le commutateur « Allow reading Profile Fields » (`NC_MCP_PROFILE_FIELDS_READ`) figure
   dans les paramètres d'administration de cette application et est déclaré comme variable
   d'environnement, pour qu'une installation depuis l'App Store puisse activer l'outil. Un

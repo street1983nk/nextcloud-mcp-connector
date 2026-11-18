@@ -14,7 +14,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - `profile_fields_browse`: an optional read-only tool for the Nextcloud app Profile Fields,
-  off by default. 27 tools by default, 28 with the switch on.
+  off by default. 27 tools by default, 28 with the switch on. Thanks to @vitormattos (#49).
 - The switch "Allow reading Profile Fields" (`NC_MCP_PROFILE_FIELDS_READ`) is in the admin
   settings of this app and declared as an environment variable, so an installation from the
   app store can switch the tool on. A change takes effect after you disable and enable this
