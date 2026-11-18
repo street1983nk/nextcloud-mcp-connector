@@ -640,6 +640,21 @@ def test_the_byte_gate_measures_with_every_switch_on() -> None:
     assert standard == EXPECTED_TOOLS
 
 
+def test_the_acceptance_run_hands_on_every_switch_of_the_gates() -> None:
+    """A switch the acceptance run does not hand on to the server it starts is a tool that
+    run never sees, and it says nothing about it: the expected set of the run is the registry
+    of that server. ``NC_MCP_PROFILE_FIELDS_READ`` was missing there until 0.9.0."""
+    path = Path(__file__).resolve().parents[2] / "scripts" / "acceptance_all_tools.py"
+    spec = importlib.util.spec_from_file_location("acceptance_all_tools", path)
+    if spec is None or spec.loader is None:  # pragma: no cover - a missing script is a red test
+        raise RuntimeError(f"{path} could not be loaded")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert set(module.FORWARDED_SWITCHES) == set(SWITCHES)
+    assert len(module.FORWARDED_SWITCHES) == len(set(module.FORWARDED_SWITCHES))
+
+
 def test_the_byte_gate_refuses_a_planted_size() -> None:
     """Counter proof through the check the gate runs: one byte over a limit is a finding."""
     gate = _load_budget_gate()
