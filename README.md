@@ -106,6 +106,7 @@ hand: a contract test reads the live registry and fails if a name or a level dis
 | `talk_send` | create-only | One message into a conversation; never edited or deleted, switchable off instance wide |
 | `mail_browse` | read | Mail accounts, their mailboxes and message envelopes; strictly read only |
 | `contacts_search` | read | Address book contacts |
+| `profile_fields_browse` | read | Fields of the Profile Fields app: own values, and for administrators definitions, values of one account and an exact search; available only when the admin enables `NC_MCP_PROFILE_FIELDS_READ` |
 | `unified_search` | read | The Nextcloud unified search across providers, permission aware |
 | `prepare_context` | read | Files, notes, cards, the next week of events, waiting Talk conversations and unread mail counts in one call |
 | `search` | read | OpenAI compatible search entry point, delegates to unified search |

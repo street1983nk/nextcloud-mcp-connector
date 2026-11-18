@@ -23,13 +23,16 @@ TOTAL = 27
 # The same registry with every switch on: the default plus every optional tool. 28 in plan
 # 33-02 (files_update), 29 since plan 33-06 (tasks_complete), 30 since plan 33-07
 # (tasks_update), 31 since plan 33-08 (tasks_move), all three behind NC_MCP_TASKS_UPDATE.
-TOTAL_SWITCHED_ON = 31
+# 32 since 0.9.0 (profile_fields_browse behind NC_MCP_PROFILE_FIELDS_READ).
+TOTAL_SWITCHED_ON = 32
 
 # The optional tools that carry a class entry: tasks_complete since plan 33-06, tasks_update
-# since plan 33-07 and tasks_move since plan 33-08 (all UNAFFECTED). files_update stays
-# unclassified as before phase 33. Named as a literal, so a new entry has to pass this door
-# on purpose like a standard tool.
-CLASSIFIED_OPTIONAL = frozenset({"tasks_complete", "tasks_update", "tasks_move"})
+# since plan 33-07, tasks_move since plan 33-08 and profile_fields_browse since 0.9.0 (all
+# UNAFFECTED). files_update stays unclassified as before phase 33. Named as a literal, so a
+# new entry has to pass this door on purpose like a standard tool.
+CLASSIFIED_OPTIONAL = frozenset(
+    {"tasks_complete", "tasks_update", "tasks_move", "profile_fields_browse"}
+)
 
 
 async def _tools() -> dict[str, Tool]:

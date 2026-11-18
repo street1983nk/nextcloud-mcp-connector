@@ -13,6 +13,11 @@ Plans 33-06 to 33-08 add ``tasks_complete``, ``tasks_update`` and ``tasks_move``
 ``OPTIONAL_TOOLS``, each with ``NC_MCP_TASKS_UPDATE``; that switch is set on already, so a
 tool behind it that registers without an entry here is found as "neither standard nor
 optional" the day it appears.
+
+0.9.0 adds ``profile_fields_browse`` behind ``NC_MCP_PROFILE_FIELDS_READ``, the first optional
+tool that only reads. It registers in ``server/opt_profile_fields.py`` and not in a bundle,
+and it stood outside this list at first, which is the gap of phase 33 once more: no gate
+of this folder saw it.
 """
 
 import functools
@@ -31,6 +36,7 @@ OPTIONAL_TOOLS: dict[str, str] = {
     "tasks_complete": "NC_MCP_TASKS_UPDATE",
     "tasks_update": "NC_MCP_TASKS_UPDATE",
     "tasks_move": "NC_MCP_TASKS_UPDATE",
+    "profile_fields_browse": "NC_MCP_PROFILE_FIELDS_READ",
 }
 
 #: The variable of the modifying task tools (D-33-01). Named here as well as through

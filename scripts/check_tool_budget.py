@@ -5,7 +5,8 @@ Exit code 1 when the budget is exceeded, plus the five biggest tools so a regres
 immediately attributable.
 
 Measured with every switch on since phase 33 (TMOD-05, pitfall 6 of 33-RESEARCH.md): the
-optional tools register only behind ``NC_MCP_FILES_UPDATE`` and ``NC_MCP_TASKS_UPDATE``, and a
+optional tools register only behind ``NC_MCP_FILES_UPDATE``, ``NC_MCP_TASKS_UPDATE`` and
+``NC_MCP_PROFILE_FIELDS_READ`` (the last one since 0.9.0), and a
 gate that weighs the default registry never sees them, neither in the total nor under the per
 tool ceiling. The switches are read when ``mcp_connector.server`` is imported, so each state
 is measured in a fresh interpreter, and the script sets them itself: the CI call stays as it
@@ -20,7 +21,7 @@ from typing import Any
 
 #: The switches the authoritative measurement turns on; held equal to the ones of the
 #: contract gates by ``tests/contract/test_tool_surface.py``.
-SWITCHES = ("NC_MCP_FILES_UPDATE", "NC_MCP_TASKS_UPDATE")
+SWITCHES = ("NC_MCP_FILES_UPDATE", "NC_MCP_TASKS_UPDATE", "NC_MCP_PROFILE_FIELDS_READ")
 
 _MEASURE = """
 import asyncio, json
@@ -180,6 +181,16 @@ print(json.dumps(asyncio.run(main())))
 #   Budget      22198 + 15 percent = 25527.7, rounded up to the next 500 = 26000 bytes,
 #               anchored by the house rule on the measured end state (D-33-04, TMOD-05).
 #               It is the number plan 33-08 wrote, because the surface did not move since.
+#
+#   Measurement 2026-11-18, 32 tools with every switch on: 23109 bytes; standard state
+#               18770 bytes, 27 tools. profile_fields_browse behind
+#               NC_MCP_PROFILE_FIELDS_READ joins the measurement (0.9.0); it is 911 bytes,
+#               below the per tool ceiling, which stays where it is. Until this line the tool
+#               registered behind a switch this gate did not set, so it was never weighed.
+#   Budget      unchanged at 26000, because the measurement fits below it. The house rule
+#               reads 23109 + 15 percent = 26575.35, rounded up to the next 500 = 27000 on
+#               this number; that is arithmetic and not a decision, and a budget is lifted
+#               against a measurement that needs it.
 BUDGET_BYTES = 26_000
 
 # The second claim, and the one that actually reports a regression. A total with headroom

@@ -38,6 +38,11 @@ FORBIDDEN_PARAMS: frozenset[str] = frozenset(
 #: :data:`FORBIDDEN_PARAMS`. A tool without an entry here is a failure of the contract test
 #: and not a silently empty set, because an empty set would look like a decision.
 #:
+#: ``profile_fields_browse`` (0.9.0) is narrower than its schema on purpose: ``level``,
+#: ``limit`` and ``offset`` only. ``user_uid``, ``field_keys``, ``field_key`` and ``value``
+#: stay out, because they exist to name an account or a profile value, and ``level`` already
+#: says which kind of read it was.
+#:
 #: The name has to be spelled in capitals, and that is not taste:
 #: ``tests/contract/test_no_destructive_calls.py:635`` takes ``target.id.isupper()`` as the
 #: only exemption from the ban on module level mutable state (D-20), so a lowercase
@@ -63,6 +68,7 @@ PARAM_ALLOWLIST: Mapping[str, frozenset[str]] = {
     "notes_read": frozenset({"note_id"}),
     "notes_search": frozenset({"limit", "query"}),
     "prepare_context": frozenset({"detail", "query"}),
+    "profile_fields_browse": frozenset({"level", "limit", "offset"}),
     "search": frozenset({"query"}),
     "tables_browse": frozenset({"cursor", "level", "limit", "table_id"}),
     "tables_create_row": frozenset({"table_id"}),
