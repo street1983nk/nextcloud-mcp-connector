@@ -106,15 +106,16 @@ LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "::1", "localhost"})
 #: is looking at, and a second spelling there would be a string that drifts silently.
 PUBLIC_URL_KEY = "public_url"
 
-#: The seven keys, in the order the form declares its fields. They are the field ids of the
+#: The ten keys, in the order the form declares its fields. They are the field ids of the
 #: admin form and the configuration keys at the same time (see the module docstring).
 #: ``oauth_cimd`` stands next to ``oauth_dcr`` because the code reads the two as one answer
 #: (``registry.client_policy``: this switch AND the DCR switch), and two coupled switches
 #: that sit apart in a form are two switches an administrator reads as independent.
 #: ``talk_send`` comes after them for the same reason read the other way round: it is
 #: independent of all four OAuth values, and putting it between them would tear that grouping
-#: apart. ``audit_log`` is last and joined in phase 18; it is about none of the six above,
-#: because it is about this app watching itself rather than about who may reach it.
+#: apart. ``audit_log`` joined in phase 18; it is about none of the six above, because it is
+#: about this app watching itself rather than about who may reach it. The three opt-in
+#: switches ``files_update``, ``tasks_update`` and ``profile_fields_read`` follow it.
 CONFIG_KEYS: tuple[str, ...] = (
     PUBLIC_URL_KEY,
     "oauth_dcr",
