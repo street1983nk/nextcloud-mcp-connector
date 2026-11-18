@@ -123,7 +123,7 @@ variable. A store installation needs this: with a single Docker daemon, Nextclou
 an ExApp without asking for deploy options, so `--env` never happens and every declared
 variable arrives empty.
 
-The form sits in **Administration settings, Security, MCP Connector** and carries six
+The form sits in **Administration settings, Security, MCP Connector** and carries ten
 fields:
 
 | Field | Config key | What it sets |
@@ -134,15 +134,21 @@ fields:
 | Only allow the clients listed below | `oauth_allowlist_only` | `NC_MCP_OAUTH_ALLOWLIST_ONLY` |
 | Allowed clients | `oauth_allowed_clients` | `NC_MCP_OAUTH_ALLOWED_CLIENTS` |
 | Let assistant apps send Talk messages | `talk_send` | `NC_MCP_TALK_SEND` |
+| Keep a record of tool calls | `audit_log` | `NC_MCP_AUDIT_LOG` |
+| Allow editing existing text files | `files_update` | `NC_MCP_FILES_UPDATE` |
+| Allow changing existing tasks | `tasks_update` | `NC_MCP_TASKS_UPDATE` |
+| Allow reading Profile Fields | `profile_fields_read` | `NC_MCP_PROFILE_FIELDS_READ` |
 
-**Not every field of this form is about OAuth.** The last one is not: it decides whether
+**Not every field of this form is about OAuth.** The last five are not. The four after
+`talk_send` ship off; the write switches and the Profile Fields switch are described in
+[exapp-install.md](./exapp-install.md). The Talk field decides whether
 `talk_send` may post a message into a Talk conversation at all, for every account of this
 instance and regardless of what an account is allowed to do in Talk itself. It is on unless
 it is switched off, reading conversations and their history is never affected by it, and like
-the other five it takes effect after this app has been disabled and enabled again.
+every other field it takes effect after this app has been disabled and enabled again.
 
-**The last field is new and takes effect with 0.1.4**, together with the Talk family it
-belongs to. The field above it arrived with 0.1.3: in 0.1.2 the form carries four fields and
+**The Talk field arrived with 0.1.4**, together with the Talk family it belongs to. The
+`oauth_cimd` field arrived with 0.1.3: in 0.1.2 the form carries four fields and
 `NC_MCP_OAUTH_CIMD` can only be set as a deploy variable, which a store installation never
 receives, so on such an installation that switch could not be set at all. The document way
 itself is not in 0.1.2 either, so nothing was reachable and unswitchable in a released

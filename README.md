@@ -137,8 +137,8 @@ missing app is answered in one sentence, never with an empty result.
 - Needs the Profile Fields app, installed and enabled.
 - Switch: "Allow reading Profile Fields" (`NC_MCP_PROFILE_FIELDS_READ`), read at start. A
   missing, off or unrecognized value leaves the tool off.
-  - Installed from the app store: tick the box under Administration settings, MCP Connector,
-    or run `occ app_api:app:config:set mcp_connector profile_fields_read --value on` (with
+  - Installed from the app store: tick the box under Administration settings, Security, MCP
+    Connector, or run `occ app_api:app:config:set mcp_connector profile_fields_read --value on` (with
     `--update-only` once the key exists). A change takes effect after you disable and enable
     this app again.
   - Every other mode: set `NC_MCP_PROFILE_FIELDS_READ=on` in the environment of the server

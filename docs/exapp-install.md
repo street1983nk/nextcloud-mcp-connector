@@ -30,7 +30,7 @@ is served under a different domain than Nextcloud, or when the prefix differs. W
 usable address it names a loopback default and no assistant can complete a connection.
 
 - **Installed from the app store:** enter it in Nextcloud, under Administration settings,
-  MCP Connector. A store installation has no way to pass a deploy variable, so this is the
+  Security, MCP Connector. A store installation has no way to pass a deploy variable, so this is the
   way there, and the value entered here wins over the variable and over the derivation.
 - **Registered with occ:** the `--env` value is the override for the derivation; pass it at
   registration time when you need it, because the daemon injects a variable only then:
@@ -54,7 +54,7 @@ anything.
 | `NC_MCP_TASKS_UPDATE` | `tasks_update` | Allow changing existing tasks | `tasks_complete`, `tasks_update`, `tasks_move`: complete or reopen, edit and move one existing task, only with the ETag from `tasks_read` |
 
 - **Installed from the app store:** tick the box in Nextcloud, under Administration settings,
-  MCP Connector.
+  Security, MCP Connector.
 - **Registered with occ:** pass `--env "NC_MCP_TASKS_UPDATE=on"` (or
   `NC_MCP_FILES_UPDATE=on`) at registration time, like the public address above.
 - **Changing a running installation with occ:** the value lives under the config key, and a

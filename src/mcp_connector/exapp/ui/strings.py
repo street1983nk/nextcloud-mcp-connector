@@ -678,10 +678,11 @@ ADMIN_SETTINGS_TITLE = "MCP Connector"
 
 ADMIN_SETTINGS_DESCRIPTION = (
     "Settings an installation from the app store needs. A field left empty keeps whatever the "
-    "deploy environment of the container sets, and a value set here wins over it. The first "
-    "five fields are about connecting an assistant app; the two switches after them are not: "
-    "one decides whether an assistant may send a Talk message through this app, the other "
-    "whether this app keeps a record of tool calls. Changes take effect after you disable and "
+    "deploy environment of the container sets, and a value set here wins over it. Of the ten "
+    "fields, the first five are about connecting an assistant app. The five switches after "
+    "them decide whether an assistant may send a Talk message through this app, whether this "
+    "app keeps a record of tool calls, and whether assistants may edit existing text files, "
+    "change existing tasks and read Profile Fields. Changes take effect after you disable and "
     "enable this app again."
 )
 

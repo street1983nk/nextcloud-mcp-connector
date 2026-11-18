@@ -152,8 +152,8 @@ Satz beantwortet, nie mit einem leeren Ergebnis.
 - Voraussetzung: Die App Profile Fields ist installiert und aktiviert.
 - Schalter: "Allow reading Profile Fields" (`NC_MCP_PROFILE_FIELDS_READ`), wird beim Start
   gelesen. Ein fehlender, ausgeschalteter oder unbekannter Wert lässt das Tool aus.
-  - Aus dem App Store installiert: Haken unter Verwaltungseinstellungen, MCP Connector,
-    setzen oder `occ app_api:app:config:set mcp_connector profile_fields_read --value on`
+  - Aus dem App Store installiert: Haken unter Verwaltungseinstellungen, Sicherheit, MCP
+    Connector, setzen oder `occ app_api:app:config:set mcp_connector profile_fields_read --value on`
     ausführen (mit `--update-only`, sobald der Schlüssel existiert). Eine Änderung wirkt,
     nachdem die App einmal deaktiviert und wieder aktiviert wurde.
   - Jeder andere Modus: `NC_MCP_PROFILE_FIELDS_READ=on` in der Umgebung des Servers setzen

@@ -156,8 +156,8 @@ manquante reçoit une réponse en une phrase, jamais un résultat vide.
 - Prérequis : l'application Profile Fields est installée et activée.
 - Commutateur : « Allow reading Profile Fields » (`NC_MCP_PROFILE_FIELDS_READ`), lu au
   démarrage. Une valeur absente, désactivée ou inconnue laisse l'outil désactivé.
-  - Installation depuis l'App Store : cocher la case dans Paramètres d'administration, MCP
-    Connector, ou exécuter
+  - Installation depuis l'App Store : cocher la case dans Paramètres d'administration,
+    Sécurité, MCP Connector, ou exécuter
     `occ app_api:app:config:set mcp_connector profile_fields_read --value on` (avec
     `--update-only` dès que la clé existe). Un changement prend effet après avoir désactivé
     puis réactivé l'application.
