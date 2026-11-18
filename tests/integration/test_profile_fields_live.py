@@ -12,12 +12,20 @@ running Nextcloud, through a real MCP client over Streamable HTTP:
 *   an account reads its own value and never the value of the other account,
 *   an account without administrator rights gets no foreign value over any level of the
     tool, while an administrator gets exactly that value with exactly those arguments (the
-    positive control, without which the refusal could be an empty pass).
+    positive control, without which the refusal could be an empty pass),
+*   the switch steers the tool and nothing else: the app registers a search provider of
+    its own (``profile_fields.directory``), and ``unified_search`` asks every installed
+    provider, so with the switch **off** the search still answers from the app, with the
+    permissions of the app. Measured and held here: an administrator finds a private
+    value that way, an account without administrator rights finds no private value of
+    another account, and it does find a value the app shares with every signed-in
+    account (the positive control of that absence).
 
 The world is built and checked a second time **without** the code under test: the field,
 the two values and the counter check of the app's own guard go through plain ``httpx``
 requests against the OCS routes of the app (``lib/Controller`` of profile_fields 4.0.0:
-``POST /definitions``, ``PUT /users/{uid}/values/{id}``, ``GET /users/{uid}/values``).
+``POST /definitions``, ``PUT /users/{uid}/values/{id}``, ``GET /users/{uid}/values``),
+and the search is asked a second time at the provider route of Nextcloud itself.
 The module creates its own administrator with a random password, passed through the
 environment of ``docker exec`` and never through an argument, and deletes it again, so it
 depends on no administrator password of the instance. The two markers are random and
@@ -94,12 +102,20 @@ LIST_SWITCHES = (
 )
 API = "/ocs/v2.php/apps/profile_fields/api/v1"
 OCS_HEADERS = {"OCS-APIRequest": "true", "Accept": "application/json"}
+SEARCH_TOOL = "unified_search"
+#: ``ProfileFieldSearchProvider::getId`` of profile_fields 4.0.0.
+SEARCH_PROVIDER = "profile_fields.directory"
+SEARCH_ROUTE = f"/ocs/v2.php/search/providers/{SEARCH_PROVIDER}/search"
 STAMP = uuid.uuid4().hex[:8]
 
 
 @dataclasses.dataclass(frozen=True)
 class World:
-    """One private text field with one value per account, and who may read all of it."""
+    """One private text field with one value per account, and who may read all of it.
+
+    ``shared_value`` is the value of alice in a second field the app shows to every
+    signed-in account: what an account without administrator rights may find.
+    """
 
     base_url: str
     field_key: str
@@ -109,6 +125,7 @@ class World:
     bob: tuple[str, str]
     alice_value: str
     bob_value: str
+    shared_value: str
 
 
 def demand(reason: str) -> NoReturn:
@@ -207,9 +224,17 @@ def world(env: dict[str, str], admin: tuple[str, str]) -> Iterator[World]:
     may read it (``FieldAccessService::canViewValue``). The visibility each value really
     got is read back from the answer, because the refusals below are only worth something
     for a value that is private.
+
+    The second field carries ``exposurePolicy=users``, so its value starts with the
+    visibility ``users`` (``FieldExposurePolicy::initialVisibility``) and the search
+    provider of the app hands it to every signed-in account
+    (``ProfileFieldDirectorySearchService::isSearchableForActor``). It exists for one
+    reason: an empty search answer for bob is only a refusal if the same search finds
+    something for bob at all.
     """
     key = f"mcp_live_{STAMP}"
     marks = {name: f"pf-{name}-{uuid.uuid4().hex[:12]}" for name in ("alice", "bob")}
+    shared_mark = f"pf-shared-{uuid.uuid4().hex[:12]}"
     with httpx.Client(
         base_url=env["base_url"] + API, auth=admin, headers=OCS_HEADERS, timeout=30.0
     ) as http:
@@ -229,7 +254,30 @@ def world(env: dict[str, str], admin: tuple[str, str]) -> Iterator[World]:
         )
         field_id = created["id"]
         assert isinstance(field_id, int), created
+        shared_id: int | None = None
         try:
+            shared = _ocs_data(
+                http.post(
+                    "/definitions",
+                    json={
+                        "fieldKey": f"mcp_live_shared_{STAMP}",
+                        "label": f"MCP live shared {STAMP}",
+                        "type": "text",
+                        "editPolicy": "admins",
+                        "exposurePolicy": "users",
+                    },
+                ),
+                "create the shared field definition",
+                201,
+            )
+            shared_id = shared["id"]
+            assert isinstance(shared_id, int), shared
+            stored = _ocs_data(
+                http.put(f"/users/{env['alice']}/values/{shared_id}", json={"value": shared_mark}),
+                "store the shared value of alice",
+                200,
+            )
+            assert stored["current_visibility"] == "users", stored
             for name in ("alice", "bob"):
                 stored = _ocs_data(
                     http.put(f"/users/{env[name]}/values/{field_id}", json={"value": marks[name]}),
@@ -247,9 +295,12 @@ def world(env: dict[str, str], admin: tuple[str, str]) -> Iterator[World]:
                 bob=(env["bob"], env["bob_secret"]),
                 alice_value=marks["alice"],
                 bob_value=marks["bob"],
+                shared_value=shared_mark,
             )
         finally:
             http.delete(f"/definitions/{field_id}")
+            if shared_id is not None:
+                http.delete(f"/definitions/{shared_id}")
 
 
 # --- the two servers ------------------------------------------------------------------
@@ -503,3 +554,90 @@ def test_the_app_itself_refuses_bob_the_values_of_alice(world: World) -> None:
     as_bob = httpx.get(url, auth=world.bob, headers=OCS_HEADERS, timeout=30.0)
     assert as_bob.status_code >= 400, f"bob is answered with HTTP {as_bob.status_code}"
     assert world.alice_value not in as_bob.text
+
+
+# --- the search, which the switch does not steer ----------------------------------------
+
+
+async def directory_hits(url: str, account: tuple[str, str], term: str) -> list[dict[str, Any]]:
+    """The hits ``unified_search`` hands ``account`` from the provider of the app, and only it.
+
+    A provider that was not asked or did not answer appears under ``degraded``; that is a
+    broken measurement and never an empty result, so it fails here.
+    """
+    answer = await call(
+        url, account, SEARCH_TOOL, {"query": term, "providers": SEARCH_PROVIDER, "limit": 100}
+    )
+    broken = [
+        entry for entry in answer.get("degraded", []) if entry.get("provider") == SEARCH_PROVIDER
+    ]
+    assert not broken, f"{SEARCH_PROVIDER} did not answer {account[0]}: {broken}"
+    hits = answer["results"]
+    assert all(hit["provider"] == SEARCH_PROVIDER for hit in hits), hits
+    return hits
+
+
+async def test_the_search_follows_the_app_with_the_switch_off(
+    server_off: str, world: World
+) -> None:
+    """What ``unified_search`` hands out from the app while ``profile_fields_browse`` is off.
+
+    The server is the one without the switch, so the tool is not registered (held above),
+    and the search still reaches the provider of the app. The line printed here is the
+    record of that state; the CI step reads it back.
+    """
+    admin_private = await directory_hits(server_off, world.admin, world.alice_value)
+    bob_private = await directory_hits(server_off, world.bob, world.alice_value)
+    bob_shared = await directory_hits(server_off, world.bob, world.shared_value)
+    print(
+        f"PROFILE-FIELDS search without switch: private value admin={len(admin_private)} "
+        f"bob={len(bob_private)}, shared value bob={len(bob_shared)}"
+    )
+
+    # The positive control of the refusal below: this search, this term and this server do
+    # find the private value of alice, for the one account the app allows it to.
+    assert len(admin_private) == 1, admin_private
+    assert world.alice_value in json.dumps(admin_private)
+    # And the provider does answer an account without administrator rights at all.
+    assert len(bob_shared) == 1, bob_shared
+    assert world.shared_value in json.dumps(bob_shared)
+    # The refusal itself.
+    assert bob_private == []
+
+
+async def test_bob_finds_no_private_value_over_any_search(server_off: str, world: World) -> None:
+    """The same question asked wider: a part of the value, and every provider at once.
+
+    The provider of the app matches a part of a value, so the stem every marker of alice
+    starts with is a term of its own; the administrator is its positive control. The second
+    half leaves ``providers`` empty, which is how an assistant searches by default. The
+    answer repeats the term under ``query``, so only ``results`` is read.
+    """
+    stem = world.alice_value[: len("pf-alice-") + 4]
+    assert world.alice_value in json.dumps(await directory_hits(server_off, world.admin, stem))
+    assert world.alice_value not in json.dumps(await directory_hits(server_off, world.bob, stem))
+
+    for term in (world.alice_value, stem):
+        answer = await call(server_off, world.bob, SEARCH_TOOL, {"query": term, "limit": 100})
+        assert world.alice_value not in json.dumps(answer["results"]), term
+
+
+def test_the_app_itself_answers_the_search_the_same_way(world: World) -> None:
+    """The counter check without the connector: the provider route of Nextcloud, asked directly.
+
+    What the search of this project handed out above is what the app hands the same account
+    without it: the private value for the administrator, nothing for bob, and the shared
+    value for bob. The filter is the app's and not one of this project.
+    """
+    url = f"{world.base_url}{SEARCH_ROUTE}"
+
+    def asked(account: tuple[str, str], term: str) -> str:
+        response = httpx.get(
+            url, params={"term": term}, auth=account, headers=OCS_HEADERS, timeout=30.0
+        )
+        assert response.status_code == 200, f"{account[0]}: HTTP {response.status_code}"
+        return json.dumps(response.json()["ocs"]["data"]["entries"])
+
+    assert world.alice_value in asked(world.admin, world.alice_value)
+    assert world.shared_value in asked(world.bob, world.shared_value)
+    assert world.alice_value not in asked(world.bob, world.alice_value)

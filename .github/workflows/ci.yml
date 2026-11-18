@@ -390,6 +390,10 @@ jobs:
           fi
           cat profile-fields-live.txt
           grep -E 'PROFILE-FIELDS tools without switch=27 with switch=28' profile-fields-live.txt
+          # The switch steers the tool only: the search provider of the app answers with the
+          # switch off, and the line says to whom. An administrator finds the private value,
+          # the account without administrator rights does not, and it does find the shared one.
+          grep -F 'PROFILE-FIELDS search without switch: private value admin=1 bob=0, shared value bob=1' profile-fields-live.txt
           if grep -E '[0-9]+ (skipped|deselected)' profile-fields-live.txt > /dev/null; then
             echo "::error title=Profile Fields live proof incomplete::pytest skipped or deselected a test of the live proof."
             exit 1

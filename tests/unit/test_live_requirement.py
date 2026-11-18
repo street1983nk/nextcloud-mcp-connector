@@ -197,6 +197,15 @@ def test_the_integration_job_proves_profile_fields_after_its_suite() -> None:
     assert 'NC_MCP_PROFILE_FIELDS_READ: "on"' in step
     assert "NC_MCP_E2E_NEXTCLOUD: nc-mcp-test" in step
     assert "PROFILE-FIELDS tools without switch=27 with switch=28" in step
+    # The search is measured with the switch off: who finds a private value, and who does not.
+    assert (
+        "PROFILE-FIELDS search without switch: private value admin=1 bob=0, shared value bob=1"
+        in step
+    )
+    live = (ROOT / "tests" / "integration" / "test_profile_fields_live.py").read_text(
+        encoding="utf-8"
+    )
+    assert "PROFILE-FIELDS search without switch: private value admin=" in live
     assert "(skipped|deselected)" in step
 
 
