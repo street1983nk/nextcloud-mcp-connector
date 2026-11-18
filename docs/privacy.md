@@ -128,6 +128,35 @@ but an operator has to account for this flow:
   or European LLM) keeps this flow inside your own control and is the way to avoid
   the third country transfer entirely.
 
+### Profile values of the Profile Fields app
+
+Profile values are personal data of the accounts they describe. Where the Profile
+Fields app is installed, they reach an assistant on two ways:
+
+- `profile_fields_browse`, an opt-in tool that is off by default. It registers only
+  with `NC_MCP_PROFILE_FIELDS_READ=on`, set as a deploy variable or with the box
+  "Allow reading Profile Fields" in the admin settings of this app. It reads the own
+  values of the connected account; for an administrator account also the field
+  definitions, selected values of one other account by its UID and an exact search
+  for one field value. Read only, with the permissions of the connected account as
+  the app enforces them; the connector adds no rule of its own.
+- The search. The app registers a search provider, and `unified_search`, `search`
+  and `prepare_context` ask it whether the switch is on or off. The search follows
+  the permissions of the app: an administrator account finds private values of other
+  accounts, every other account finds only values the app shows it.
+
+For an operator this means: the switch decides about one tool and is not an access
+control, and an assistant connected with an administrator account can read private
+profile values of other accounts through the search. Do not connect an administrator
+account to an assistant, and use the visibility settings of the app for values that
+must stay out of the search. The audit log records at most the parameter names
+`level`, `limit` and `offset` of a `profile_fields_browse` call, never a UID, a field
+key or a value.
+
+The tool is held by `tests/unit/test_profile_fields_tools.py`. The behaviour against
+a running Nextcloud (34, Profile Fields 4.0.0), the search included, is measured by
+`tests/integration/test_profile_fields_live.py`, which runs in CI only.
+
 ### The chain that mail closes
 
 Since mail can be read, this server has all three ingredients of one chain at the
