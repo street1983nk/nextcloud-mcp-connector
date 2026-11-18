@@ -678,6 +678,16 @@ def main() -> None:
     if config.ENV_TASKS_UPDATE in resolved:
         os.environ[config.ENV_TASKS_UPDATE] = resolved[config.ENV_TASKS_UPDATE]
 
+    # The fourth key that travels, for the same reader and for the same reason. The opt-in
+    # switch of profile_fields_browse is read once, when ``.server`` decides whether it
+    # imports the optional registration, and that decision reads the process environment.
+    # Without this line a box ticked in Nextcloud would leave the tool missing on a store
+    # installation, and a box unticked there would leave it served when the deploy
+    # environment armed it. The write comes before :func:`build_exapp_app` like the two
+    # above, and the price is the same activation cycle.
+    if config.ENV_PROFILE_FIELDS_READ in resolved:
+        os.environ[config.ENV_PROFILE_FIELDS_READ] = resolved[config.ENV_PROFILE_FIELDS_READ]
+
     try:
         config.exapp_settings(resolved)
         # The place the OAuth store writes to, checked before the first request and not on

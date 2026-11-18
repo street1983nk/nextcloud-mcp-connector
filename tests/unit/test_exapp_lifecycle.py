@@ -761,6 +761,32 @@ def test_a_start_that_read_the_stored_tasks_update_switch_is_not_restarted(
 
 
 @pytest.mark.usefixtures("quiet_enable")
+def test_a_stored_profile_fields_switch_that_the_start_missed_restarts_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The box ticked in Nextcloud after the container started takes effect."""
+    stored(monkeypatch, {config.ENV_PROFILE_FIELDS_READ: config_values.SWITCH_ON})
+
+    status, body, restarts = enable(dict(ENV))
+
+    assert status == 200
+    assert body == {"error": ""}
+    assert restarts == ["x"]
+
+
+@pytest.mark.usefixtures("quiet_enable")
+def test_a_start_that_read_the_stored_profile_fields_switch_is_not_restarted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stored(monkeypatch, {config.ENV_PROFILE_FIELDS_READ: config_values.SWITCH_ON})
+
+    _, body, restarts = enable({**ENV, config.ENV_PROFILE_FIELDS_READ: config_values.SWITCH_ON})
+
+    assert body == {"error": ""}
+    assert restarts == []
+
+
+@pytest.mark.usefixtures("quiet_enable")
 def test_a_stored_security_switch_that_the_start_missed_restarts_as_well(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

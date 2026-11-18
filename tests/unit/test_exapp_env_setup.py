@@ -2488,6 +2488,10 @@ def test_every_variable_the_code_reads_is_declared_in_the_manifest(
     read since 0.3.0 but never declared, so a store installation could not arm the path
     (issue #42). They join through ``config.EXCHANGE_VARIABLES``, the one list the code
     reads them from, so a variable added there and forgotten here turns this gate red.
+
+    ``NC_MCP_PROFILE_FIELDS_READ`` joined before its first release (0.9.0): the tool came
+    with a variable only, and this gate held its absence, so a store installation could
+    not have switched ``profile_fields_browse`` on.
     """
     declared = {
         (variable.findtext("name") or "").strip()
@@ -2504,6 +2508,7 @@ def test_every_variable_the_code_reads_is_declared_in_the_manifest(
         config.ENV_FILES_ROOT,
         config.ENV_FILES_UPDATE,
         config.ENV_TASKS_UPDATE,
+        config.ENV_PROFILE_FIELDS_READ,
         config.ENV_DISABLED_TOOLS,
         config.ENV_AUDIT_LOG,
         config.ENV_AUDIT_RETENTION_DAYS,

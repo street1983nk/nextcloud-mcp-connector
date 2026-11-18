@@ -131,6 +131,7 @@ def form_scheme(env: Mapping[str, str] | None = None) -> dict[str, Any]:
         audit_log_field,
         files_update_field,
         tasks_update_field,
+        profile_fields_read_field,
     ) = CONFIG_KEYS
     return {
         "id": ADMIN_FORM_ID,
@@ -223,6 +224,15 @@ def form_scheme(env: Mapping[str, str] | None = None) -> dict[str, Any]:
                 "type": "checkbox",
                 # Off like the switch above (D-33-01): tools that overwrite and move
                 # existing tasks are an administrator's decision, never a default.
+                "default": False,
+            },
+            {
+                "id": profile_fields_read_field,
+                "title": strings.ADMIN_FIELD_PROFILE_FIELDS_READ_LABEL,
+                "description": strings.ADMIN_FIELD_PROFILE_FIELDS_READ_DESCRIPTION,
+                "type": "checkbox",
+                # Off like the two switches above: a tool that reads profile values of
+                # accounts is an administrator's decision, never a default.
                 "default": False,
             },
         ],

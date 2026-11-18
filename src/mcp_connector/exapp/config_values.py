@@ -125,6 +125,7 @@ CONFIG_KEYS: tuple[str, ...] = (
     "audit_log",
     "files_update",
     "tasks_update",
+    "profile_fields_read",
 )
 
 #: The variable each key stands for. The overlay speaks the language of the deploy
@@ -139,6 +140,7 @@ KEY_TO_ENV: Mapping[str, str] = {
     "audit_log": config.ENV_AUDIT_LOG,
     "files_update": config.ENV_FILES_UPDATE,
     "tasks_update": config.ENV_TASKS_UPDATE,
+    "profile_fields_read": config.ENV_PROFILE_FIELDS_READ,
 }
 
 #: The keys that carry a checkbox, named once so the validation cannot drift from the form.
@@ -147,7 +149,8 @@ KEY_TO_ENV: Mapping[str, str] = {
 #: the key out of the overlay, so the deploy variable and then the default in code decide,
 #: and that default is off (``config.audit_log_enabled``). Seven since phase 33: the two
 #: opt-in write switches ``files_update`` and ``tasks_update`` follow the same rule, and both
-#: defaults in code are off.
+#: defaults in code are off. Eight since 0.9.0: ``profile_fields_read`` is the opt-in switch
+#: of a read tool, follows the same rule, and its default in code is off as well.
 SWITCH_KEYS: frozenset[str] = frozenset(
     {
         "oauth_dcr",
@@ -157,6 +160,7 @@ SWITCH_KEYS: frozenset[str] = frozenset(
         "audit_log",
         "files_update",
         "tasks_update",
+        "profile_fields_read",
     }
 )
 

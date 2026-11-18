@@ -164,6 +164,7 @@ async def test_the_eight_fields_are_the_eight_config_keys_in_order() -> None:
         "audit_log",
         "files_update",
         "tasks_update",
+        "profile_fields_read",
     ]
     assert tuple(field["id"] for field in fields) == config_values.CONFIG_KEYS
     assert [field["type"] for field in fields] == [
@@ -172,6 +173,7 @@ async def test_the_eight_fields_are_the_eight_config_keys_in_order() -> None:
         "checkbox",
         "checkbox",
         "text",
+        "checkbox",
         "checkbox",
         "checkbox",
         "checkbox",
@@ -384,6 +386,40 @@ def test_the_tasks_update_texts_are_the_ones_of_the_plan() -> None:
     )
 
 
+@pytest.mark.anyio
+@respx.mock
+async def test_the_profile_fields_field_is_a_checkbox_that_ships_off() -> None:
+    """The switch of ``profile_fields_browse`` is opt-in and ships disabled."""
+    route = respx.post(SETTINGS_URL).mock(return_value=httpx.Response(200, json={}))
+
+    await admin_settings.register_admin_form(env=ENV)
+
+    fields = json.loads(route.calls.last.request.content)["formScheme"]["fields"]
+    switch = next(field for field in fields if field["id"] == "profile_fields_read")
+    assert switch["type"] == "checkbox"
+    assert switch["default"] is False
+    assert switch["title"] == strings.ADMIN_FIELD_PROFILE_FIELDS_READ_LABEL
+    assert switch["description"] == strings.ADMIN_FIELD_PROFILE_FIELDS_READ_DESCRIPTION
+    assert "sensitive" not in json.dumps(switch).lower()
+
+
+def test_the_profile_fields_texts_say_what_the_switch_does_and_does_not() -> None:
+    """Off by default, read-only, the tool by name, and the two limits an administrator has
+    to know: the search does not hang on this switch, and a change needs the activation
+    cycle. The German and French wording goes into the READMEs."""
+    assert strings.ADMIN_FIELD_PROFILE_FIELDS_READ_LABEL == "Allow reading Profile Fields"
+    description = strings.ADMIN_FIELD_PROFILE_FIELDS_READ_DESCRIPTION
+    assert description.startswith("Off by default.")
+    for part in (
+        "profile_fields_browse",
+        "read-only",
+        "permissions of the connected account",
+        "The search of this connector does not depend on this switch",
+        "after you disable and enable this app again",
+    ):
+        assert part in description, part
+
+
 def _manifest_display_name(variable: str) -> str:
     """The ``display-name`` of one environment variable in appinfo/info.xml."""
     from pathlib import Path
@@ -406,12 +442,15 @@ def _manifest_display_name(variable: str) -> str:
     [
         ("NC_MCP_FILES_UPDATE", "ADMIN_FIELD_FILES_UPDATE_LABEL"),
         ("NC_MCP_TASKS_UPDATE", "ADMIN_FIELD_TASKS_UPDATE_LABEL"),
+        ("NC_MCP_PROFILE_FIELDS_READ", "ADMIN_FIELD_PROFILE_FIELDS_READ_LABEL"),
     ],
 )
-def test_each_write_switch_has_one_label_in_the_form_and_the_manifest(
+def test_each_opt_in_switch_has_one_label_in_the_form_and_the_manifest(
     variable: str, label: str
 ) -> None:
     """Owner decision 2026-11-14: a write switch carries one English label everywhere.
+
+    The opt-in read switch of ``profile_fields_browse`` follows the same rule since 0.9.0.
 
     The admin form and the environment variable of the manifest name the same switch, so an
     admin who reads either sees the same words.
@@ -518,7 +557,7 @@ async def test_no_field_of_the_form_offers_a_level_of_recording() -> None:
     await admin_settings.register_admin_form(env=ENV)
 
     fields = json.loads(route.calls.last.request.content)["formScheme"]["fields"]
-    assert len(fields) == 9, "every field of the form is walked, not a subset of it"
+    assert len(fields) == 10, "every field of the form is walked, not a subset of it"
     for field in fields:
         assert LEVEL_WORD.search(json.dumps(field).lower()) is None, (
             f"{field['id']} offers a level of recording this app cannot deliver"

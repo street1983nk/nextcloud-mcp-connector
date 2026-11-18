@@ -46,6 +46,8 @@ __all__ = [
     "ADMIN_FIELD_DCR_LABEL",
     "ADMIN_FIELD_FILES_UPDATE_DESCRIPTION",
     "ADMIN_FIELD_FILES_UPDATE_LABEL",
+    "ADMIN_FIELD_PROFILE_FIELDS_READ_DESCRIPTION",
+    "ADMIN_FIELD_PROFILE_FIELDS_READ_LABEL",
     "ADMIN_FIELD_PUBLIC_URL_DESCRIPTION",
     "ADMIN_FIELD_PUBLIC_URL_LABEL",
     "ADMIN_FIELD_TALK_SEND_DESCRIPTION",
@@ -825,6 +827,21 @@ ADMIN_FIELD_TASKS_UPDATE_DESCRIPTION = (
     "Off by default. When on, assistants can complete, reopen, edit and move existing tasks "
     "with tasks_complete, tasks_update and tasks_move, and only with the ETag returned by "
     "tasks_read. A change takes effect after you disable and enable this app again."
+)
+
+ADMIN_FIELD_PROFILE_FIELDS_READ_LABEL = "Allow reading Profile Fields"
+
+#: The form half of ``NC_MCP_PROFILE_FIELDS_READ``. An opt-in like the two above, but for a
+#: read tool: ``profile_fields_browse`` asks the Profile Fields app with the permissions of
+#: the connected account and changes nothing. The sentence about the search is there because
+#: the switch is not an access control: the search provider of that app answers with or
+#: without it. The switch follows the same activation cycle as the other switches.
+ADMIN_FIELD_PROFILE_FIELDS_READ_DESCRIPTION = (
+    "Off by default. When on, assistants can read the fields of the Profile Fields app with "
+    "profile_fields_browse, read-only and with the permissions of the connected account. It "
+    "needs the Profile Fields app. The search of this connector does not depend on this "
+    "switch and follows the permissions of that app. A change takes effect after you disable "
+    "and enable this app again."
 )
 
 
