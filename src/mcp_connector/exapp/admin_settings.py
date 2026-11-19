@@ -1,4 +1,4 @@
-"""The administration form of BL-06, TALK-04 and D-14: seven values a store installation needs.
+"""The administration form of BL-06, TALK-04, D-14 and the opt-in switches: ten values.
 
 Built like :mod:`mcp_connector.exapp.settings_form`, which is the one to one model for the
 transport, the app context and the error model. Four things differ, and they are the whole
@@ -18,8 +18,8 @@ that equality: a form whose ids drift from the read path is a form whose values 
 * ``sensitive: true`` at a field makes the ``SetValueListener`` encrypt the value with
   ``ICrypto`` before storing it, using the server secret. The ExApp then reads back a blob it
   cannot open, so a value it needs at runtime would be lost behind a flag that looks like
-  hardening (T-05-05). None of the seven fields carries it, in any spelling, and for the
-  audit switch of D-14 the consequence would be the worst of the seven: a switch that cannot
+  hardening (T-05-05). None of the ten fields carries it, in any spelling, and for the
+  audit switch of D-14 the consequence would be the worst of the ten: a switch that cannot
   be read back as off either (T-18-19).
 * Declarative Settings have no button type. The complete list is ``text``, ``password``,
   ``email``, ``tel``, ``url``, ``number``, ``checkbox``, ``multi-checkbox``, ``radio``,
@@ -82,9 +82,10 @@ LEGACY_ADMIN_FORM_ID = "mcp_connector_admin"
 ADMIN_SECTION_TYPE = "admin"
 
 #: Where the entry sits. ``security`` is where an administrator already manages the sign in
-#: and the app passwords of the instance, which is the same subject as these seven values:
+#: and the app passwords of the instance, which is the same subject as these ten values:
 #: the sixth decides whether this app may write into a conversation on behalf of an account,
-#: and the seventh whether it keeps a record of what assistants did (D-14).
+#: the seventh whether it keeps a record of what assistants did (D-14), and the last three
+#: whether assistants may use the optional tools those switches name.
 ADMIN_SECTION_ID = "security"
 
 ADMIN_FORM_PRIORITY = 10
@@ -106,7 +107,7 @@ def form_scheme(env: Mapping[str, str] | None = None) -> dict[str, Any]:
     documentation address in it comes from the public URL of this deployment, which is
     configuration and not a compile time fact.
 
-    The seven fields are built from :data:`CONFIG_KEYS`, in that order, so the form and the
+    The ten fields are built from :data:`CONFIG_KEYS`, in that order, so the form and the
     read path cannot drift apart. Every field carries a ``default``, which is what the shape
     documented for Declarative Settings looks like; the five switches show the state this app
     ships with, so an administrator sees what is in force before touching anything.

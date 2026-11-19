@@ -1,4 +1,4 @@
-"""The seven admin values of BL-06, TALK-04 and D-14, read out of the ExApp configuration.
+"""The ten admin values (BL-06, TALK-04, D-14, opt-in switches), read from the ExApp configuration.
 
 The fifth one joined in phase 6 with ``NC_MCP_OAUTH_CIMD``: a switch that exists as a deploy
 variable and as a documented sentence, but not in this chain, is a switch an installation
@@ -7,9 +7,11 @@ variable (the whole reason this module exists). The sixth joined in phase 9 with
 ``NC_MCP_TALK_SEND``, the switch that closes the outgoing Talk channel of this app, and it is
 here for exactly that reason: a countermeasure a store installation cannot reach is not one.
 The seventh joined in phase 18 with ``NC_MCP_AUDIT_LOG``, the switch that decides whether
-tool calls are recorded at all (D-14), and it is the one of the seven that ships off: a
+tool calls are recorded at all (D-14), and it was the first of them that ships off: a
 record about named people that an administrator never asked for is the failure that switch
-exists to prevent, so the end of this chain, the default in code, says no.
+exists to prevent, so the end of this chain, the default in code, says no. The eighth to the
+tenth followed as opt-in switches that ship off as well: ``NC_MCP_FILES_UPDATE`` and
+``NC_MCP_TASKS_UPDATE`` in phase 33, ``NC_MCP_PROFILE_FIELDS_READ`` in 0.9.0.
 
 Three facts carry this module, and each of them is measured rather than assumed:
 
@@ -22,7 +24,7 @@ Three facts carry this module, and each of them is measured rather than assumed:
 * **The config key IS the field id of the Declarative Settings form.** AppAPI's
   ``SetValueListener`` stores an admin value with
   ``ExAppConfigService::setAppConfigValue($app, $fieldId, $value)``, without a prefix, so
-  the seven ids of ``exapp/admin_settings.py`` are exactly :data:`CONFIG_KEYS`
+  the ten ids of ``exapp/admin_settings.py`` are exactly :data:`CONFIG_KEYS`
   (nextcloud/app_api v34.0.3, ``lib/Listener/DeclarativeSettings/SetValueListener.php``).
 * **AppAPI 34 answers in lower case.** The entries carry ``configkey`` and ``configvalue``,
   the column names of ``ex_apps_config`` serialised straight out of the entity. The camel
@@ -543,7 +545,7 @@ def _headers(settings: config.ExAppSettings) -> dict[str, str]:
 
 
 def _config_values(payload: Any) -> dict[str, str] | None:
-    """Pull our seven values out of the OCS envelope, or refuse to guess.
+    """Pull our ten values out of the OCS envelope, or refuse to guess.
 
     ``None`` means the answer could not be read and is therefore not an empty one. The three
     accepted shapes are the ones ``crypto._config_value`` accepts: a list of entries with
