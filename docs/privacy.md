@@ -135,7 +135,8 @@ Fields app is installed, they reach an assistant on two ways:
 
 - `profile_fields_browse`, an opt-in tool that is off by default. It registers only
   with `NC_MCP_PROFILE_FIELDS_READ=on`, set as a deploy variable or with the box
-  "Allow reading Profile Fields" in the admin settings of this app. It reads the own
+  "Allow reading Profile Fields" under Administration settings, Security, MCP Connector.
+  It reads the own
   values of the connected account; for an administrator account also the field
   definitions, selected values of one other account by its UID and an exact search
   for one field value. Read only, with the permissions of the connected account as

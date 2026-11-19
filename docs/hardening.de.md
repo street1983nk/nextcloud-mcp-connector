@@ -132,7 +132,8 @@ machen; mit der eigenen Ordnerstruktur testen, nicht nur auf dem Papier.
 `profile_fields_browse` liest die Felder der App Profile Fields. Es ist
 standardmäßig aus und wird nur mit `NC_MCP_PROFILE_FIELDS_READ=on`
 registriert, gesetzt als Deploy-Variable oder über das Kästchen "Allow
-reading Profile Fields" in den Administrationseinstellungen dieser App. Eine
+reading Profile Fields" unter Administrationseinstellungen, Sicherheit, MCP
+Connector. Eine
 Änderung wirkt, nachdem die App einmal deaktiviert und wieder aktiviert
 wurde.
 

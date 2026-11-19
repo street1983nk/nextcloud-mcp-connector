@@ -8,7 +8,8 @@ Three ways to connect an assistant to your Nextcloud with this server:
 | **Streamable HTTP** | A shared or remote deployment. One process can serve several people. | App password per request, in the `Authorization` header |
 | **ExApp (AppAPI)** | An administrator installs the server into Nextcloud itself, and every user connects with their own identity. | OAuth 2.1 per user, or an app password per request; HaRP resolves either to the user |
 
-All three speak the same 20 tools. The only difference is where the credentials come from and
+All three speak the same tools, 27 by default (the count is held by
+`tests/contract/test_tool_surface.py`). The only difference is where the credentials come from and
 where the identity is resolved.
 
 The ExApp mode has its own installation guide in [exapp-install.md](exapp-install.md). Per
@@ -71,7 +72,7 @@ Edit `claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop completely, not just the window. The 20 tools then appear in the
+Restart Claude Desktop completely, not just the window. The tools then appear in the
 tools menu of a new conversation.
 
 If `nc-mcp` is not found, the desktop app does not see your shell PATH. Use the absolute
@@ -221,7 +222,7 @@ off with `NC_MCP_DISABLE_DNS_REBINDING_PROTECTION=true`.
 ## ExApp mode (installed through AppAPI)
 
 The third way to run this server is as a Nextcloud ExApp, installed by an administrator
-through AppAPI. It sits beside stdio and the standalone HTTP mode above: same code, same 20
+through AppAPI. It sits beside stdio and the standalone HTTP mode above: same code, same
 tools, a different place the identity comes from. Installing it is a separate document,
 [exapp-install.md](exapp-install.md); this section is about connecting a client to an
 instance where it is already installed.

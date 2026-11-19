@@ -123,8 +123,8 @@ your own folder structure, not just on paper.
 
 `profile_fields_browse` reads the fields of the Profile Fields app. It is off
 by default and registers only with `NC_MCP_PROFILE_FIELDS_READ=on`, set as a
-deploy variable or with the box "Allow reading Profile Fields" in the admin
-settings of this app. A change takes effect after the app was disabled and
+deploy variable or with the box "Allow reading Profile Fields" under
+Administration settings, Security, MCP Connector. A change takes effect after the app was disabled and
 enabled again.
 
 - What it reads: the own values of the connected account; for an

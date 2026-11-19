@@ -1,0 +1,164 @@
+# 35-01 Faktencheck vor Release 0.9.0 (2026-11-19)
+# Format: Schlüsselwort-Zeilen (ASCII-Marker), Prosa deutsch.
+
+## Task 1: Worktree, Basis, Ausgangsgates
+
+WORKTREE pfad=C:/Users/Student/nextcloud-mcp-connector-worktrees/release-090 branch=plan/release-090
+HINWEIS main-kopf beim anlegen=9ac9f50f "docs(35): revise plans after plan check" (nur .planning/phases/35-*: 35-04..35-07-PLAN.md, 35-RULES.md), Planungscommit 9a2b0fac liegt direkt darunter
+BASIS 9a2b0faceeea6d79c8e8dc3fda88b913183a076b
+BASIS positivkontrolle 40hex=ja ancestor_von_HEAD=ja
+ORIGIN-MAIN 66ffa30d (66ffa30d2fabe620b5d1b075a172b7a4ef71c688)
+ORIGIN-MAIN..HEAD nur street1983nk: bd395542 5c35eab9 9a2b0fac 9ac9f50f
+UVSYNC uv sync --frozen (ohne Extra) dann uv sync --frozen --extra documents (CI-Form, ci.yml:26); uv.lock unverändert (git diff --quiet -- uv.lock exit=0)
+GATE pytest-unit-contract exit=2 vor-extra (4 Sammelfehler: docx, pypdf, pptx, openpyxl fehlten ohne --extra documents)
+GATE pytest-unit-contract exit=0 passed=8312 skipped=35
+GATE check_tool_budget exit=0 standard=27/18770 alle=32/23109 budget=26000
+GATE ruff-check exit=0 "All checks passed!"
+GATE ruff-format exit=0 dateien=416
+GATE pyright exit=0 errors=0 warnings=0 (vor-extra: 19 errors, nur fehlende Importe docx/pypdf/pptx)
+GATE vulture exit=0 funde=0
+BUDGET standard=27 bytes_standard=18770 alle=32 bytes_alle=23109
+
+## Task 2: Fakten (nur geprüft, nichts geändert)
+
+# Belege der Zahlen
+# registry = BUDGET-Zeile oben (scripts/check_tool_budget.py)
+# 27: tests/contract/test_tool_surface.py::test_the_curated_set_is_complete_and_only_the_chatgpt_profile_has_a_schema (len==27)
+# 28: tests/unit/test_profile_fields_tools.py:204 (28 if enabled else 27); CI ci.yml:392 "PROFILE-FIELDS tools without switch=27 with switch=28"
+# 31: registry alle=32 minus profile_fields_browse; vier Schreibwerkzeuge in tests/contract/optional_surface.py OPTIONAL_TOOLS
+# 32: registry alle=32; test_tool_surface.py::test_the_byte_gate_measures_with_every_switch_on
+
+# (Werkzeugzahlen README)
+FAKT README.md:25 aussage="27 tools across ten app families" beleg=registry+test_tool_surface urteil=stimmt
+FAKT README.md:26 aussage="31 when the admin enables the optional write tools" beleg=registry+code:tests/contract/optional_surface.py:34 urteil=stimmt
+FAKT README.md:137 aussage="27 tools by default, 28 with the switch on" beleg=code:tests/unit/test_profile_fields_tools.py:204 urteil=stimmt
+FAKT README.de.md:28 aussage="27 Tools über zehn App-Familien" beleg=registry+test_tool_surface urteil=stimmt
+FAKT README.de.md:29 aussage="31, wenn der Admin die optionalen Schreib-Tools einschaltet" beleg=registry+code:tests/contract/optional_surface.py:34 urteil=stimmt
+FAKT README.de.md:152 aussage="27 Tools im Standard, 28 mit eingeschaltetem Schalter" beleg=code:tests/unit/test_profile_fields_tools.py:204 urteil=stimmt
+FAKT README.fr.md:28 aussage="27 outils répartis sur dix familles" beleg=registry+test_tool_surface urteil=stimmt
+FAKT README.fr.md:29 aussage="31 lorsque l'administrateur active les outils d'écriture" beleg=registry+code:tests/contract/optional_surface.py:34 urteil=stimmt
+FAKT README.fr.md:157 aussage="27 outils par défaut, 28 avec le commutateur activé" beleg=code:tests/unit/test_profile_fields_tools.py:204 urteil=stimmt
+FAKT readme-alle-schalter aussage="kein Text nennt den Zustand alle Schalter; 27+4+1=32 aus den beiden Zählstellen ableitbar" beleg=registry urteil=stimmt
+FAKT readme-statuszeile vorhanden=nein (grep "Version x.y.z." und "Status:" in README*.md ohne Treffer)
+
+# (Werkzeugzahlen docs, aktuelle Aussagen)
+FAKT docs/exapp-install.md:80 aussage="27 tools with both off and 31 with both on" beleg=registry+test_tool_surface urteil=stimmt
+FAKT docs/exapp-install.md:92 aussage="28 tools with the write switches off" beleg=code:tests/unit/test_profile_fields_tools.py:204 urteil=stimmt
+FAKT docs/client-setup.md:11 aussage="All three speak the same 20 tools" beleg=registry(27) urteil=falsch
+FAKT docs/client-setup.md:74 aussage="The 20 tools then appear" beleg=registry(27) urteil=falsch
+FAKT docs/client-setup.md:224 aussage="same code, same 20 tools" beleg=registry(27) urteil=falsch
+FAKT docs/n8n-setup.md:36 aussage="23 tools" beleg=Seitenkopf "Measured on 2026-09-04", Connector 0.1.11 urteil=stimmt (Zeitzeugnis; Seite verweist auf test_tool_surface.py)
+FAKT docs/n8n-setup.md:258 aussage="The tool set is 23 tools" beleg=Seitenkopf "Measured on 2026-09-04", Connector 0.1.11 urteil=stimmt (Zeitzeugnis; Präsens, Hinweis an den Owner)
+FAKT docs/spike-opendesk.md:2611 aussage="21 tools" beleg=Messprotokoll 2026-08-28 urteil=stimmt (Zeitzeugnis)
+ZAEHLUNG historisch docs/store-submission.md=7 docs/folder-evidence.md=2 docs/nc35-evidence.md=1 docs/tasks-evidence.md=2 docs/exchange-evidence.md=0 (nicht bewertet)
+
+# (b) Rechte-Aussagen Profile Fields
+FAKT README.md:147 aussage="me eigene Felder; definitions, values, search Admin-Routen" beleg=code:src/mcp_connector/tools/profile_fields.py:78,98,131,38 urteil=stimmt
+FAKT README.md:150 aussage="nur authentifizierte OCS GET, kein Anlegen/Ändern/Löschen" beleg=code:src/mcp_connector/tools/profile_fields.py:35,78,98,131 (nur ocs.ocs_get) urteil=stimmt
+FAKT README.md:152 aussage="Suche mit und ohne Schalter, folgt Rechten der App" beleg=code:src/mcp_connector/nextcloud/clients/ocs.py:47 (allgemeine Anbieterliste) + ci.yml:396 urteil=stimmt
+FAKT README.de.md:162 aussage="Ebenen, nur GET, Suche mit und ohne Schalter" beleg=wie README.md urteil=stimmt
+FAKT README.fr.md:168 aussage="Niveaux, uniquement GET, recherche avec ou sans" beleg=wie README.md urteil=stimmt
+FAKT docs/hardening.md:130 aussage="liest eigene Werte, als Admin Definitionen, Werte einer UID, exakte Suche; nur GET" beleg=code:src/mcp_connector/tools/profile_fields.py urteil=stimmt
+FAKT docs/hardening.md:147 aussage="Audit nur level, limit, offset" beleg=code:src/mcp_connector/audit/allowlist.py:71 urteil=stimmt
+FAKT docs/hardening.de.md:140 aussage="wie EN" beleg=wie EN urteil=stimmt
+FAKT docs/hardening.fr.md:142 aussage="wie EN" beleg=wie EN urteil=stimmt
+FAKT docs/privacy.md:136 aussage="Werkzeug und Suche, Audit level/limit/offset" beleg=code:src/mcp_connector/audit/allowlist.py:71 urteil=stimmt
+FAKT docs/threat-model.md:135 aussage="ab Werk aus, Admin liest fremde Werte, Schalter keine Grenze" beleg=code:src/mcp_connector/config.py:767 urteil=stimmt
+FAKT docs/threat-model.md:230 aussage="Admin-Konto erreicht private Profilwerte über die Suche" beleg=ci.yml:396 urteil=stimmt
+FAKT docs/exapp-install.md:89 aussage="Schalter, Schlüssel profile_fields_read, Rechte des verbundenen Kontos" beleg=code:src/mcp_connector/exapp/config_values.py CONFIG_KEYS urteil=stimmt
+FAKT src/mcp_connector/config.py:767 aussage="ungültiger Wert lässt Schalter aus" beleg=code:src/mcp_connector/config.py:775 urteil=stimmt
+FAKT src/mcp_connector/server/opt_profile_fields.py:13 aussage="Annotation READ_ONLY" beleg=code urteil=stimmt
+
+# (c) Ort des Schalters (Soll laut test_docs_admin_form_truth.py)
+FAKT README.md:141 aussage="Administration settings, Security, MCP Connector" beleg=tests/unit/test_docs_admin_form_truth.py urteil=stimmt
+FAKT README.de.md:156 aussage="Administrationseinstellungen, Sicherheit, MCP Connector" beleg=tests/unit/test_docs_admin_form_truth.py urteil=stimmt
+FAKT README.fr.md:161 aussage="Paramètres d'administration, Sécurité, MCP Connector" beleg=tests/unit/test_docs_admin_form_truth.py urteil=stimmt
+FAKT docs/oauth-setup.md:125 aussage="Administration settings, Security, MCP Connector, zehn Felder" beleg=code:src/mcp_connector/exapp/config_values.py CONFIG_KEYS (10) urteil=stimmt
+FAKT docs/hardening.md:126 aussage="in the admin settings of this app" beleg=test_docs_admin_form_truth.py urteil=fehlt (Ort ungenau)
+FAKT docs/hardening.de.md:135 aussage="in den Administrationseinstellungen dieser App" beleg=test_docs_admin_form_truth.py urteil=fehlt (Ort ungenau)
+FAKT docs/hardening.fr.md:138 aussage="dans les paramètres d'administration de cette application" beleg=test_docs_admin_form_truth.py urteil=fehlt (Ort ungenau)
+FAKT docs/privacy.md:138 aussage="in the admin settings of this app" beleg=test_docs_admin_form_truth.py urteil=fehlt (Ort ungenau)
+FAKT docs/threat-model.md:137 aussage="(deploy variable or admin setting)" beleg=- urteil=stimmt (Kurzform, nicht falsch)
+
+# (d) CHANGELOG [Unreleased]
+FAKT CHANGELOG.md:12 aussage="[Unreleased] Added" punkte=5 urteil=stimmt (Inhalt der fünf Punkte gegen Code geprüft)
+FAKT CHANGELOG.de.md:12 aussage="[Unreleased] Hinzugefügt" punkte=5 urteil=stimmt (gleiche Punkte wie EN)
+FAKT CHANGELOG.fr.md:12 aussage="[Unreleased] Ajouté" punkte=5 urteil=stimmt (gleiche Punkte wie EN)
+FAKT CHANGELOG.md:17 aussage="Thanks to @vitormattos (#49)" beleg=PR #49 Autor Vitor Mattos urteil=fehlt (Name)
+FAKT CHANGELOG.de.md:18 aussage="Danke an @vitormattos (#49)" beleg=PR #49 urteil=fehlt (Name)
+FAKT CHANGELOG.fr.md:18 aussage="Merci à @vitormattos (#49)" beleg=PR #49 urteil=fehlt (Name)
+FAKT CHANGELOG.md:18 aussage="in the admin settings of this app" beleg=test_docs_admin_form_truth.py urteil=fehlt (Ort)
+FAKT CHANGELOG.de.md:19 aussage="in den Admin-Einstellungen dieser App" beleg=test_docs_admin_form_truth.py urteil=fehlt (Ort)
+FAKT CHANGELOG.fr.md:19 aussage="dans les paramètres d'administration de cette application" beleg=test_docs_admin_form_truth.py urteil=fehlt (Ort)
+FAKT CHANGELOG.md:unreleased aussage="CI-Livebeweis gegen Store-Release" beleg=ci.yml:342,367,392,396 urteil=fehlt
+FAKT CHANGELOG.de.md:unreleased aussage="CI-Livebeweis gegen Store-Release" beleg=ci.yml:342,367,392,396 urteil=fehlt
+FAKT CHANGELOG.fr.md:unreleased aussage="CI-Livebeweis gegen Store-Release" beleg=ci.yml:342,367,392,396 urteil=fehlt
+FAKT CHANGELOG-linkzeilen aussage="[Unreleased] compare/v0.8.0...HEAD in EN:1164 DE:127 FR:128" urteil=stimmt
+
+# (e) "seven" in den Admin-Modulen (Zahl gezählt: CONFIG_KEYS 10 Einträge, Formular 10 Felder, davon 8 checkbox)
+FAKT src/mcp_connector/exapp/admin_settings.py:1 aussage="seven values a store installation needs" beleg=code:src/mcp_connector/exapp/config_values.py:121 zahl=10 urteil=falsch
+FAKT src/mcp_connector/exapp/admin_settings.py:21 aussage="None of the seven fields" beleg=code:src/mcp_connector/exapp/admin_settings.py:149-233 zahl=10 urteil=falsch
+FAKT src/mcp_connector/exapp/admin_settings.py:22 aussage="the worst of the seven" beleg=code:src/mcp_connector/exapp/admin_settings.py:149-233 zahl=10 urteil=falsch
+FAKT src/mcp_connector/exapp/admin_settings.py:85 aussage="these seven values" beleg=code:src/mcp_connector/exapp/config_values.py:121 zahl=10 urteil=falsch
+FAKT src/mcp_connector/exapp/admin_settings.py:87 aussage="and the seventh whether it keeps a record" beleg=code:config_values.py CONFIG_KEYS (audit_log ist Nr. 7) zahl=7 urteil=stimmt (Ordnungszahl; die letzten drei fehlten, mit ergänzt)
+FAKT src/mcp_connector/exapp/admin_settings.py:109 aussage="The seven fields are built from CONFIG_KEYS" beleg=code:src/mcp_connector/exapp/config_values.py:121 zahl=10 urteil=falsch
+FAKT src/mcp_connector/exapp/config_values.py:1 aussage="The seven admin values" beleg=code:src/mcp_connector/exapp/config_values.py:121 zahl=10 urteil=falsch
+FAKT src/mcp_connector/exapp/config_values.py:9 aussage="The seventh joined in phase 18" beleg=code CONFIG_KEYS zahl=7 urteil=stimmt (Ordnungszahl, historisch)
+FAKT src/mcp_connector/exapp/config_values.py:10 aussage="the one of the seven that ships off" beleg=code:config_values.py:151-154 (vier Schalter ab Werk aus) zahl=10 urteil=falsch
+FAKT src/mcp_connector/exapp/config_values.py:25 aussage="the seven ids of exapp/admin_settings.py" beleg=code CONFIG_KEYS zahl=10 urteil=falsch
+FAKT src/mcp_connector/exapp/config_values.py:153 aussage="Seven since phase 33 ... Eight since 0.9.0" beleg=code:config_values.py SWITCH_KEYS (8) zahl=8 urteil=stimmt
+FAKT src/mcp_connector/exapp/config_values.py:546 aussage="Pull our seven values" beleg=code CONFIG_KEYS zahl=10 urteil=falsch
+
+# (f) Screenshot
+FAKT docs/screenshots/admin-settings.png felder=10 erwartet=10 urteil=stimmt (Adresse, 3 OAuth-Schalter, Liste, Talk, Audit, Dateien, Aufgaben, Profile Fields; Beschreibung "Of the ten fields")
+
+FAKTEN gesamt=69 stimmt=43 falsch=12 fehlt=13 info=1 (readme-statuszeile)
+
+## Task 3: Korrekturen
+
+ERLEDIGT CHANGELOG.md:17 | Thanks to Vitor Mattos (@vitormattos) for #49.
+ERLEDIGT CHANGELOG.md:19 | is in Administration settings, Security, MCP Connector and declared ...
+ERLEDIGT CHANGELOG.md:30 | CI installs Profile Fields from the app store and proves the tool live ... job `integration`: 27 ... 28 ... no foreign value ...
+ERLEDIGT CHANGELOG.de.md:18 | Danke an Vitor Mattos (@vitormattos) für #49.
+ERLEDIGT CHANGELOG.de.md:20 | steht unter Administrationseinstellungen, Sicherheit, MCP Connector ...
+ERLEDIGT CHANGELOG.de.md:31 | Die CI installiert Profile Fields aus dem App Store und beweist das Tool live ...
+ERLEDIGT CHANGELOG.fr.md:17 | Merci à Vitor Mattos (@vitormattos) pour #49.
+ERLEDIGT CHANGELOG.fr.md:19 | figure dans Paramètres d'administration, Sécurité, MCP Connector ...
+ERLEDIGT CHANGELOG.fr.md:32 | La CI installe Profile Fields depuis l'App Store et prouve l'outil ...
+ERLEDIGT docs/hardening.md:126 | box "Allow reading Profile Fields" under Administration settings, Security, MCP Connector.
+ERLEDIGT docs/hardening.de.md:135 | unter Administrationseinstellungen, Sicherheit, MCP Connector.
+ERLEDIGT docs/hardening.fr.md:138 | dans Paramètres d'administration, Sécurité, MCP Connector.
+ERLEDIGT docs/privacy.md:138 | under Administration settings, Security, MCP Connector.
+ERLEDIGT docs/client-setup.md:11 | the same tools, 27 by default (the count is held by tests/contract/test_tool_surface.py)
+ERLEDIGT docs/client-setup.md:75 | The tools then appear in the tools menu
+ERLEDIGT docs/client-setup.md:225 | same code, same tools
+ERLEDIGT src/mcp_connector/exapp/admin_settings.py:1 | administration form of BL-06, TALK-04, D-14 and the opt-in switches: ten values.
+ERLEDIGT src/mcp_connector/exapp/admin_settings.py:21 | None of the ten fields
+ERLEDIGT src/mcp_connector/exapp/admin_settings.py:22 | the worst of the ten
+ERLEDIGT src/mcp_connector/exapp/admin_settings.py:85 | these ten values ... and the last three whether assistants may use the optional tools
+ERLEDIGT src/mcp_connector/exapp/admin_settings.py:110 | The ten fields are built from CONFIG_KEYS
+ERLEDIGT src/mcp_connector/exapp/config_values.py:1 | The ten admin values (BL-06, TALK-04, D-14, opt-in switches)
+ERLEDIGT src/mcp_connector/exapp/config_values.py:10 | it was the first of them that ships off ... The eighth to the tenth followed (phase 33, 0.9.0)
+ERLEDIGT src/mcp_connector/exapp/config_values.py:27 | the ten ids of exapp/admin_settings.py
+ERLEDIGT src/mcp_connector/exapp/config_values.py:548 | Pull our ten values
+FAKTEN offen=0
+
+PUNKTE unreleased en=6 de=6 fr=6 gleich=ja
+AST src/mcp_connector/exapp/admin_settings.py gleich=ja
+AST src/mcp_connector/exapp/config_values.py gleich=ja
+AST positivkontrolle ungleich=ja (gepflanzt: ADMIN_FORM_PRIORITY 10->11 und String-Literal "profile_fields_read"->"profile_fields_reed" in CONFIG_KEYS, beide gleich=nein)
+UMLAUT CHANGELOG.de.md geprueft=0 fehler=0 (keine ae/oe/ue/ss-Fundstelle in hinzugefügten Zeilen; echte Umlaute: für, über, Änderung)
+UMLAUT docs/hardening.de.md geprueft=0 fehler=0 (keine ae/oe/ue/ss-Fundstelle in hinzugefügten Zeilen)
+FRANZ CHANGELOG.fr.md geprueft=3 fehler=0 (Leerzeichen vor ":" im neuen Punkt, gerade Apostrophe wie in der Datei, Akzente)
+FRANZ docs/hardening.fr.md geprueft=1 fehler=0
+DASH positivkontrolle=ja
+DASH treffer=0 (README*.md CHANGELOG*.md docs/*.md und beide src-Dateien)
+ZEILENENDEN alle geänderten Dateien CRLF in der Arbeitskopie (Index LF, text=auto); numstat zeigt nur geänderte Zeilen
+DIFFBEWEIS src/ nur exapp/admin_settings.py und exapp/config_values.py (git diff --stat B -- src/ gefiltert leer)
+GATE-ENDE pytest-unit-contract exit=0 passed=8312 skipped=35
+GATE-ENDE check_tool_budget exit=0 standard=27/18770 alle=32/23109 budget=26000
+GATE-ENDE ruff-check exit=0
+GATE-ENDE ruff-format exit=0 dateien=416
+GATE-ENDE pyright exit=0 errors=0 warnings=0
+GATE-ENDE vulture exit=0 funde=0
+GATE-ENDE nachlauf test_changelog_translations+test_docs_admin_form_truth+test_tool_surface passed=124 (nach DE-Zeilenumbruch)

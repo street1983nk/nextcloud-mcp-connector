@@ -16,11 +16,11 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
 
 - `profile_fields_browse`: ein optionales Tool nur zum Lesen für die Nextcloud-App Profile
   Fields, ab Werk aus. 27 Tools im Standard, 28 mit eingeschaltetem Schalter. Danke an
-  @vitormattos (#49).
-- Der Schalter "Allow reading Profile Fields" (`NC_MCP_PROFILE_FIELDS_READ`) steht in den
-  Admin-Einstellungen dieser App und ist als Umgebungsvariable deklariert, damit eine
-  Installation aus dem App Store das Tool einschalten kann. Eine Änderung wirkt, nachdem die
-  App einmal deaktiviert und wieder aktiviert wurde.
+  Vitor Mattos (@vitormattos) für #49.
+- Der Schalter "Allow reading Profile Fields" (`NC_MCP_PROFILE_FIELDS_READ`) steht unter
+  Administrationseinstellungen, Sicherheit, MCP Connector und ist als Umgebungsvariable
+  deklariert, damit eine Installation aus dem App Store das Tool einschalten kann. Eine
+  Änderung wirkt, nachdem die App einmal deaktiviert und wieder aktiviert wurde.
 - Ebenen: `me` für die eigenen sichtbaren Felder; `definitions`, `values` und `search`
   nutzen Routen, die die App Administratoren vorbehält. Nur OCS-GET-Anfragen mit den
   Berechtigungen des verbundenen Kontos; nichts wird angelegt, geändert oder gelöscht.
@@ -28,6 +28,9 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
   `prepare_context`) erreicht den Suchprovider der App mit und ohne Schalter und folgt den
   Berechtigungen der App: Ein Administrator findet private Werte, jedes andere Konto nur
   Werte, die die App ihm zeigt.
+- Die CI installiert Profile Fields aus dem App Store und beweist das Tool live über einen
+  echten MCP-Client im Job `integration`: 27 Tools ohne Schalter, 28 mit Schalter, kein
+  fremder Wert für ein Konto ohne Administratorrechte.
 - Gemessen auf Nextcloud 34 mit Profile Fields 4.0.0. Auf Nextcloud 35 nicht gemessen: Der
   App Store führt für 35 nur einen Nightly der App.
 
