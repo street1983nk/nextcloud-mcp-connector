@@ -129,3 +129,40 @@ d'exploitation :
 
 Le cas de partage de la section 2 est celui que les installations réelles
 ratent ; le tester avec sa propre arborescence, pas seulement sur le papier.
+
+## 10. Profile Fields : un outil facultatif, et une recherche qui ne l'attend pas
+
+`profile_fields_browse` lit les champs de l'application Profile Fields. Il
+est désactivé par défaut et n'est enregistré qu'avec
+`NC_MCP_PROFILE_FIELDS_READ=on`, défini comme variable de déploiement ou par
+la case « Allow reading Profile Fields » dans les paramètres
+d'administration de cette application. Un changement prend effet après
+avoir désactivé puis réactivé l'application.
+
+- Ce qu'il lit : les propres valeurs du compte connecté ; pour un compte
+  administrateur, en plus, les définitions des champs, des valeurs choisies
+  d'un autre compte par son UID et une recherche exacte d'une valeur de
+  champ. Il n'envoie que des requêtes OCS GET et ne modifie rien.
+- Quelles règles s'appliquent : celles de l'application. Le connecteur
+  transmet les permissions du compte connecté et n'ajoute aucune règle
+  propre ; un compte sans droits d'administration est refusé par
+  l'application sur les routes réservées aux administrateurs.
+- Le commutateur n'est **pas un contrôle d'accès**. L'application
+  enregistre son propre fournisseur de recherche, et `unified_search`,
+  `search` et `prepare_context` l'interrogent avec ou sans le commutateur.
+  Cette recherche suit les permissions de l'application : un compte
+  administrateur trouve des valeurs privées d'autres comptes, tout autre
+  compte ne trouve que les valeurs que l'application lui montre.
+- Conséquence : la section 1 s'applique entièrement. Ne pas connecter un
+  compte administrateur à un assistant. S'il y en a un de connecté, les
+  valeurs de profil privées sont à portée de la recherche, quel que soit
+  l'état de ce commutateur. Pour tenir une valeur hors de la recherche,
+  utiliser les réglages de visibilité de l'application.
+- Le journal d'audit (section 7) consigne au plus les noms `level`, `limit`
+  et `offset` d'un tel appel, jamais un UID, une clé de champ ni une valeur.
+
+Tenu par `tests/unit/test_profile_fields_tools.py` et
+`tests/contract/test_audit_surface.py`. Le comportement face à un Nextcloud
+en fonctionnement (34, Profile Fields 4.0.0), recherche comprise, est mesuré
+par `tests/integration/test_profile_fields_live.py`, qui ne s'exécute qu'en
+CI. Non mesuré sur Nextcloud 35.

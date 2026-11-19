@@ -139,6 +139,10 @@ UNAFFECTED: dict[str, str] = {
         "Answers old and new task ids, the target list name, a stop reason and an ETag of its "
         "own task and takes no file argument (tools/tasks.py:2090, :2124-2136, :2156-2166)."
     ),
+    "profile_fields_browse": (
+        "Answers field definitions and profile values of accounts from the Profile Fields "
+        "routes and takes no file argument (tools/profile_fields.py:68-75, :82, :104-121, :146)."
+    ),
 }
 
 # The shortest reason the freeze accepts: long enough that "n/a" or "safe" cannot pass.

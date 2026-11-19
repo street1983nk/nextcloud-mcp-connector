@@ -23,8 +23,9 @@ first line of the answer, so a failure is attributable without a rerun.
 
 Exit code 1 means a tool failed or was never called. Exit code 3 means that every tool
 answered and one step met a missing prerequisite of the test instance (verdict ``PREREQ``):
-that is neither a pass nor a tool failure, and the line names what the instance lacks. The
-one such step is the full text of a mail. The Mail app lists messages out of its own cache,
+that is neither a pass nor a tool failure, and the line names what the instance lacks. There
+are two such steps: the full text of a mail, and ``profile_fields_browse`` on an instance
+without the app Profile Fields (further down). The Mail app lists messages out of its own cache,
 so a mail server that lost them still shows a list; the GreenMail of the test topology keeps
 mail in memory and is empty after every restart. When ``fetch`` fails on a listed message,
 the script asks the Mail app of the instance for the same message with the same account,
@@ -70,6 +71,15 @@ file uploaded in step one with the ETag ``files_upload`` handed back, and a seco
 that first ETag, stale by then, has to be refused. With the switch off it is named as not
 registered and is not called.
 
+With ``NC_MCP_PROFILE_FIELDS_READ=on`` the server registers ``profile_fields_browse``, and the
+run calls it once with ``level=me``, the one read every account may make: its own values. The
+tool reads the OCS routes of the app Profile Fields (``profile_fields``), which the test
+topology of ``compose.test.yml`` does not install. A failed call is therefore sorted the way a
+failed mail is: the app is asked for the same values with the same account, past the connector.
+If the instance has no such route (HTTP 404), the step is a ``PREREQ`` that names the missing
+app, never a pass and never a silent skip; if the app answers and the tool did not, it is a
+``FAIL``. With the switch off the tool is named as not registered and is not called.
+
 ``fetch`` is called once per id kind that needs an object of this instance, and every one of
 those ids comes out of a read of the same run: a ``fetch("mail:<number>")`` on a guessed number
 would be a request about somebody's mail, and ``message:`` and ``table:`` are no different. A
@@ -98,13 +108,24 @@ from mcp.types import TextContent
 REQUIRED_ENV = ("NC_MCP_URL", "NC_MCP_USER", "NC_MCP_APP_PASSWORD")
 
 #: Switches handed on to the server when they are set here; nothing else of this environment is.
-FORWARDED_SWITCHES = ("NC_MCP_FILES_UPDATE", "NC_MCP_TASKS_UPDATE")
+FORWARDED_SWITCHES = (
+    "NC_MCP_FILES_UPDATE",
+    "NC_MCP_TASKS_UPDATE",
+    "NC_MCP_PROFILE_FIELDS_READ",
+)
 
 #: The one modifying file tool, registered only behind ``NC_MCP_FILES_UPDATE``.
 FILES_UPDATE = "files_update"
 
 #: The modifying task tools, registered only behind ``NC_MCP_TASKS_UPDATE`` (TMOD-05).
 MODIFY_TASK_TOOLS = ("tasks_update", "tasks_complete", "tasks_move")
+
+#: The one reading tool behind a switch, registered only behind ``NC_MCP_PROFILE_FIELDS_READ``.
+PROFILE_FIELDS_BROWSE = "profile_fields_browse"
+
+#: The route of the app Profile Fields behind ``level=me``, asked past the connector when the
+#: tool failed, to tell a missing app from a broken tool.
+PROFILE_FIELDS_OWN_VALUES = "/ocs/v2.php/apps/profile_fields/api/v1/me/values"
 
 #: The one tool of the mail family, called at three levels in a row. The name lives in a
 #: constant because the chain below would otherwise carry the same string five times, and five
@@ -116,6 +137,7 @@ MAIL_BROWSE = "mail_browse"
 PREREQ = "PREREQ"
 EXIT_PREREQ = 3
 SERVER_ERROR = 500
+NOT_FOUND = 404
 
 #: The type of the one document this run converts with ``files_read_as_markdown``.
 DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -147,6 +169,10 @@ class Report:
 
     def called(self) -> set[str]:
         return {tool for tool, verdict, _ in self.rows if verdict in ("OK", "SKIP")}
+
+    def held_up(self) -> set[str]:
+        """The tools with a step that met a missing prerequisite: called, and not answered."""
+        return {tool for tool, verdict, _ in self.rows if verdict == PREREQ}
 
 
 def text_of(result: Any) -> str:
@@ -428,6 +454,9 @@ async def run(client: Client, report: Report) -> set[str]:
     # zero accounts rather than a defect. The walk down the three levels lives in a function of
     # its own, because each of its dead ends has to be told apart from a failed call.
     mail_id, mail_reason = await _mail_message_id(client, report)
+
+    # --- profile fields ---------------------------------------------------------------
+    await _profile_fields(client, report, registered=set(names))
 
     # --- contacts, search, chatgpt profile ---------------------------------------------
     await call(client, report, "contacts_search", {"query": "a"})
@@ -830,6 +859,74 @@ async def _fetch_mail(client: Client, report: Report, identifier: str) -> None:
     report.add("fetch", "FAIL", f"{payload} (the Mail app itself {asked} for that message)")
 
 
+async def _profile_fields(client: Client, report: Report, *, registered: set[str]) -> None:
+    """``profile_fields_browse`` with ``level=me``, a failure sorted into tool or instance.
+
+    ``level=me`` is the one read every account may make, so the answer does not depend on the
+    rights of the test account; what an administrator may read of somebody else is held by
+    ``tests/integration/test_profile_fields_live.py`` and not by this run. The tool needs the
+    app Profile Fields, which is not a connector feature and is missing on the test topology.
+    A failed call therefore asks the app itself, as ``_fetch_mail`` does: no such route on the
+    instance makes this a PREREQ with the name of the app, an app that answers leaves the
+    FAIL where it belongs. With ``NC_MCP_PROFILE_FIELDS_READ`` off the tool is not registered
+    and is named as such, not called.
+    """
+    if PROFILE_FIELDS_BROWSE not in registered:
+        print(f"  {'-':<7} {PROFILE_FIELDS_BROWSE:<22} not registered (switch off)", flush=True)
+        return
+    try:
+        result = await client.call_tool(PROFILE_FIELDS_BROWSE, {"level": "me"})
+    # Broad on purpose, as in ``call``: one broken tool must land in the matrix.
+    except Exception as exc:
+        report.add(PROFILE_FIELDS_BROWSE, "FAIL", f"{type(exc).__name__}: {exc}")
+        return
+    payload = text_of(result)
+    if not result.is_error:
+        answer = loads(payload)
+        results = answer.get("results")
+        if not isinstance(results, list) or answer.get("count") != len(results):
+            report.add(PROFILE_FIELDS_BROWSE, "FAIL", f"not a list of own values: {payload}")
+            return
+        report.add(PROFILE_FIELDS_BROWSE, "OK", payload)
+        return
+    status = await _profile_fields_app_status()
+    if status == NOT_FOUND:
+        report.add(
+            PROFILE_FIELDS_BROWSE,
+            PREREQ,
+            f"this instance itself answers HTTP {status} for the own values of the app "
+            "Profile Fields: the app profile_fields is not installed or not enabled, and "
+            "NC_MCP_PROFILE_FIELDS_READ registered a tool with nothing to read. Install the "
+            "app (occ app:install profile_fields) or run without the switch",
+        )
+        return
+    asked = "did not answer" if status is None else f"answers HTTP {status}"
+    report.add(
+        PROFILE_FIELDS_BROWSE,
+        "FAIL",
+        f"{payload} (the app Profile Fields itself {asked} for the own values)",
+    )
+
+
+async def _profile_fields_app_status() -> int | None:
+    """The status the app Profile Fields gives for the own values, past the connector.
+
+    Same instance, same account, same app password as the server under test, and nothing
+    of the answer but its status is used. ``None`` when the request itself failed.
+    """
+    url = f"{os.environ['NC_MCP_URL'].rstrip('/')}{PROFILE_FIELDS_OWN_VALUES}"
+    try:
+        async with httpx.AsyncClient(timeout=60.0, follow_redirects=False) as direct:
+            response = await direct.get(
+                url,
+                headers={"OCS-APIRequest": "true", "Accept": "application/json"},
+                auth=(os.environ["NC_MCP_USER"], os.environ["NC_MCP_APP_PASSWORD"]),
+            )
+    except httpx.HTTPError:
+        return None
+    return response.status_code
+
+
 async def _mail_app_status(identifier: str) -> int | None:
     """The status the Mail app gives for one message when asked past the connector.
 
@@ -909,7 +1006,9 @@ async def main() -> int:
     # (tests/contract/test_tool_surface.py). A tool this registry gained since the run was
     # written therefore shows up here as never called, which is exactly the case a hand kept
     # list would have missed.
-    never_called = registry - report.called()
+    # A tool whose only step met a missing prerequisite was called and is named as PREREQ
+    # below; it is not listed a second time as never called.
+    never_called = registry - report.called() - report.held_up()
     failures = report.failures()
 
     if never_called:
@@ -923,9 +1022,9 @@ async def main() -> int:
         return 1
     if prerequisites:
         print(
-            f"\nINCOMPLETE: all {len(registry)} tools of the registry answered, but "
-            f"{len(prerequisites)} step met a missing prerequisite of the test instance "
-            "(see PREREQ above). This is not a pass.",
+            f"\nINCOMPLETE: {len(registry & report.called())} of {len(registry)} tools of the "
+            f"registry answered, and {len(prerequisites)} step met a missing prerequisite of "
+            "the test instance (see PREREQ above). This is not a pass.",
             file=sys.stderr,
         )
         return EXIT_PREREQ

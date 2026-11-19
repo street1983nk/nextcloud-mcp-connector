@@ -107,6 +107,7 @@ hand: a contract test reads the live registry and fails if a name or a level dis
 | `talk_send` | create-only | One message into a conversation; never edited or deleted, switchable off instance wide |
 | `mail_browse` | read | Mail accounts, their mailboxes and message envelopes; strictly read only |
 | `contacts_search` | read | Address book contacts |
+| `profile_fields_browse` | read | Fields of the Profile Fields app: own values, and for administrators definitions, values of one account and an exact search; available only when the admin enables `NC_MCP_PROFILE_FIELDS_READ` |
 | `unified_search` | read | The Nextcloud unified search across providers, permission aware |
 | `prepare_context` | read | Files, notes, cards, the next week of events, waiting Talk conversations and unread mail counts in one call |
 | `search` | read | OpenAI compatible search entry point, delegates to unified search |
@@ -129,6 +130,36 @@ missing app is answered in one sentence, never with an empty result.
 ```json
 {"query":"budget","count":2,"results":[{"id":"file:4711","title":"Budget 2026.md","url":"https://cloud.example.org/index.php/f/4711","provider":"files","kind":"file"},{"id":"url:https://cloud.example.org/index.php/call/abc123","title":"Khaled","url":"https://cloud.example.org/index.php/call/abc123","provider":"talk-conversations","kind":"url","resolvable":false}]}
 ```
+
+### Optional Profile Fields integration
+
+- `profile_fields_browse`: one read-only tool for the Nextcloud app Profile Fields, off by
+  default (opt-in). 27 tools by default, 28 with the switch on.
+- Needs the Profile Fields app, installed and enabled.
+- Switch: "Allow reading Profile Fields" (`NC_MCP_PROFILE_FIELDS_READ`), read at start. A
+  missing, off or unrecognized value leaves the tool off.
+  - Installed from the app store: tick the box under Administration settings, Security, MCP
+    Connector, or run `occ app_api:app:config:set mcp_connector profile_fields_read --value on` (with
+    `--update-only` once the key exists). A change takes effect after you disable and enable
+    this app again.
+  - Every other mode: set `NC_MCP_PROFILE_FIELDS_READ=on` in the environment of the server
+    and restart it.
+- Levels: `me` returns the fields the connected account may see of itself; `definitions`,
+  `values` (selected keys of one exact UID) and `search` (exact match, paginated) use routes
+  the app reserves for administrators.
+- Only authenticated OCS GET requests with the permissions of the connected account. It
+  cannot create, change or delete anything and cannot change the visibility of a field.
+- The switch steers this tool only and is not an access control. The app registers a search
+  provider of its own (`profile_fields.directory`), and `unified_search`, `search` and
+  `prepare_context` ask it with or without the switch. The search follows the permissions of
+  the app: an administrator finds every value, private ones included; every other account
+  finds only values the app shows it (visibility `users` or `public`) and never a private
+  one. To keep profile values out of the search, use the visibility settings of the app.
+- `profile_fields` is not a bundle name: `NC_MCP_DISABLED_TOOLS` does not switch this tool,
+  and naming it there stops the server at start like any unknown name.
+- Measured in CI on Nextcloud 34 against the store release of the app (4.0.0),
+  [tests/integration/test_profile_fields_live.py](tests/integration/test_profile_fields_live.py).
+  Not measured on Nextcloud 35: the app store carries only a nightly of the app for 35.
 
 ## Switching tool bundles off
 

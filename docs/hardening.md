@@ -118,3 +118,37 @@ results with your deployment notes:
 
 Section 2's share case is the one real deployments get wrong; test it with
 your own folder structure, not just on paper.
+
+## 10. Profile Fields: an opt-in tool, and a search that does not wait for it
+
+`profile_fields_browse` reads the fields of the Profile Fields app. It is off
+by default and registers only with `NC_MCP_PROFILE_FIELDS_READ=on`, set as a
+deploy variable or with the box "Allow reading Profile Fields" in the admin
+settings of this app. A change takes effect after the app was disabled and
+enabled again.
+
+- What it reads: the own values of the connected account; for an
+  administrator account also the field definitions, selected values of one
+  other account by its UID, and an exact search for one field value. It
+  sends OCS GET requests only and changes nothing.
+- Whose rules apply: the ones of the app. The connector hands the
+  permissions of the connected account through and adds no rule of its own;
+  an account without administrator rights is refused by the app on the
+  administrator routes.
+- The switch is **not an access control**. The app registers a search
+  provider of its own, and `unified_search`, `search` and `prepare_context`
+  ask it with or without the switch. That search follows the permissions of
+  the app: an administrator account finds private values of other accounts,
+  every other account finds only values the app shows it.
+- Consequence: section 1 applies in full. Do not connect an administrator
+  account to an assistant. With one connected, private profile values are
+  within reach of the search whatever this switch says. To keep a value out
+  of the search, use the visibility settings of the app.
+- The audit log (section 7) records at most the names `level`, `limit` and
+  `offset` of such a call, never a UID, a field key or a value.
+
+Held by `tests/unit/test_profile_fields_tools.py` and
+`tests/contract/test_audit_surface.py`. The behaviour against a running
+Nextcloud (34, Profile Fields 4.0.0), the search included, is measured by
+`tests/integration/test_profile_fields_live.py`, which runs in CI only. Not
+measured on Nextcloud 35.

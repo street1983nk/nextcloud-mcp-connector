@@ -91,7 +91,7 @@ angeschaltet lassen, wenn der Client sie anbietet.
 
 ## 7. Das Audit-Log anschalten
 
-Standardmäßig aus, ein Schalter in den Verwaltungseinstellungen dieser App.
+Standardmäßig aus, ein Schalter in den Administrationseinstellungen dieser App.
 Angeschaltet wird jeder Werkzeugaufruf festgehalten mit Konto, Werkzeug,
 Zeit, aufrufender App und Ausgang, nie mit einem Parameterwert oder einem
 Teil eines Ergebnisses. Die Einträge sind Hash-verkettet;
@@ -126,3 +126,40 @@ Nutzer, und die Ergebnisse zu den Betriebsnotizen legen:
 
 Der Freigabefall aus Abschnitt 2 ist der, den echte Installationen falsch
 machen; mit der eigenen Ordnerstruktur testen, nicht nur auf dem Papier.
+
+## 10. Profile Fields: ein Opt-in-Werkzeug und eine Suche, die nicht darauf wartet
+
+`profile_fields_browse` liest die Felder der App Profile Fields. Es ist
+standardmäßig aus und wird nur mit `NC_MCP_PROFILE_FIELDS_READ=on`
+registriert, gesetzt als Deploy-Variable oder über das Kästchen "Allow
+reading Profile Fields" in den Administrationseinstellungen dieser App. Eine
+Änderung wirkt, nachdem die App einmal deaktiviert und wieder aktiviert
+wurde.
+
+- Was es liest: die eigenen Werte des verbundenen Kontos; bei einem
+  Administratorkonto zusätzlich die Felddefinitionen, ausgewählte Werte
+  eines anderen Kontos über dessen UID und eine exakte Suche nach einem
+  Feldwert. Es sendet ausschließlich OCS-GET-Anfragen und ändert nichts.
+- Wessen Regeln gelten: die der App. Der Connector reicht die
+  Berechtigungen des verbundenen Kontos durch und fügt keine eigene Regel
+  hinzu; ein Konto ohne Administratorrechte weist die App auf den
+  Administrator-Routen ab.
+- Der Schalter ist **keine Zugriffskontrolle**. Die App registriert einen
+  eigenen Suchprovider, und `unified_search`, `search` und `prepare_context`
+  fragen ihn mit und ohne Schalter. Diese Suche folgt den Berechtigungen der
+  App: Ein Administratorkonto findet private Werte anderer Konten, jedes
+  andere Konto nur Werte, die die App ihm zeigt.
+- Folge: Abschnitt 1 gilt uneingeschränkt. Kein Administratorkonto mit
+  einem Assistenten verbinden. Ist eines verbunden, liegen private
+  Profilwerte in Reichweite der Suche, egal wie dieser Schalter steht. Wer
+  einen Wert aus der Suche heraushalten will, nutzt die
+  Sichtbarkeitseinstellungen der App.
+- Das Audit-Log (Abschnitt 7) hält von einem solchen Aufruf höchstens die
+  Namen `level`, `limit` und `offset` fest, nie eine UID, einen
+  Feldschlüssel oder einen Wert.
+
+Gehalten von `tests/unit/test_profile_fields_tools.py` und
+`tests/contract/test_audit_surface.py`. Das Verhalten gegen eine laufende
+Nextcloud (34, Profile Fields 4.0.0), die Suche eingeschlossen, misst
+`tests/integration/test_profile_fields_live.py`, und dieser Test läuft nur
+in der CI. Auf Nextcloud 35 nicht gemessen.

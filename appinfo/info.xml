@@ -538,6 +538,11 @@ Prérequis :
 		  - store installation could not arm it: the register command accepted the variables
 		  - and the container never saw them. No defaults here, the code holds them
 		  - (oauth/chain.py), and a test holds this list equal to config.EXCHANGE_VARIABLES.
+		  -
+		  - NC_MCP_PROFILE_FIELDS_READ joins them together with the tool it switches
+		  - (0.9.0), so the lesson of issue #12 is not learned once more: without this
+		  - declaration a store installation could not switch profile_fields_browse on.
+		  - No default, the code defaults to off.
 		-->
 		<environment-variables>
 			<variable>
@@ -577,6 +582,11 @@ Prérequis :
 				<name>NC_MCP_TASKS_UPDATE</name>
 				<display-name>Allow changing existing tasks</display-name>
 				<description>Off unless set to on. When enabled, assistants can complete, reopen, edit and move existing tasks with tasks_complete, tasks_update and tasks_move, and only with the ETag returned by tasks_read. A change takes effect after you disable and enable this app again.</description>
+			</variable>
+			<variable>
+				<name>NC_MCP_PROFILE_FIELDS_READ</name>
+				<display-name>Allow reading Profile Fields</display-name>
+				<description>Off unless set to on. When enabled, assistants can read the fields of the Profile Fields app with profile_fields_browse, read-only and with the permissions of the connected account. It needs the Profile Fields app. The search of this connector does not depend on this switch and follows the permissions of that app. A change takes effect after you disable and enable this app again.</description>
 			</variable>
 			<variable>
 				<name>NC_MCP_DISABLED_TOOLS</name>

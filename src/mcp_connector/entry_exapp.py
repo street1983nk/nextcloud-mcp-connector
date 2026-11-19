@@ -558,9 +558,10 @@ def _resolved_env() -> tuple[dict[str, str], frozenset[str]]:
     to read over. A failure of the read is an empty overlay, so the deploy environment of an
     existing installation keeps working exactly as it did (T-05-20).
 
-    Two keys of the result travel further than this mapping, and :func:`main` says why: the
-    switch of TALK-04 is read by a tool and the switch of files_update by the registration of
-    the tools (issue #31), and neither ever sees this mapping.
+    Four keys of the result travel further than this mapping, and :func:`main` says why: the
+    switch of TALK-04 is read by a tool, and the switches of files_update (issue #31), of the
+    modifying task tools and of profile_fields_browse by the registration of the tools, and
+    none of them ever sees this mapping.
     """
     env = dict(os.environ)
     if not config.exapp_configured(env):
@@ -677,6 +678,16 @@ def main() -> None:
     # the price is the same activation cycle.
     if config.ENV_TASKS_UPDATE in resolved:
         os.environ[config.ENV_TASKS_UPDATE] = resolved[config.ENV_TASKS_UPDATE]
+
+    # The fourth key that travels, for the same reader and for the same reason. The opt-in
+    # switch of profile_fields_browse is read once, when ``.server`` decides whether it
+    # imports the optional registration, and that decision reads the process environment.
+    # Without this line a box ticked in Nextcloud would leave the tool missing on a store
+    # installation, and a box unticked there would leave it served when the deploy
+    # environment armed it. The write comes before :func:`build_exapp_app` like the two
+    # above, and the price is the same activation cycle.
+    if config.ENV_PROFILE_FIELDS_READ in resolved:
+        os.environ[config.ENV_PROFILE_FIELDS_READ] = resolved[config.ENV_PROFILE_FIELDS_READ]
 
     try:
         config.exapp_settings(resolved)

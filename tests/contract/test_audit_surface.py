@@ -24,6 +24,7 @@ import os
 import subprocess
 import sys
 from collections.abc import Mapping
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -37,6 +38,7 @@ from optional_surface import (
 )
 
 from mcp_connector.audit.allowlist import FORBIDDEN_PARAMS, PARAM_ALLOWLIST
+from mcp_connector.audit.record import set_parameter_names
 from mcp_connector.server import mcp
 
 #: Optional tools that stand in no allowlist on purpose, each with its reason. The recorder
@@ -204,6 +206,32 @@ def test_the_block_list_names_parameters_that_really_exist() -> None:
         "no name of FORBIDDEN_PARAMS occurs in the measured tool surface: the list would be "
         "decoration, and the case above would pass for the wrong reason"
     )
+
+
+#: The arguments of ``profile_fields_browse`` that name an account or a profile value. A
+#: literal of this file and not derived from the allowlist, so widening the entry turns the
+#: case below red.
+PROFILE_FIELDS_UNRECORDED = frozenset({"user_uid", "field_keys", "field_key", "value"})
+
+
+def test_a_profile_fields_call_records_no_name_of_an_account_or_value_argument() -> None:
+    """Every argument set at once: the recorder keeps the three paging and level names."""
+    schema = _measured_surface()["profile_fields_browse"]
+    assert schema > PROFILE_FIELDS_UNRECORDED, "the unrecorded names must really be arguments"
+    assert not PARAM_ALLOWLIST["profile_fields_browse"] & PROFILE_FIELDS_UNRECORDED
+
+    arguments = dict.fromkeys(sorted(schema), "PAYLOADMARK")
+    ctx = SimpleNamespace(
+        request_context=SimpleNamespace(
+            params={"name": "profile_fields_browse", "arguments": arguments}
+        )
+    )
+
+    recorded = set_parameter_names(ctx, "profile_fields_browse")
+
+    assert recorded == sorted(schema - PROFILE_FIELDS_UNRECORDED)
+    assert recorded == ["level", "limit", "offset"]
+    assert "PAYLOADMARK" not in json.dumps(recorded)
 
 
 async def _undecorated(ctx: Any = None) -> str:

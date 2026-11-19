@@ -174,6 +174,41 @@ def test_the_switch_keeps_integration_tests_from_the_skip_of_the_shared_conftest
     assert demanded.markers == [], "with the switch the test decides, and fails"
 
 
+def test_the_integration_job_proves_profile_fields_after_its_suite() -> None:
+    """The live proof of ``profile_fields_browse``: suite, store install, then the measurement.
+
+    The app is installed after the job-wide suite, so that suite keeps measuring the instance
+    it was written against. The measuring step carries the demand of the file and the opt-in
+    switch, and it reads the line of the measurement back, because the shared conftest would
+    turn a run without ``NC_MCP_URL`` into a green skip (the job may not set the live switch).
+    """
+    workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    steps = _steps(_job(workflow, "integration"))
+    suite = [i for i, step in enumerate(steps) if step.endswith("uv run pytest -m integration")]
+    install = [i for i, step in enumerate(steps) if "app:install profile_fields" in step]
+    measured = [i for i, step in enumerate(steps) if "test_profile_fields_live.py" in step]
+    assert len(suite) == len(install) == len(measured) == 1, (suite, install, measured)
+    assert suite[0] < install[0] < measured[0], "suite, install, live proof in order"
+    installing = steps[install[0]]
+    assert "::error title=Profile Fields is not installable::" in installing
+    assert "grep -E '^  - profile_fields: '" in installing, "the version of the app in the log"
+    step = steps[measured[0]]
+    assert 'NC_MCP_EXPECT_PROFILE_FIELDS: "1"' in step
+    assert 'NC_MCP_PROFILE_FIELDS_READ: "on"' in step
+    assert "NC_MCP_E2E_NEXTCLOUD: nc-mcp-test" in step
+    assert "PROFILE-FIELDS tools without switch=27 with switch=28" in step
+    # The search is measured with the switch off: who finds a private value, and who does not.
+    assert (
+        "PROFILE-FIELDS search without switch: private value admin=1 bob=0, shared value bob=1"
+        in step
+    )
+    live = (ROOT / "tests" / "integration" / "test_profile_fields_live.py").read_text(
+        encoding="utf-8"
+    )
+    assert "PROFILE-FIELDS search without switch: private value admin=" in live
+    assert "(skipped|deselected)" in step
+
+
 def test_the_exapp_topology_stays_on_34_0_3_by_default() -> None:
     """Without an override compose.exapp.yml still starts Nextcloud 34.0.3.
 

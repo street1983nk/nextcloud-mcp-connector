@@ -15,6 +15,7 @@ named in one place.
 """
 
 import importlib.util
+import itertools
 import json
 import os
 import re
@@ -639,6 +640,21 @@ def test_the_byte_gate_measures_with_every_switch_on() -> None:
     assert standard == EXPECTED_TOOLS
 
 
+def test_the_acceptance_run_hands_on_every_switch_of_the_gates() -> None:
+    """A switch the acceptance run does not hand on to the server it starts is a tool that
+    run never sees, and it says nothing about it: the expected set of the run is the registry
+    of that server. ``NC_MCP_PROFILE_FIELDS_READ`` was missing there until 0.9.0."""
+    path = Path(__file__).resolve().parents[2] / "scripts" / "acceptance_all_tools.py"
+    spec = importlib.util.spec_from_file_location("acceptance_all_tools", path)
+    if spec is None or spec.loader is None:  # pragma: no cover - a missing script is a red test
+        raise RuntimeError(f"{path} could not be loaded")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    assert set(module.FORWARDED_SWITCHES) == set(SWITCHES)
+    assert len(module.FORWARDED_SWITCHES) == len(set(module.FORWARDED_SWITCHES))
+
+
 def test_the_byte_gate_refuses_a_planted_size() -> None:
     """Counter proof through the check the gate runs: one byte over a limit is a finding."""
     gate = _load_budget_gate()
@@ -1036,6 +1052,219 @@ async def test_no_input_schema_accepts_a_user_parameter() -> None:
     assert findings == [], (
         "a tool that takes a user name lets the model act as someone else: " + ", ".join(findings)
     )
+
+
+# The gate above compares five exact names on the default registry. Two things escaped it: a
+# tool behind a switch, and a name that says the same in other letters (``user_uid``,
+# ``target_user``, ``on_behalf_of``). The gate below reads the surface with every switch on and
+# asks of every property name whether it can name an account at all. It replaces nothing: the
+# five exact names stay refused without any exception, here and above.
+
+#: Pieces that make a parameter name one for an account wherever they stand in it, read on
+#: the name without its separators: ``user`` (username, user_id, targetUser), ``owner``,
+#: ``account``, ``principal``, ``login``, ``identity``, and the three ways to ask for somebody
+#: else's rights, ``impersonat`` (impersonate, impersonation), ``behalf`` (on_behalf_of) and
+#: ``sudo``.
+ACCOUNT_FRAGMENTS = (
+    "user",
+    "owner",
+    "account",
+    "principal",
+    "login",
+    "identity",
+    "impersonat",
+    "behalf",
+    "sudo",
+)
+
+#: Words that mean the same only as a whole word of the name: ``uid`` inside ``uuid`` and
+#: ``actor`` inside ``factor`` name nothing.
+ACCOUNT_WORDS = frozenset({"uid", "uids", "actor", "runas", "actas"})
+
+#: A word that ends in ``uid`` names an account as well (``targetuid``), these two apart.
+NOT_AN_ACCOUNT_UID = frozenset({"uuid", "guid"})
+
+#: The second word of ``run_as`` and ``act_as``, after one of the first two.
+AS_AFTER = frozenset({"run", "act"})
+
+#: The parameters that name an account on purpose: tool, parameter, why this is no change of
+#: identity, and the live test that holds exactly that. Narrow by construction: an entry
+#: covers one parameter of one tool, a new parameter of the same kind is a finding until
+#: somebody decides about it here, an entry without its parameter or without its test is a
+#: finding too, and none of the five exact names of ``FORBIDDEN_PROPERTIES`` can be entered.
+ACCOUNT_PARAMETER_EXCEPTIONS: dict[tuple[str, str], tuple[str, str, str]] = {
+    ("mail_browse", "account_id"): (
+        (
+            "the number of a mail account of the Mail app, taken from level=accounts, and not a "
+            "Nextcloud account: the request runs as the caller, and the Mail app hands out "
+            "nothing of an account the caller does not own"
+        ),
+        "tests/integration/test_mail_read.py",
+        "test_the_second_account_reaches_neither_mailbox_nor_message_nor_full_text",
+    ),
+    ("profile_fields_browse", "user_uid"): (
+        (
+            "names whose values to read and never whom to act as: the request runs as the "
+            "caller, and the app profile_fields answers for a foreign UID only to an "
+            "administrator"
+        ),
+        "tests/integration/test_profile_fields_live.py",
+        "test_bob_gets_no_value_of_alice_over_any_level",
+    ),
+}
+
+
+def _names_an_account(property_name: str) -> bool:
+    """Whether a parameter of this name can say which account is meant."""
+    words = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", property_name).lower()
+    parts = [part for part in re.split(r"[^a-z0-9]+", words) if part]
+    joined = "".join(parts)
+    if any(fragment in joined for fragment in ACCOUNT_FRAGMENTS):
+        return True
+    if any(
+        part in ACCOUNT_WORDS or (part.endswith("uid") and part not in NOT_AN_ACCOUNT_UID)
+        for part in parts
+    ):
+        return True
+    return any(first in AS_AFTER and second == "as" for first, second in itertools.pairwise(parts))
+
+
+def _account_parameter_findings(
+    schemas: dict[str, dict[str, Any]],
+    exceptions: dict[tuple[str, str], tuple[str, str, str]],
+) -> list[str]:
+    """What the confused deputy gate has to say about a surface, in the printed form.
+
+    One function for the gate and its counter proofs. A parameter that can name an account
+    is a finding unless it is entered as an exception; an exception is a finding itself when
+    it would cover an exact forbidden name, when its parameter is gone, or when it carries
+    no reason or names a test that does not exist.
+    """
+    root = Path(__file__).resolve().parents[2]
+    findings: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for name, schema in sorted(schemas.items()):
+        for property_name in sorted({found for found, _definition in _properties(schema)}):
+            if not _names_an_account(property_name):
+                continue
+            seen.add((name, property_name))
+            if property_name.lower() in FORBIDDEN_PROPERTIES:
+                findings.append(f"{name}.{property_name} is a user parameter, never an exception")
+            elif (name, property_name) not in exceptions:
+                findings.append(f"{name}.{property_name} can name an account, no exception")
+    for (name, property_name), (reason, evidence, test) in sorted(exceptions.items()):
+        entry = f"{name}.{property_name}"
+        if (name, property_name) not in seen:
+            findings.append(f"exception without such a parameter: {entry}")
+        if not reason.strip():
+            findings.append(f"exception without a reason: {entry}")
+        proof = root / evidence
+        if not proof.is_file() or f"def {test}(" not in proof.read_text(encoding="utf-8"):
+            findings.append(f"exception without its live test: {entry} ({evidence}::{test})")
+    return findings
+
+
+def test_no_input_schema_of_the_switched_on_surface_names_an_account_unexplained() -> None:
+    """T-01-95 over all 32 schemas and over every spelling, with the exceptions by name."""
+    surface = switched_on_surface()
+
+    assert surface_findings(surface, EXPECTED_TOOLS) == []
+    assert set(surface) == EXPECTED_TOOLS | OPTIONAL_TOOLS.keys(), (
+        "the confused deputy check must cover every schema of the switched-on surface"
+    )
+    assert all(_names_an_account(name) for name in FORBIDDEN_PROPERTIES), (
+        "the wide reading must contain the five exact names"
+    )
+
+    schemas = {name: entry["input_schema"] or {} for name, entry in surface.items()}
+    findings = _account_parameter_findings(schemas, ACCOUNT_PARAMETER_EXCEPTIONS)
+
+    assert findings == [], (
+        "a parameter that names an account needs a decision (T-01-95): " + "; ".join(findings)
+    )
+
+
+@pytest.mark.parametrize(
+    "property_name",
+    [
+        "user",
+        "USERNAME",
+        "userId",
+        "user_uid",
+        "target_user",
+        "targetuid",
+        "uids",
+        "owner_id",
+        "account",
+        "principal_uri",
+        "login_name",
+        "on_behalf_of",
+        "onBehalfOf",
+        "impersonate",
+        "impersonation_target",
+        "run_as",
+        "actAs",
+        "sudo",
+        "actor_id",
+    ],
+)
+def test_a_parameter_name_for_an_account_is_recognised(property_name: str) -> None:
+    assert _names_an_account(property_name)
+
+
+@pytest.mark.parametrize(
+    "property_name",
+    ["upload_id", "uuid", "guid", "factor", "task_id", "field_key", "value", "as", "run", "list"],
+)
+def test_a_parameter_name_for_something_else_is_left_alone(property_name: str) -> None:
+    assert not _names_an_account(property_name)
+
+
+def test_the_account_gate_reports_a_planted_parameter_and_a_worn_out_exception() -> None:
+    """Counter proof through the function the gate runs, on schemas written out here."""
+    plain = {"type": "object", "properties": {"task_id": {"type": "string"}}}
+    reading = {"type": "object", "properties": {"user_uid": {"type": "string"}}}
+    nested = {
+        "type": "object",
+        "properties": {"user_uid": {"type": "string"}, "target": {"$ref": "#/$defs/Target"}},
+        "$defs": {"Target": {"type": "object", "properties": {"on_behalf_of": {}}}},
+    }
+    key = next(entry for entry in ACCOUNT_PARAMETER_EXCEPTIONS if entry[1] == "user_uid")
+    assert key == ("profile_fields_browse", "user_uid")
+    entered = {key: ACCOUNT_PARAMETER_EXCEPTIONS[key]}
+    reason, evidence, test = entered[key]
+
+    assert _account_parameter_findings({"profile_fields_browse": reading}, entered) == []
+    assert _account_parameter_findings({"profile_fields_browse": reading}, {}) == [
+        "profile_fields_browse.user_uid can name an account, no exception"
+    ]
+    # The exception belongs to one tool: the same name on another tool is a finding, and so
+    # is a second such parameter on the tool that has the exception.
+    assert _account_parameter_findings(
+        {"profile_fields_browse": reading, "tasks_move": reading}, entered
+    ) == ["tasks_move.user_uid can name an account, no exception"]
+    assert _account_parameter_findings({"profile_fields_browse": nested}, entered) == [
+        "profile_fields_browse.on_behalf_of can name an account, no exception"
+    ]
+    assert _account_parameter_findings({"profile_fields_browse": plain}, entered) == [
+        "exception without such a parameter: profile_fields_browse.user_uid"
+    ]
+    assert _account_parameter_findings(
+        {"profile_fields_browse": reading}, {key: (" ", evidence, test)}
+    ) == ["exception without a reason: profile_fields_browse.user_uid"]
+    assert _account_parameter_findings(
+        {"profile_fields_browse": reading}, {key: (reason, evidence, "test_nobody_wrote")}
+    ) == [
+        (
+            "exception without its live test: profile_fields_browse.user_uid "
+            f"({evidence}::test_nobody_wrote)"
+        )
+    ]
+    # An exact forbidden name stays forbidden even with an entry made for it.
+    owner = {"type": "object", "properties": {"owner": {"type": "string"}}}
+    assert _account_parameter_findings(
+        {"tasks_move": owner}, {("tasks_move", "owner"): (reason, evidence, test)}
+    ) == ["tasks_move.owner is a user parameter, never an exception"]
 
 
 #: The permission levels of the README table, one per class of tool.

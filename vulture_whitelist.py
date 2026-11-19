@@ -44,6 +44,12 @@ tasks_complete
 tasks_update
 tasks_move
 
+# --- The opt-in tool functions ---------------------------------------------------------
+# Registered by @mcp.tool only when server/__init__.py imports their module behind the
+# opt-in switch, so vulture sees neither the import nor a caller. The switch, the default
+# off and the registration are covered by tests/unit/test_profile_fields_tools.py.
+profile_fields_browse
+
 # --- Tool logic ahead of its registration (plan 31-02, dissolved in plan 31-03) ---------
 # Empty on purpose: plan 31-02 parked create_folder here, because the tool logic was written
 # and tested one plan before its registration. Plan 31-03 registered files_create_folder,

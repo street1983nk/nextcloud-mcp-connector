@@ -132,6 +132,17 @@ decision for the operator, see privacy.md, not a vulnerability).
   `prepare_context` still reach the content of a hidden bundle. The README
   and hardening.md both carry that sentence so nobody buys a boundary that
   was never sold.
+- Profile Fields: `profile_fields_browse` is off by default and registers
+  only with `NC_MCP_PROFILE_FIELDS_READ=on` (deploy variable or admin
+  setting). It reads the own values of the connected account, and for an
+  administrator account the definitions and the values of other accounts,
+  read only and with the permissions the app enforces. That switch is
+  **not** a disclosure boundary either: the search provider of the app is
+  asked by `unified_search`, `search` and `prepare_context` with or without
+  it, and an administrator account finds private values of other accounts
+  there. `tests/integration/test_profile_fields_live.py` measures both
+  against a running Nextcloud 34, in CI only; hardening.md section 10 has
+  the operator's side.
 
 ### Denial of service: can this app be used to exhaust the instance?
 
@@ -216,7 +227,12 @@ the three tools are in
    deployment mistake this design permits.
 4. **The host is trusted.** Disk encryption and backup policy are the
    operator's layer; this app cannot add one below itself.
-5. **No independent audit has verified any of this yet.** The tests named
+5. **An administrator account reaches private profile values.** Where the
+   Profile Fields app is installed, the search hands an administrator
+   account private values of other accounts, with
+   `NC_MCP_PROFILE_FIELDS_READ` on or off. The connector does not filter
+   them; connect no administrator account to an assistant.
+6. **No independent audit has verified any of this yet.** The tests named
    above are the project's own. The scans that run on every push (CodeQL,
    pip-audit, OpenSSF Scorecard) are external tools but not an audit.
    SECURITY.md is the channel for whoever proves a sentence of this page

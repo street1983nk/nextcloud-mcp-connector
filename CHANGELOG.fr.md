@@ -13,6 +13,26 @@ dans [CHANGELOG.md](CHANGELOG.md).
 
 ## [Unreleased]
 
+### Ajouté
+
+- `profile_fields_browse` : un outil facultatif en lecture seule pour l'application
+  Nextcloud Profile Fields, désactivé par défaut. 27 outils par défaut, 28 avec le
+  commutateur activé. Merci à @vitormattos (#49).
+- Le commutateur « Allow reading Profile Fields » (`NC_MCP_PROFILE_FIELDS_READ`) figure
+  dans les paramètres d'administration de cette application et est déclaré comme variable
+  d'environnement, pour qu'une installation depuis l'App Store puisse activer l'outil. Un
+  changement prend effet après avoir désactivé puis réactivé l'application.
+- Niveaux : `me` pour ses propres champs visibles ; `definitions`, `values` et `search`
+  utilisent des routes que l'application réserve aux administrateurs. Uniquement des
+  requêtes OCS GET avec les permissions du compte connecté ; rien n'est créé, modifié ni
+  supprimé.
+- Le commutateur ne pilote que cet outil. La recherche (`unified_search`, `search`,
+  `prepare_context`) atteint le fournisseur de recherche de l'application avec ou sans lui
+  et suit les permissions de l'application : un administrateur trouve les valeurs privées,
+  tout autre compte seulement les valeurs que l'application lui montre.
+- Mesuré sur Nextcloud 34 avec Profile Fields 4.0.0. Non mesuré sur Nextcloud 35 : l'App
+  Store ne propose pour 35 qu'une version nightly de l'application.
+
 ## [0.8.0] - 2026-11-14
 
 ### Ajouté

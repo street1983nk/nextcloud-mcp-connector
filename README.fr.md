@@ -125,6 +125,7 @@ qu'un nom ou un niveau diverge.
 | `talk_send` | create-only | Un message dans une conversation ; jamais modifié ni supprimé, désactivable pour toute l'instance |
 | `mail_browse` | read | Les comptes Mail, leurs boîtes aux lettres et les en-têtes de messages ; strictement en lecture seule |
 | `contacts_search` | read | Des contacts dans les carnets d'adresses |
+| `profile_fields_browse` | read | Les champs de l'application Profile Fields : ses propres valeurs et, pour les administrateurs, les définitions, les valeurs d'un compte et une recherche exacte ; disponible seulement si l'admin active `NC_MCP_PROFILE_FIELDS_READ` |
 | `unified_search` | read | La recherche unifiée de Nextcloud à travers les fournisseurs, en respectant les permissions |
 | `prepare_context` | read | Fichiers, notes, cartes, la semaine d'événements à venir, les conversations Talk en attente et les courriels non lus en un appel |
 | `search` | read | Point d'entrée de recherche compatible OpenAI, délègue à la recherche unifiée |
@@ -149,6 +150,41 @@ manquante reçoit une réponse en une phrase, jamais un résultat vide.
 ```json
 {"query":"budget","count":2,"results":[{"id":"file:4711","title":"Budget 2026.md","url":"https://cloud.example.org/index.php/f/4711","provider":"files","kind":"file"},{"id":"url:https://cloud.example.org/index.php/call/abc123","title":"Khaled","url":"https://cloud.example.org/index.php/call/abc123","provider":"talk-conversations","kind":"url","resolvable":false}]}
 ```
+
+### Intégration Profile Fields facultative
+
+- `profile_fields_browse` : un outil en lecture seule pour l'application Nextcloud Profile
+  Fields, désactivé par défaut (opt-in). 27 outils par défaut, 28 avec le commutateur activé.
+- Prérequis : l'application Profile Fields est installée et activée.
+- Commutateur : « Allow reading Profile Fields » (`NC_MCP_PROFILE_FIELDS_READ`), lu au
+  démarrage. Une valeur absente, désactivée ou inconnue laisse l'outil désactivé.
+  - Installation depuis l'App Store : cocher la case dans Paramètres d'administration,
+    Sécurité, MCP Connector, ou exécuter
+    `occ app_api:app:config:set mcp_connector profile_fields_read --value on` (avec
+    `--update-only` dès que la clé existe). Un changement prend effet après avoir désactivé
+    puis réactivé l'application.
+  - Tout autre mode : définir `NC_MCP_PROFILE_FIELDS_READ=on` dans l'environnement du
+    serveur et le redémarrer.
+- Niveaux : `me` renvoie les champs que le compte connecté peut voir de lui-même ;
+  `definitions`, `values` (clés choisies d'un UID exact) et `search` (égalité exacte,
+  paginée) utilisent des routes que l'application réserve aux administrateurs.
+- Uniquement des requêtes OCS GET authentifiées, avec les permissions du compte connecté.
+  Aucune création, modification ou suppression, aucun changement de visibilité d'un champ.
+- Le commutateur ne pilote que cet outil et n'est pas un contrôle d'accès. L'application
+  enregistre son propre fournisseur de recherche (`profile_fields.directory`), et
+  `unified_search`, `search` et `prepare_context` l'interrogent avec ou sans le commutateur.
+  La recherche suit les permissions de l'application : un administrateur trouve chaque
+  valeur, y compris les valeurs privées ; tout autre compte ne trouve que les valeurs que
+  l'application lui montre (visibilité `users` ou `public`) et jamais une valeur privée.
+  Pour tenir des valeurs de profil hors de la recherche, utiliser les réglages de visibilité
+  de l'application.
+- `profile_fields` n'est pas un nom de bundle : `NC_MCP_DISABLED_TOOLS` ne commute pas cet
+  outil, et ce nom y arrête le serveur au démarrage comme tout nom inconnu.
+- Mesuré en CI sur Nextcloud 34 avec la version de l'application publiée dans l'App Store
+  (4.0.0),
+  [tests/integration/test_profile_fields_live.py](tests/integration/test_profile_fields_live.py).
+  Non mesuré sur Nextcloud 35 : l'App Store ne propose pour 35 qu'une version nightly de
+  l'application.
 
 ## Désactiver des bundles d'outils
 

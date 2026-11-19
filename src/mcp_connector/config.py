@@ -50,6 +50,7 @@ ENV_TALK_SEND = "NC_MCP_TALK_SEND"
 ENV_FILES_ROOT = "NC_MCP_FILES_ROOT"
 ENV_FILES_UPDATE = "NC_MCP_FILES_UPDATE"
 ENV_TASKS_UPDATE = "NC_MCP_TASKS_UPDATE"
+ENV_PROFILE_FIELDS_READ = "NC_MCP_PROFILE_FIELDS_READ"
 # Comma separated tool bundle names whose tools are not registered (issue #15).
 ENV_DISABLED_TOOLS = "NC_MCP_DISABLED_TOOLS"
 
@@ -760,6 +761,18 @@ def tasks_update_enabled(env: Mapping[str, str] | None = None) -> bool:
         ", ".join(sorted(_TRUE_VALUES)),
         ", ".join(sorted(_FALSE_VALUES)),
     )
+    return False
+
+
+def profile_fields_read_enabled(env: Mapping[str, str] | None = None) -> bool:
+    """Expose the read-only Profile Fields tool only after an explicit opt-in."""
+    source = os.environ if env is None else env
+    value = (source.get(ENV_PROFILE_FIELDS_READ) or "").strip().lower()
+    if value in _TRUE_VALUES:
+        return True
+    if not value or value in _FALSE_VALUES:
+        return False
+    logger.warning("%s is invalid; Profile Fields stays disabled.", ENV_PROFILE_FIELDS_READ)
     return False
 
 

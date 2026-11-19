@@ -106,15 +106,16 @@ LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "::1", "localhost"})
 #: is looking at, and a second spelling there would be a string that drifts silently.
 PUBLIC_URL_KEY = "public_url"
 
-#: The seven keys, in the order the form declares its fields. They are the field ids of the
+#: The ten keys, in the order the form declares its fields. They are the field ids of the
 #: admin form and the configuration keys at the same time (see the module docstring).
 #: ``oauth_cimd`` stands next to ``oauth_dcr`` because the code reads the two as one answer
 #: (``registry.client_policy``: this switch AND the DCR switch), and two coupled switches
 #: that sit apart in a form are two switches an administrator reads as independent.
 #: ``talk_send`` comes after them for the same reason read the other way round: it is
 #: independent of all four OAuth values, and putting it between them would tear that grouping
-#: apart. ``audit_log`` is last and joined in phase 18; it is about none of the six above,
-#: because it is about this app watching itself rather than about who may reach it.
+#: apart. ``audit_log`` joined in phase 18; it is about none of the six above, because it is
+#: about this app watching itself rather than about who may reach it. The three opt-in
+#: switches ``files_update``, ``tasks_update`` and ``profile_fields_read`` follow it.
 CONFIG_KEYS: tuple[str, ...] = (
     PUBLIC_URL_KEY,
     "oauth_dcr",
@@ -125,6 +126,7 @@ CONFIG_KEYS: tuple[str, ...] = (
     "audit_log",
     "files_update",
     "tasks_update",
+    "profile_fields_read",
 )
 
 #: The variable each key stands for. The overlay speaks the language of the deploy
@@ -139,6 +141,7 @@ KEY_TO_ENV: Mapping[str, str] = {
     "audit_log": config.ENV_AUDIT_LOG,
     "files_update": config.ENV_FILES_UPDATE,
     "tasks_update": config.ENV_TASKS_UPDATE,
+    "profile_fields_read": config.ENV_PROFILE_FIELDS_READ,
 }
 
 #: The keys that carry a checkbox, named once so the validation cannot drift from the form.
@@ -147,7 +150,8 @@ KEY_TO_ENV: Mapping[str, str] = {
 #: the key out of the overlay, so the deploy variable and then the default in code decide,
 #: and that default is off (``config.audit_log_enabled``). Seven since phase 33: the two
 #: opt-in write switches ``files_update`` and ``tasks_update`` follow the same rule, and both
-#: defaults in code are off.
+#: defaults in code are off. Eight since 0.9.0: ``profile_fields_read`` is the opt-in switch
+#: of a read tool, follows the same rule, and its default in code is off as well.
 SWITCH_KEYS: frozenset[str] = frozenset(
     {
         "oauth_dcr",
@@ -157,6 +161,7 @@ SWITCH_KEYS: frozenset[str] = frozenset(
         "audit_log",
         "files_update",
         "tasks_update",
+        "profile_fields_read",
     }
 )
 

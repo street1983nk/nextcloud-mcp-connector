@@ -339,6 +339,65 @@ jobs:
           uv run python tests/compat/modern_client_check.py http://127.0.0.1:8765/mcp
           uv run --isolated --no-project --with "mcp>=1.29,<2" \
             python tests/compat/legacy_client_check.py http://127.0.0.1:8765/mcp
+      - name: Install the Profile Fields app from the app store
+        # The opt-in tool profile_fields_browse reads the OCS routes of this app, so its live
+        # proof needs the store release and not a mock. The step stands after the suite above
+        # on purpose: the app registers a search provider of its own, and no earlier test
+        # should measure an instance that differs from the one it was written against.
+        # The store carries a stable release for Nextcloud 34 only (4.0.0, measured
+        # 2026-11-18; for 35 there is a nightly and nothing else, which occ does not install).
+        # compose.test.yml runs 34, so a failing install here is a finding and never a skip:
+        # the step prints the version of record and the answer of occ and fails with an
+        # annotation, instead of leaving the proof below to pass over nothing.
+        run: |
+          occ() { docker compose -f compose.test.yml exec -T --user www-data nextcloud php occ "$@"; }
+          occ status | tee nc-status.txt
+          if ! occ app:install profile_fields > pf-install.txt 2>&1; then
+            cat pf-install.txt
+            if ! grep -E 'already installed' pf-install.txt > /dev/null; then
+              version="$(sed -n 's/^ *- versionstring: //p' nc-status.txt)"
+              echo "::error title=Profile Fields is not installable::occ app:install profile_fields failed on Nextcloud ${version}. The live proof of profile_fields_browse did not run."
+              exit 1
+            fi
+          fi
+          occ app:enable profile_fields
+          occ app:list > app-list.txt
+          sed -n '/^Enabled:/,/^Disabled:/p' app-list.txt > apps-enabled.txt
+          grep -E '^  - profile_fields: ' apps-enabled.txt
+      - name: Profile Fields live through a real MCP client (opt-in tool, PR 49)
+        # Definitions for an administrator, the own value for each account, no foreign value
+        # for an account without administrator rights (with the administrator as positive
+        # control), and exactly 27 tools without the switch. The switches stand here and not
+        # on the job, so the suite above keeps skipping the file.
+        # NC_MCP_EXPECT_PROFILE_FIELDS is the demand of this file: with it a missing
+        # prerequisite fails instead of skipping. The shared conftest still skips a run
+        # without NC_MCP_URL, so the step checks the variable itself and, after the run, the
+        # line the measurement prints with -s: green means the tool lists were counted, not
+        # that pytest found nothing to do. NC_MCP_E2E_NEXTCLOUD names the container of
+        # compose.test.yml for the occ calls of the test.
+        env:
+          PYTHONUTF8: "1"
+          NC_MCP_E2E_NEXTCLOUD: nc-mcp-test
+          NC_MCP_EXPECT_PROFILE_FIELDS: "1"
+          NC_MCP_PROFILE_FIELDS_READ: "on"
+        run: |
+          set -a && . ./.env.test && set +a
+          test -n "${NC_MCP_URL}"
+          if ! uv run pytest tests/integration/test_profile_fields_live.py -m integration -s \
+              > profile-fields-live.txt 2>&1; then
+            cat profile-fields-live.txt
+            exit 1
+          fi
+          cat profile-fields-live.txt
+          grep -E 'PROFILE-FIELDS tools without switch=27 with switch=28' profile-fields-live.txt
+          # The switch steers the tool only: the search provider of the app answers with the
+          # switch off, and the line says to whom. An administrator finds the private value,
+          # the account without administrator rights does not, and it does find the shared one.
+          grep -F 'PROFILE-FIELDS search without switch: private value admin=1 bob=0, shared value bob=1' profile-fields-live.txt
+          if grep -E '[0-9]+ (skipped|deselected)' profile-fields-live.txt > /dev/null; then
+            echo "::error title=Profile Fields live proof incomplete::pytest skipped or deselected a test of the live proof."
+            exit 1
+          fi
       - name: Nextcloud logs on failure
         if: failure()
         run: docker compose -f compose.test.yml logs --tail=200
