@@ -843,6 +843,10 @@ Recent decisions affecting current work:
 - [Phase 32]: 32-06: Auch der Suchtreffer einer geteilten Liste (hit_url) zeigt nur die Startseite der Tasks-App; fetch-metadata shared als "true"/"false" (dict[str, str])
 - [Phase 32]: 32-05b: tests/conftest.py setzt unter NC_MCP_REQUIRE_LIVE=1 keinen Skip-Marker mehr (W3); die Kanarie nutzt den Stamm als Titel und Suchwort, nie den Marker; Aufgabenliste der Welt als zweite Sammlung, Kalender der Welt bleibt VEVENT
 
+### Roadmap Evolution
+
+- Phase 35 added (2026-11-19): Release 0.9.0 Profile Fields, Einzelphase ohne Milestone nach Merge von PR #49 (main 66ffa30d, CI grün)
+
 ### Pending Todos
 
 - **AUTH-04 (Plan 03-09, Owner):** Claude.ai und ChatGPT gegen eine oeffentlich erreichbare Staging-Instanz. Alles, was ohne oeffentliche Domain messbar war, ist mit 03-08 gemessen; offen bleibt genau der Teil, der eine erreichbare Instanz und die beiden gehosteten Oberflaechen braucht.

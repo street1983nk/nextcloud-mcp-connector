@@ -170,10 +170,21 @@ Kein Milestone-Audit (wie v1.5 bis v1.7): Aussagen aus den Phase-Verifikationen 
 | 32. Tasks-Bundle suchen, lesen, anlegen | v1.8 | 12/12 | Complete    | 2026-11-13 |
 | 33. Aufgaben ändern | v1.8 | 13/13 | Complete    | 2026-11-14 |
 | 34. Doku, Store, Release 0.8.0 | v1.8 | 11/11 | Complete    | 2026-11-14 |
+| 35. Release 0.9.0 Profile Fields | Einzelphase | 0/? | Not planned | - |
 
 ## Next
 
-Kein aktiver Milestone. v1.8 ist abgeschlossen, Release 0.8.0 steht seit 2026-11-14 im Store. Der nächste Zyklus startet mit `/gsd:new-milestone`, sobald das Owner-Thema feststeht. Vorgemerkt: Tag-Alias `no-ai` neben `kein-ki` als eigene kleine Phase (Schreibweise beim Owner erfragen), Audit-Grund "unspecified" bei veraltetem ETag. files_update-Weiterentwicklung und die F13-Spur bleiben außerhalb (milestones/v1.6-REQUIREMENTS.md).
+Kein aktiver Milestone. v1.8 ist abgeschlossen, Release 0.8.0 steht seit 2026-11-14 im Store. Am 2026-11-19 als Einzelphase ohne Milestone (wie die Releases 0.7.0 bis 0.7.3) dazugekommen: Phase 35, Release 0.9.0 mit dem Profile-Fields-Tool aus PR #49 (main 66ffa30d). Der nächste Zyklus startet mit `/gsd:new-milestone`, sobald das Owner-Thema feststeht. Vorgemerkt: Tag-Alias `no-ai` neben `kein-ki` als eigene kleine Phase (Schreibweise beim Owner erfragen), Audit-Grund "unspecified" bei veraltetem ETag. files_update-Weiterentwicklung und die F13-Spur bleiben außerhalb (milestones/v1.6-REQUIREMENTS.md).
+
+### Phase 35: Release 0.9.0 Profile Fields
+
+**Goal:** Release 0.9.0 mit dem optionalen, lesenden Profile-Fields-Tool aus PR #49 (main 66ffa30d) steht im Store, ohne Folge-Release wegen eines Fehlers. Ablauf nach dem Muster der Phase 34 (34-RULES.md, raw/34-07-volltest.txt): Versionssprung in info.xml, `__version__`, pyproject und uv.lock; CHANGELOG DE/EN/FR mit Datum; README-Faktencheck DE/EN/FR (Tool-Zahlen 27, 28, 31); Store-Texte-Entwurf mit Owner-Freigabe und danach SHA-Pin in test_store_texts_frozen.py; Volltest DE/EN/FR gegen die ExApp-Testinstanz; Tag v0.9.0, release.yml, Signatur und Store-Abgabe je Einzelfreigabe des Owners.
+**Requirements**: keine eigenen (Release-Phase)
+**Depends on:** Phase 34
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 35 to break down)
 
 ---
 *Roadmap created: 2026-08-14 (granularity: coarse, mode: mvp); v1.0 abgeschlossen: 2026-08-20; v1.1 abgeschlossen: 2026-08-20 (Phase 7 deferred); v1.2 abgeschlossen: 2026-08-25 (Release 0.1.8 live); v1.3 abgeschlossen: 2026-08-26 (Release 0.1.9 live); v1.4 abgeschlossen: 2026-08-28 (Release 0.1.10 live); v1.5 abgeschlossen: 2026-08-31 (Release 0.1.11, openDesk-Spike, Audit-Log; Abschluss nachgetragen 2026-09-18); v1.6 aufgesetzt: 2026-09-18 (Phasen 20-24, 15 Requirements, granularity coarse); v1.6 abgeschlossen: 2026-09-26 (Token-Exchange-Pfad komplett, 15/15 Requirements, kein Release); v1.7 aufgesetzt: 2026-09-26 (Phasen 25-29, 14 Requirements, granularity coarse); v1.7 abgeschlossen: 2026-10-01 (kein-ki-Filter komplett, 14/14 Requirements, kein Release; Release 0.4.0 nach PR #14); v1.8 Roadmap geschrieben: 2026-11-11 (Phasen 30-34, 34 Requirements, granularity coarse; Owner-Entscheide E1 bis E14); v1.8 abgeschlossen: 2026-11-14 (Ordner anlegen und Tasks-Bundle, 33/33 Requirements, TMOD-07 Out of Scope; Release 0.8.0 live)*
