@@ -29,3 +29,12 @@ CI-MAIN codeql conclusion=success run=44813960803 attempt=2
 CI-MAIN reuse conclusion=success run=44813960803 attempt=2
 CI-MAIN pip-audit conclusion=success run=44813960803 attempt=2
 CI-MAIN-ERGEBNIS alle acht Jobs success auf sha=b70a860f (unit, image, exapp, canary-nc35, integration aus run=44813960801 attempt=1; codeql, reuse, pip-audit aus run=44813960803 attempt=2, event=push branch=main)
+DATUM tag=2026-11-20 changelog_main=2026-11-20 gleich=ja (git show b70a860f:CHANGELOG.md/.de.md/.fr.md, Ortszeit 21:55)
+VORAUS-TAG threats_open=0 origin/main=b70a860f (git fetch davor) v0.9.0_remote_vorher=keiner
+PRUEFUNG vor=tag bereich=origin/main..v0.9.0 commits=0 tag_auf_main=ja autor_committer_fremd=0 trailer=0 closes_woerter=0 (Tagziel-Commit b70a860f street1983nk, trailer=0)
+TAG v0.9.0 sha=b70a860fbc05abc9661d82d8151743bd5b044ac9 art=leichtgewichtig (cat-file -t commit, wie v0.8.0) remote=ja (git ls-remote)
+RELEASE-WORKFLOW run=44815709326 conclusion=success event=push sha=b70a860f job=publish success (alle Schritte success: Version, ghcr-Login, Multi-Arch-Build mit Push, Store-Archiv, Anhang)
+IMAGE ghcr.io/street1983nk/mcp_connector:0.9.0 index=sha256:3e8a21bdde8fc8a4063e83f6a39e79bc571475ab088684e9786b30d12ef7be4b linux/amd64=sha256:3409963811f9414656aa2046195e4480e3c675c6f2286d2af1d15e776e9989d8 linux/arm64=sha256:6be6f67cc209d2211c4f8d39268cf5acd9139ca7088815461817b682118f0c66 (+2 Attestations; lesend per Registry-API, anonym)
+ASSET mcp_connector-0.9.0.tar.gz groesse=64052 sha256=115b0e9fe877332e938b7ab1e605b0e73526b536d0efc64217724d68305c5f77 (GitHub-Digest und sha256sum des heruntergeladenen Assets gleich)
+RELEASE url=https://github.com/street1983nk/nextcloud-mcp-connector/releases/tag/v0.9.0 draft=false prerelease=false
+NOTIZ gesetzt=ja quelle=raw/35-03-release-notes.md wortgleich=ja (diff -B, nur abschließender Zeilenumbruch der gh-Ausgabe) at=0 session=0 vitor_mattos=1
