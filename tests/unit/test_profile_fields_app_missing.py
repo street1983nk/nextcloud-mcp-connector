@@ -269,3 +269,113 @@ def test_other_apps_keep_the_shared_404_and_998_wording() -> None:
     assert error.message == f'Nextcloud did not find the note. Nextcloud says: "{CORE_998_TEXT}".'
     assert error.hint == "Search for it first; the id or the name is unknown to this instance."
     assert error.reason == REASON_UNKNOWN_ID
+
+
+# --- The app enabled for some groups only (35-12, owner decision pf-gruppen-412) -------------
+#
+# Measured on Nextcloud 34.0.3 with ``occ app:enable profile_fields --groups=<group>``: an
+# account outside every listed group gets HTTP 412, ``Content-Type: application/json`` and
+# the body ``{"message":"App is not enabled"}`` without an OCS envelope. The text is the fixed,
+# untranslated literal of ``AppNotEnabledException`` (same in 34.0.3 and 35.0.0); the other
+# 412 answers of the core security middleware carry other texts ("CSRF check failed",
+# "ExApp required", the two cookie checks), and Profile Fields 4.0.0 never answers 412.
+
+GROUP_MESSAGE = "Profile Fields is not enabled for this account."
+GROUP_HINT = (
+    "Ask an administrator to enable the app Profile Fields for one of your groups or to "
+    "switch off profile_fields_read."
+)
+
+
+def not_enabled_for_account() -> dict[str, Any]:
+    return {"message": "App is not enabled"}
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("level", "kwargs", "route"), LEVELS)
+async def test_app_not_enabled_for_the_account_gets_its_own_sentence_on_every_level(
+    clients: NcClients, level: str, kwargs: dict[str, Any], route: str
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(ROOT + route).respond(412, json=not_enabled_for_account())
+        with pytest.raises(AppMissingError) as caught:
+            await profile_fields.browse(clients, level=level, **kwargs)
+        assert len(mock.calls) == 1
+    error = caught.value
+    assert error.message == GROUP_MESSAGE
+    assert error.hint == GROUP_HINT
+    assert str(error) == f"{GROUP_MESSAGE} Hint: {GROUP_HINT}"
+    assert error.reason == REASON_UNSPECIFIED
+    assert_clean(error)
+    assert "App is not enabled" not in str(error)
+
+
+@pytest.mark.anyio
+async def test_not_enabled_between_catalog_and_values_gets_the_same_sentence(
+    clients: NcClients,
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(ROOT + "/definitions").respond(200, json=ok([{"id": 1, "field_key": "cpf"}]))
+        mock.get(ROOT + "/users/alice/values").respond(412, json=not_enabled_for_account())
+        with pytest.raises(AppMissingError) as caught:
+            await profile_fields.browse(clients, level="values", user_uid="alice", field_keys="cpf")
+    assert caught.value.message == GROUP_MESSAGE
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("status", "body"),
+    [
+        (412, {"message": "CSRF check failed"}),
+        (412, {"message": "ExApp required"}),
+        (412, {"message": "Strict Cookie has not been found in request."}),
+        (412, {"message": "App is not enabled", "ocs": {}}),
+        (412, {"ocs": {"meta": {"statuscode": 412, "message": "App is not enabled"}, "data": []}}),
+        (412, ["App is not enabled"]),
+        (403, {"message": "App is not enabled"}),
+        (404, {"message": "App is not enabled"}),
+    ],
+)
+async def test_other_answers_never_read_as_not_enabled_positive_control(
+    clients: NcClients, status: int, body: object
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(ROOT + "/me/values").respond(status, json=body)
+        with pytest.raises(ToolError) as caught:
+            await profile_fields.browse(clients)
+    assert caught.value.message not in (GROUP_MESSAGE, MISSING_MESSAGE)
+
+
+@pytest.mark.anyio
+async def test_a_412_without_json_keeps_the_old_way(clients: NcClients) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(ROOT + "/me/values").respond(
+            412, content=b"App is not enabled", headers={"Content-Type": "text/plain"}
+        )
+        with pytest.raises(ToolError) as caught:
+            await profile_fields.browse(clients)
+    assert not isinstance(caught.value, AppMissingError)
+
+
+@pytest.mark.anyio
+async def test_the_412_csrf_answer_keeps_its_previous_wording(clients: NcClients) -> None:
+    """The way a non-matching 412 took before 35-12 is unchanged, word for word."""
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(ROOT + "/me/values").respond(412, json={"message": "CSRF check failed"})
+        with pytest.raises(ToolError) as caught:
+            await profile_fields.browse(clients)
+    assert caught.value.message == (
+        "Nextcloud answered the current user's Profile Fields values without an OCS envelope."
+    )
+
+
+def test_other_apps_keep_the_envelope_wording_for_the_412_answer() -> None:
+    response = httpx.Response(
+        412,
+        json=not_enabled_for_account(),
+        request=httpx.Request("GET", "http://nc.test/ocs/v2.php/apps/notes/x"),
+    )
+    with pytest.raises(ToolError) as caught:
+        ocs.parse_ocs(response, what="the note")
+    assert not isinstance(caught.value, AppMissingError)
+    assert caught.value.message == "Nextcloud answered the note without an OCS envelope."
