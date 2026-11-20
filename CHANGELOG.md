@@ -32,8 +32,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CI installs Profile Fields from the app store and proves the tool live through a real MCP
   client in the job `integration`: 27 tools without the switch, 28 with it, no foreign value
   for an account without administrator rights.
-- Measured on Nextcloud 34 with Profile Fields 4.0.0. Not measured on Nextcloud 35: the app
-  store carries only a nightly of the app for 35.
+- Without the app Profile Fields, or with the app disabled, the tool reports that the app
+  is missing and says how to fix it.
+- Measured on Nextcloud 34 with Profile Fields 4.0.0. On Nextcloud 35 Profile Fields is
+  only available as a nightly; there the tool reports that the app is missing.
 
 ### Changed
 
