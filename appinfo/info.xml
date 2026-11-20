@@ -64,70 +64,52 @@
 	-->
 	<description><![CDATA[What MCP Connector does:
 
-- Connects MCP assistants (Claude, ChatGPT, n8n, your own agent) to Nextcloud; every request runs as the signed-in user (OAuth sign-in; a per-account switch pauses access, one click can disconnect an assistant)
-- Tools: files (Office and PDF read as Markdown), calendar, tasks, notes, Deck, contacts, Tables, Talk, mail (read only) and one search across all of it
-- Nothing destructive: no delete, tasks included; no share; no move except one task when the admin enables changing tasks; nothing in the background, no telemetry
-- New in 0.8.0: create folders, missing parent folders too (at most 10 per call, nothing is overwritten); search, read and create tasks
-- Change existing tasks, off by default: complete, reopen, edit, or move a task with its subtasks into another list; the admin enables it, and a task is only changed when it is unchanged since it was read; recurring tasks are not changed, and tasks are never deleted
-- Files attached to a ChatGPT message land in your Nextcloud; only trusted ChatGPT hosts, and uploads never overwrite
-- Edit existing text files, off by default; the admin enables it, and a file is only replaced when it has not changed in the meantime
-- Files and folders with the collaborative tag kein-ki stay invisible to every assistant; occ mcp_connector:exclusion:check shows whether the tag is set up correctly
+- Claude, ChatGPT, n8n or your own agent work in Nextcloud as the signed-in user (OAuth sign-in); a per-account switch pauses access, one click can disconnect an assistant
+- Areas: files (Office and PDF as Markdown), folders, calendar, tasks, notes, Deck, contacts, Tables, Talk, mail (read only), Profile Fields (optional) and one search across all of it
+- No delete, tasks included; no share; no move except one task when the admin enables changing tasks; nothing in the background, no telemetry
+- Files and folders with the collaborative tag kein-ki stay invisible to every assistant
+- Creating works out of the box; changing existing text files and tasks is off by default, the admin enables it
+- Requirements: Nextcloud 32 to 35 with AppAPI, runs as an External App
 
 Together with [Findling](https://apps.nextcloud.com/apps/findling), search hits include the contents of your documents, scans included, with exactly the rights of the asking user.
 
+Documentation: [README on GitHub](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/README.md)
+
 ### Enterprise
 
-The hash-chained audit log is built in and off by default. Sign-in through your own identity provider arrived with 0.2.0, in the deployment without AppAPI; group policies are next on this road.
-
-Requirements:
-
-- Nextcloud 32 to 35 with the AppAPI app; runs as an External App
-- Or without AppAPI, since 0.2.0: run it beside your Nextcloud, with the consent confirmed by your OIDC sign-in; guide: docs/standalone-oauth.md in the source code
-- n8n speaks MCP natively since 1.119.0; guide: docs/n8n-setup.md in the source code]]></description>
+Built-in audit log, off by default; group policies are next.]]></description>
 	<description lang="de"><![CDATA[Was der MCP Connector kann:
 
-- Verbindet MCP-Assistenten (Claude, ChatGPT, n8n, eigene Agenten) mit Nextcloud; jede Anfrage läuft als der angemeldete Nutzer (OAuth-Anmeldung; ein Schalter je Konto pausiert den Zugriff, ein Klick kann einen Assistenten trennen)
-- Werkzeuge: Dateien (Office und PDF als Markdown lesbar), Kalender, Aufgaben, Notizen, Deck, Kontakte, Tables, Talk, Mail (nur lesen) und eine Suche über alles
-- Nichts Destruktives: kein Löschen, auch nicht von Aufgaben; kein Teilen; kein Verschieben, außer einer einzelnen Aufgabe, wenn der Admin das Ändern von Aufgaben freischaltet; nichts im Hintergrund, keine Telemetrie
-- Neu in 0.8.0: Ordner anlegen, auch fehlende Elternordner (höchstens 10 je Aufruf, nichts wird überschrieben); Aufgaben suchen, lesen und anlegen
-- Bestehende Aufgaben ändern, ab Werk aus: abhaken, wieder öffnen, bearbeiten oder mit ihren Unteraufgaben in eine andere Liste verschieben; der Admin schaltet es frei, und eine Aufgabe wird nur geändert, wenn sie seit dem Lesen unverändert ist; wiederkehrende Aufgaben bleiben unberührt, und Aufgaben werden nie gelöscht
-- An eine ChatGPT-Nachricht angehängte Dateien landen in Ihrer Nextcloud; nur vertrauenswürdige ChatGPT-Hosts, und Uploads überschreiben nie
-- Bestehende Textdateien bearbeiten, ab Werk aus; der Admin schaltet es frei, und eine Datei wird nur ersetzt, wenn sie sich zwischenzeitlich nicht geändert hat
-- Dateien und Ordner mit dem kollaborativen Tag kein-ki bleiben für jeden Assistenten unsichtbar; occ mcp_connector:exclusion:check zeigt, ob das Tag richtig eingerichtet ist
+- Claude, ChatGPT, n8n oder eigene Agenten arbeiten in Nextcloud als der angemeldete Nutzer (OAuth-Anmeldung); ein Schalter je Konto pausiert den Zugriff, ein Klick kann einen Assistenten trennen
+- Bereiche: Dateien (Office und PDF als Markdown), Ordner, Kalender, Aufgaben, Notizen, Deck, Kontakte, Tables, Talk, Mail (nur lesen), Profile Fields (optional) und eine Suche über alles
+- Kein Löschen, auch nicht von Aufgaben; kein Teilen; kein Verschieben, außer einer einzelnen Aufgabe, wenn der Admin das Ändern von Aufgaben freischaltet; nichts im Hintergrund, keine Telemetrie
+- Dateien und Ordner mit dem kollaborativen Tag kein-ki bleiben für jeden Assistenten unsichtbar
+- Anlegen geht ab Werk; das Ändern bestehender Textdateien und Aufgaben ist ab Werk aus, der Admin schaltet es frei
+- Voraussetzungen: Nextcloud 32 bis 35 mit AppAPI, läuft als External App
 
 Zusammen mit [Findling](https://apps.nextcloud.com/apps/findling) enthalten Suchtreffer die Inhalte Ihrer Dokumente, auch aus Scans, mit genau den Rechten des fragenden Nutzers.
 
+Dokumentation: [README auf GitHub](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/README.de.md)
+
 ### Enterprise
 
-Das hash-verkettete Audit-Log ist eingebaut und ab Werk aus. Die Anmeldung über den eigenen Identity-Provider gibt es seit 0.2.0, im Betrieb ohne AppAPI; als Nächstes auf dieser Schiene: Gruppen-Policies.
-
-Anforderungen:
-
-- Nextcloud 32 bis 35 mit der App AppAPI; läuft als External App
-- Oder ohne AppAPI, seit 0.2.0: neben Ihrer Nextcloud betrieben, die Zustimmung bestätigt Ihre OIDC-Anmeldung; Anleitung: docs/standalone-oauth.md im Quellcode
-- n8n spricht MCP ab 1.119.0 direkt; Anleitung: docs/n8n-setup.md im Quellcode]]></description>
+Audit-Log eingebaut und ab Werk aus; als Nächstes kommen Gruppen-Policies.]]></description>
 	<description lang="fr"><![CDATA[Ce que sait faire le MCP Connector :
 
-- Connecte les assistants MCP (Claude, ChatGPT, n8n, vos propres agents) à Nextcloud ; chaque requête s'exécute comme l'utilisateur connecté (connexion OAuth ; un interrupteur par compte suspend l'accès, un clic peut déconnecter un assistant)
-- Outils : fichiers (Office et PDF lus en Markdown), calendrier, tâches, notes, Deck, contacts, Tables, Talk, mail (lecture seule) et une recherche sur tout
-- Rien de destructif : pas de suppression, tâches comprises ; pas de partage ; pas de déplacement, sauf celui d'une seule tâche quand l'administrateur active la modification des tâches ; rien en arrière-plan, pas de télémétrie
-- Nouveau en 0.8.0 : créer des dossiers, dossiers parents manquants compris (10 au plus par appel, rien n'est écrasé) ; chercher, lire et créer des tâches
-- Modifier des tâches existantes, désactivé par défaut : marquer comme terminée, rouvrir, modifier ou déplacer une tâche avec ses sous-tâches vers une autre liste ; l'administrateur l'active, et une tâche n'est modifiée que si elle n'a pas changé depuis sa lecture ; les tâches récurrentes ne sont pas modifiées, et aucune tâche n'est jamais supprimée
-- Les fichiers joints à un message ChatGPT arrivent dans votre Nextcloud ; seuls les hôtes ChatGPT de confiance, et les envois n'écrasent jamais rien
-- Modifier des fichiers texte existants, désactivé par défaut ; l'administrateur l'active, et un fichier n'est remplacé que s'il n'a pas changé entre-temps
-- Les fichiers et dossiers portant l'étiquette collaborative kein-ki restent invisibles pour tout assistant ; occ mcp_connector:exclusion:check indique si l'étiquette est correctement configurée
+- Claude, ChatGPT, n8n ou vos propres agents travaillent dans Nextcloud comme l'utilisateur connecté (connexion OAuth) ; un interrupteur par compte suspend l'accès, un clic peut déconnecter un assistant
+- Domaines : fichiers (Office et PDF en Markdown), dossiers, calendrier, tâches, notes, Deck, contacts, Tables, Talk, mail (lecture seule), Profile Fields (facultatif) et une recherche sur tout
+- Pas de suppression, tâches comprises ; pas de partage ; pas de déplacement, sauf celui d'une seule tâche quand l'administrateur active la modification des tâches ; rien en arrière-plan, pas de télémétrie
+- Les fichiers et dossiers portant l'étiquette collaborative kein-ki restent invisibles pour tout assistant
+- La création fonctionne dès l'installation ; la modification des fichiers texte et des tâches existants est désactivée par défaut, l'administrateur l'active
+- Prérequis : Nextcloud 32 à 35 avec AppAPI, fonctionne comme External App
 
 Avec [Findling](https://apps.nextcloud.com/apps/findling), les résultats de recherche incluent le contenu de vos documents, numérisations comprises, avec exactement les droits de l'utilisateur qui demande.
 
+Documentation : [README sur GitHub](https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/README.fr.md)
+
 ### Enterprise
 
-Le journal d'audit chaîné par hachage est intégré et désactivé par défaut. La connexion via votre propre fournisseur d'identité existe depuis la 0.2.0, dans le déploiement sans AppAPI ; ensuite sur cette route : les politiques de groupe.
-
-Prérequis :
-
-- Nextcloud 32 à 35 avec l'application AppAPI ; fonctionne comme External App
-- Ou sans AppAPI, depuis la 0.2.0 : exploité à côté de votre Nextcloud, le consentement étant confirmé par votre connexion OIDC ; guide : docs/standalone-oauth.md dans le code source
-- n8n parle MCP nativement depuis la 1.119.0 ; guide : docs/n8n-setup.md dans le code source]]></description>
+Le journal d'audit est intégré et désactivé par défaut ; ensuite viendront les politiques de groupe.]]></description>
 	<version>0.8.0</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author mail="admin@infranode.dev">street1983nk</author>

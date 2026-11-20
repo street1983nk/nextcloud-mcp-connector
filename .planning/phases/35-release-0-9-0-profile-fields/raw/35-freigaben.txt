@@ -1,3 +1,5 @@
 # Phase 35: Owner-Freigaben, je Schritt eine Zeile (35-RULES Abschnitt 2)
 FREIGABE tooltexte-53 antwort=freigabe instruktion=A context=umformulieren laufzeit=ja datum=2026-11-20
 ZUSATZ searchhit=lassen dateien_plus=carddav.py,clients/mail.py antwort=freigabe datum=2026-11-20
+FREIGABE store-text antwort=freigabe-mit-aenderung variante=kurz kein-ki=ja findling=wortlaut-bisher gates=bleiben link=readme-je-sprache datum=2026-11-20
+ANTWORT wortlaut="Kurzer Store-Text freigeben?: Nein der Text zu Findling soll bleiben | Optionen: kein-ki-Tag, Findling-Hinweis | Gates: Beide bleiben (Empfohlen) | Doku-Link: README je Sprache (Empfohlen)" datum=2026-11-20

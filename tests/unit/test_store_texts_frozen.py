@@ -9,7 +9,12 @@ release 0.6.0 renewed it with the owner's decision of 2026-10-18 (the files_upda
 bullet, and the summary now says read, search, create and edit as the signed-in user);
 release 0.8.0 renewed it with the owner's decision of 2026-11-14 (tasks in the tools
 bullet, the delete limit names tasks and moving names the one task exception, the new
-folder and task bullets, and the ChatGPT upload bullet kept without a version number).
+folder and task bullets, and the ChatGPT upload bullet kept without a version number);
+release 0.9.0 renewed it with the owner's decision of 2026-11-20 (a short description
+that links the README of its language: areas as keywords with Profile Fields as an
+optional area, the delete and move limit, what is on and off by default, the kein-ki
+bullet, the Findling paragraph word for word, requirements and a one line Enterprise
+section; summaries unchanged).
 
 Why a hash instead of ``git show ca157b4:appinfo/info.xml``: the CI job
 ``unit`` checks out with depth 1, the reference commit is not available there.
@@ -37,8 +42,8 @@ from mcp_connector.nextcloud.clients.xml import hardened_parser
 ROOT = Path(__file__).resolve().parents[2]
 INFO_XML = ROOT / "appinfo" / "info.xml"
 
-FROZEN_AT = "release 0.8.0"
-EXPECTED_SHA256 = "4e510fec45ca96e341b53968a31c6cc5c84fd2d3d683a7135122381b281ba902"
+FROZEN_AT = "release 0.9.0"
+EXPECTED_SHA256 = "812b1b03d75311a949ee8a7e8461d343e5e26f45d3ac548e5b2bb9dc6a43b410"
 EXPECTED_COUNT = 6
 
 _STORE_TAGS = ("summary", "description")
