@@ -26,3 +26,27 @@ GATE ruff check exit=0 "All checks passed!"
 GATE ruff format --check exit=0 dateien=417
 GATE pyright exit=0 errors=0 warnings=0
 GATE vulture exit=0 funde=0
+
+## Runbook Schritt 2: Changelog
+
+CHANGELOG 0.9.0-Block aus [Unreleased] geschnitten, Datum 2026-11-20, [Unreleased] leer darueber, in CHANGELOG.md, CHANGELOG.de.md, CHANGELOG.fr.md
+CHANGELOG neuer Punkt unter Changed/Geaendert/Modifie: Store-Beschreibung kurz mit Link auf das README der Sprache (Owner-Entscheid 2026-11-20 aus 35-02, keine "New in"-Zeile)
+CHANGELOG Linkzeilen [Unreleased] compare/v0.9.0...HEAD und [0.9.0] compare/v0.8.0...v0.9.0 in allen drei Dateien
+CHANGELOG numstat je Datei 6/1, CRLF erhalten
+PUNKTE 0.9.0 en=8 de=8 fr=8 gleich=ja (Added 6, Changed 2)
+UMLAUT CHANGELOG.de.md geprueft=7 fehler=0 (values, steuert, Gemessen, gemessen, Business, Risikoeinstufung, Issue; neue Zeilen ohne Fundstelle)
+FRANZ CHANGELOG.fr.md geprueft=9 fehler=0 (8 Satzzeichen mit Leerzeichen davor, neue Zeile mit geraden Apostrophen und Akzenten)
+DASH changelog treffer=0 (Positivkontrolle ok)
+SCHLIESSWORT changelog treffer=0
+
+## Runbook Schritt 3: Gates nach dem Changelog (vor Commit docs(35-03))
+
+GATE pytest unit+contract exit=0 passed=8338 skipped=35
+GATE check_tool_budget exit=0 standard=27 tools 18606 bytes, alle_schalter=32 tools 22933 bytes, budget=26000, groesstes files_upload 1377
+GATE ruff check exit=0 "All checks passed!"
+GATE ruff format --check exit=0 dateien=417
+GATE pyright exit=0 errors=0 warnings=0
+GATE vulture exit=0 funde=0
+GATE runbook pytest -q -p no:xdist exit=0 passed=8338 skipped=35 failed=0 (aus den Fortschrittszeichen gezaehlt, -q doppelt ohne Schlusszeile)
+
+DIFFBEWEIS src/ gegen B leer (Muster 35-RULES Abschnitt 4 inkl. vierter und fuenfter Stelle)

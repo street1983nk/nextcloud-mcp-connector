@@ -11,6 +11,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-20
+
 ### Added
 
 - `profile_fields_browse`: an optional read-only tool for the Nextcloud app Profile Fields,
@@ -39,6 +41,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   an approval check such as the one in ChatGPT Business does not read them as an attempt to
   lower the risk rating (issue #53, reported by Excauboi). Behaviour is unchanged, and the
   guarantees stay in the README and the docs.
+- The store description is short now and links to the README of its language for the
+  details.
 
 ## [0.8.0] - 2026-11-14
 
@@ -1168,7 +1172,8 @@ First release, submitted to the Nextcloud App Store.
   never sees more than that user sees in the web interface.
 - A privacy and data flow description, see [docs/privacy.md](docs/privacy.md).
 
-[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.1...v0.7.2

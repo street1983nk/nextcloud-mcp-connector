@@ -13,6 +13,8 @@ dans [CHANGELOG.md](CHANGELOG.md).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-20
+
 ### Ajouté
 
 - `profile_fields_browse` : un outil facultatif en lecture seule pour l'application
@@ -43,6 +45,8 @@ dans [CHANGELOG.md](CHANGELOG.md).
   celui de ChatGPT Business ne les lise pas comme une tentative d'abaisser le niveau de
   risque (ticket #53, signalé par Excauboi). Le comportement est inchangé ; les garanties
   restent dans le README et la documentation.
+- La description dans l'App Store est désormais courte et renvoie au README de sa langue
+  pour les détails.
 
 ## [0.8.0] - 2026-11-14
 
@@ -133,5 +137,6 @@ dans [CHANGELOG.md](CHANGELOG.md).
   voyait jamais (#42). Un test maintient désormais les déclarations identiques à
   la liste dans laquelle le code les lit.
 
-[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.3...v0.8.0

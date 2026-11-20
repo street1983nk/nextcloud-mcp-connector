@@ -12,6 +12,8 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-11-20
+
 ### Hinzugefügt
 
 - `profile_fields_browse`: ein optionales Tool nur zum Lesen für die Nextcloud-App Profile
@@ -40,6 +42,8 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
   Zusicherungen, damit eine Freigabeprüfung wie die in ChatGPT Business sie nicht als
   Versuch liest, die Risikoeinstufung zu senken (Issue #53, gemeldet von Excauboi). Das
   Verhalten ist unverändert, die Zusagen stehen weiter in README und Dokumentation.
+- Die Beschreibung im App Store ist jetzt kurz und verweist für die Details auf das README
+  der jeweiligen Sprache.
 
 ## [0.8.0] - 2026-11-14
 
@@ -131,5 +135,6 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
   Ein Test hält die Deklarationen jetzt gleich mit der Liste, aus der der Code sie
   liest.
 
-[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.3...v0.8.0
