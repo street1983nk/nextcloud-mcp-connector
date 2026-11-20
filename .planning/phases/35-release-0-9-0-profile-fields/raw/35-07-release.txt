@@ -1,0 +1,11 @@
+# 35-07 Release-Protokoll (Fast-Forward main, CI main, Tag)
+
+DATUM changelog=2026-11-20 heute=2026-11-20 gleich=ja (CHANGELOG.md, CHANGELOG.de.md, CHANGELOG.fr.md je "## [0.9.0] - 2026-11-20")
+VORAUS ci_pr_final_gruen=ja ci_sha=2307ede0b7175249608129fc45ada2093dfb8e30 (acht CI-Zeilen final=ja in raw/35-06-push.txt, alle sha=2307ede0)
+VORAUS threats_open=0 (35-SECURITY.md Frontmatter, status=verified)
+VORAUS status_sauber=ja (git status --porcelain leer vor diesem Protokoll)
+VORAUS head_hinter_origin_main=0 (nach git fetch origin; origin/main=66ffa30d2fabe620b5d1b075a172b7a4ef71c688)
+VORAUS ueber_branch_nur_planung=ja
+VORAUS-BELEG git diff --name-only 2307ede0 409e7d2d | grep -v ^.planning/ leer (rc=1); Dateien: 35-06-SUMMARY.md, raw/35-06-push.txt
+PR nummer=55 head_ci=2307ede0
+FREIGABE-HINWEIS Owner-Antwort "Go" auf die Fast-Forward-Frage, eingetragen als FREIGABE merge-main antwort=go (gleichbedeutend mit Option merge)

@@ -23,3 +23,5 @@ FREIGABE fix-T-35-PF-02 antwort="(a) Vor 0.9.0 schließen (Empfohlen)" datum=202
 FREIGABE pr-text-mention antwort="Ohne @ (Empfohlen)" datum=2026-11-20
 FREIGABE push-branch antwort=push datum=2026-11-20
 FREIGABE changelog-mention antwort="Lassen (Empfohlen)" datum=2026-11-20
+FREIGABE merge-main antwort=go datum=2026-11-20
+ANTWORT wortlaut="Darf ich main per Fast-Forward auf den Release-Stand bringen?: Go" | Kontext: zum CI-geprüften Stand kommen nur Planungsnotizen dazu, vor dem Push geprüft, danach CI auf main; Tag separat gefragt datum=2026-11-20
