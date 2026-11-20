@@ -33,8 +33,8 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
 - Die CI installiert Profile Fields aus dem App Store und beweist das Tool live über einen
   echten MCP-Client im Job `integration`: 27 Tools ohne Schalter, 28 mit Schalter, kein
   fremder Wert für ein Konto ohne Administratorrechte.
-- Ohne die App Profile Fields, oder wenn sie deaktiviert ist, meldet das Tool, dass die
-  App fehlt, und sagt, wie sich das beheben lässt.
+- Fehlt die App Profile Fields, ist sie deaktiviert oder für keine Gruppe des Kontos
+  aktiviert, meldet das Tool das und sagt, wie sich das beheben lässt.
 - Gemessen auf Nextcloud 34 mit Profile Fields 4.0.0. Auf Nextcloud 35 gibt es Profile
   Fields nur als Nightly; dort meldet das Tool, dass die App fehlt.
 

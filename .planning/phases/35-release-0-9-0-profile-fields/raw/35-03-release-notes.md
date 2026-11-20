@@ -4,7 +4,7 @@
 
 - `profile_fields_browse`: an optional read-only tool for the Nextcloud app Profile Fields, off by default.
 - Levels `me`, `definitions`, `values` and `search`.
-- Without the app Profile Fields, or with the app disabled, the tool reports that the app is missing and says how to fix it.
+- If the app Profile Fields is missing, disabled or not enabled for any of the account's groups, the tool says so and explains how to fix it.
 
 ### Permissions
 

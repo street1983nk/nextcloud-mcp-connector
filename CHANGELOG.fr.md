@@ -35,8 +35,8 @@ dans [CHANGELOG.md](CHANGELOG.md).
 - La CI installe Profile Fields depuis l'App Store et prouve l'outil en conditions réelles
   par un vrai client MCP dans le job `integration` : 27 outils sans le commutateur, 28 avec,
   aucune valeur d'autrui pour un compte sans droits d'administrateur.
-- Sans l'application Profile Fields, ou si elle est désactivée, l'outil signale que
-  l'application est absente et indique comment y remédier.
+- Si l'application Profile Fields est absente ou désactivée, ou si elle n'est activée
+  pour aucun des groupes du compte, l'outil le signale et indique comment y remédier.
 - Mesuré sur Nextcloud 34 avec Profile Fields 4.0.0. Sur Nextcloud 35, Profile Fields
   n'est disponible qu'en version nightly ; l'outil y signale que l'application est
   absente.
