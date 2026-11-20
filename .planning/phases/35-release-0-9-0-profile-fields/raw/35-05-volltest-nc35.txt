@@ -231,3 +231,43 @@ ABGLEICH messung Store nc35 nur Nightly 5.0.0 (PF store nc35 stabil=nein nightly
 ABGLEICH nc35-aussage changelog=stimmt notiz=stimmt
 SCAN gesamt treffer=0 (Fortsetzung: ganzes Protokoll und neuer Teil gegen 24 Werte aus .env.nc35 und .env.exapp voll und in den ersten 12 Zeichen, den HaRP-Schlüssel von nc35, das Admin-Passwort aus compose.nc35.yml und den Namen des AppAPI-Autorisierungskopfs; Positivkontrolle mit gepflanzten 12 Zeichen des App-Passworts gab Treffer; Talk-Raumnamen maskiert als <raum>)
 GATES unit+contract 8374 passed, 35 skipped; check_tool_budget exit 0; ruff check ok; ruff format 418 Dateien; pyright 0 errors; vulture exit 0 (Stand e9a68cba, in 35-05 kein Code und kein CHANGELOG geändert)
+
+== Task 4: Owner-Abnahme und Nachmessung NC34-Rechte (2026-11-20)
+FREIGABE volltest antwort=abgenommen screenshot=entfaellt nachmessung=nc34-rechte datum=2026-11-20 (Owner: "Abgenommen + NC34-Rechte nachmessen (Empf.)")
+NACHMESSUNG nc34-rechte grund=Rechte-Livetest von 35-04 lief vor 35-11 und 35-12; Wiederholung auf dem finalen Stand (HEAD 3cec88d5, src gleich e9a68cba)
+NACHMESSUNG nc34-rechte DOCKER fremd=0 laufend=0; RAM frei_kib=5178984 schwelle=4194304 ergebnis=ok
+NACHMESSUNG nc34-rechte start NC_EXAPP_NEXTCLOUD_IMAGE=nextcloud:34.0.3-apache docker compose -f compose.exapp.yml up -d --wait (HP_SHARED_KEY aus dem Container nc-mcp-exapp-harp gelesen, Länge 64, nicht ausgegeben) -> 5 Container healthy
+NACHMESSUNG nc34-rechte NC version=34.0.3 installed=true; PF nc34 version=4.0.0 aktiv=ja (occ app:list Enabled, config:app:get enabled=yes)
+NACHMESSUNG nc34-rechte EXAPP-CONTAINER vorher netz=nc-mcp-nc35-net image_id=sha256:f526402393fadcc4c0644ba6a3cc9f960616e32d93d7e6611eea2cfa93178d3d status=exited (gehörte nc35)
+NACHMESSUNG nc34-rechte RUECKWEG image=127.0.0.1:5000/mcp_connector:f5264023-vor-nachmessung
+BASELINE nc34 konto=alice calendars=1 objekte=0 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc34 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+PROFILFELDER definitionen=2 werte=2 konten=3 phase=vorher
+$ occ app_api:app:unregister mcp_connector (ohne --rm-data, auf NC34) exit=0 | disabled, removed, unregistered (löst den Container von nc35 ab, vom Orchestrator so vorgesehen)
+$ bash scripts/bootstrap_exapp.sh (ohne Flag, HP_SHARED_KEY aus nc-mcp-exapp-harp, nicht ausgegeben) exit=0
+image 127.0.0.1:5000/mcp_connector:0.9.0: built and pushed (sha256:5f486c5f93e0a7dd960489a1150937beeed342369189f9003dac885c3a596318)
+exapp mcp_connector: registered and deployed
+exapp mcp_connector: enabled
+wrote .env.exapp
+NACHMESSUNG nc34-rechte EXAPP nachher version=0.9.0 image_id=sha256:5f486c5f93e0a7dd960489a1150937beeed342369189f9003dac885c3a596318 netz=nc-mcp-exapp-net status=running; Meldungen aus 35-11 und 35-12 im Image je 1x gefunden
+NACHMESSUNG nc34-rechte livetest tests/integration/test_profile_fields_live.py (NC_MCP_E2E_NEXTCLOUD=nc-mcp-exapp-nc NC_MCP_EXPECT_PROFILE_FIELDS=1 NC_MCP_PROFILE_FIELDS_READ=on, alice und bob ohne Adminrechte, APP_ID und APP_SECRET aus der Shell entfernt) exit=0
+PROFILE-FIELDS nextcloud=34.0.3 app=4.0.0 container=nc-mcp-exapp-nc
+PROFILE-FIELDS tools without switch=27 with switch=28
+PROFILE-FIELDS search without switch: private value admin=1 bob=0, shared value bob=1
+NACHMESSUNG nc34-rechte RECHTE live tools_ohne=27 tools_mit=28
+NACHMESSUNG nc34-rechte RECHTE live suche privat_admin=1 privat_bob=0 geteilt_bob=1
+NACHMESSUNG nc34-rechte RECHTE live passed=10 failed=0 skipped=0 deselected=0 leck=nein
+NACHMESSUNG nc34-rechte SCHALTER profile_fields_read=on files_update=off tasks_update=off (--update-only) app_neu_gestartet=ja; WERKZEUGE kette nutzer=alice anzahl=28
+NACHMESSUNG nc34-rechte RECHTE kette nutzer=alice level=me urteil=OK | fehler=nein count=2 (Werte nicht protokolliert)
+NACHMESSUNG nc34-rechte RECHTE kette nutzer=alice level=definitions urteil=ABGELEHNT | Error executing tool profile_fields_browse: No permission for the Profile Fields admin catalog. Nextcloud says: "Logged in account must be an admin". Hint: Ask the owner of the item or an administrator in Nextcloud for the missing permission.
+NACHMESSUNG nc34-rechte SCHALTER ende files_update=off tasks_update=off profile_fields_read=off (config:get geprüft) app_neu_gestartet=ja; WERKZEUGE kette nach_aus anzahl=27
+NACHMESSUNG nc34-rechte log nc_app_mcp_connector traceback=0
+NACHMESSUNG nc34-rechte RUECKBAU keine Laufobjekte (nur lesende Aufrufe; Wegwerf-Admin und Testfelder baut der Livetest im finally ab)
+BASELINE nc34 konto=alice calendars=1 objekte=0 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc34 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+PROFILFELDER definitionen=2 werte=2 konten=3 phase=nachher gleich=ja
+ADMIN-SPRACHE ende=en (NC34, nicht verändert); firstrunwizard Disabled
+REGISTRIERUNG ende: die ExApp 0.9.0 (image 5f486c5f) ist auf NC34 registriert und besitzt den Container nc_app_mcp_connector; nc35 führt die ExApp 0.9.0 weiter in occ app_api:app:list, ihr Container ist abgelöst (vor dem nächsten nc35-Einsatz Bootstrap --nc35)
+DOCKER ende eigene=0 (nc_app_mcp_connector per docker stop, Stapel per docker compose -f compose.exapp.yml stop; kein down; fremde Container: keine)
+TOKENDATEIEN geloescht=ja
+SCAN gesamt treffer=0 (Abschluss: Protokoll, Freigaben und Nachmessung gegen 24 Werte aus .env.nc35 und .env.exapp voll und in den ersten 12 Zeichen, beide HaRP-Schlüssel, das Admin-Passwort aus compose.nc35.yml und den Namen des AppAPI-Autorisierungskopfs; Positivkontrolle mit gepflanzten 12 Zeichen des App-Passworts von bob gab Treffer)
