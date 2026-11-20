@@ -36,6 +36,14 @@ dans [CHANGELOG.md](CHANGELOG.md).
 - Mesuré sur Nextcloud 34 avec Profile Fields 4.0.0. Non mesuré sur Nextcloud 35 : l'App
   Store ne propose pour 35 qu'une version nightly de l'application.
 
+### Modifié
+
+- Les descriptions des outils et les indications d'erreur énoncent des conditions
+  préalables et des erreurs au lieu d'assurances, afin qu'un contrôle d'approbation comme
+  celui de ChatGPT Business ne les lise pas comme une tentative d'abaisser le niveau de
+  risque (ticket #53, signalé par Excauboi). Le comportement est inchangé ; les garanties
+  restent dans le README et la documentation.
+
 ## [0.8.0] - 2026-11-14
 
 ### Ajouté

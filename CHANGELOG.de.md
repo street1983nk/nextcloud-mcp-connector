@@ -34,6 +34,13 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
 - Gemessen auf Nextcloud 34 mit Profile Fields 4.0.0. Auf Nextcloud 35 nicht gemessen: Der
   App Store führt für 35 nur einen Nightly der App.
 
+### Geändert
+
+- Tool-Beschreibungen und Fehlerhinweise nennen Vorbedingungen und Fehler statt
+  Zusicherungen, damit eine Freigabeprüfung wie die in ChatGPT Business sie nicht als
+  Versuch liest, die Risikoeinstufung zu senken (Issue #53, gemeldet von Excauboi). Das
+  Verhalten ist unverändert, die Zusagen stehen weiter in README und Dokumentation.
+
 ## [0.8.0] - 2026-11-14
 
 ### Hinzugefügt

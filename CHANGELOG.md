@@ -33,6 +33,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Measured on Nextcloud 34 with Profile Fields 4.0.0. Not measured on Nextcloud 35: the app
   store carries only a nightly of the app for 35.
 
+### Changed
+
+- Tool descriptions and error hints state preconditions and errors instead of assurances, so
+  an approval check such as the one in ChatGPT Business does not read them as an attempt to
+  lower the risk rating (issue #53, reported by Excauboi). Behaviour is unchanged, and the
+  guarantees stay in the README and the docs.
+
 ## [0.8.0] - 2026-11-14
 
 ### Added

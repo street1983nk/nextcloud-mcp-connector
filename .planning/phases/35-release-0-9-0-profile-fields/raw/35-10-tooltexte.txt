@@ -277,3 +277,33 @@ BUDGET schaetzung_vs_messung gleich=ja (alle 12 Werkzeuge byte-genau wie geschä
 GATES green pytest_unit_contract=8338_passed_35_skipped (vorher 8312 plus 26 neue) budget=exit0 ruff=exit0 format=exit0_417_dateien pyright=0_fehler vulture=0_funde
 INTEGRATION tests/integration/test_files_roundtrip.py ruff=gruen gesammelt=9 (Lauf selbst in CI, 35-06)
 LIVE_VORAB stdio tools=32 (Hilfsprogramm live_stdio.py, Platzhalter NC_MCP_URL=http://127.0.0.1:9, keine echten Werte); Zeilen in Task 4
+
+# ---------------------------------------------------------------------------------------------
+# Task 4
+# ---------------------------------------------------------------------------------------------
+
+LIVE weg=stdio tools=32 neue_texte=ja (nc-mcp.exe aus .venv über StdioServerParameters, alle drei Schalter on, NC_MCP_URL=http://127.0.0.1:9 und Platzhalter für Nutzer und App-Passwort; tools/list ruft keine Nextcloud, der Server startet ohne erreichbare Instanz)
+LIVE files_upload | Create a new file from text, base64 or a ChatGPT attachment.
+LIVE files_create_folder | Create a folder; an existing folder answers created false, an existing file at the path returns an e
+LIVE files_update | Replace an existing UTF-8 text file only when its ETag still matches. This is a whole-file replaceme
+LIVE calendar_create_event | Create a new calendar event; returns the times the server confirmed.
+LIVE notes_create | Create a new note; the returned title is the one the server stored.
+LIVE deck_create_card | Create a new card in an existing stack.
+LIVE tables_create_row | Add one new row to an existing table. A timeout does not mean nothing was written. Read back with ta
+LIVE talk_send | Send one new message into a conversation. A timeout does not mean nothing was sent. Read back with t
+LIVE tasks_create | Create a new task; a list others can see must be named in list.
+LIVE tasks_move | Move a task into the named list; needs its etag from tasks_read. Its subtasks move along. A name tak
+LIVE mail_browse | List the mail accounts of this user, the mailboxes of one, or the messages of one. Envelopes newest 
+LIVE prepare_context | Bundle matching files, notes and cards, the next week of events, waiting Talk chats and unread Mail
+
+GARANTIE nachzug=keiner (alle GARANTIE-Zeilen aus Task 1 mit vorhanden=ja; README und docs unverändert)
+CHANGELOG unreleased abschnitt=Changed/Geändert/Modifié neu_angelegt=ja punkt="issue #53, reported by Excauboi" crlf=erhalten numstat=en_7_0,de_7_0,fr_8_0
+PUNKTE unreleased en=7 de=7 fr=7 gleich=ja
+UMLAUT CHANGELOG.de.md geprueft=3 fehler=0 (Risikoeinstufung: oe echt; Issue: ss und ue echt, englisches Wort)
+UMLAUT 35-10-antwort-issue53.md geprueft=2 fehler=0 (Issue: echt; Rückmeldung, Übersetzung mit echten Umlauten)
+FRANZ CHANGELOG.fr.md geprueft=7 fehler=0 (Leerzeichen vor ;, gerade Apostrophe wie im übrigen Text)
+DASH treffer=0 (Positivkontrolle mit gepflanztem Strich erkannt; geprüft CHANGELOG.md, CHANGELOG.de.md, CHANGELOG.fr.md, 35-10-antwort-issue53.md, 35-10-tooltexte.txt)
+SCHLIESSWORT treffer=0 (CHANGELOG x3, Antwortentwurf)
+GRENZE chatgpt_pruefer=unveroeffentlicht wirkung_live=ungemessen instruktion_gelesen=ungeklaert angebot_melder=test_0.9.0
+ANTWORT entwurf=raw/35-10-antwort-issue53.md sprache=en saetze=4 uebersetzung=de gepostet=nein
+GATES vor_task4_commit pytest=8338_passed_35_skipped budget=22933/18606 ruff=0 format=417 pyright=0 vulture=0
