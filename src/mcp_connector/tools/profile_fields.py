@@ -148,7 +148,14 @@ async def browse(
     if level == "values":
         uid = user_uid.strip()
         keys = [key.strip() for key in field_keys.split(",")]
-        if not uid or len(uid) > 256 or any(char in uid for char in ("/", "\\", "\x00")):
+        # "." and ".." pass quote() unchanged and httpx resolves them, so the request would
+        # leave users/{uid}; Nextcloud refuses exactly these two ids as well (T-35-PF-02).
+        if (
+            not uid
+            or uid in (".", "..")
+            or len(uid) > 256
+            or any(char in uid for char in ("/", "\\", "\x00"))
+        ):
             raise ToolError(message="Invalid user UID.", hint="Provide one exact Nextcloud UID.")
         if not 1 <= len(keys) <= 12 or any(not _KEY.fullmatch(key) for key in keys):
             raise ToolError(message="Invalid field keys.", hint="Provide up to 12 exact keys.")
