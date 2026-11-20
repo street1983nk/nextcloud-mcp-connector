@@ -1303,7 +1303,8 @@ async def test_a_four_hundred_of_the_app_is_passed_through_with_its_own_message(
         with pytest.raises(ToolError) as excinfo:
             await talk_tools.send(clients, "abcd1234", "Die Maße sind geprüft")
 
-    assert "Nextcloud says: Message too long" in excinfo.value.message
+    # Wording fix of plan 35-11: the Nextcloud text is quoted so the sentence can end.
+    assert 'Nextcloud says: "Message too long".' in excinfo.value.message
 
 
 def test_the_levels_and_the_limits_are_the_ones_the_schema_will_offer() -> None:

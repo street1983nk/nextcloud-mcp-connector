@@ -272,7 +272,7 @@ def _status_error(status: int, detail: str, what: str) -> ToolError:
     honest. Only ``reason`` may ever reach a log; ``message`` and ``hint`` name paths, ids and
     calendar names and stay in the tool answer (T-18-01).
     """
-    suffix = f" Nextcloud says: {detail}" if detail else ""
+    suffix = f' Nextcloud says: "{detail}".' if detail else ""
     if status == 400:
         return ToolError(
             message=f"Nextcloud rejected the request for {what} as invalid.{suffix}",
@@ -289,7 +289,10 @@ def _status_error(status: int, detail: str, what: str) -> ToolError:
     if status == 403:
         return ToolError(
             message=f"No permission for {what}.{suffix}",
-            hint="Ask the owner in Nextcloud for the missing permission.",
+            hint=(
+                "Ask the owner of the item or an administrator in Nextcloud for the missing "
+                "permission."
+            ),
             reason=REASON_PERMISSION_DENIED,
         )
     if status in (404, 998):

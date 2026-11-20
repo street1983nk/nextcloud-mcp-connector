@@ -197,6 +197,11 @@ print(json.dumps(asyncio.run(main())))
 #               and errors instead of assurances (plan 35-10); the biggest tool is files_upload
 #               at 1377 bytes, below the per tool ceiling, which stays where it is.
 #   Budget      unchanged at 26000, because the measurement fits below it.
+#
+#   Measurement 2026-11-20, wording fix of plan 35-11: 22938 bytes with every switch on,
+#               32 tools; standard state 18611 bytes, 27 tools. The files_download
+#               description gained its article ("a file of any size"), 612 to 617 bytes.
+#   Budget      unchanged at 26000, because the measurement fits below it.
 BUDGET_BYTES = 26_000
 
 # The second claim, and the one that actually reports a regression. A total with headroom

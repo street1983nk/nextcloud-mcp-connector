@@ -125,7 +125,7 @@ async def files_download(
     ] = files_tools.DEFAULT_DOWNLOAD_BYTES,
     ctx: Context | None = None,
 ) -> list[TextContent | EmbeddedResource]:
-    """Download any-size file in chunks; repeat with next_offset while truncated is true."""
+    """Download a file of any size in chunks; repeat with next_offset while truncated is true."""
     clients = deps.resolve_clients(ctx)
     result = await files_tools.download(clients, path=path, offset=offset, max_bytes=chunk_bytes)
     metadata = {key: value for key, value in result.items() if key != "content"}

@@ -160,7 +160,8 @@ async def test_files_download_is_an_embedded_resource_read() -> None:
     assert set(tool.input_schema.get("required", [])) == {"path"}
     description = tool.description or ""
     assert "next_offset" in description
-    assert "any-size" in description
+    # Wording fix of plan 35-11: "any-size file" lacked its article; the claim is the same.
+    assert "any size" in description
 
 
 @pytest.mark.anyio
