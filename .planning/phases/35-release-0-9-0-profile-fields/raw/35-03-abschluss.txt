@@ -1,0 +1,28 @@
+# 35-03 Abschlussprotokoll: Version 0.9.0, Changelog, Gates
+# Worktree release-090, Branch plan/release-090, Start-HEAD b61c4e35, Datum 2026-11-20
+
+BASIS B=9a2b0faceeea6d79c8e8dc3fda88b913183a076b positivkontrolle=ok
+
+## Runbook Schritt 1: Version
+
+VERSION pyproject.toml:3 alt=0.8.0 neu=0.9.0
+VERSION src/mcp_connector/__init__.py:7 alt=0.8.0 neu=0.9.0
+VERSION appinfo/info.xml:113 <version> alt=0.8.0 neu=0.9.0
+VERSION appinfo/info.xml:193 <image-tag> alt=0.8.0 neu=0.9.0
+VERSION uv.lock:608 nextcloud-mcp-connector alt=0.8.0 neu=0.9.0
+VERSION uv.lock:20 annotated-types 0.8.0 unveraendert
+VERSION README-Statuszeile keine (grep "Version x.y.z." in README.md/.de/.fr ohne Treffer)
+ZEILENENDEN CRLF erhalten (file), numstat pyproject 1/1, __init__ 1/1, info.xml 2/2, uv.lock 1/1
+
+UVLOCK lauf1 "uv lock" (uv 0.11.7): Projekteintrag 0.8.0->0.9.0 UND Kopfzeile revision 5->3, Datei auf LF -> verworfen (git checkout -- uv.lock), nicht committet
+UVLOCK lauf2 nur Zeile 608 per sed -b geaendert, danach "uv lock --check" exit=0 (Resolved 69 packages)
+UVLOCK geaendert=1 nur_projekt=ja
+
+## Gates nach dem Versionssprung (vor Commit release: 0.9.0)
+
+GATE pytest unit+contract exit=0 passed=8338 skipped=35
+GATE check_tool_budget exit=0 standard=27 tools 18606 bytes, alle_schalter=32 tools 22933 bytes, budget=26000, groesstes files_upload 1377
+GATE ruff check exit=0 "All checks passed!"
+GATE ruff format --check exit=0 dateien=417
+GATE pyright exit=0 errors=0 warnings=0
+GATE vulture exit=0 funde=0
