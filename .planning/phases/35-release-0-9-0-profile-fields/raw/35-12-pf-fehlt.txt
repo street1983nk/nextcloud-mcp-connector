@@ -136,3 +136,80 @@ DOCKER ende eigene=0 (nc_app_mcp_connector per docker stop, Stapel per docker co
 TOKENDATEIEN geloescht=ja (Scratchpad p35/tok)
 SCAN siehe letzte Zeile
 SCAN gesamt treffer=0 (35-12-pf-fehlt.txt, 35-freigaben.txt, 35-03-release-notes.md, 35-03-pr-text.md, CHANGELOG*.md, neue Testdatei, profile_fields.py gegen 21 nicht leere Werte aus .env.nc35 und .env.exapp, beide HaRP-Schlüssel, die Testpasswörter aus compose und bootstrap und den Namen des AppAPI-Autorisierungskopfs, voll und in den ersten 12 Zeichen; einzige Fundstellen waren APP_ID = öffentliche App-ID mcp_connector, kein Geheimnis; Positivkontrolle mit gepflanzten 12 Zeichen des App-Passworts gab Treffer)
+
+== 9. Owner-Antworten zu den offenen Punkten (2026-11-20)
+FREIGABE pf-artikel-4 antwort="Behalten (Empfohlen)" datum=2026-11-20 (vierter Artikel "the selected user's Profile Fields values" bleibt)
+FREIGABE pf-gruppen-412 antwort="Ja, vor 0.9.0 (Empfohlen)" datum=2026-11-20
+FOLGEPUNKT ocs-data-message antwort="Nach 0.9.0 (Empfohlen)" datum=2026-11-20: bei einem 404 der App steht ihr Text in ocs.data.message (gemessen "Search field definition not found"), der Connector liest nur ocs.meta.message; jetzt nichts geändert
+(alle drei Zeilen auch in raw/35-freigaben.txt angehängt)
+
+== 10. Gruppen-Fall: Messung (NC34, vor jeder Codeänderung)
+DOCKER fremd=0 laufend=0; RAM frei_kib=5177984 ergebnis=ok; Stapel nc-mcp-exapp mit NC_EXAPP_NEXTCLOUD_IMAGE=nextcloud:34.0.3-apache gestartet (HP_SHARED_KEY aus nc-mcp-exapp-harp, nicht ausgegeben)
+GRUPPEN vorher ["admin"]; admin in admin, alice in keiner Gruppe
+$ occ app:enable profile_fields --groups=admin -> enabled=["admin"]
+MESSUNG nc34-gruppe nutzer=alice (außerhalb) pfad=me/values http=412 content_type=application/json; charset=utf-8 body={"message":"App is not enabled"}
+MESSUNG nc34-gruppe nutzer=alice (außerhalb) pfade=definitions, users/search, users/alice/values je http=403 body={"ocs":{"meta":{"status":"failure","statuscode":403,"message":"Logged in account must be an admin"},"data":[]}} (die Admin-Prüfung des Kerns greift vor der App-Prüfung)
+MESSUNG nc34-gruppe nutzer=admin (in der Gruppe, Positivkontrolle) me/values 200 Liste(2); definitions 200 Liste(2); users/search 404/404 (Schlüssel x unbekannt, fachlich); users/alice/values 200 Liste(2)
+$ occ group:add pfgrenze35; group:adduser pfgrenze35 alice; app:enable profile_fields --groups=pfgrenze35
+MESSUNG nc34-gruppe-ohne-admin erster Lauf direkt nach dem Umschalten: admin auf allen vier Routen 200/404 wie vorher, alice (Mitglied) me 200 Liste(2), Admin-Routen 403 -> Ergebnis für admin unplausibel
+$ Wiederholung mit frischer Gruppe pfgrenze35 ohne Mitglieder, enabled=["pfgrenze35"] per config:app:get geprüft, admin_gruppen=["admin"]:
+MESSUNG nc34-admin-ausserhalb nutzer=admin pfad=me/values http=412 body={"message":"App is not enabled"}
+MESSUNG nc34-admin-ausserhalb nutzer=admin pfad=definitions http=412 body={"message":"App is not enabled"}
+MESSUNG nc34-alice-ausserhalb nutzer=alice pfad=me/values http=412 body={"message":"App is not enabled"}
+  Bewertung erster Lauf: Ursache nicht bestimmt. Die Wiederholung mit geprüftem Konfigurationswert ist eindeutig, und der Livebeweis unten (Kette, alle vier Ebenen als admin) bestätigt 412.
+$ occ app:enable profile_fields (ohne groups) -> enabled=yes; group:delete pfgrenze35 -> gruppen=["admin"]; alice me/values 200 Liste(2)
+QUELLE nc34 lib/private/AppFramework/Middleware/Security/SecurityMiddleware.php:226 wirft AppNotEnabledException, wenn appPath existiert, die Seite nicht öffentlich ist und isEnabledForUser falsch ist; afterException antwortet bei Accept ohne html mit JSONResponse(['message' => getMessage()], getCode()), also ohne OCS-Umschlag
+QUELLE nc34 AppNotEnabledException: parent::__construct('App is not enabled', 412), fester Text ohne Übersetzung
+QUELLE nc34 andere 412 derselben Middleware: CrossSiteRequestForgeryException 'CSRF check failed', ExAppRequiredException 'ExApp required', LaxSameSiteCookieFailedException 'Lax Same Site Cookie is invalid in request.', StrictCookieMissingException 'Strict Cookie has not been found in request.'
+QUELLE nc35 (docker cp aus dem gestoppten eigenen Container nc35-nc, nur lesend, Kopie danach gelöscht): AppNotEnabledException mit gleichem Text und Status, SecurityMiddleware mit gleichem Zweig
+QUELLE profile_fields 4.0.0 lib: kein 412, kein PRECONDITION, kein "not enabled" -> eine fachliche Antwort der App kann nicht 412 "App is not enabled" sein
+KRITERIUM gruppe_fehlt = HTTP 412 UND JSON-Objekt ohne Schlüssel "ocs" UND message == "App is not enabled" (alle drei nötig)
+BEGRUENDUNG Der Status allein ist mehrdeutig (vier andere 412 im Kern). Der Text ist ein festes Kernliteral ohne Übersetzung und kommt nur bei AppNotEnabledException vor. Der fehlende OCS-Umschlag trennt die Antwort von jeder OCS-Antwort. Eindeutig, kein zusätzlicher Netzaufruf nötig.
+REICHWEITE gemessen: ein Konto ohne Adminrechte außerhalb der Gruppe bekommt 412 nur bei level=me; bei definitions, values und search greift vorher die Admin-Prüfung (403, bisherige Meldung, inhaltlich richtig). Ein Admin außerhalb der Gruppe bekommt 412 auf allen vier Ebenen.
+
+== 11. Gruppen-Fall: Umsetzung
+TDD RED e0d35586 test(35-12): failing tests for Profile Fields not enabled for the account -> 5 failed, 31 passed (die neuen Gegenkontrollen sind schon vorher grün)
+TDD GREEN bda76149 fix(35-12): name Profile Fields not enabled for the account instead of the envelope error -> Testdatei 36 passed, Profile-Fields-Tests gesamt 62 passed
+CODE nur src/mcp_connector/tools/profile_fields.py: _parse prüft zusätzlich 412 + Objekt ohne "ocs" + message "App is not enabled" -> AppMissingError; der 998-Zweig verlangt weiter HTTP 404
+MELDUNG wortlaut="Profile Fields is not enabled for this account." hint="Ask an administrator to enable the app Profile Fields for one of your groups or to switch off profile_fields_read."
+WORTWAHL "for one of your groups" statt "for your group": ein Konto kann in mehreren Gruppen sein, und Nextcloud gibt die App frei, sobald eine davon in der Liste steht (AppManager::checkAppForUser). "this account" in der Meldung wie bei den Meldungen von Talk und Mail für Apps, die dem Konto fehlen.
+REASON unspecified (wie im App-fehlt-Fall und bei capabilities.app_missing für Talk/Mail "for this account"); permission_denied wäre falsch, weil es um die Freigabe der App geht, nicht um ein Recht auf ein Objekt; keine neue Kategorie
+TESTS 412 mit diesem Körper -> neue Meldung auf allen vier Ebenen und zwischen Katalog und Werten. Gegenkontrollen: 412 mit CSRF-, ExApp- und Cookie-Text, 412 mit OCS-Umschlag, 412 als Liste, 403 und 404 mit demselben Text, 412 ohne JSON -> nicht die neue Meldung. Der CSRF-412 behält wörtlich "Nextcloud answered the current user's Profile Fields values without an OCS envelope." Die 998-Tests sind unverändert grün. Andere Apps über parse_ocs: 412 mit diesem Körper ergibt weiter "Nextcloud answered the note without an OCS envelope."
+DIFFBEWEIS git diff --stat e3560c1d -- src/ -> nur src/mcp_connector/tools/profile_fields.py (+31/-5)
+GATES unit+contract 8374 passed, 35 skipped; check_tool_budget exit 0; ruff check ok; ruff format 418 Dateien; pyright 0 errors; vulture exit 0; #53 test_tool_text_assurances 26 passed; RUNBOOK pytest -q -p no:xdist exit=0, 0 F und 0 E
+BUDGET standard=27 bytes_standard=18611 alle=32 bytes_alle=22938 (unverändert)
+CHANGELOG docs-Commit 564a40de: Added-Punkt aus 35-12 erweitert, DE/EN/FR je 7 Punkte in Added; Release-Notiz und PR-Text nachgezogen
+DASH positivkontrolle exit=0; CHANGELOG*.md, profile_fields.py, Testdatei, 35-03-release-notes.md, 35-03-pr-text.md treffer=0
+UMLAUT CHANGELOG.de.md geprueft=1 fehler=0 (lässt)
+FRANZ CHANGELOG.fr.md geprueft=1 fehler=0 ("n'est activée pour aucun", Akzente in désactivée und remédier; gerade Apostrophe)
+
+== 12. Gruppen-Fall: Livebeweis NC34
+DOCKER fremd=0 laufend=0; RAM frei_kib=5218348 ergebnis=ok; Stapel gestartet wie oben
+EXAPP-CONTAINER vorher netz=nc-mcp-exapp-net image_id=sha256:f23eeeaa9494261455015d339646ccfbe66892db2c0cba4ada27099f3e577530 status=exited; RUECKWEG image=127.0.0.1:5000/mcp_connector:f23eeeaa-vor412
+$ occ app_api:app:unregister mcp_connector (ohne --rm-data) exit=0; bash scripts/bootstrap_exapp.sh (ohne Flag) exit=0
+  image built and pushed sha256:7e7efda40ebf53e3673cae147fe25f159cd7a8aa8e410ad0fffb2ca208e166b5; registered, deployed, enabled; wrote .env.exapp
+EXAPP nachher netz=nc-mcp-exapp-net image_id=sha256:7e7efda40ebf53e3673cae147fe25f159cd7a8aa8e410ad0fffb2ca208e166b5 status=running; neue Meldung im Image 1x gefunden
+SCHALTER profile_fields_read=on (--update-only), files_update=off, tasks_update=off app_neu_gestartet=ja; WERKZEUGE alice anzahl=28
+VORHER alice level=me fehler=nein count=2
+$ occ group:add pfgrenze35; group:adduser pfgrenze35 bob; app:enable profile_fields --groups=pfgrenze35 -> enabled=["pfgrenze35"]
+LIVE412 kette nutzer=alice (außerhalb) level=me fehler=ja dauer_ms=1238 | Profile Fields is not enabled for this account. Hint: Ask an administrator to enable the app Profile Fields for one of your groups or to switch off profile_fields_read.
+LIVE412 kette nutzer=alice (außerhalb) level=definitions fehler=ja | No permission for the Profile Fields admin catalog. Nextcloud says: "Logged in account must be an admin". Hint: Ask the owner of the item or an administrator in Nextcloud for the missing permission.
+LIVE412 kette nutzer=alice (außerhalb) level=values fehler=ja | gleiche 403-Meldung (der Katalog wird zuerst gelesen)
+LIVE412 kette nutzer=alice (außerhalb) level=search fehler=ja | No permission for the Profile Fields exact search. Nextcloud says: "Logged in account must be an admin". Hint: Ask the owner of the item or an administrator in Nextcloud for the missing permission.
+LIVE412 kette nutzer=admin (außerhalb) level=me fehler=ja dauer_ms=1228 | Profile Fields is not enabled for this account. Hint: Ask an administrator to enable the app Profile Fields for one of your groups or to switch off profile_fields_read.
+LIVE412 kette nutzer=admin (außerhalb) level=definitions fehler=ja dauer_ms=1241 | gleicher Wortlaut
+LIVE412 kette nutzer=admin (außerhalb) level=values fehler=ja dauer_ms=1201 | gleicher Wortlaut
+LIVE412 kette nutzer=admin (außerhalb) level=search fehler=ja dauer_ms=1298 | gleicher Wortlaut
+LIVE412 kette nutzer=bob (in der Gruppe, Positivkontrolle) level=me fehler=nein count=2 (Werte nicht protokolliert)
+LIVE412 kette nutzer=bob (in der Gruppe) level=definitions fehler=ja | bisherige 403-Meldung (bob ist kein Admin)
+LIVE412 stdio nutzer=alice tools=28; level=me is_error=ja ms=93 | Error executing tool profile_fields_browse: Profile Fields is not enabled for this account. Hint: Ask an administrator to enable the app Profile Fields for one of your groups or to switch off profile_fields_read.
+LIVE412 stdio nutzer=alice level=definitions ms=28, values ms=27, search ms=28 | je die bisherige 403-Meldung; files_list is_error=nein ms=44
+(dauer_ms der Kette jeweils inkl. Start von uv)
+$ occ app:enable profile_fields (ohne groups) -> enabled=yes; group:removeuser pfgrenze35 bob; group:delete pfgrenze35 -> gruppen=["admin"]
+NACHHER alice level=me fehler=nein count=2 gleich_vorher=ja
+SCHALTER profile_fields_read=off (--update-only), files_update=off, tasks_update=off app_neu_gestartet=ja; WERKZEUGE nach_aus anzahl=27
+LIVE412 log nc_app_mcp_connector traceback=0
+ADMIN-SPRACHE ende=en; firstrunwizard Disabled
+TOKENDATEIEN geloescht=ja
+DOCKER ende eigene=0 (nc_app_mcp_connector per docker stop, Stapel per docker compose -f compose.exapp.yml stop; kein down; fremde Container: keine)
+SCAN gruppenfall treffer=0 (Abschnitte 9 bis 12, 35-freigaben.txt, 35-03-release-notes.md, 35-03-pr-text.md, CHANGELOG*.md, Testdatei, profile_fields.py gegen alle nicht leeren Werte aus .env.nc35 und .env.exapp ohne die öffentliche APP_ID mcp_connector, beide HaRP-Schlüssel, die Testpasswörter aus compose und bootstrap und den Namen des AppAPI-Autorisierungskopfs, voll und in den ersten 12 Zeichen; Positivkontrolle mit gepflanzten 12 Zeichen des Passworts von bob gab Treffer)
