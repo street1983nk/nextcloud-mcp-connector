@@ -43,9 +43,9 @@ You bring the model, and no content leaves your server.
 - No deleting: no tool deletes files, events, tasks, notes, cards or contacts; deleting a task
   is deliberately not offered
 - No unconditional overwriting: `files_upload` refuses existing paths. If the admin enables
-  `NC_MCP_FILES_UPDATE`, `files_update` can replace an existing UTF-8 text file only when its
-  ETag matches the value read earlier; stale or deleted files are rejected. Version history
-  depends on the Nextcloud storage backend.
+  `NC_MCP_FILES_UPDATE`, `files_update` can replace an existing file (text as `content`, any
+  other file as a ChatGPT attachment) only when its ETag matches the value read earlier; stale
+  or deleted files are rejected. Version history depends on the Nextcloud storage backend.
 - Existing tasks stay unchanged unless the admin turns on the switch
   "Allow changing existing tasks" (`NC_MCP_TASKS_UPDATE`): Off by default. When on, assistants
   can change one task at a time, and only with the ETag returned by `tasks_read`:
@@ -87,7 +87,7 @@ hand: a contract test reads the live registry and fails if a name or a level dis
 | `files_read_as_markdown` | read | A DOCX, XLSX, PPTX or PDF file converted to Markdown, in slices |
 | `files_upload` | create-only | A new text file or any-size binary upload in base64 chunks; an existing path is refused, never overwritten |
 | `files_create_folder` | create-only | A new folder, optionally with its missing parents (at most 10 per call); an existing folder answers created false, nothing is overwritten |
-| `files_update` | conditional-update | Replaces an existing UTF-8 text file only with its previously read ETag; available only when the admin enables `NC_MCP_FILES_UPDATE` |
+| `files_update` | conditional-update | Replaces an existing file (UTF-8 text as `content`, any file as a ChatGPT attachment) only with its previously read ETag; available only when the admin enables `NC_MCP_FILES_UPDATE` |
 | `calendar_list_events` | read | Events in an explicit time range, with an explicit time zone |
 | `calendar_create_event` | create-only | A new event; existing events are never changed |
 | `tasks_search` | read | Open tasks by default, from own and shared task lists; 25 per page |

@@ -1039,26 +1039,33 @@ async def update_file(
     client: httpx.AsyncClient,
     creds: Credentials,
     path: str,
-    data: bytes,
+    data: bytes | AsyncIterable[bytes],
     content_type: str,
     etag: str,
     fileid: int | str = "",
+    content_length: int | None = None,
 ) -> dict:
     """Replace an existing file only when its ETag still matches ``etag``.
 
-    ``etag`` arrives already normalized (:func:`normalize_etag`). Everything after the
-    PUT is best-effort reporting: once Nextcloud accepted the write, no follow-up read
-    may turn the answer into an error, or the caller would retry a write that happened.
+    ``etag`` arrives already normalized (:func:`normalize_etag`). A streamed ``data``
+    needs ``content_length``. Everything after the PUT is best-effort reporting: once
+    Nextcloud accepted the write, no follow-up read may turn the answer into an error,
+    or the caller would retry a write that happened.
     """
     target = safe_path(path)
+    if isinstance(data, bytes):
+        size = len(data)
+    elif content_length is None:
+        raise ValueError("content_length is required when data is a stream")
+    else:
+        size = content_length
     before = await _count_versions(client, creds, fileid)
+    # One literal dict, so the no-destructive-calls gate reads If-Match off this call.
+    length = {} if isinstance(data, bytes) else {"Content-Length": str(size)}
     response = await client.put(
         files_url(creds, target),
         content=data,
-        headers={
-            "If-Match": etag,
-            "Content-Type": content_type,
-        },
+        headers={"If-Match": etag, "Content-Type": content_type, **length},
         auth=creds.auth(),
     )
     _check_update(response, target)
@@ -1068,7 +1075,7 @@ async def update_file(
     return {
         "path": target,
         "etag": new_etag,
-        "size": len(data),
+        "size": size,
         "versioned": versioned,
     }
 

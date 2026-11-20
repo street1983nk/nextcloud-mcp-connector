@@ -77,8 +77,9 @@ nicht bekannt. Dieser Server begrenzt stattdessen den Schaden:
   nur neu an,
 - jede Änderung an Bestehendem steht hinter einem Schalter, der ab Werk aus
   ist, und braucht das unmittelbar zuvor gelesene ETag: `NC_MCP_FILES_UPDATE`
-  für `files_update` (bestehende UTF-8-Textdateien), `NC_MCP_TASKS_UPDATE`
-  für `tasks_complete`, `tasks_update` und `tasks_move`. Beide ausgeschaltet lassen,
+  für `files_update` (bestehende Dateien, Text oder ChatGPT-Anhang),
+  `NC_MCP_TASKS_UPDATE` für `tasks_complete`, `tasks_update` und `tasks_move`.
+  Beide ausgeschaltet lassen,
   solange der Assistent sie nicht braucht; ein Contract-Test schlägt bei
   jedem anderen destruktiven Aufruf fehl,
 - Inhalte kommen mit ihrer Herkunft als Strukturfeldern zurück, der Client

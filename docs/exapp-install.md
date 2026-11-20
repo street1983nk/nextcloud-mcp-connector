@@ -50,7 +50,7 @@ anything.
 
 | Variable | Config key | Label in the admin settings | Tools it adds |
 |---|---|---|---|
-| `NC_MCP_FILES_UPDATE` | `files_update` | Allow editing existing text files | `files_update`: replaces an existing UTF-8 text file, only with the ETag read before |
+| `NC_MCP_FILES_UPDATE` | `files_update` | Allow editing existing text files | `files_update`: replaces an existing file (text as content, any file as a ChatGPT attachment), only with the ETag read before |
 | `NC_MCP_TASKS_UPDATE` | `tasks_update` | Allow changing existing tasks | `tasks_complete`, `tasks_update`, `tasks_move`: complete or reopen, edit and move one existing task, only with the ETag from `tasks_read` |
 
 - **Installed from the app store:** tick the box in Nextcloud, under Administration settings,

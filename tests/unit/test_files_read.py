@@ -186,6 +186,7 @@ async def test_download_returns_a_complete_binary_file(clients: NcClients) -> No
         "path": "/Docs/scan.pdf",
         "size": len(body),
         "content_type": "application/pdf",
+        "etag": '"etag-1"',
         "offset": 0,
         "bytes": len(body),
         "truncated": False,

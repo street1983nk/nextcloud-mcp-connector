@@ -50,9 +50,10 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
 - Kein Löschen: kein Tool löscht Dateien, Termine, Aufgaben, Notizen, Karten oder Kontakte;
   das Löschen einer Aufgabe wird bewusst nicht angeboten
 - Kein bedingungsloses Überschreiben: `files_upload` lehnt einen vorhandenen Pfad ab. Aktiviert
-  der Admin `NC_MCP_FILES_UPDATE`, ersetzt `files_update` eine bestehende UTF-8-Textdatei nur
-  dann, wenn ihr ETag dem zuvor gelesenen Wert entspricht; geänderte oder gelöschte Dateien
-  werden abgelehnt. Der Versionsverlauf hängt vom Speicher-Backend von Nextcloud ab.
+  der Admin `NC_MCP_FILES_UPDATE`, ersetzt `files_update` eine bestehende Datei (Text als
+  `content`, jede andere Datei als ChatGPT-Anhang) nur dann, wenn ihr ETag dem zuvor gelesenen
+  Wert entspricht; geänderte oder gelöschte Dateien werden abgelehnt. Der Versionsverlauf hängt
+  vom Speicher-Backend von Nextcloud ab.
 - Bestehende Aufgaben bleiben unverändert, solange der Admin den Schalter
   "Bestehende Aufgaben ändern erlauben" (in der Oberfläche englisch "Allow changing existing
   tasks", `NC_MCP_TASKS_UPDATE`) nicht einschaltet; ab Werk ist er aus.
@@ -101,7 +102,7 @@ abweicht.
 | `files_read_as_markdown` | read | Eine DOCX-, XLSX-, PPTX- oder PDF-Datei, in Markdown umgewandelt, in Abschnitten |
 | `files_upload` | create-only | Eine neue Textdatei oder ein Binär-Upload beliebiger Größe in Base64-Blöcken; ein vorhandener Pfad wird abgelehnt, nie überschrieben |
 | `files_create_folder` | create-only | Ein neuer Ordner, auf Wunsch samt fehlender Elternordner (höchstens 10 je Aufruf); ein vorhandener Ordner antwortet mit created false, nichts wird überschrieben |
-| `files_update` | conditional-update | Ersetzt eine bestehende UTF-8-Textdatei nur mit ihrem zuvor gelesenen ETag; nur verfügbar, wenn der Admin `NC_MCP_FILES_UPDATE` aktiviert |
+| `files_update` | conditional-update | Ersetzt eine bestehende Datei (UTF-8-Text als `content`, jede Datei als ChatGPT-Anhang) nur mit ihrem zuvor gelesenen ETag; nur verfügbar, wenn der Admin `NC_MCP_FILES_UPDATE` aktiviert |
 | `calendar_list_events` | read | Termine in einem expliziten Zeitraum, mit expliziter Zeitzone |
 | `calendar_create_event` | create-only | Ein neuer Termin; bestehende Termine werden nie geändert |
 | `tasks_search` | read | Standardmäßig offene Aufgaben, aus eigenen und geteilten Aufgabenlisten; 25 je Seite |

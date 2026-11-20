@@ -31,6 +31,13 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
 - Gemessen auf Nextcloud 34 mit Profile Fields 4.0.0. Auf Nextcloud 35 nicht gemessen: Der
   App Store führt für 35 nur einen Nightly der App.
 
+### Geändert
+
+- `files_update` ersetzt auch eine bestehende Datei beliebigen Typs, etwa DOCX oder XLSX,
+  durch einen ChatGPT-Anhang (`file`), unter derselben ETag-Bedingung wie bei Text
+  (`content`).
+- `files_download` liefert das ETag der Datei.
+
 ## [0.8.0] - 2026-11-14
 
 ### Hinzugefügt

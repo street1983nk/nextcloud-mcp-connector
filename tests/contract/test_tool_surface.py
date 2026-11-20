@@ -1517,7 +1517,8 @@ BASE_INSTRUCTION = (
     " Tasks are never deleted."
 )
 FILES_UPDATE_SENTENCE = (
-    " Existing UTF-8 text files can be replaced with files_update, and only with a matching ETag."
+    " Existing files can be replaced with files_update (text as content, other files as a "
+    "ChatGPT attachment), and only with a matching ETag."
 )
 TASKS_UPDATE_SENTENCE = (
     " Existing tasks can be completed, changed or moved with tasks_complete, tasks_update "

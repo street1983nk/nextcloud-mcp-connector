@@ -166,8 +166,8 @@ decision for the operator, see privacy.md, not a vulnerability).
   `files_upload` remains create-only.
 - Every tool that changes something existing sits behind a switch that
   ships off and needs the ETag read just before. With
-  `NC_MCP_FILES_UPDATE` on, `files_update` can replace an existing UTF-8
-  text file. With `NC_MCP_TASKS_UPDATE` on, `tasks_complete` completes or
+  `NC_MCP_FILES_UPDATE` on, `files_update` can replace an existing file,
+  text or a ChatGPT attachment. With `NC_MCP_TASKS_UPDATE` on, `tasks_complete` completes or
   reopens one task (its subtasks first), `tasks_update` edits named fields
   of one task, and `tasks_move` relocates one. A stale ETag, a read-only
   list, a recurring task and a Deck board are refused before any write.
@@ -212,8 +212,9 @@ the three tools are in
 1. **Prompt injection is reduced, not removed.** A model with a live grant
    can still misuse read tools and create-only writes within the user's
    rights. When `NC_MCP_FILES_UPDATE` is enabled, it can also request
-   ETag-protected replacement of existing UTF-8 text files. When
-   `NC_MCP_TASKS_UPDATE` is enabled, it can complete, reopen, edit or move
+   ETag-protected replacement of existing files (text, or any file as a
+   ChatGPT attachment). When `NC_MCP_TASKS_UPDATE` is enabled, it can
+   complete, reopen, edit or move
    one task at a time, with its subtasks, in every list the user can write
    to. It cannot delete anything.
 2. **Writes into shared containers can expose content.** Created files and

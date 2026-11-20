@@ -226,9 +226,9 @@ protection incident.
   `tasks_move`, which relocates one task with its subtasks into another own or
   writable shared list when `NC_MCP_TASKS_UPDATE` is on. Uploads remain create-only.
   When `NC_MCP_FILES_UPDATE` is enabled, `files_update` can replace an
-  existing UTF-8 text file only with a matching ETag. Stale or deleted
-  targets are refused as conflicts, and the task tools refuse a stale ETag the
-  same way.
+  existing file only with a matching ETag (text as `content`, any file as a
+  ChatGPT attachment). Stale or deleted targets are refused as conflicts, and
+  the task tools refuse a stale ETag the same way.
 - The assistant never sees more than the signed in user. Every request runs under
   that identity, so Nextcloud's own permissions decide what an injection could
   reach at most.

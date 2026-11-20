@@ -51,10 +51,10 @@ Le modèle, c'est vous qui l'apportez, et aucun contenu ne quitte votre serveur.
 - Aucune suppression : aucun outil ne supprime de fichiers, d'événements, de tâches, de notes,
   de cartes ou de contacts ; la suppression d'une tâche n'est volontairement pas proposée
 - Pas d'écrasement inconditionnel : `files_upload` refuse un chemin existant. Si
-  l'administrateur active `NC_MCP_FILES_UPDATE`, `files_update` ne remplace un fichier texte
-  UTF-8 existant que si son ETag correspond à la valeur lue auparavant ; les fichiers modifiés
-  ou supprimés sont refusés. L'historique des versions dépend du backend de stockage de
-  Nextcloud.
+  l'administrateur active `NC_MCP_FILES_UPDATE`, `files_update` ne remplace un fichier existant
+  (texte en `content`, tout autre fichier en pièce jointe ChatGPT) que si son ETag correspond
+  à la valeur lue auparavant ; les fichiers modifiés ou supprimés sont refusés. L'historique
+  des versions dépend du backend de stockage de Nextcloud.
 - Les tâches existantes restent inchangées tant que l'administrateur n'active pas
   l'interrupteur « Autoriser la modification des tâches existantes » (en anglais dans
   l'interface : « Allow changing existing tasks », `NC_MCP_TASKS_UPDATE`) :
@@ -105,7 +105,7 @@ qu'un nom ou un niveau diverge.
 | `files_read_as_markdown` | read | Un fichier DOCX, XLSX, PPTX ou PDF converti en Markdown, par tranches |
 | `files_upload` | create-only | Un nouveau fichier texte ou un envoi binaire de toute taille en blocs Base64 ; un chemin existant est refusé, jamais écrasé |
 | `files_create_folder` | create-only | Un nouveau dossier, au besoin avec ses dossiers parents manquants (au plus 10 par appel) ; un dossier existant répond created false, rien n'est écrasé |
-| `files_update` | conditional-update | Remplace un fichier texte UTF-8 existant uniquement avec son ETag lu auparavant ; disponible seulement si l'admin active `NC_MCP_FILES_UPDATE` |
+| `files_update` | conditional-update | Remplace un fichier existant (texte UTF-8 en `content`, tout fichier en pièce jointe ChatGPT) uniquement avec son ETag lu auparavant ; disponible seulement si l'admin active `NC_MCP_FILES_UPDATE` |
 | `calendar_list_events` | read | Les événements d'une plage de temps explicite, avec un fuseau horaire explicite |
 | `calendar_create_event` | create-only | Un nouvel événement ; les événements existants ne sont jamais modifiés |
 | `tasks_search` | read | Par défaut les tâches ouvertes, des listes de tâches propres et partagées ; 25 par page |

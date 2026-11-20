@@ -72,8 +72,9 @@ instead is bound the damage:
   one task with its subtasks; `files_upload` remains create-only,
 - every change to something existing sits behind a switch that ships off and
   needs the ETag read just before: `NC_MCP_FILES_UPDATE` for `files_update`
-  (existing UTF-8 text files), `NC_MCP_TASKS_UPDATE` for `tasks_complete`,
-  `tasks_update` and `tasks_move`. Leave both off unless the assistant needs
+  (existing files, text or ChatGPT attachment), `NC_MCP_TASKS_UPDATE` for
+  `tasks_complete`, `tasks_update` and `tasks_move`. Leave both off unless
+  the assistant needs
   them; a contract test fails on any other destructive call,
 - content is returned with its origin as structured fields, so the client can
   tell where text came from,
