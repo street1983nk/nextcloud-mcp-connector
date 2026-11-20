@@ -93,7 +93,7 @@ def assert_clean(error: ToolError) -> None:
 @pytest.mark.anyio
 @pytest.mark.parametrize(("level", "kwargs", "route"), LEVELS)
 async def test_missing_app_gets_the_owner_approved_sentence_on_every_level(
-    clients: NcClients, level: str, kwargs: dict[str, str], route: str
+    clients: NcClients, level: str, kwargs: dict[str, Any], route: str
 ) -> None:
     with respx.mock(assert_all_called=True) as mock:
         mock.get(ROOT + route).respond(404, json=core_route_missing())
@@ -142,7 +142,7 @@ async def test_the_apps_own_404_keeps_its_hint_positive_control(clients: NcClien
 @pytest.mark.anyio
 @pytest.mark.parametrize(("level", "kwargs", "route"), LEVELS)
 async def test_an_ocs_404_without_998_is_never_called_a_missing_app(
-    clients: NcClients, level: str, kwargs: dict[str, str], route: str
+    clients: NcClients, level: str, kwargs: dict[str, Any], route: str
 ) -> None:
     with respx.mock(assert_all_called=True) as mock:
         mock.get(ROOT + route).respond(404, json=app_not_found("Field definition not found"))
@@ -244,7 +244,7 @@ async def test_403_names_the_catalog_with_its_article(clients: NcClients) -> Non
     ],
 )
 async def test_every_profile_fields_object_carries_its_article(
-    clients: NcClients, level: str, kwargs: dict[str, str], failing: str, what: str
+    clients: NcClients, level: str, kwargs: dict[str, Any], failing: str, what: str
 ) -> None:
     with respx.mock(assert_all_called=True) as mock:
         if failing != "/definitions" and level == "values":

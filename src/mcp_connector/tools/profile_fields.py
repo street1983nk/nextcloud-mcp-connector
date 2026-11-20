@@ -4,12 +4,46 @@ import re
 from typing import Any
 from urllib.parse import quote
 
-from ..errors import ToolError
+import httpx
+
+from ..errors import AppMissingError, ToolError
 from ..nextcloud import NcClients
 from ..nextcloud.clients import ocs
 
 _PREFIX = "/apps/profile_fields/api/v1"
 _KEY = re.compile(r"^[a-z0-9_]{1,100}$")
+
+#: The OCS status Nextcloud core writes for a route that no enabled app registered.
+_ROUTE_UNKNOWN = 998
+
+
+def _parse(response: httpx.Response, what: str) -> Any:
+    """``ocs.parse_ocs`` with one case of its own: the app Profile Fields is not there.
+
+    Measured on 2026-11-20 (raw/35-12-pf-fehlt.txt): with the app missing (Nextcloud 35.0.0)
+    or disabled (Nextcloud 34.0.3) every route of this module answers HTTP 404 with
+    ``ocs.meta.statuscode`` 998, the core answer for a route nobody registered. The app's
+    own failures never carry 998: Profile Fields 4.0.0 answers them through
+    ``DataResponse`` with 400, 401, 403, 404 or 409 as the status, and an unknown UID is an
+    empty 200. Only both halves together mean "missing app"; everything else keeps the
+    shared wording of ``_status_error``, which stays the same for every other app.
+    """
+    if response.status_code == 404:
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = None
+        envelope = payload.get("ocs") if isinstance(payload, dict) else None
+        meta = envelope.get("meta") if isinstance(envelope, dict) else None
+        if isinstance(meta, dict) and meta.get("statuscode") == _ROUTE_UNKNOWN:
+            raise AppMissingError(
+                message="Profile Fields is not installed or not enabled on this Nextcloud.",
+                hint=(
+                    "Ask an administrator to install the app Profile Fields or to switch off "
+                    "profile_fields_read."
+                ),
+            )
+    return ocs.parse_ocs(response, what=what)
 
 
 async def browse(
@@ -44,7 +78,7 @@ async def browse(
                 "offset": offset,
             },
         )
-        result = ocs.parse_ocs(response, what="Profile Fields exact search")
+        result = _parse(response, what="the Profile Fields exact search")
         if not isinstance(result, dict) or not isinstance(result.get("items"), list):
             raise ToolError(message="Invalid search result.", hint="Check Profile Fields API.")
         users = []
@@ -76,7 +110,7 @@ async def browse(
 
     if level == "me":
         response = await ocs.ocs_get(clients.client, clients.creds, _PREFIX + "/me/values")
-        data = ocs.parse_ocs(response, what="current user Profile Fields values")
+        data = _parse(response, what="the current user's Profile Fields values")
         if not isinstance(data, list):
             raise ToolError(message="Invalid own values.", hint="Check Profile Fields API.")
         return {"level": level, "count": len(data), "results": data}
@@ -96,7 +130,7 @@ async def browse(
             raise ToolError(message="Duplicate field keys.", hint="List each key once.")
 
     response = await ocs.ocs_get(clients.client, clients.creds, _PREFIX + "/definitions")
-    data = ocs.parse_ocs(response, what="Profile Fields admin catalog")
+    data = _parse(response, what="the Profile Fields admin catalog")
     if not isinstance(data, list):
         raise ToolError(message="Invalid field catalog.", hint="Check Profile Fields API.")
     definitions = [entry for entry in data if isinstance(entry, dict)]
@@ -131,7 +165,7 @@ async def browse(
     response = await ocs.ocs_get(
         clients.client, clients.creds, f"{_PREFIX}/users/{quote(uid, safe='')}/values"
     )
-    values = ocs.parse_ocs(response, what="Profile Fields selected user values")
+    values = _parse(response, what="the selected user's Profile Fields values")
     if not isinstance(values, list):
         raise ToolError(message="Invalid user values.", hint="Check Profile Fields API.")
     fields: dict[str, Any] = {}
