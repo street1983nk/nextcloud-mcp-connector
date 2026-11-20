@@ -15,27 +15,53 @@ _KEY = re.compile(r"^[a-z0-9_]{1,100}$")
 
 #: The OCS status Nextcloud core writes for a route that no enabled app registered.
 _ROUTE_UNKNOWN = 998
+#: The fixed, untranslated text of the core ``AppNotEnabledException`` (HTTP 412).
+_NOT_ENABLED_FOR_ACCOUNT = "App is not enabled"
 
 
 def _parse(response: httpx.Response, what: str) -> Any:
-    """``ocs.parse_ocs`` with one case of its own: the app Profile Fields is not there.
+    """``ocs.parse_ocs`` with two cases of its own: the app Profile Fields is not there.
 
     Measured on 2026-11-20 (raw/35-12-pf-fehlt.txt): with the app missing (Nextcloud 35.0.0)
     or disabled (Nextcloud 34.0.3) every route of this module answers HTTP 404 with
     ``ocs.meta.statuscode`` 998, the core answer for a route nobody registered. The app's
     own failures never carry 998: Profile Fields 4.0.0 answers them through
     ``DataResponse`` with 400, 401, 403, 404 or 409 as the status, and an unknown UID is an
-    empty 200. Only both halves together mean "missing app"; everything else keeps the
-    shared wording of ``_status_error``, which stays the same for every other app.
+    empty 200. Only both halves together mean "missing app".
+
+    With the app enabled for some groups only, an account outside all of them gets HTTP 412
+    and the bare JSON ``{"message": "App is not enabled"}`` from the core security
+    middleware, without an OCS envelope. The other 412 answers of that middleware carry other
+    texts, so status, missing envelope and the exact text are required together.
+
+    Everything else keeps the shared wording of ``_status_error``, which stays the same for
+    every other app.
     """
-    if response.status_code == 404:
+    if response.status_code in (404, 412):
         try:
             payload = response.json()
         except ValueError:
             payload = None
+        if (
+            response.status_code == 412
+            and isinstance(payload, dict)
+            and "ocs" not in payload
+            and payload.get("message") == _NOT_ENABLED_FOR_ACCOUNT
+        ):
+            raise AppMissingError(
+                message="Profile Fields is not enabled for this account.",
+                hint=(
+                    "Ask an administrator to enable the app Profile Fields for one of your "
+                    "groups or to switch off profile_fields_read."
+                ),
+            )
         envelope = payload.get("ocs") if isinstance(payload, dict) else None
         meta = envelope.get("meta") if isinstance(envelope, dict) else None
-        if isinstance(meta, dict) and meta.get("statuscode") == _ROUTE_UNKNOWN:
+        if (
+            response.status_code == 404
+            and isinstance(meta, dict)
+            and meta.get("statuscode") == _ROUTE_UNKNOWN
+        ):
             raise AppMissingError(
                 message="Profile Fields is not installed or not enabled on this Nextcloud.",
                 hint=(
