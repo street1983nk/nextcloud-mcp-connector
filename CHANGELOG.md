@@ -22,7 +22,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Administration settings, Security, MCP Connector and declared as an environment variable,
   so an installation from the app store can switch the tool on. A change takes effect after
   you disable and enable this app again.
-- Levels: `me` for the own visible fields; `definitions`, `values` and `search` use routes
+- Levels: `me` for the account's own visible fields; `definitions`, `values` and `search` use routes
   the app reserves for administrators. Only OCS GET requests with the permissions of the
   connected account; nothing is created, changed or deleted.
 - The switch steers this tool only. The search (`unified_search`, `search`,

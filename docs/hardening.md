@@ -127,7 +127,7 @@ deploy variable or with the box "Allow reading Profile Fields" under
 Administration settings, Security, MCP Connector. A change takes effect after the app was disabled and
 enabled again.
 
-- What it reads: the own values of the connected account; for an
+- What it reads: the connected account's own values; for an
   administrator account also the field definitions, selected values of one
   other account by its UID, and an exact search for one field value. It
   sends OCS GET requests only and changes nothing.

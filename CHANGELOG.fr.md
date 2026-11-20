@@ -23,8 +23,8 @@ dans [CHANGELOG.md](CHANGELOG.md).
 - Le commutateur « Allow reading Profile Fields » (`NC_MCP_PROFILE_FIELDS_READ`) figure
   dans Paramètres d'administration, Sécurité, MCP Connector et est déclaré comme variable
   d'environnement, pour qu'une installation depuis l'App Store puisse activer l'outil. Un
-  changement prend effet après avoir désactivé puis réactivé l'application.
-- Niveaux : `me` pour ses propres champs visibles ; `definitions`, `values` et `search`
+  changement prend effet une fois l'application désactivée puis réactivée.
+- Niveaux : `me` pour les champs visibles du compte lui-même ; `definitions`, `values` et `search`
   utilisent des routes que l'application réserve aux administrateurs. Uniquement des
   requêtes OCS GET avec les permissions du compte connecté ; rien n'est créé, modifié ni
   supprimé.

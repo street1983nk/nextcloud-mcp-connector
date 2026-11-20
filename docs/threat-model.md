@@ -134,7 +134,7 @@ decision for the operator, see privacy.md, not a vulnerability).
   was never sold.
 - Profile Fields: `profile_fields_browse` is off by default and registers
   only with `NC_MCP_PROFILE_FIELDS_READ=on` (deploy variable or admin
-  setting). It reads the own values of the connected account, and for an
+  setting). It reads the connected account's own values, and for an
   administrator account the definitions and the values of other accounts,
   read only and with the permissions the app enforces. That switch is
   **not** a disclosure boundary either: the search provider of the app is

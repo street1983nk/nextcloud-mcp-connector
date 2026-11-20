@@ -136,10 +136,10 @@ ratent ; le tester avec sa propre arborescence, pas seulement sur le papier.
 est désactivé par défaut et n'est enregistré qu'avec
 `NC_MCP_PROFILE_FIELDS_READ=on`, défini comme variable de déploiement ou par
 la case « Allow reading Profile Fields » dans Paramètres d'administration,
-Sécurité, MCP Connector. Un changement prend effet après
-avoir désactivé puis réactivé l'application.
+Sécurité, MCP Connector. Un changement prend effet une fois
+l'application désactivée puis réactivée.
 
-- Ce qu'il lit : les propres valeurs du compte connecté ; pour un compte
+- Ce qu'il lit : les valeurs propres au compte connecté ; pour un compte
   administrateur, en plus, les définitions des champs, des valeurs choisies
   d'un autre compte par son UID et une recherche exacte d'une valeur de
   champ. Il n'envoie que des requêtes OCS GET et ne modifie rien.

@@ -125,7 +125,7 @@ qu'un nom ou un niveau diverge.
 | `talk_send` | create-only | Un message dans une conversation ; jamais modifié ni supprimé, désactivable pour toute l'instance |
 | `mail_browse` | read | Les comptes Mail, leurs boîtes aux lettres et les en-têtes de messages ; strictement en lecture seule |
 | `contacts_search` | read | Des contacts dans les carnets d'adresses |
-| `profile_fields_browse` | read | Les champs de l'application Profile Fields : ses propres valeurs et, pour les administrateurs, les définitions, les valeurs d'un compte et une recherche exacte ; disponible seulement si l'admin active `NC_MCP_PROFILE_FIELDS_READ` |
+| `profile_fields_browse` | read | Les champs de l'application Profile Fields : les valeurs du compte connecté et, pour les administrateurs, les définitions, les valeurs d'un compte et une recherche exacte ; disponible seulement si l'admin active `NC_MCP_PROFILE_FIELDS_READ` |
 | `unified_search` | read | La recherche unifiée de Nextcloud à travers les fournisseurs, en respectant les permissions |
 | `prepare_context` | read | Fichiers, notes, cartes, la semaine d'événements à venir, les conversations Talk en attente et les courriels non lus en un appel |
 | `search` | read | Point d'entrée de recherche compatible OpenAI, délègue à la recherche unifiée |
@@ -161,8 +161,8 @@ manquante reçoit une réponse en une phrase, jamais un résultat vide.
   - Installation depuis l'App Store : cocher la case dans Paramètres d'administration,
     Sécurité, MCP Connector, ou exécuter
     `occ app_api:app:config:set mcp_connector profile_fields_read --value on` (avec
-    `--update-only` dès que la clé existe). Un changement prend effet après avoir désactivé
-    puis réactivé l'application.
+    `--update-only` dès que la clé existe). Un changement prend effet une fois l'application
+    désactivée puis réactivée.
   - Tout autre mode : définir `NC_MCP_PROFILE_FIELDS_READ=on` dans l'environnement du
     serveur et le redémarrer.
 - Niveaux : `me` renvoie les champs que le compte connecté peut voir de lui-même ;
