@@ -7,3 +7,21 @@ PUSH entsperrt grund=T-35-PF-02 geschlossen (bda22ac2), 35-SECURITY.md threats_o
 PRUEFUNG vor=push-branch-vorschau bereich=origin/main..HEAD commits=48 autor_committer_fremd=0 trailer=0 closes_woerter=0
 PRUEFUNG zusatz head=3bee05c1 origin/main=66ffa30d (erneut geholt) claude_ai_code=0 66ffa30d_im_bereich=0
 FETCH origin/main=66ffa30d vor dem Freigabe-Commit
+PRUEFUNG vor=push-branch bereich=origin/main..HEAD commits=50 autor_committer_fremd=0 trailer=0 closes_woerter=0
+PRUEFUNG zusatz head=2307ede0 origin/main=66ffa30d (git fetch unmittelbar davor) ff=ja claude_ai_code=0 66ffa30d_im_bereich=0
+PR nummer=55 draft=ja url=https://github.com/street1983nk/nextcloud-mcp-connector/pull/55 head=2307ede0 base=main body_claude=0 body_at=0
+PUSH git push -u origin plan/release-090 -> [new branch], origin/plan/release-090=2307ede0 (kein force)
+CI-LAEUFE CI run=44809180588 conclusion=success; Security scans run=44809180578 conclusion=success; event=pull_request sha=2307ede0
+CI unit conclusion=success run=44809180588 sha=2307ede0 lauf=1 final=ja
+CI image conclusion=success run=44809180588 sha=2307ede0 lauf=1 final=ja
+CI exapp conclusion=success run=44809180588 sha=2307ede0 lauf=1 final=ja
+CI canary-nc35 conclusion=success run=44809180588 sha=2307ede0 lauf=1 final=ja
+CI integration conclusion=success run=44809180588 sha=2307ede0 lauf=1 final=ja
+CI codeql conclusion=success run=44809180578 sha=2307ede0 lauf=1 final=ja (Anzeigename "CodeQL (python)")
+CI reuse conclusion=success run=44809180578 sha=2307ede0 lauf=1 final=ja (Anzeigename "REUSE licensing lint")
+CI pip-audit conclusion=success run=44809180578 sha=2307ede0 lauf=1 final=ja (Anzeigename "pip-audit over the locked set")
+CI-PF-SCHRITTE "Install the Profile Fields app from the app store" success; "Profile Fields live through a real MCP client (opt-in tool, PR 49)" success
+CI-PF PROFILE-FIELDS nextcloud=34.0.6 app=4.0.0 container=nc-mcp-test
+CI-PF PROFILE-FIELDS tools without switch=27 with switch=28
+CI-PF PROFILE-FIELDS search without switch: private value admin=1 bob=0, shared value bob=1
+CI-SCAN PROFILE-FIELDS-Zeilen gegen password, secret, token, AUTHORIZATION-APP-API, bearer treffer=0; ins Protokoll nur Job, Ergebnis, Run-Id und diese Zeilen
