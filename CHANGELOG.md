@@ -29,6 +29,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Measured on Nextcloud 34 with Profile Fields 4.0.0. Not measured on Nextcloud 35: the app
   store carries only a nightly of the app for 35.
 
+### Changed
+
+- `files_update` also replaces an existing file of any type, such as DOCX or XLSX, with a
+  ChatGPT attachment (`file`), under the same ETag condition as for text (`content`).
+- `files_download` returns the ETag of the file.
+
 ## [0.8.0] - 2026-11-14
 
 ### Added

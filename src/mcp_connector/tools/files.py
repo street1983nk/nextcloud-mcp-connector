@@ -20,10 +20,12 @@ before the request or by Nextcloud itself; a folder that already exists is left 
 
 import asyncio
 import base64
+import dataclasses
 import re
 import tempfile
 import uuid
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncGenerator, AsyncIterator, Mapping
+from contextlib import asynccontextmanager
 from posixpath import dirname
 from typing import Any
 from urllib.parse import urlsplit
@@ -42,7 +44,7 @@ from ..errors import (
 )
 from ..nextcloud import NcClients
 from ..nextcloud.clients import dav
-from ..nextcloud.exclusion import TagScope
+from ..nextcloud.exclusion import ExclusionGuard, TagScope
 from . import withhold
 
 DEFAULT_MAX_BYTES = 512 * 1024
@@ -622,6 +624,10 @@ async def download(
         "truncated": offset + len(data) < size,
         "content": data,
     }
+    if offset == 0:
+        # Only the first chunk carries the ETag: a later chunk could come from a newer
+        # version, and files_update must reject a mixed download instead of accepting it.
+        result["etag"] = info["etag"]
     if result["truncated"]:
         result["next_offset"] = offset + len(data)
     return result
@@ -1080,10 +1086,15 @@ async def upload_attachment(
         return await _stage_attachment(clients, target, source_url, mime_type)
 
 
-async def _stage_attachment(
-    clients: NcClients, target: str, source_url: str, mime_type: str
-) -> dict[str, Any]:
-    """Stage a single attachment under the process-wide disk usage guard."""
+@asynccontextmanager
+async def _staged_attachment(
+    source_url: str, mime_type: str
+) -> AsyncGenerator[tuple[AsyncIterator[bytes], int, str]]:
+    """Download one attachment into a bounded temporary file; yield (body, size, type).
+
+    Every check runs before the first yield, so a failed download never reaches the
+    caller's write to Nextcloud.
+    """
     with tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024, mode="w+b") as staged:
         seen = 0
         try:
@@ -1156,15 +1167,23 @@ async def _stage_attachment(
                     return
                 yield chunk
 
+        yield body(), seen, content_type
+
+
+async def _stage_attachment(
+    clients: NcClients, target: str, source_url: str, mime_type: str
+) -> dict[str, Any]:
+    """Stage a single attachment under the process-wide disk usage guard."""
+    async with _staged_attachment(source_url, mime_type) as (body, size, content_type):
         result = await dav.put_new_file_stream(
             clients.client,
             clients.creds,
             target,
-            body(),
+            body,
             content_type,
-            content_length=seen,
+            content_length=size,
         )
-        return {**result, "bytes": seen, "content_type": content_type}
+        return {**result, "bytes": size, "content_type": content_type}
 
 
 def _update_conflict(target: str) -> ConflictError:
@@ -1180,13 +1199,10 @@ def _update_conflict(target: str) -> ConflictError:
     )
 
 
-async def update(
-    clients: NcClients,
-    path: str,
-    content: str,
-    etag: str,
-) -> dict:
-    """Replace an existing UTF-8 text file when its ETag still matches.
+async def _update_preconditions(
+    clients: NcClients, path: str, etag: str
+) -> tuple[str, str, dict[str, Any]]:
+    """Checks shared by both update paths; returns (target, normalized ETag, stat).
 
     The supplied ETag is validated to exactly one strong quoted validator before any
     request (SabreDAV would honour ``*``, an empty value or a list and skip the
@@ -1217,12 +1233,26 @@ async def update(
 
     if info["etag"] and wanted != info["etag"]:
         raise _update_conflict(target)
+    return target, wanted, info
+
+
+async def update(
+    clients: NcClients,
+    path: str,
+    content: str,
+    etag: str,
+) -> dict:
+    """Replace an existing UTF-8 text file when its ETag still matches.
+
+    The preconditions are those of :func:`_update_preconditions`.
+    """
+    target, wanted, info = await _update_preconditions(clients, path, etag)
 
     content_type = info["content_type"] or "application/octet-stream"
     if not _is_text(content_type):
         raise ToolError(
             message=f"{target} is {content_type} and not text.",
-            hint="files_update only replaces UTF-8 text files in v1.",
+            hint="Send the edited file as a ChatGPT attachment in file to replace a non-text file.",
         )
 
     try:
@@ -1248,6 +1278,68 @@ async def update(
         wanted,
         fileid=info["fileid"],
     )
+
+
+def _attachment_type_check(target: str, existing: str, attachment_type: str) -> None:
+    """Refuse an attachment whose type differs from the existing file's, ignoring parameters."""
+
+    def essence(value: str) -> str:
+        bare = (value or "").split(";", 1)[0].strip().lower()
+        return "" if bare == "application/octet-stream" else bare
+
+    wanted, current = essence(attachment_type), essence(existing)
+    if wanted and current and wanted != current:
+        raise ToolError(
+            message=f"The attachment is {attachment_type.strip()}, but {target} is {existing}.",
+            hint="Attach a file of the same type, or save it as a new file with files_upload.",
+        )
+
+
+async def update_attachment(
+    clients: NcClients,
+    path: str,
+    etag: str,
+    download_url: str,
+    file_id: str,
+    mime_type: str = "",
+) -> dict:
+    """Replace an existing file of any type with a ChatGPT attachment, ETag-guarded.
+
+    The ETag and type checks run before the attachment is downloaded, so a stale ETag
+    never costs a download, and run again after it, right before the PUT, so a tag or a
+    change made during the download gives the same conflict and writes nothing. The tag is
+    not part of the HTTP precondition, so the same small residual window as in the text
+    path remains between the last check and the PUT. The existing file's content type is
+    kept.
+    """
+    if not (file_id or "").strip():
+        raise ToolError(
+            message="The ChatGPT attachment has no file id.",
+            hint="Attach the file to ChatGPT and retry.",
+        )
+    source_url = _openai_download_url(download_url)
+    target, wanted, info = await _update_preconditions(clients, path, etag)
+    _attachment_type_check(target, info["content_type"] or "application/octet-stream", mime_type)
+    async with (
+        _ATTACHMENT_STAGING_SEMAPHORE,
+        _staged_attachment(source_url, mime_type) as (body, size, staged_type),
+    ):
+        # A fresh guard: the one in clients caches the tag scope for the whole call.
+        fresh = dataclasses.replace(clients, exclusion=ExclusionGuard())
+        target, wanted, info = await _update_preconditions(fresh, path, etag)
+        existing = info["content_type"] or "application/octet-stream"
+        _attachment_type_check(target, existing, mime_type)
+        _attachment_type_check(target, existing, staged_type)
+        return await dav.update_file(
+            clients.client,
+            clients.creds,
+            target,
+            body,
+            existing,
+            wanted,
+            fileid=info["fileid"],
+            content_length=size,
+        )
 
 
 async def upload_binary(

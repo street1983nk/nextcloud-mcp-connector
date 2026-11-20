@@ -125,7 +125,8 @@ async def files_download(
     ] = files_tools.DEFAULT_DOWNLOAD_BYTES,
     ctx: Context | None = None,
 ) -> list[TextContent | EmbeddedResource]:
-    """Download any-size file in chunks; repeat with next_offset while truncated is true."""
+    """Download any-size file in chunks; repeat with next_offset while truncated is true.
+    The first chunk carries the etag for files_update."""
     clients = deps.resolve_clients(ctx)
     result = await files_tools.download(clients, path=path, offset=offset, max_bytes=chunk_bytes)
     metadata = {key: value for key, value in result.items() if key != "content"}
@@ -263,29 +264,55 @@ async def files_create_folder(
 
 if config.files_update_enabled():
 
-    @mcp.tool(annotations=UPDATE_EXISTING, structured_output=False)
+    @mcp.tool(
+        annotations=UPDATE_EXISTING,
+        meta={"openai/fileParams": ["file"]},
+        structured_output=False,
+    )
     @graceful
     async def files_update(
-        path: Annotated[str, Field(description="Existing text file path; must already exist")],
-        content: Annotated[str, Field(description="Complete replacement content as UTF-8 text")],
-        etag: Annotated[str, Field(description="ETag returned when the file was read")],
+        path: Annotated[str, Field(description="Existing file path; must already exist")],
+        etag: Annotated[str, Field(description="ETag returned by files_read or files_download")],
+        content: Annotated[
+            str | None,
+            Field(description="Complete replacement as UTF-8 text; omit when sending file"),
+        ] = None,
+        file: OpenAIFile = None,
         ctx: Context | None = None,
     ) -> str:
-        """Replace an existing UTF-8 text file only when its ETag still matches.
+        """Replace an existing file only when its ETag still matches.
 
-        This is a whole-file replacement: read the complete file first and send the
-        complete new content, never a partial read. It cannot create, delete, move or
-        rename files. If the file changed or was deleted, the update is rejected and
-        the client must read it again and decide what to do. Version history is not
-        guaranteed for every Nextcloud storage backend.
+        Send content with the complete new UTF-8 text for a text file, or file with a
+        ChatGPT attachment for any file type such as DOCX or XLSX. Take the ETag from
+        files_read or files_download. This is a whole-file replacement: send the complete
+        new file, never a partial read. It cannot create, delete, move or rename files. If
+        the file changed or was deleted, the update is rejected and the client must read
+        it again and decide what to do. Version history is not guaranteed for every
+        Nextcloud storage backend.
         """
 
-        clients = deps.resolve_clients(ctx)
-        return compact(
-            await files_tools.update(
-                clients,
-                path=path,
-                content=content,
-                etag=etag,
+        if content is not None and file is not None:
+            raise ToolError(
+                message="Send content or file, not both.",
+                hint="Use content for a text file and file for a ChatGPT attachment.",
             )
+        if content is None and file is None:
+            raise ToolError(
+                message="Send content for a text file or file for a ChatGPT attachment.",
+                hint="Read the file first with files_read or files_download to get its ETag.",
+            )
+        clients = deps.resolve_clients(ctx)
+        if file is not None:
+            return compact(
+                await files_tools.update_attachment(
+                    clients,
+                    path=path,
+                    etag=etag,
+                    download_url=file["download_url"],
+                    file_id=file["file_id"],
+                    mime_type=file.get("mime_type", ""),
+                )
+            )
+        return compact(
+            await files_tools.update(clients, path=path, content=content or "", etag=etag)
         )

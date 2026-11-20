@@ -178,7 +178,7 @@ async def test_empty_files_never_trigger_unbounded_get(
     binary: bool, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     async def empty_stat(*args, **kwargs):
-        return {"is_collection": False, "size": 0, "content_type": "text/plain"}
+        return {"is_collection": False, "size": 0, "content_type": "text/plain", "etag": ""}
 
     monkeypatch.setattr(dav, "stat", empty_stat)
     async with httpx.AsyncClient() as client:

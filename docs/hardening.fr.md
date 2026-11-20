@@ -77,8 +77,9 @@ complète n'est connue. Ce serveur limite plutôt les dégâts :
   fait que créer,
 - toute modification d'un élément existant passe par un interrupteur
   désactivé par défaut et exige l'ETag lu juste avant : `NC_MCP_FILES_UPDATE`
-  pour `files_update` (fichiers texte UTF-8 existants), `NC_MCP_TASKS_UPDATE`
-  pour `tasks_complete`, `tasks_update` et `tasks_move`. Les laisser
+  pour `files_update` (fichiers existants, texte ou pièce jointe ChatGPT),
+  `NC_MCP_TASKS_UPDATE` pour `tasks_complete`, `tasks_update` et
+  `tasks_move`. Les laisser
   désactivés tant que l'assistant n'en a pas besoin ; un test de contrat
   échoue à tout autre appel destructif,
 - les contenus reviennent avec leur origine en champs structurés, le client

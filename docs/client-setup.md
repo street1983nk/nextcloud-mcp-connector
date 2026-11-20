@@ -875,8 +875,9 @@ anything, a task included, and nothing moves except `tasks_move`, which
 relocates one task with its subtasks when the administrator has turned on
 `NC_MCP_TASKS_UPDATE` (off by default). `files_upload` refuses existing
 paths. When `NC_MCP_FILES_UPDATE` is enabled, `files_update` can replace an
-existing UTF-8 text file only with a matching ETag, and the three task tools
-`tasks_complete`, `tasks_update` and `tasks_move` likewise only work with
+existing file (text as `content`, any file as a ChatGPT attachment) only
+with a matching ETag, and the three task tools `tasks_complete`,
+`tasks_update` and `tasks_move` likewise only work with
 the ETag from `tasks_read`. One honest limit of the file guard: on common
 storage backends the ETag of a file changes at most once per second, so two
 writers inside the same second cannot be told apart by their ETags. `files_search` matches names,
