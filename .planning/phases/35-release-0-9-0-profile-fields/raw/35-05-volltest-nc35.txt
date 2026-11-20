@@ -1,0 +1,93 @@
+# 35-05 Volltest 0.9.0 auf Nextcloud 35.0.0 (Stapel nc35-*, 2026-11-20)
+BASIS 9a2b0faceeea6d79c8e8dc3fda88b913183a076b
+HEAD-VOR-LAUF 68266ae2 (Branch plan/release-090, Stand inklusive Textfix f9d59db5)
+FREIGABE volltest-nc35 antwort=option-a datum=2026-11-20 (Commit edf795e5, Owner-Antwort "Ja, starten")
+
+== Task 2: Docker- und RAM-Gate
+DOCKER fremd=0 laufend=0 (vor dem Start; kein nc-mcp-exapp-*, kein nc35-*, kein nc_app_mcp_connector aktiv)
+RAM frei_kib=4543972 schwelle=4194304 ergebnis=ok
+EXAPP-CONTAINER netz=nc-mcp-exapp-net (Alias mcp_connector, gehört dem NC34-Stapel) image=127.0.0.1:5000/mcp_connector:0.9.0 image_id=sha256:03c3fe0417db002a8a2d475715c9d4dded773f7e42dfe8b5dc72e5e16d0f5727 (Build aus 35-04, vor dem Textfix f9d59db5) status=exited, nicht angefasst
+RUECKWEG image=127.0.0.1:5000/mcp_connector:03c3fe04-vor35 image_id=sha256:03c3fe0417db002a8a2d475715c9d4dded773f7e42dfe8b5dc72e5e16d0f5727
+docker start nc-mcp-exapp-registry (nur die Registry des NC34-Stapels, keine Nextcloud; compose.nc35.yml hat keine eigene Registry, Vorbild 34-07)
+docker start nc35-nc -> installed=true version=35.0.0 (35.0.0.10) maintenance=false
+docker start nc35-harp nc35-caddy nc35-greenmail
+EXAPP nc35 vorher version=0.8.0 status=enabled (occ app_api:app:list; nicht neu registriert, weil Profile Fields fehlt und Task 2 anhält)
+ADMIN-SPRACHE start=standard (occ user:setting admin core lang: Einstellung nicht gesetzt; nichts geändert)
+
+== Profile Fields auf NC35
+PF nc35 vorher installiert=nein (occ app:list: weder Enabled noch Disabled führt profile_fields; nur die Kern-App profile 2.0.0-dev.0)
+$ occ app:install profile_fields (ohne --allow-unstable) exit=1
+  Error: App "Profile fields" cannot be installed because it is not compatible with this version of the server.
+PF nc35 installierbar=nein grund=Error: App "Profile fields" cannot be installed because it is not compatible with this version of the server.
+  Nebenwirkung: der Installer hat das stabile Archiv 4.0.0 nach /var/www/html/apps/profile_fields geladen (appinfo: min-version=34 max-version=34); occ app:list führt es seitdem unter Disabled als 4.0.0, aktiviert ist es nicht. Nicht entfernt (kein Auftrag dafür).
+PF store quelle=https://apps.nextcloud.com/api/v1/platform/35.0.0/apps.json http=200 apps=588 profile_fields: version=5.0.0 nightly=ja platform=">=35 <=35" erstellt=2026-10-31
+PF store vergleich quelle=https://apps.nextcloud.com/api/v1/platform/34.0.3/apps.json http=200 apps=666 profile_fields: 4.0.0 stabil platform=">=34 <=34" erstellt=2026-05-18; 1.0.0 bis 1.0.4 stabil platform=">=32 <=34"
+PF store nc35 stabil=nein nightly=ja
+DOCKER zwischen eigene=0 (nc35-caddy, nc35-harp, nc35-greenmail, nc35-nc, nc-mcp-exapp-registry per docker stop; nc_app_mcp_connector lief nicht; fremde Container: keine)
+SCAN task2 treffer=0 (Protokoll enthält nur Versionen, Store-Metadaten und die occ-Fehlerzeile; keine Env-Datei geladen, kein Schlüssel gelesen)
+FREIGABE pf-nc35 antwort=luecke datum=2026-11-20 (Owner: "Messen statt warten (Empfohlen)"; Wortlaut beider Antworten in raw/35-freigaben.txt)
+FREIGABE nc35-aufraeumen antwort=entfernen datum=2026-11-20
+ZUSATZ Owner-Auftrag "100% Zuverlässigkeit auf NC35, so weit messbar": realer NC35-Fall (Schalter an ohne App) über Kette und stdio messen; unklare oder sprachlich falsche Meldung heißt anhalten und zeigen, nicht ändern
+
+== Task 3 (Teil 1): Gates, Aufräumen, Neuregistrierung
+DOCKER fremd=0 laufend=0 (vor dem zweiten Start)
+RAM frei_kib=4244980 schwelle=4194304 ergebnis=ok
+docker start nc-mcp-exapp-registry nc35-nc -> installed=true version=35.0.0; docker start nc35-harp nc35-caddy nc35-greenmail
+REGISTRY nc-mcp-exapp-registry lief für den Bootstrap mit (vom Orchestrator akzeptiert, wie 34-07; keine zweite Nextcloud)
+$ occ app:remove profile_fields exit=0 | Disabled app 'profile_fields' (uninstall steps executed). Removed app 'profile_fields' (version 4.0.0).
+AUFRAEUMEN nc35 app_list_profile_fields=0 (weder Enabled noch Disabled) apps/profile_fields=weg custom_apps/profile_fields=weg
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=vorher
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=vorher
+EXAPP nc35 vorher version=0.8.0 status=enabled; SCHALTER vorher files_update=off tasks_update=off profile_fields_read=fehlt
+$ occ app_api:app:unregister mcp_connector (ohne --rm-data) exit=0 | disabled, removed, unregistered
+EXAPP-CONTAINER abgeloest: nc_app_mcp_connector des NC34-Stapels wurde durch das Unregister auf nc35 entfernt (vom Orchestrator akzeptiert, nur Testinstanz; NC34 braucht vor seinem nächsten Einsatz einen Bootstrap ohne Flag)
+$ HP_SHARED_KEY aus nc35-harp exportiert (nicht ausgegeben, Länge 64 geprüft); bash scripts/bootstrap_exapp.sh --nc35 exit=0 (Auszug)
+daemon harp_proxy_docker: exists
+image 127.0.0.1:5000/mcp_connector:0.9.0: built and pushed (sha256:8c1d8abcf302573c694619a38d813f3b10d070f023ded6004a82a385d83375e6)
+image digest sha256:8c1d8abcf302573c694619a38d813f3b10d070f023ded6004a82a385d83375e6: unchanged since the push
+exapp mcp_connector: registered and deployed
+exapp mcp_connector: enabled
+wrote .env.nc35
+EXAPP nachher version=0.9.0 image=127.0.0.1:5000/mcp_connector:0.9.0 image_id=sha256:8c1d8abcf302573c694619a38d813f3b10d070f023ded6004a82a385d83375e6 netz=nc-mcp-nc35-net status=running
+TEXTFIX im Image geprüft: ocs.py:275 suffix=' Nextcloud says: "{detail}".', reg_files.py:128 "Download a file of any size in chunks", __version__ 0.9.0
+
+== Schalterfolge über die Kette (occ setzen, App aus und ein, connect als alice über OAuth, tools)
+SCHALTER s1 files_update=off tasks_update=off (--update-only) profile_fields_read=off (Schlüssel fehlte, einmal ohne --update-only angelegt) app_neu_gestartet=ja
+WERKZEUGE pf=aus alle=aus anzahl=27 profile_fields_browse=nein (familien=10 aendernd=keine)
+SCHALTER s2 profile_fields_read=on files_update=off tasks_update=off (--update-only) app_neu_gestartet=ja
+WERKZEUGE pf=an anzahl=28 profile_fields_browse=ja (App Profile Fields nicht installiert)
+
+== PF-FEHLT: Schalter an, App Profile Fields fehlt (Kette, Konto alice ohne Adminrechte)
+PF-FEHLT direkt GET /ocs/v2.php/apps/profile_fields/api/v1/me/values als alice http=404 (Gegenkontrolle an der Instanz vorbei: die Route fehlt)
+PF-FEHLT kette level=me fehler=ja dauer_s=1 | "Error executing tool profile_fields_browse: Nextcloud did not find current user Profile Fields values. Nextcloud says: "Invalid query, please check the syntax. API specifications are here: http://www.freedesktop.org/wiki/Specifications/open-collaboration-services.\n". Hint: Search for it first; the id or the name is unknown to this instance."
+PF-FEHLT kette level=definitions fehler=ja dauer_s=1 | "Error executing tool profile_fields_browse: Nextcloud did not find Profile Fields admin catalog. Nextcloud says: "Invalid query, please check the syntax. API specifications are here: http://www.freedesktop.org/wiki/Specifications/open-collaboration-services.\n". Hint: Search for it first; the id or the name is unknown to this instance."
+PF-FEHLT kette level=values user_uid=alice field_keys=leer fehler=ja dauer_s=2 | "Error executing tool profile_fields_browse: Invalid field keys. Hint: Provide up to 12 exact keys." (Eingabeprüfung vor dem Netz, unabhängig von der App)
+PF-FEHLT kette level=values user_uid=alice field_keys=x fehler=ja | "Error executing tool profile_fields_browse: Nextcloud did not find Profile Fields admin catalog. Nextcloud says: "Invalid query, please check the syntax. API specifications are here: http://www.freedesktop.org/wiki/Specifications/open-collaboration-services.\n". Hint: Search for it first; the id or the name is unknown to this instance."
+PF-FEHLT kette level=search fehler=ja dauer_s=1 | "Error executing tool profile_fields_browse: Nextcloud did not find Profile Fields exact search. Nextcloud says: "Invalid query, please check the syntax. API specifications are here: http://www.freedesktop.org/wiki/Specifications/open-collaboration-services.\n". Hint: Search for it first; the id or the name is unknown to this instance."
+PF-FEHLT kette andere_werkzeuge files_list=ok unified_search=ok(count=58) search=ok prepare_context=ok (kein Fehler, providers ohne profile_fields-Fehler)
+PF-FEHLT log nc_app_mcp_connector traceback=0 (nur die INFO-Zeilen "Tool 'profile_fields_browse' failed" der Aufrufe), kein 500, kein Hängen (jeder Aufruf unter 3 s)
+PF-FEHLT stdio schalter=an tools=28 profile_fields_browse=ja (NC_MCP_PROFILE_FIELDS_READ=on, Konto alice, Server nc-mcp.exe aus dem Worktree)
+PF-FEHLT stdio level=me is_error=ja ms=118 | gleicher Wortlaut wie Kette (Zeilenumbruch des Nextcloud-Textes hier als Leerzeichen vor dem Schlusszitat)
+PF-FEHLT stdio level=definitions is_error=ja ms=36 | gleicher Wortlaut wie Kette
+PF-FEHLT stdio level=values field_keys=leer is_error=ja ms=3 | "Invalid field keys. Hint: Provide up to 12 exact keys."
+PF-FEHLT stdio level=search is_error=ja ms=37 | gleicher Wortlaut wie Kette
+PF-FEHLT stdio andere_werkzeuge files_list=ok unified_search=ok(count=26) search=ok prepare_context=ok
+PF-FEHLT technik=ok (klare Ablehnung als Werkzeugfehler, kein 500, kein Traceback, kein Hängen, kein Geheimnis, andere Werkzeuge und Suche fehlerfrei)
+PF-FEHLT meldung=UNKLAR -> ANHALTEN (Owner-Auftrag: unklare Meldung zeigen, nicht ändern). Befund EN:
+  1. Die Meldung nennt die Ursache nicht: nirgends steht, dass die App Profile Fields auf dieser Instanz fehlt oder nicht aktiviert ist.
+  2. Der Hinweis "Search for it first; the id or the name is unknown to this instance." führt in die Irre: es gibt nichts zu suchen, der Admin müsste die App installieren oder den Schalter ausschalten.
+  3. Das Zitat ist der allgemeine OCS-998-Text von Nextcloud ("Invalid query, please check the syntax. API specifications are here: <freedesktop-URL>") mit einem literalen "\n" vor dem Schlusszitat (Kette) bzw. einem Leerzeichen (stdio); für Nutzer ohne Wert, mit fremder URL.
+  4. Sprache: "Nextcloud did not find current user Profile Fields values" ohne Artikel ("the current user's Profile Fields values"), gleiche Art wie der HINWEIS aus 35-11 zu "what" ohne "the".
+  Quelle: src/mcp_connector/nextcloud/clients/ocs.py:298-301 (gemeinsamer 404/998-Zweig von _status_error) mit what aus src/mcp_connector/tools/profile_fields.py:47, 79, 99. Eine Änderung wäre Code oder Laufzeittext und braucht einen Owner-Entscheid (35-RULES Abschnitt 4 und 11).
+
+== Rückbau bis zum Anhalten
+SCHALTER s5 files_update=off tasks_update=off profile_fields_read=off (--update-only, occ config:get geprüft) app_neu_gestartet=ja
+WERKZEUGE nach_aus anzahl=27 profile_fields_browse=nein
+RUECKBAU nichts angelegt (bis hier nur lesende Aufrufe; stdio-Lauf A/B und 403-Livetest noch nicht gelaufen)
+BASELINE nc35 konto=alice calendars=1 objekte=31 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+BASELINE nc35 konto=bob calendars=2 objekte=1 geloescht=0 shares=0 abos=0 phase=nachher gleich=ja
+ADMIN-SPRACHE ende=standard (nicht verändert)
+DOCKER angehalten eigene=0 (nc_app_mcp_connector, nc35-caddy, nc35-harp, nc35-greenmail, nc35-nc, nc-mcp-exapp-registry per docker stop; fremde Container: keine)
+TOKENDATEIEN geloescht=ja (Scratchpad p35/tok)
+VOLLTEST nc35 angehalten=meldung-pf-fehlt (Owner-Entscheid zur Meldung offen; offen danach: WERKZEUGE pf=ungueltig und alle=an, stdio Lauf A/B, 403 live, ABGLEICH, Task 4)
+SCAN gesamt treffer=0 (Protokoll und Freigaben gegen 10 Werte aus .env.nc35 voll und in den ersten 12 Zeichen, den HaRP-Schlüssel und den Namen des AppAPI-Autorisierungskopfs; Positivkontrolle mit gepflanzten 12 Zeichen des App-Passworts gab Treffer)

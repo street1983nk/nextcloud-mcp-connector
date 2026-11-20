@@ -8,3 +8,8 @@ ANTWORT wortlaut="Darf ich den Volltest auf NC34 starten?: Ok | Kontext: Release
 FREIGABE textfix-35-04 antwort="Ja, vor 0.9.0 (Empfohlen)" datum=2026-11-20
 FREIGABE volltest-nc35 antwort=option-a datum=2026-11-20
 ANTWORT wortlaut="Volltest NC35 (Plan 35-05) mit Docker starten? Seriell, nur eigene Container (nc35-*), danach wieder aus. Falls Profile Fields auf NC35 nicht stabil installierbar ist (Store hat dort nur Nightly), hält der Test an und fragt dich.: Ja, starten" datum=2026-11-20
+FREIGABE pf-nc35 antwort=luecke datum=2026-11-20
+ANTWORT wortlaut="Ich möchte 100% Zuverlässigkeit, wäre es nicht sinnvoll bis Profile files für n35 stabil im Store ist" | nach Erklärung (Warten bringt keine zusätzliche Messung): "Messen statt warten (Empfohlen)" datum=2026-11-20
+FREIGABE nc35-aufraeumen antwort=entfernen datum=2026-11-20
+ANTWORT wortlaut="Entfernen (Empfohlen)" (liegengebliebenes Archiv profile_fields 4.0.0 auf nc35 per occ app:remove) datum=2026-11-20
+ZUSATZ pf-nc35 auftrag="100% Zuverlässigkeit auf NC35, so weit messbar": Schalter an ohne App über Kette und stdio messen (28, je Ebene klare Meldung, andere Werkzeuge und Suche fehlerfrei), danach aus und 27; Nachprüfung, sobald Profile Fields für 35 stabil im Store ist datum=2026-11-20
