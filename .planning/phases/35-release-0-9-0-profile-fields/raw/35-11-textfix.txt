@@ -1,0 +1,48 @@
+35-11 Textkorrektur vor 0.9.0 (zwei Hinweise aus dem Volltest 35-04, Abschnitt HINWEIS Punkt 1 und 2)
+Freigabe: FREIGABE textfix-35-04 antwort="Ja, vor 0.9.0 (Empfohlen)" datum=2026-11-20 (in raw/35-freigaben.txt angehängt)
+Basis: HEAD vorher a91bf0db, Phasenbasis 9a2b0fac (docs(35): create phase plan), Positivkontrolle Hash-Format und Vorfahre ok
+
+TEXT files_download datei=src/mcp_connector/server/reg_files.py:128 (Docstring = Werkzeugbeschreibung)
+  alt="Download any-size file in chunks; repeat with next_offset while truncated is true."
+  neu="Download a file of any size in chunks; repeat with next_offset while truncated is true."
+  stil=#53 (keine Zusicherung, nur Artikel ergänzt; Aussage gleich)
+
+TEXT ocs-suffix datei=src/mcp_connector/nextcloud/clients/ocs.py:275 (_status_error, gilt für 400, 403, 404/998, 507, 5xx und unerwartete Status)
+  alt=f" Nextcloud says: {detail}"
+  neu=f' Nextcloud says: "{detail}".'
+  grund: der Nextcloud-Text endet meist ohne Punkt ("Logged in account must be an admin", "Message too long", "Value is not a valid number"), danach hängt errors.py " Hint: " an. Ein bloßer Schlusspunkt würde bei einem Nextcloud-Text mit eigenem Punkt ".." ergeben; in Anführungszeichen ist das Zitat abgegrenzt und der Satz endet in jedem Fall. Ohne Codeänderung (nur String-Literal) ist das die einzige Form, die immer stimmt.
+
+TEXT ocs-403-hint datei=src/mcp_connector/nextcloud/clients/ocs.py:292
+  alt="Ask the owner in Nextcloud for the missing permission."
+  neu="Ask the owner of the item or an administrator in Nextcloud for the missing permission."
+  pruefung_generisch=ja: _status_error ist der gemeinsame Fehlerweg von parse_ocs und parse_app_json (Aufrufer: clients/deck.py, mail.py, notes.py, systemtags.py, tables.py, talk.py, capabilities.py, tools/notes.py, tools/profile_fields.py). Bei geteilten Boards, Tabellen, Notizen oder Talk-Räumen ist der Eigentümer richtig, bei Admin-Routen (Profile Fields definitions/values/search, eingeschränkte Systemtags) der Administrator. Darum beide Adressaten statt eines Sonderhinweises nur für Admin-Routen (der bräuchte Code, nicht nur ein Literal).
+
+BEISPIEL 403 vorher: No permission for Profile Fields admin catalog. Nextcloud says: Logged in account must be an admin Hint: Ask the owner in Nextcloud for the missing permission.
+BEISPIEL 403 nachher: No permission for Profile Fields admin catalog. Nextcloud says: "Logged in account must be an admin". Hint: Ask the owner of the item or an administrator in Nextcloud for the missing permission.
+
+AST src/mcp_connector/nextcloud/clients/ocs.py nur_strings=ja (HEAD gegen Arbeitskopie, str-Konstanten geleert, f-Strings auf ihre Ausdrücke reduziert)
+AST src/mcp_connector/server/reg_files.py nur_strings=ja
+AST positivkontrolle reg_files ge=1->ge=2 ungleich=ja; ocs status==403->404 ungleich=ja; ocs {detail}->{what} im f-String ungleich=ja
+DIFFBEWEIS git diff --stat 9a2b0fac -- src/ ohne erlaubte Stellen (inkl. server/reg_*.py und nextcloud/clients/*.py) rest_zeilen=0; src-Dateien dieses Schritts: ocs.py, reg_files.py
+
+TESTAENDERUNG tests/contract/test_tool_surface.py:163 alt="assert \"any-size\" in description" neu="assert \"any size\" in description" grund="Artikel ergänzt; geprüft wird weiter, dass die Beschreibung beliebige Größen nennt"
+TESTAENDERUNG tests/unit/test_tables_tools.py:891 alt="\"Nextcloud says: Value is not a valid number\" in message" neu="'Nextcloud says: \"Value is not a valid number\".' in message" grund="neues Zitatformat des Suffix; geprüft wird weiter, dass der 400-Text der App durchgereicht wird"
+TESTAENDERUNG tests/unit/test_talk_tools.py:1306 alt="\"Nextcloud says: Message too long\" in message" neu="'Nextcloud says: \"Message too long\".' in message" grund="wie tables"
+TESTLAUF vor den Teständerungen: 2 failed (genau diese beiden tables/talk-Tests), 8336 passed, 35 skipped; test_tool_surface war schon mitgezogen. Kein integration-Test hält "Nextcloud says" oder den alten 403-Hinweis (grep tests/ ohne Treffer).
+
+BUDGET vorher standard=27 bytes_standard=18606 alle=32 bytes_alle=22933 files_download=612
+BUDGET nachher standard=27 bytes_standard=18611 alle=32 bytes_alle=22938 files_download=617 groesstes=files_upload:1377 grenze_gesamt=26000 grenze_werkzeug=1400
+  (files_download vorher gemessen mit kurz auf HEAD zurückgesetzter reg_files.py, danach Arbeitsstand wiederhergestellt, Diff 1/1 Zeile; Messkommentar in scripts/check_tool_budget.py ergänzt, BUDGET_BYTES und MAX_TOOL_BYTES unverändert)
+
+SPRACHE en positivkontrolle: alter 403-Text als fehlendes Satzende gemeldet=ja, "any-size file" gemeldet=ja
+SPRACHE en ocs-status 400,403,404,429,500,507,418 je mit Detail ohne Punkt, mit Punkt und leer: 21 Sätze, satzende_vor_hint=21/21, doppelpunkt=0
+SPRACHE en files_download telegrammstil=nein fehler=0
+SPRACHE #53 test_tool_text_assurances 26 passed (keine Zusicherung in den neuen Texten)
+DASH positivkontrolle exit=0; geänderte Dateien (ocs.py, reg_files.py, check_tool_budget.py, test_tool_surface.py, test_tables_tools.py, test_talk_tools.py, dieses Protokoll) treffer=0
+
+GATES unit+contract 8338 passed, 35 skipped; check_tool_budget exit 0; ruff check ok; ruff format 417 Dateien; pyright 0 errors; vulture exit 0
+RUNBOOK pytest -q -p no:xdist exit=0, Fortschrittsanzeige 0 F und 0 E (Zusammenfassungszeile fehlt durch das doppelte -q, wie in 35-04)
+
+CHANGELOG nein: reine Wortkorrektur zweier Texte; kein Werkzeug, Schema, Schalter, Status oder Ablauf ändert sich, der Fehlerfall bleibt derselbe Fehler mit derselben Ursache (reason unverändert). Nur der Wortlaut der Meldung wird lesbarer; ein Nutzer merkt keinen Unterschied im Verhalten.
+
+HINWEIS nicht geändert (außerhalb der Freigabe): in den OCS-Meldungen fehlt teils der Artikel vor dem Objektnamen, z. B. "No permission for Profile Fields admin catalog", weil der Aufrufer "what" ohne "the" übergibt. Betrifft viele Aufrufer, Owner-Entscheid nötig.

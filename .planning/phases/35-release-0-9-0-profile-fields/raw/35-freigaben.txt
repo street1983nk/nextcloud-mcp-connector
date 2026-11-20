@@ -5,3 +5,4 @@ FREIGABE store-text antwort=freigabe-mit-aenderung variante=kurz kein-ki=ja find
 ANTWORT wortlaut="Kurzer Store-Text freigeben?: Nein der Text zu Findling soll bleiben | Optionen: kein-ki-Tag, Findling-Hinweis | Gates: Beide bleiben (Empfohlen) | Doku-Link: README je Sprache (Empfohlen)" datum=2026-11-20
 FREIGABE volltest-nc34 antwort=option-a datum=2026-11-20
 ANTWORT wortlaut="Darf ich den Volltest auf NC34 starten?: Ok | Kontext: Release-Image bauen, ExApp neu registrieren, Werkzeugzahl, Schalter, Rechte, stdio und Sprachen DE/EN/FR prüfen, am Ende herunterfahren" datum=2026-11-20
+FREIGABE textfix-35-04 antwort="Ja, vor 0.9.0 (Empfohlen)" datum=2026-11-20
