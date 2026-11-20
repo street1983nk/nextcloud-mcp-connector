@@ -13,3 +13,4 @@ ANTWORT wortlaut="Ich möchte 100% Zuverlässigkeit, wäre es nicht sinnvoll bis
 FREIGABE nc35-aufraeumen antwort=entfernen datum=2026-11-20
 ANTWORT wortlaut="Entfernen (Empfohlen)" (liegengebliebenes Archiv profile_fields 4.0.0 auf nc35 per occ app:remove) datum=2026-11-20
 ZUSATZ pf-nc35 auftrag="100% Zuverlässigkeit auf NC35, so weit messbar": Schalter an ohne App über Kette und stdio messen (28, je Ebene klare Meldung, andere Werkzeuge und Suche fehlerfrei), danach aus und 27; Nachprüfung, sobald Profile Fields für 35 stabil im Store ist datum=2026-11-20
+FREIGABE pf-fehlt-meldung antwort="(a) Klare Meldung (Empfohlen)" datum=2026-11-20

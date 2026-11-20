@@ -1,0 +1,138 @@
+# 35-12 Klare Meldung bei fehlender oder deaktivierter App Profile Fields (Befund PF-FEHLT aus 35-05, 2026-11-20)
+FREIGABE pf-fehlt-meldung antwort="(a) Klare Meldung (Empfohlen)" datum=2026-11-20 (Wortlaut in raw/35-freigaben.txt angehängt)
+BASIS 9a2b0faceeea6d79c8e8dc3fda88b913183a076b (Hash-Format und Vorfahre geprüft)
+HEAD-VOR-LAUF aa995882 (Branch plan/release-090)
+
+== 1. Messung (vor jeder Codeänderung)
+DOCKER fremd=0 laufend=0 (vor dem ersten Start)
+RAM frei_kib=3784108 schwelle=4194304 ergebnis=rot -> drop_caches, nach 75 s frei_kib=4568368, vor dem Start frei_kib=4700772 ergebnis=ok
+docker start nc35-nc -> installed=true version=35.0.0 maintenance=false; docker start nc35-harp nc35-caddy nc35-greenmail (Registry nicht gestartet, nur Messung)
+PF nc35 app_list_profile_fields=0 (weder Enabled noch Disabled, Stand nach dem Aufräumen in 35-05)
+Werkzeug: curl mit OCS-APIRequest und Accept: application/json gegen NC_MCP_URL aus .env.nc35 (geladen, nicht gelesen); ausgegeben nur HTTP-Status, ocs.meta.status, ocs.meta.statuscode, Content-Type, Form von ocs.data und ocs.meta.message
+MESSUNG nc35 nutzer=alice pfad=/apps/profile_fields/api/v1/me/values http=404 ocs_statuscode=998 message="Invalid query, please check the syntax. API specifications are here: http://www.freedesktop.org/wiki/Specifications/open-collaboration-services.\n" data=[]
+MESSUNG nc35 nutzer=alice pfad=/apps/profile_fields/api/v1/definitions http=404 ocs_statuscode=998 message=gleich data=[]
+MESSUNG nc35 nutzer=alice pfad=/apps/profile_fields/api/v1/users/search?fieldKey=x&operator=eq&value=y&limit=25&offset=0 http=404 ocs_statuscode=998 message=gleich data=[]
+MESSUNG nc35 nutzer=alice pfad=/apps/profile_fields/api/v1/users/alice/values http=404 ocs_statuscode=998 message=gleich data=[]
+MESSUNG nc35 nutzer=admin dieselben vier Pfade: je http=404 ocs_statuscode=998 message=gleich data=[]
+MESSUNG nc35-kontrolle nutzer=alice pfad=/apps/notesXYZ/api/v1/x (Route, die keine App kennt) http=404 ocs_statuscode=998 message=gleich -> 998 ist die Kernantwort für eine unbekannte Route
+MESSUNG nc35-kontrolle nutzer=alice pfad=/cloud/user (Kernroute) http=200 ocs_statuscode=200 message="OK" -> Messweg liefert auch Erfolg (Positivkontrolle)
+DOCKER zwischen eigene=0 (nc35-caddy, nc35-harp, nc35-greenmail, nc35-nc per docker stop)
+
+RAM frei_kib=4075884 ergebnis=rot -> drop_caches, nach 75 s frei_kib=4155572 (Hintergrundmessung), unmittelbar vor dem Start frei_kib=4619780 ergebnis=ok
+NC_EXAPP_NEXTCLOUD_IMAGE=nextcloud:34.0.3-apache docker compose -f compose.exapp.yml up -d --wait (HP_SHARED_KEY aus dem gestoppten nc-mcp-exapp-harp exportiert, Länge 64, nicht ausgegeben) -> 5 Container healthy
+PF nc34 version=4.0.0 aktiv=ja (custom_apps/profile_fields, appinfo <version>4.0.0</version>)
+QUELLE profile_fields 4.0.0 (docker exec nc-mcp-exapp-nc, nur lesend, grep in lib/Controller): Fehlerantworten nur als DataResponse mit 400, 401, 403, 404, 409; kein 998, kein RESPOND_NOT_FOUND, keine OCS*Exception im ganzen lib/
+QUELLE FieldValueAdminApiController::index (GET /api/v1/users/{userUid}/values) liefert findByUserUid als Liste, ohne 404-Zweig
+QUELLE FieldValueAdminApiController search: unbekannter fieldKey -> DataResponse(['message' => 'Search field definition not found'], 404)
+MESSUNG nc34-pf400 nutzer=admin pfad=/apps/profile_fields/api/v1/definitions http=200 ocs_statuscode=200 data=Liste(2)
+MESSUNG nc34-pf400 nutzer=admin pfad=/apps/profile_fields/api/v1/users/unbekannt-zz9/values (unbekannte uid) http=200 ocs_statuscode=200 data=Liste(0)
+MESSUNG nc34-pf400 nutzer=admin pfad=/apps/profile_fields/api/v1/users/search?fieldKey=unbekannter_key_zz9&operator=eq&value=y&limit=25&offset=0 (unbekannter Key) http=404 ocs_statuscode=404 ocs.meta.message="" data={message} (Text laut Quelle "Search field definition not found")
+MESSUNG nc34-pf400 nutzer=admin pfad=/apps/profile_fields/api/v1/me/values http=200 ocs_statuscode=200 data=Liste(2)
+MESSUNG nc34-pf400 nutzer=alice pfad=/apps/profile_fields/api/v1/me/values http=200 ocs_statuscode=200 data=Liste(2)
+MESSUNG nc34-pf400 nutzer=alice pfade=definitions, users/search, users/unbekannt-zz9/values je http=403 ocs_statuscode=403 message="Logged in account must be an admin"
+$ occ app:disable profile_fields -> "profile_fields 4.0.0 disabled"
+MESSUNG nc34-pf-aus nutzer=admin alle vier Pfade je http=404 ocs_statuscode=998 message="Invalid query, ..." (gleicher Text wie nc35)
+MESSUNG nc34-pf-aus nutzer=alice pfad=/apps/profile_fields/api/v1/me/values http=404 ocs_statuscode=998 message=gleich
+$ occ app:enable profile_fields --groups admin -> "enabled for groups: admin"
+MESSUNG nc34-pf-gruppe-admin nutzer=alice (nicht in der Gruppe) pfad=/apps/profile_fields/api/v1/me/values http=412 kein OCS-Umschlag, Körper {"message":"App is not enabled"}
+MESSUNG nc34-pf-gruppe-admin nutzer=alice pfad=/apps/profile_fields/api/v1/definitions http=403 ocs_statuscode=403 (Admin-Prüfung des Kerns greift vor der App-Prüfung)
+MESSUNG nc34-pf-gruppe-admin nutzer=admin pfad=/apps/profile_fields/api/v1/me/values http=200 ocs_statuscode=200
+$ occ app:enable profile_fields -> "profile_fields 4.0.0 enabled"; occ config:app:get profile_fields enabled -> yes
+MESSUNG nc34-pf-wieder-an nutzer=alice pfad=/apps/profile_fields/api/v1/me/values http=200 ocs_statuscode=200 data=Liste(2) (Ausgangszustand wieder hergestellt)
+DOCKER zwischen eigene=0 (docker compose -f compose.exapp.yml stop)
+
+== 2. Kriterium
+KRITERIUM app_fehlt = HTTP 404 UND ocs.meta.statuscode == 998 (beide Hälften nötig)
+BEGRUENDUNG
+  - App fehlt (nc35) und App deaktiviert (nc34): alle vier Routen, beide Konten, je 404/998 mit dem Kerntext.
+  - Fachliche Antworten der App (nc34, Quelle und Messung): 404 nur mit ocs_statuscode 404 (unbekannter Suchschlüssel), unbekannte uid ist 200 mit leerer Liste, Admin-Sperre ist 403/403. Profile Fields 4.0.0 erzeugt nirgends 998.
+  - 998 ist die Kernantwort für eine Route, die keine aktivierte App registriert hat (Kontrolle /apps/notesXYZ).
+  - Kein zusätzlicher Netzaufruf nötig: die Unterscheidung steckt eindeutig in der Antwort selbst. Kein Textvergleich mit dem Kerntext.
+GRENZE nicht abgedeckt (außerhalb der Freigabe, nicht geändert): App nur für Gruppen aktiviert, Konto nicht in der Gruppe -> 412 ohne OCS-Umschlag; der Connector meldet dort weiter "answered ... without an OCS envelope". Owner-Entscheid nötig, falls gewünscht.
+
+== 3. Umsetzung
+TDD RED 79cefab1 test(35-12): failing tests for a missing or disabled Profile Fields app -> 11 failed, 9 passed (die 9 grünen sind Gegenkontrollen und Positivkontrollen, die schon vorher gelten)
+TDD GREEN b78df97b fix(35-12): name a missing or disabled Profile Fields app instead of the core 998 text -> tests/unit/test_profile_fields_app_missing.py 20 passed
+  zusätzlich im GREEN-Commit: Typangabe kwargs dict[str, str] -> dict[str, Any] in der neuen Testdatei (pyright meldete 6 Fehler im RED-Stand; reine Annotation, kein Assert geändert)
+CODE src/mcp_connector/tools/profile_fields.py: Hilfsfunktion _parse vor ocs.parse_ocs für alle vier Antworten; bei 404 und ocs.meta.statuscode 998 -> AppMissingError (bestehende Klasse aus errors.py, wie capabilities.app_missing)
+REASON unspecified (Standard von ToolError, wie bei allen anderen fehlenden Apps über capabilities.app_missing); kein neuer Grund, REASONS (12, eingefroren) unverändert; unknown_id passt nicht, weil nichts über eine id gesucht wurde
+MELDUNG wortlaut="Profile Fields is not installed or not enabled on this Nextcloud." hint="Ask an administrator to install the app Profile Fields or to switch off profile_fields_read." (unverändert wie freigegeben; keine Sprachanpassung nötig)
+ARTIKEL what (profile_fields.py):
+  "Profile Fields exact search" -> "the Profile Fields exact search"
+  "current user Profile Fields values" -> "the current user's Profile Fields values"
+  "Profile Fields admin catalog" -> "the Profile Fields admin catalog"
+  "Profile Fields selected user values" -> "the selected user's Profile Fields values" (vierte Stelle, im Auftrag nicht genannt, gleiche Art; ohne sie läse ein 5xx auf users/{uid}/values weiter ohne Artikel)
+UNVERAENDERT ocs.py (_status_error, _check_transport) und alle anderen Aufrufer; Test test_other_apps_keep_the_shared_404_and_998_wording hält das
+DIFFBEWEIS git diff --stat aa995882 -- src/ -> nur src/mcp_connector/tools/profile_fields.py (39 Zeilen hinzu, 5 entfernt); gegen Basis 9a2b0fac zusätzlich nur die schon begründeten Stellen aus 35-01, 35-03, 35-10, 35-11
+
+== 4. Gates (Stand vor dem fix- und dem docs-Commit, mit allen Änderungen im Arbeitsbaum)
+GATES unit+contract 8358 passed, 35 skipped (vorher 8338 + 20 neue); check_tool_budget exit 0; ruff check ok; ruff format 418 Dateien; pyright 0 errors; vulture exit 0
+GATE #53 tests/contract/test_tool_text_assurances.py 26 passed
+RUNBOOK pytest -q -p no:xdist exit=0, Fortschrittsanzeige 0 F und 0 E
+BUDGET standard=27 bytes_standard=18611 alle=32 bytes_alle=22938 groesstes=files_upload:1377 grenze_gesamt=26000 grenze_werkzeug=1400 (gleich BUDGET nachher aus 35-11; Werkzeugtexte unverändert)
+
+== 5. CHANGELOG und Entwürfe (docs-Commit f4c63ef3)
+CHANGELOG [0.9.0] Added je Sprache 6 -> 7 Punkte (ein neuer Punkt, der NC35-Punkt präzisiert); EN/DE/FR gleiche Punktzahl
+DASH positivkontrolle exit=0; CHANGELOG*.md, profile_fields.py, neue Testdatei, 35-03-release-notes.md, 35-03-pr-text.md treffer=0
+UMLAUT CHANGELOG.de.md geprueft=4 fehler=0 (dass, lässt, Gemessen, dass)
+FRANZ CHANGELOG.fr.md geprueft=2 fehler=0 (Akzente désactivée, remédier, Mesuré; Leerzeichen vor ";"; gerade Apostrophe wie im Rest der Datei)
+ENTWURF raw/35-03-release-notes.md: ein Punkt unter New, Tested-Satz zu Nextcloud 35 präzisiert
+ENTWURF raw/35-03-pr-text.md: ein Punkt zur neuen Meldung
+
+== 6. Livebeweis nc35 (Profile Fields fehlt)
+DOCKER fremd=0 laufend=0; RAM frei_kib=5340488 schwelle=4194304 ergebnis=ok
+docker start nc-mcp-exapp-registry nc35-nc -> installed=true version=35.0.0; docker start nc35-harp nc35-caddy nc35-greenmail
+EXAPP-CONTAINER netz=nc-mcp-nc35-net image=127.0.0.1:5000/mcp_connector:0.9.0 image_id=sha256:8c1d8abcf302573c694619a38d813f3b10d070f023ded6004a82a385d83375e6 status=exited
+RUECKWEG image=127.0.0.1:5000/mcp_connector:8c1d8abc-vor35
+$ occ app_api:app:unregister mcp_connector (ohne --rm-data) exit=0 | disabled, removed, unregistered
+$ HP_SHARED_KEY aus nc35-harp exportiert (Länge 64, nicht ausgegeben); bash scripts/bootstrap_exapp.sh --nc35 exit=0
+  image 127.0.0.1:5000/mcp_connector:0.9.0: built and pushed (sha256:4bb8a0325b6003fab9cc8fcbbd5048cd5a7d42a32694fad8b735e2b1505f1564); exapp registered, deployed, enabled; wrote .env.nc35
+EXAPP nachher image_id=sha256:4bb8a0325b6003fab9cc8fcbbd5048cd5a7d42a32694fad8b735e2b1505f1564 status=running; FIX im Image geprüft (profile_fields.py: _ROUTE_UNKNOWN = 998, neue Meldung, what mit Artikel)
+SCHALTER profile_fields_read=on (--update-only, Schlüssel war vorhanden; config:get=on) app_neu_gestartet=ja
+WERKZEUGE kette pf=an anzahl=28 profile_fields_browse=ja
+LIVE nc35 kette nutzer=alice level=me fehler=ja dauer_ms=2448 (inkl. uv-Start) | Profile Fields is not installed or not enabled on this Nextcloud. Hint: Ask an administrator to install the app Profile Fields or to switch off profile_fields_read.
+LIVE nc35 kette nutzer=alice level=definitions fehler=ja dauer_ms=1387 | gleicher Wortlaut
+LIVE nc35 kette nutzer=alice level=values user_uid=alice field_keys=employee_id fehler=ja dauer_ms=1301 | gleicher Wortlaut
+LIVE nc35 kette nutzer=alice level=search field_key=employee_id fehler=ja dauer_ms=1258 | gleicher Wortlaut
+LIVE nc35 kette gegenprobe files_list fehler=nein; unified_search fehler=nein; prepare_context fehler=nein (degraded nur Kappungen file/note/card, kein Profile-Fields-Fehler in den Antworten)
+LIVE nc35 stdio NC_MCP_PROFILE_FIELDS_READ=on tools=28 profile_fields_browse=ja (nc-mcp.exe aus dem Worktree, Konto alice)
+LIVE nc35 stdio level=me is_error=ja ms=111 | Error executing tool profile_fields_browse: Profile Fields is not installed or not enabled on this Nextcloud. Hint: Ask an administrator to install the app Profile Fields or to switch off profile_fields_read.
+LIVE nc35 stdio level=definitions is_error=ja ms=40 | gleicher Wortlaut
+LIVE nc35 stdio level=values is_error=ja ms=39 | gleicher Wortlaut
+LIVE nc35 stdio level=search is_error=ja ms=35 | gleicher Wortlaut
+LIVE nc35 stdio gegenprobe files_list is_error=nein ms=59 count=100; unified_search is_error=nein ms=702 count=48; prepare_context is_error=nein ms=2772
+LIVE nc35 log nc_app_mcp_connector traceback=0, kein 500
+LIVE nc35 meldung: keine URL, kein "\n", kein Kerntext, Ursache und Abhilfe genannt
+SCHALTER profile_fields_read=off (--update-only, config:get=off), files_update=off, tasks_update=off app_neu_gestartet=ja
+WERKZEUGE kette nach_aus anzahl=27 profile_fields_browse=nein
+DOCKER zwischen eigene=0 (nc_app_mcp_connector, nc35-caddy, nc35-harp, nc35-greenmail, nc35-nc, nc-mcp-exapp-registry per docker stop)
+
+== 7. Livebeweis NC34 (Profile Fields 4.0.0 installiert)
+DOCKER fremd=0 laufend=0; RAM frei_kib=3737052 ergebnis=rot -> drop_caches, nach 75 s frei_kib=5458704 ergebnis=ok
+NC_EXAPP_NEXTCLOUD_IMAGE=nextcloud:34.0.3-apache docker compose -f compose.exapp.yml up -d --wait -> healthy
+EXAPP-CONTAINER netz=nc-mcp-nc35-net (Container gehörte nach dem nc35-Bootstrap dem nc35-Stapel) image_id=sha256:4bb8a032... status=exited; RUECKWEG für NC34 bleibt 127.0.0.1:5000/mcp_connector:03c3fe04-vor35 (vorhanden, image_id sha256:03c3fe04...)
+$ occ app_api:app:unregister mcp_connector (ohne --rm-data, auf NC34) exit=0 | disabled, removed, unregistered (löst den Container von nc35 ab, vom Auftrag so vorgesehen)
+$ bash scripts/bootstrap_exapp.sh (ohne Flag, HP_SHARED_KEY aus nc-mcp-exapp-harp, nicht ausgegeben) exit=0
+  image 127.0.0.1:5000/mcp_connector:0.9.0: built and pushed (sha256:f23eeeaa9494261455015d339646ccfbe66892db2c0cba4ada27099f3e577530); exapp registered, deployed, enabled; wrote .env.exapp
+EXAPP nachher netz=nc-mcp-exapp-net image_id=sha256:f23eeeaa9494261455015d339646ccfbe66892db2c0cba4ada27099f3e577530 status=running; FIX im Image geprüft (neue Meldung 1x, vier what mit Artikel)
+PF nc34 version=4.0.0 aktiv=ja
+SCHALTER profile_fields_read=on (--update-only), files_update=off, tasks_update=off app_neu_gestartet=ja
+WERKZEUGE kette nutzer=alice pf=an anzahl=28
+LIVE nc34 kette nutzer=alice level=me fehler=nein count=2 (Werte nicht protokolliert)
+LIVE nc34 kette nutzer=alice level=definitions fehler=ja | No permission for the Profile Fields admin catalog. Nextcloud says: "Logged in account must be an admin". Hint: Ask the owner of the item or an administrator in Nextcloud for the missing permission.
+LIVE nc34 kette nutzer=admin level=definitions fehler=nein count=2
+LIVE nc34 kette nutzer=admin level=values user_uid=unbekannt-zz9 field_keys=<key1> fehler=nein fields=0 (unbekannte uid: leere Antwort, wie gemessen, keine Fehlermeldung)
+LIVE nc34 kette nutzer=admin level=values user_uid=alice field_keys=unbekannter_key_zz9 fehler=ja | Unknown field key. Hint: List definitions first.
+LIVE nc34 kette nutzer=admin level=search field_key=unbekannter_key_zz9 fehler=ja dauer_ms=3370 (inkl. uv-Start) | Nextcloud did not find the Profile Fields exact search. Hint: Search for it first; the id or the name is unknown to this instance.
+LIVE nc34 kette nutzer=admin level=values user_uid=alice field_keys=<key1> fehler=nein fields=1 (Positivkontrolle des Weges, Wert nicht protokolliert)
+LIVE nc34 not_installed_meldungen=0 (keine der Antworten nennt die App fehlend)
+LIVE nc34 log nc_app_mcp_connector traceback=0
+SCHALTER profile_fields_read=off (--update-only, config:get=off), files_update=off, tasks_update=off app_neu_gestartet=ja
+WERKZEUGE kette nach_aus anzahl=27
+ADMIN-SPRACHE ende=en (nicht verändert); firstrunwizard Disabled
+DOCKER ende eigene=0 (nc_app_mcp_connector per docker stop, Stapel per docker compose -f compose.exapp.yml stop; kein down, keine Volumes gelöscht; fremde Container: keine)
+
+== 8. Abschluss
+TOKENDATEIEN geloescht=ja (Scratchpad p35/tok)
+SCAN siehe letzte Zeile
+SCAN gesamt treffer=0 (35-12-pf-fehlt.txt, 35-freigaben.txt, 35-03-release-notes.md, 35-03-pr-text.md, CHANGELOG*.md, neue Testdatei, profile_fields.py gegen 21 nicht leere Werte aus .env.nc35 und .env.exapp, beide HaRP-Schlüssel, die Testpasswörter aus compose und bootstrap und den Namen des AppAPI-Autorisierungskopfs, voll und in den ersten 12 Zeichen; einzige Fundstellen waren APP_ID = öffentliche App-ID mcp_connector, kein Geheimnis; Positivkontrolle mit gepflanzten 12 Zeichen des App-Passworts gab Treffer)
