@@ -1,0 +1,5 @@
+# 35-06 Push-Protokoll (Branch plan/release-090 -> origin, PR als Draft)
+FETCH origin/main=66ffa30d (git fetch origin main, 2026-11-20); merge-base --is-ancestor origin/main HEAD ja; Branch auf origin nicht vorhanden (ls-remote leer)
+PRUEFUNG vor=push-branch-vorschau bereich=origin/main..HEAD commits=44 autor_committer_fremd=0 trailer=0 closes_woerter=0
+PRUEFUNG zusatz claude_ai_code=0; 66ffa30d_im_bereich=0; positivkontrolle "Fixes #12"/"Claude-Session" gemeldet=ja
+PUSH gesperrt grund=35-SECURITY.md threats_open=1 (T-35-PF-02), Owner-Entscheid ausstehend
