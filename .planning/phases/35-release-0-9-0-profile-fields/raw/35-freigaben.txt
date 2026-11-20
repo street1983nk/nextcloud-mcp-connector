@@ -6,3 +6,5 @@ ANTWORT wortlaut="Kurzer Store-Text freigeben?: Nein der Text zu Findling soll b
 FREIGABE volltest-nc34 antwort=option-a datum=2026-11-20
 ANTWORT wortlaut="Darf ich den Volltest auf NC34 starten?: Ok | Kontext: Release-Image bauen, ExApp neu registrieren, Werkzeugzahl, Schalter, Rechte, stdio und Sprachen DE/EN/FR prüfen, am Ende herunterfahren" datum=2026-11-20
 FREIGABE textfix-35-04 antwort="Ja, vor 0.9.0 (Empfohlen)" datum=2026-11-20
+FREIGABE volltest-nc35 antwort=option-a datum=2026-11-20
+ANTWORT wortlaut="Volltest NC35 (Plan 35-05) mit Docker starten? Seriell, nur eigene Container (nc35-*), danach wieder aus. Falls Profile Fields auf NC35 nicht stabil installierbar ist (Store hat dort nur Nightly), hält der Test an und fragt dich.: Ja, starten" datum=2026-11-20
