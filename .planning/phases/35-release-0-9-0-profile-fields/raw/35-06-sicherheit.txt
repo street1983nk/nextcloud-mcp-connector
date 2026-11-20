@@ -73,3 +73,17 @@ THREAT T-35-PF-07 status=CLOSED beleg=transfer; docs/hardening.md:138-146; docs/
 THREAT T-35-PF-08 status=CLOSED beleg=server/__init__.py:281-282; config.py:767-776; READ_ONLY opt_profile_fields.py:13
 THREAT T-35-PF-09 status=CLOSED beleg=profile_fields.py:167-178,188-205; Tests Filter
 SICHERHEIT threats=46 closed=45 open=1
+# Nachtrag nach Owner-Entscheid (2026-11-20)
+FREIGABE fix-T-35-PF-02 antwort="(a) Vor 0.9.0 schließen (Empfohlen)" (raw/35-freigaben.txt)
+NEXTCLOUD uid-regel stable34 lib/private/User/Manager.php:757 erlaubt a-z A-Z 0-9 Leerzeichen _ . @ - '; :773 verbietet genau '.' und '..' ("Login must not consist of dots only")
+TDD RED 43454f05 test(35-06) tests/unit/test_profile_fields_uid_dot_segments.py -> 12 failed, 8 passed (die 8 grünen sind Positivkontrollen und Gegenkontrollen)
+TDD GREEN bda22ac2 fix(35-06) nur src/mcp_connector/tools/profile_fields.py (+8/-1): uid in (".", "..") in der bestehenden Ablehnung, gleiche Meldung, gleicher Hinweis, gleicher reason -> 20 passed
+UIDPUNKT nachher '.', '..', ' .. ', Tab-'.' abgelehnt, anfragen=0; jane.doe, a..b, ..., .x, x. gelesen über users/<uid>/values; me/definitions setzen user_uid in keinen Pfad; search value '..' bleibt Query
+GATES unit+contract 8394 passed, 35 skipped; check_tool_budget exit 0 (32/22938, 27/18611, groesstes files_upload 1377); ruff ok; ruff format 419 Dateien; pyright 0 errors; vulture 0; RUNBOOK pytest -q -p no:xdist exit 0, 0 F und 0 E
+DIFFBEWEIS 11ac2f80..bda22ac2 src/ nur tools/profile_fields.py; gegen 9a2b0fac rest=leer; PITFALL1 treffer=0
+CHANGELOG 3bee05c1 je ein Satz im Levels-Punkt EN/DE/FR, PUNKTE 0.9.0 en=9 de=9 fr=9 gleich=ja; UMLAUT CHANGELOG.de.md geprueft=0 fehler=0 (neue Zeile ohne ae/oe/ue/ss); FRANZ CHANGELOG.fr.md geprueft=1 fehler=0 (refusé, requête, gerade Apostrophe wie in der Datei); DASH positivkontrolle exit=0 treffer=0; SCHLIESSWORT 0
+ENTWURF raw/35-03-pr-text.md und raw/35-03-release-notes.md: "(@vitormattos)" -> "(vitormattos)" (FREIGABE pr-text-mention), je ein Punkt zur UID-Prüfung
+UMFELD Punktsegmente nach quote in anderen Pfaden: caldav.safe_segment (caldav.py:115) und carddav.safe_segment (carddav.py:103) lehnen '.' '..' ab; dav.safe_path (dav.py:173-179) überspringt '.', lehnt '..' ab; Upload-Ordner SHA-256, Chunk {chunk_index:05d}; deck/tables/notes/mail _path_id nur Ziffern; talk Token [a-z0-9]{4,30} und Nachrichten-Id per Regex; provider_id nur aus installierten Anbietern (search.py:261); fileid aus Serverantwort; chatgpt.py:578 nur Anzeige-Link; creds.user keine Werkzeugeingabe -> befund=0
+THREAT T-35-PF-02 status=CLOSED beleg=43454f05 RED, bda22ac2 GREEN, 20 Tests, 3bee05c1 Changelog
+THREAT T-35-PF-10 status=CLOSED beleg=UMFELD befund=0
+SICHERHEIT threats=47 closed=47 open=0

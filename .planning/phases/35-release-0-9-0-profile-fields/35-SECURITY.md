@@ -1,21 +1,21 @@
 ---
 phase: 35
 slug: release-0-9-0-profile-fields
-status: open
-threats_open: 1
+status: verified
+threats_open: 0
 asvs_level: 1
 block_on: high
 register_authored_at_plan_time: true
 created: 2026-11-20
-audited_head: 11ac2f80
+audited_head: 3bee05c1
 ---
 
 # Phase 35: Security
 
 > Sicherheitsvertrag je Phase: Bedrohungsregister, akzeptierte Risiken, Prüfspur.
 > Register aus den `<threat_model>`-Blöcken von 35-01 bis 35-06 und 35-10 (31 Einträge, zur Planzeit verfasst), dazu eigene Einträge für die Zusatzschritte 35-11 und 35-12 (ohne PLAN-Datei, Owner-Freigaben in raw/35-freigaben.txt) und für den mit 0.9.0 ausgelieferten Code aus PR #49 (T-35-PF-01 ff.).
-> Geprüft gegen HEAD 11ac2f80 (Branch plan/release-090, 44 Commits über origin/main 66ffa30d). Der Code aus PR #49 liegt seit dem Squash-Commit 66ffa30d auf origin/main; in Phase 35 geändert sind davon nur `tools/profile_fields.py` (35-12) und der gemeinsame Fehlertext in `nextcloud/clients/ocs.py` (35-11).
-> **Ergebnis: 46 Einträge, 45 CLOSED, 1 OPEN (T-35-PF-02, niedrig). Nach 35-RULES Abschnitt 12 kein Push, bis der Owner entscheidet.**
+> Erstes Audit gegen HEAD 11ac2f80 (44 Commits über origin/main 66ffa30d), Nachprüfung nach der Korrektur von T-35-PF-02 gegen HEAD 3bee05c1 (48 Commits über origin/main). Der Code aus PR #49 liegt seit dem Squash-Commit 66ffa30d auf origin/main; in Phase 35 geändert sind davon nur `tools/profile_fields.py` (35-12 und 35-06) und der gemeinsame Fehlertext in `nextcloud/clients/ocs.py` (35-11).
+> **Ergebnis: 47 Einträge, 47 CLOSED, 0 OPEN. T-35-PF-02 (niedrig) war im ersten Audit offen und ist nach Owner-Entscheid vor 0.9.0 per Codekorrektur geschlossen; T-35-PF-10 (Umfeldprüfung) ohne Befund.**
 
 ---
 
@@ -69,7 +69,7 @@ audited_head: 11ac2f80
 | T-35-05-05 | Repudiation | CHANGELOG*, Release-Notiz, PR-Text | mitigate | ABGLEICH-Zeile | CLOSED | raw/35-05-volltest-nc35.txt:231 `ABGLEICH nc35-aussage changelog=stimmt notiz=stimmt` |
 | T-35-06-01 | Spoofing | Commits, PR-Text | mitigate | PRUEFUNG vor dem Push, PR-Body per grep | CLOSED | Vorschau-PRUEFUNG `autor_committer_fremd=0 trailer=0`, `claude.ai/code` 0 (raw/35-06-push.txt); raw/35-03-pr-text.md ohne Session-Zeile; die PRUEFUNG unmittelbar vor dem Push wird in Task 3 wiederholt |
 | T-35-06-02 | Tampering | Commit-Texte, PR-Text | mitigate | Schließwort-Prüfung | CLOSED | Vorschau-PRUEFUNG `closes_woerter=0`, Positivkontrolle mit gepflanztem "Fixes #12" gemeldet |
-| T-35-06-03 | Elevation of Privilege | profile_fields_browse (Fremdcode) | mitigate | dieses Dokument, threats_open 0 als Push-Voraussetzung | CLOSED | Code-Prüfung unten (T-35-PF-01 ff.) liegt vor; das Gate greift: wegen T-35-PF-02 ist der Push gesperrt |
+| T-35-06-03 | Elevation of Privilege | profile_fields_browse (Fremdcode) | mitigate | dieses Dokument, threats_open 0 als Push-Voraussetzung | CLOSED | Code-Prüfung unten (T-35-PF-01 ff.) liegt vor; das Gate hat gegriffen: der Push war wegen T-35-PF-02 gesperrt, bis die Korrektur bda22ac2 lag |
 | T-35-06-04 | Information Disclosure | CI-Logs im Protokoll | mitigate | nur Job, Ergebnis, Run-Id, zwei PROFILE-FIELDS-Zeilen | CLOSED | Regel im Plan Task 3; bis jetzt keine CI-Ausgabe im Protokoll; Durchführung wird in raw/35-06-push.txt sichtbar und in 35-09 nachgeprüft |
 
 ### Zusatzschritt 35-11 (Wortlaut files_download und gemeinsamer OCS-Fehlertext)
@@ -92,15 +92,16 @@ audited_head: 11ac2f80
 
 | Threat ID | Category | Component | Disposition | Mitigation | Status | Beleg |
 |-----------|----------|-----------|-------------|------------|--------|-------|
-| T-35-PF-01 | Spoofing / Elevation (fremde oder erhöhte Rechte) | tools/profile_fields.py, server/opt_profile_fields.py | mitigate | Jeder Aufruf ist `ocs.ocs_get(clients.client, clients.creds, ...)` mit den Zugangsdaten dieses Aufrufs; kein Admin-Fallback, keine zweite Identität, nur GET | CLOSED | profile_fields.py:95-98, :138, :158, :191-193; opt_profile_fields.py:31 `deps.resolve_clients(ctx)`; deps.py:276-285 (ExApp: Impersonation genau des signierten Kontos, nie leeres Konto mit APP_SECRET); ocs.py:72-91 (nur `client.get`); live raw/35-04-volltest-nc34.txt:45, :133 und Nachmessung raw/35-05-volltest-nc35.txt:254-256 |
-| T-35-PF-02 | Tampering (Pfad-Injektion über `user_uid`) | tools/profile_fields.py:151, :192 | mitigate | `quote(uid, safe='')` plus Ablehnung von `/`, `\`, NUL und Länge > 256 | **OPEN** | Befund 2026-11-20: die Punktsegmente `.` und `..` werden nicht abgelehnt, `quote` lässt sie stehen, httpx normalisiert sie. Gemessen (raw/35-06-sicherheit.txt `UIDPUNKT`): `user_uid=".."` schickt `GET .../apps/profile_fields/api/v1/values`, `user_uid="."` schickt `GET .../api/v1/users/values`. Der vorhandene Test prüft nur `"../admin"` (abgelehnt wegen `/`). Wirkung begrenzt: weiter nur GET, nur mit den Rechten des verbundenen Kontos, nur innerhalb `/apps/profile_fields/api/v1/`, nur nachdem der Admin-Katalog gelesen werden durfte (also nur für Administratorkonten), und die Antwort wird nur verwertet, wenn sie eine Liste mit Einträgen zu den gewählten Definitionen ist. Kein Leck über fremde Rechte gefunden; Schwere niedrig. Trotzdem ist die Mitigation unvollständig, deshalb OPEN bis Owner-Entscheid |
-| T-35-PF-03 | Tampering (Eingaben Feldschlüssel und Suche) | tools/profile_fields.py:14, :87-94, :150-156 | mitigate | Schlüssel per `^[a-z0-9_]{1,100}$`, höchstens 12, keine Doppelten; Suchwert nicht leer und höchstens 256 Zeichen; Suche geht als Query-Parameter (httpx kodiert), nicht im Pfad | CLOSED | profile_fields.py:14, :89, :99-105, :153, :155; test_invalid_inputs_cause_no_network_request; Messung `x?y#z` -> `%3Fy%23z` (raw/35-06-sicherheit.txt `UIDPUNKT`) |
+| T-35-PF-01 | Spoofing / Elevation (fremde oder erhöhte Rechte) | tools/profile_fields.py, server/opt_profile_fields.py | mitigate | Jeder Aufruf ist `ocs.ocs_get(clients.client, clients.creds, ...)` mit den Zugangsdaten dieses Aufrufs; kein Admin-Fallback, keine zweite Identität, nur GET | CLOSED | profile_fields.py:95-98, :138, :165, :198-200; opt_profile_fields.py:31 `deps.resolve_clients(ctx)`; deps.py:276-285 (ExApp: Impersonation genau des signierten Kontos, nie leeres Konto mit APP_SECRET); ocs.py:72-91 (nur `client.get`); live raw/35-04-volltest-nc34.txt:45, :133 und Nachmessung raw/35-05-volltest-nc35.txt:254-256 |
+| T-35-PF-02 | Tampering (Pfad-Injektion über `user_uid`) | tools/profile_fields.py:149-159, :199 | mitigate | `quote(uid, safe='')` plus Ablehnung von leer, `.`, `..`, `/`, `\`, NUL und Länge > 256, alles vor der ersten Anfrage | CLOSED | Befund 2026-11-20 (Audit an 11ac2f80, Schwere niedrig): `.` und `..` passierten die Prüfung, httpx löste sie auf (`user_uid=".."` -> `GET .../api/v1/values`, `"."` -> `.../api/v1/users/values`, raw/35-06-sicherheit.txt `UIDPUNKT`). Owner-Entscheid `FREIGABE fix-T-35-PF-02 antwort="(a) Vor 0.9.0 schließen (Empfohlen)"`. Geschlossen per TDD: RED 43454f05 (12 failed, 8 passed), GREEN bda22ac2 (nur profile_fields.py, +8/-1; gleiche Meldung "Invalid user UID.", gleicher Hinweis, gleicher reason). Tests tests/unit/test_profile_fields_uid_dot_segments.py 20 passed: `.`, `..`, ` .. `, Tab-`.` abgelehnt ohne jede Anfrage (MockTransport), keine Anfrage an `/api/v1/values` oder `/api/v1/users/values`; Positivkontrolle `jane.doe`, `a..b`, `...`, `.x`, `x.` werden weiter gelesen (Pfad `users/<uid>/values`); andere Ebenen setzen die UID in keinen Pfad, ein Suchwert `..` bleibt Query-Parameter. Deckungsgleich mit Nextcloud (stable34 `lib/private/User/Manager.php:773`: genau `.` und `..` sind als Login verboten). Changelog 3bee05c1 |
+| T-35-PF-03 | Tampering (Eingaben Feldschlüssel und Suche) | tools/profile_fields.py:14, :87-94, :150-163 | mitigate | Schlüssel per `^[a-z0-9_]{1,100}$`, höchstens 12, keine Doppelten; Suchwert nicht leer und höchstens 256 Zeichen; Suche geht als Query-Parameter (httpx kodiert), nicht im Pfad | CLOSED | profile_fields.py:14, :89, :99-105, :160, :162; test_invalid_inputs_cause_no_network_request; Messung `x?y#z` -> `%3Fy%23z` (raw/35-06-sicherheit.txt `UIDPUNKT`) |
 | T-35-PF-04 | Information Disclosure (Audit-Log) | audit/allowlist.py | mitigate | Allowlist nur `level`, `limit`, `offset`; nie UID, Schlüssel, Wert | CLOSED | audit/allowlist.py:41-44, :71; tests/contract/test_audit_surface.py heute grün |
 | T-35-PF-05 | Information Disclosure (Fehlermeldungen) | profile_fields.py, ocs.py `_status_error`, server `graceful` | mitigate | Meldungen aus festen Sätzen, `what` und dem Nextcloud-Text; kein Host, keine URL, kein Token; `from None` gegen Tracebacks mit URL | CLOSED | ocs.py:266-296; server/__init__.py:167-172; profile_fields.py feste Literale; live MELDUNG-Zeilen raw/35-04-volltest-nc34.txt:121, raw/35-05-volltest-nc35.txt:197, raw/35-12-pf-fehlt.txt:105; SCAN treffer=0 |
-| T-35-PF-06 | Denial of Service (große Seiten) | profile_fields.py, opt_profile_fields.py | mitigate | Suche limit 1 bis 100, offset ab 0 (Schema und Code); höchstens 12 Schlüssel; `values` gibt nur die angefragten Schlüssel zurück | CLOSED | opt_profile_fields.py:24-25; profile_fields.py:93, :153, :188-205. Rest: `me` und `definitions` sind ungeblättert, ihre Größe bestimmt die Zahl der vom Admin angelegten Felder (klein, admin-gesteuert); kein Threat über ASVS 1 |
+| T-35-PF-06 | Denial of Service (große Seiten) | profile_fields.py, opt_profile_fields.py | mitigate | Suche limit 1 bis 100, offset ab 0 (Schema und Code); höchstens 12 Schlüssel; `values` gibt nur die angefragten Schlüssel zurück | CLOSED | opt_profile_fields.py:24-25; profile_fields.py:93, :160, :195-212. Rest: `me` und `definitions` sind ungeblättert, ihre Größe bestimmt die Zahl der vom Admin angelegten Felder (klein, admin-gesteuert); kein Threat über ASVS 1 |
 | T-35-PF-07 | Elevation (Suche ohne Schalter: Admin findet private Werte über den Suchanbieter der App) | Suchanbieter der App Profile Fields | transfer | Verhalten der App, nicht des Connectors; der Connector reicht die Rechte des Kontos durch und filtert nicht. Betreiber werden gewarnt: kein Administratorkonto an einen Assistenten anschließen, Sichtbarkeit in der App steuern | CLOSED | docs/hardening.md:138-146; docs/threat-model.md:230-234 (Residual 5); live raw/35-04-volltest-nc34.txt:130 `private value admin=1 bob=0, shared value bob=1` (Nicht-Admin bob sieht keinen privaten Wert) |
 | T-35-PF-08 | Elevation (Werkzeug ohne Opt-in oder als Schreibwerkzeug) | server/__init__.py, config.py, opt_profile_fields.py | mitigate | Registrierung nur bei `profile_fields_read_enabled()`; ungültiger Wert = aus mit Warnung; Annotation READ_ONLY | CLOSED | server/__init__.py:281-282; config.py:767-776, :166-167; opt_profile_fields.py:13 und server/__init__.py:85; test_opt_in_switch_fails_closed, test_opt_in_is_the_only_way_to_extend_the_27_tool_registry; live `s3 pf=vielleicht 27` (35-04, 35-05) |
-| T-35-PF-09 | Information Disclosure (zu viel aus Katalog und Werten) | profile_fields.py:163-205 | mitigate | `definitions` gefiltert auf id, field_key, type, edit_policy, exposure_policy, active; `values` nur die angefragten Schlüssel mit value und current_visibility | CLOSED | profile_fields.py:167-178, :188-205; test_admin_catalog_only_returns_selected_metadata, test_admin_user_values_only_include_requested_keys |
+| T-35-PF-09 | Information Disclosure (zu viel aus Katalog und Werten) | profile_fields.py:170-212 | mitigate | `definitions` gefiltert auf id, field_key, type, edit_policy, exposure_policy, active; `values` nur die angefragten Schlüssel mit value und current_visibility | CLOSED | profile_fields.py:174-185, :195-212; test_admin_catalog_only_returns_selected_metadata, test_admin_user_values_only_include_requested_keys |
+| T-35-PF-10 | Tampering (dieselbe Lücke in anderen Werkzeugen: Punktsegmente nach `quote` in OCS- oder DAV-Pfaden) | nextcloud/clients/*, tools/* | mitigate | Umfeldprüfung aller Stellen, die einen Wert in einen Pfad setzen | CLOSED | Kein Befund (Schwere: keiner), nur geprüft, nichts geändert. Kalender und Aufgaben: `caldav.safe_segment` lehnt `.` und `..` ab (caldav.py:115, genutzt von calendar_url und object_url, auch für tasks.py:460-578). Kontakte: `carddav.safe_segment` (carddav.py:103). Dateien: `dav.safe_path` überspringt `.` und lehnt `..` ab (dav.py:173-179); Upload-Ordner ist ein SHA-256, der Chunk-Teil `{chunk_index:05d}` (dav.py:1085, :1200). Deck, Tables, Notes, Mail: `_path_id` nur Ziffern (deck.py:213, tables.py:213, notes.py:131, mail.py `_path_id`). Talk: Token per `[a-z0-9]{4,30}`, Nachrichten-Id per Regex (talk.py:294, :314). Suchanbieter: `provider_id` wird nur aus der Liste der installierten Anbieter des Servers gewählt (search.py:261), dann gequotet (ocs.py:152). Versionen: `fileid` aus der Serverantwort (dav.py:1005). chatgpt.py:578 baut nur einen angezeigten Link, keine Anfrage. Kontoname `creds.user` in DAV-Heimpfaden ist keine Werkzeugeingabe; Nextcloud verbietet `.` und `..` als Login, eine Anmeldung damit scheitert mit 401 |
 
 ---
 
@@ -111,7 +112,7 @@ audited_head: 11ac2f80
 | AR-35-01 | T-35-01-03 | Faktencheck-Protokoll enthält nur Zeilennummern, Zahlen und öffentlichen Wortlaut (Disposition accept zur Planzeit) | Planung (Owner-Plan 35-01) | 2026-11-19 |
 | AR-35-02 | T-35-05-02 | Rechte der App Profile Fields auf Nextcloud 35 ungemessen, weil der Store für 35 nur einen Nightly führt; belegt auf NC34 (35-04, Nachmessung 35-05) und in CI; ohne App meldet das Werkzeug die fehlende App (live). Nachprüfung, sobald ein stabiles Release für 35 im Store ist (35-05-SUMMARY) | Owner: `FREIGABE pf-nc35 antwort=luecke datum=2026-11-20` | 2026-11-20 |
 
-Offen zur Owner-Entscheidung (noch kein akzeptiertes Risiko): T-35-PF-02.
+Keine weiteren akzeptierten Risiken. T-35-PF-02 wurde nicht akzeptiert, sondern geschlossen (Owner: `FREIGABE fix-T-35-PF-02`).
 
 ---
 
@@ -119,9 +120,12 @@ Offen zur Owner-Entscheidung (noch kein akzeptiertes Risiko): T-35-PF-02.
 
 | Audit Date | Threats Total | Closed | Open | Run By |
 |------------|---------------|--------|------|--------|
-| 2026-11-20 | 46 | 45 | 1 (T-35-PF-02, niedrig) | Ausführer 35-06 |
+| 2026-11-20 | 46 | 45 | 1 (T-35-PF-02, niedrig) | Ausführer 35-06, erstes Audit an 11ac2f80 |
+| 2026-11-20 | 47 | 47 | 0 (T-35-PF-02 geschlossen per 43454f05, bda22ac2, 3bee05c1; T-35-PF-10 neu, ohne Befund) | Ausführer 35-06, Nachprüfung an 3bee05c1 |
 
 Lokal ausgeführt (kein Docker, kein Live-Lauf, nichts gepusht): pytest über test_tool_text_assurances, test_profile_fields_tools, test_profile_fields_app_missing, test_audit_surface, test_tool_surface, 190 passed; Schreibwerkzeug-Liste der 32er-Registry; Messung der httpx-URL für Punktsegmente; Vorschau-PRUEFUNG über origin/main..HEAD. `pip-audit` ist im Projekt kein lokales Werkzeug (`uv run --no-sync pip-audit` nicht gefunden); die Abhängigkeitsprüfung leistet der CI-Job `pip-audit` (security.yml:57-80) in Task 3. uv.lock ändert in Phase 35 nur die Projektversion.
+
+Nachprüfung an 3bee05c1 (kein Docker, nichts gepusht): Gates nach 35-RULES Abschnitt 3 mit der Korrektur im Arbeitsbaum, alle Exit 0: unit+contract 8394 passed, 35 skipped (darin das #53-Gate test_tool_text_assurances); check_tool_budget 32 Werkzeuge 22938 Bytes, 27 Werkzeuge 18611 Bytes, größtes files_upload 1377 (unverändert); ruff check ok; ruff format 419 Dateien; pyright 0 errors; vulture 0 Funde; Runbook `pytest -q -p no:xdist` exit 0, 0 F und 0 E. Diff-Beweis: gegen 11ac2f80 ändert sich unter src/ nur tools/profile_fields.py (+8/-1); gegen die Phasenbasis 9a2b0fac bleibt außerhalb der erlaubten Stellen nichts übrig. Pitfall 1 ohne Treffer.
 
 ---
 
@@ -129,7 +133,7 @@ Lokal ausgeführt (kein Docker, kein Live-Lauf, nichts gepusht): pytest über te
 
 - [x] All threats have a disposition (mitigate / accept / transfer)
 - [x] Accepted risks documented in Accepted Risks Log
-- [ ] `threats_open: 0` confirmed (offen: T-35-PF-02)
-- [ ] `status: verified` set in frontmatter
+- [x] `threats_open: 0` confirmed
+- [x] `status: verified` set in frontmatter
 
-**Approval:** ausstehend. Owner entscheidet T-35-PF-02 (schließen per Codekorrektur vor 0.9.0 oder als Risiko akzeptieren); bis dahin kein Push.
+**Approval:** verified 2026-11-20 (T-35-PF-02 nach Owner-Entscheid geschlossen, nicht akzeptiert). Push nur nach eigener Owner-Freigabe `FREIGABE push-branch`.
