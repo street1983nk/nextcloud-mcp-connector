@@ -1,0 +1,3 @@
+# Phase 35: Owner-Freigaben, je Schritt eine Zeile (35-RULES Abschnitt 2)
+FREIGABE tooltexte-53 antwort=freigabe instruktion=A context=umformulieren laufzeit=ja datum=2026-11-20
+ZUSATZ searchhit=lassen dateien_plus=carddav.py,clients/mail.py antwort=freigabe datum=2026-11-20
