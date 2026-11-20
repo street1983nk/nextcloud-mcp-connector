@@ -64,6 +64,7 @@ async def main():
                 else tool.annotations.model_dump(mode="json", exclude_none=True)
             ),
             "input_schema": tool.input_schema,
+            "description": tool.description,
             "audited": getattr(registered[tool.name].fn, "__mcp_audited__", False) is True,
         }
         for tool in tools
@@ -79,7 +80,7 @@ def tools_of_switch(switch: str) -> frozenset[str]:
 
 
 def measure(env_overrides: dict[str, str]) -> dict[str, dict[str, Any]]:
-    """One registry in a fresh interpreter: per tool annotations, schema and audit marker.
+    """One registry in a fresh interpreter: per tool annotations, schema, description, audit marker.
 
     ``NC_MCP_DISABLED_TOOLS`` and every switch are taken out of the inherited environment
     first, so the answer depends on ``env_overrides`` alone.
