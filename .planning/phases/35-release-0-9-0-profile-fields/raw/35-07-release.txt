@@ -9,3 +9,18 @@ VORAUS ueber_branch_nur_planung=ja
 VORAUS-BELEG git diff --name-only 2307ede0 409e7d2d | grep -v ^.planning/ leer (rc=1); Dateien: 35-06-SUMMARY.md, raw/35-06-push.txt
 PR nummer=55 head_ci=2307ede0
 FREIGABE-HINWEIS Owner-Antwort "Go" auf die Fast-Forward-Frage, eingetragen als FREIGABE merge-main antwort=go (gleichbedeutend mit Option merge)
+PRUEFUNG vor=push-main bereich=origin/main..HEAD commits=52 autor_committer_fremd=0 trailer=0 closes_woerter=0
+PRUEFUNG zusatz head=b70a860fbc05abc9661d82d8151743bd5b044ac9 origin/main=66ffa30d (git fetch unmittelbar davor) hinter=0 ff=ja claude_ai_code=0 66ffa30d_im_bereich=0 nicht_planung_seit_ci=leer positivkontrolle "Fixes #12"/"Claude-Session" gemeldet=ja
+PUSH branch plan/release-090 2307ede0..b70a860f ff=ja; main 66ffa30d..b70a860f ff=ja (kein force)
+PR nummer=55 ready=ja (gh pr ready) state=MERGED mergedAt=2026-11-20T20:43:43Z mergeCommit=b70a860f (Fast-Forward erkannt)
+MAIN sha=b70a860fbc05abc9661d82d8151743bd5b044ac9
+CI-MAIN unit conclusion=success run=44813960801
+CI-MAIN image conclusion=success run=44813960801
+CI-MAIN exapp conclusion=success run=44813960801
+CI-MAIN canary-nc35 conclusion=success run=44813960801
+CI-MAIN integration conclusion=success run=44813960801
+CI-MAIN codeql conclusion=cancelled run=44813960803
+CI-MAIN reuse conclusion=cancelled run=44813960803
+CI-MAIN pip-audit conclusion=cancelled run=44813960803
+CI-MAIN-BEFUND Security scans (push main) abgebrochen; Annotation "Canceling since a higher priority waiting request for security-refs/heads/main exists"; zeitgleich lief Security scans pull_request run=44813964774 auf demselben SHA b70a860f mit codeql, reuse, pip-audit success (Run ohne PR-Bezug, prs=0, weil PR 55 schon MERGED); Ursache angenommen: concurrency group security-${{ github.ref }} fiel beim pull_request-Lauf auf refs/heads/main zurück
+HALT kein Tag, keine Wiederholung ohne Owner; Vorschlag gh run rerun 44813960803
