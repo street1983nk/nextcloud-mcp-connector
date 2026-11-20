@@ -6,3 +6,4 @@ PUSH gesperrt grund=35-SECURITY.md threats_open=1 (T-35-PF-02), Owner-Entscheid 
 PUSH entsperrt grund=T-35-PF-02 geschlossen (bda22ac2), 35-SECURITY.md threats_open=0 audited_head=3bee05c1; Push weiter nur nach FREIGABE push-branch
 PRUEFUNG vor=push-branch-vorschau bereich=origin/main..HEAD commits=48 autor_committer_fremd=0 trailer=0 closes_woerter=0
 PRUEFUNG zusatz head=3bee05c1 origin/main=66ffa30d (erneut geholt) claude_ai_code=0 66ffa30d_im_bereich=0
+FETCH origin/main=66ffa30d vor dem Freigabe-Commit

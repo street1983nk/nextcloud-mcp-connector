@@ -21,3 +21,5 @@ FREIGABE volltest antwort=abgenommen screenshot=entfaellt nachmessung=nc34-recht
 ANTWORT wortlaut="Abgenommen + NC34-Rechte nachmessen (Empf.)" datum=2026-11-20
 FREIGABE fix-T-35-PF-02 antwort="(a) Vor 0.9.0 schließen (Empfohlen)" datum=2026-11-20
 FREIGABE pr-text-mention antwort="Ohne @ (Empfohlen)" datum=2026-11-20
+FREIGABE push-branch antwort=push datum=2026-11-20
+FREIGABE changelog-mention antwort="Lassen (Empfohlen)" datum=2026-11-20
