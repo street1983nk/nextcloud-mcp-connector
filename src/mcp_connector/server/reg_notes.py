@@ -47,7 +47,7 @@ async def notes_create(
     category: Annotated[str | None, Field(description="Optional category folder")] = None,
     ctx: Context | None = None,
 ) -> str:
-    """Create a note; the returned title is the one the server stored, never overwrites."""
+    """Create a new note; the returned title is the one the server stored."""
     clients = deps.resolve_clients(ctx)
     return compact(
         await notes_tools.create(clients, title=title, content=content, category=category)

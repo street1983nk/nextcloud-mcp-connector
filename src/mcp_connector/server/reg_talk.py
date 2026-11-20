@@ -76,7 +76,7 @@ async def talk_send(
     message: Annotated[str, Field(description="The text to post, plain text")],
     ctx: Context | None = None,
 ) -> str:
-    """Send one message into a conversation; never edits or deletes one.
+    """Send one new message into a conversation.
 
     A timeout does not mean nothing was sent. Read back with talk_browse(level=messages)
     instead of calling this twice."""

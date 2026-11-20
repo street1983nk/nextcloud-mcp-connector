@@ -64,7 +64,7 @@ async def tables_create_row(
     ],
     ctx: Context | None = None,
 ) -> str:
-    """Add one row to an existing table; never changes or deletes one.
+    """Add one new row to an existing table.
 
     A timeout does not mean nothing was written. Read back with tables_browse(level=rows)
     instead of calling this twice."""

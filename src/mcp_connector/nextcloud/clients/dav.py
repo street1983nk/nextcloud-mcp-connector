@@ -1248,7 +1248,7 @@ def _check_chunk_response(response: httpx.Response, path: str) -> None:
     if status == 412:
         raise ConflictError(
             message=f"A file already exists at {path}.",
-            hint="Uploads never overwrite existing files. Choose a different name.",
+            hint="The upload path must not exist yet. Choose a different name.",
         )
     if status == 403:
         raise ToolError(
@@ -1304,7 +1304,7 @@ def _check_write(response: httpx.Response, path: str) -> None:
     if status == 412:
         raise ConflictError(
             message=f"A file already exists at {path}.",
-            hint="Uploads never overwrite existing files. Choose a different name.",
+            hint="The upload path must not exist yet. Choose a different name.",
         )
     if status == 403:
         raise ToolError(

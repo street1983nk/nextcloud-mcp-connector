@@ -156,7 +156,7 @@ TASK_WORDING = caldav.WriteWording(
         "this instance: it does not honour the precondition."
     ),
     exists="A task object named {name} already exists.",
-    exists_hint="This server never overwrites tasks. Create the task again under a new name.",
+    exists_hint="Create the task again; it gets a new name.",
     forbidden="No permission to write to the task list {label}.",
     forbidden_hint=(
         "Name a list you can write to with list=...; tasks_search shows which lists are writable."

@@ -97,7 +97,7 @@ async def test_second_upload_to_the_same_path_is_refused_with_412(clients: NcCli
         await files_tools.upload(clients, path=path, content="overwrite attempt\n")
     text = f"{excinfo.value.message} {excinfo.value.hint}"
     assert f"A file already exists at {path}." in text
-    assert "Uploads never overwrite existing files." in text
+    assert "The upload path must not exist yet." in text
 
     unchanged = await files_tools.read(clients, path=path)
     assert unchanged["content"] == "original\n", "the first content must still be there"

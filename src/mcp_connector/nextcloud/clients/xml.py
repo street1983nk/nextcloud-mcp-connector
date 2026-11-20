@@ -57,7 +57,7 @@ def parse_root(body: str | bytes) -> etree._Element:
     if tree.docinfo.internalDTD is not None or tree.docinfo.externalDTD is not None:
         raise ToolError(
             message="Nextcloud response contained a document type declaration and was rejected.",
-            hint="A DAV response never needs a DTD; check for a proxy rewriting responses.",
+            hint="A DAV response does not need a DTD; check for a proxy rewriting responses.",
         )
     return root
 

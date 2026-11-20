@@ -85,7 +85,7 @@ async def tasks_create(
     ] = None,
     ctx: Context | None = None,
 ) -> str:
-    """Create a task, create-only; never into a list others can see unless it is named."""
+    """Create a new task; a list others can see must be named in list."""
     clients = deps.resolve_clients(ctx)
     return compact(
         await tasks_tools.create_task(
@@ -168,8 +168,7 @@ if config.tasks_update_enabled():
         ctx: Context | None = None,
     ) -> str:
         """Move a task into the named list; needs its etag from tasks_read. Its subtasks
-        move along. A taken name in the target is never overwritten. Recurring tasks are
-        refused."""
+        move along. A name taken in the target list and recurring tasks are refused."""
         clients = deps.resolve_clients(ctx)
         return compact(
             await tasks_tools.move_task(clients, task_id=task_id, etag=etag, list_name=list)

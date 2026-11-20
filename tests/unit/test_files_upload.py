@@ -102,7 +102,7 @@ async def test_existing_file_is_refused_with_the_no_overwrite_sentence(
     assert put.call_count == 1, "a conflict is final; never retry it as an overwrite"
     text = f"{excinfo.value.message} {excinfo.value.hint}"
     assert f"A file already exists at {TARGET}." in text
-    assert "Uploads never overwrite existing files." in text
+    assert "The upload path must not exist yet." in text
     assert "Choose a different name." in text
 
 

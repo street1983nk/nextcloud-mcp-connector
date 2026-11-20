@@ -77,8 +77,7 @@ async def mail_browse(
 
     Envelopes newest first; the full text of one is a fetch("mail:<id>") away. Percent-encode a
     filter value with a space or colon (subject:Rechnung%20Mai). truncated: page cut;
-    preview_truncated: preview cut. Reads only: never sends, drafts, moves, flags or
-    deletes."""
+    preview_truncated: preview cut."""
     clients = deps.resolve_clients(ctx)
     return compact(
         await mail_tools.browse(

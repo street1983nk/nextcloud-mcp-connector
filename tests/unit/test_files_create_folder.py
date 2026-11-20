@@ -54,10 +54,10 @@ SUFFIX_AFTER_ONE = " Already created in this call and left in place: /A/b."
 
 #: The retry is safe either way: a second call keeps what exists (E5, idempotent).
 CHAIN_RETRY_HINT = (
-    "Call again with the same path and parents=true; that is safe: folders that exist "
-    "are kept and only the missing ones are created."
+    "Call again with the same path and parents=true; folders that exist are kept and "
+    "only the missing ones are created."
 )
-SINGLE_RETRY_HINT = "Call again with the same path; that is safe: a folder that exists is kept."
+SINGLE_RETRY_HINT = "Call again with the same path; a folder that exists is kept."
 
 
 @pytest.fixture(autouse=True)
@@ -189,7 +189,7 @@ async def test_a_file_at_the_path_is_a_conflict(clients: NcClients) -> None:
         requests = requests_of(mock)
 
     assert caught.value.message == f"A file, not a folder, already exists at {TARGET}."
-    assert caught.value.hint == "Choose another name; this tool never replaces a file."
+    assert caught.value.hint == "Choose another name for the folder."
     assert requests == [("MKCOL", TARGET), ("PROPFIND", TARGET)], "no request after the conflict"
 
 
@@ -1107,10 +1107,7 @@ def test_the_path_guard_of_the_other_tools_still_trims() -> None:
 
 # --- A node that is no folder and has no file id (D-31-09, owner decision of 2026-11-12) ----
 
-NO_FOLDER_HINT = (
-    "Choose another name, for example one that does not end in .part; this tool never "
-    "replaces anything."
-)
+NO_FOLDER_HINT = "Choose another name, for example one that does not end in .part."
 
 
 def no_folder(path: str) -> tuple[str, str]:
@@ -1244,4 +1241,4 @@ async def test_a_node_with_a_file_id_is_still_called_a_file(
             await files_tools.create_folder(clients, path=TARGET)
 
     assert caught.value.message == f"A file, not a folder, already exists at {TARGET}."
-    assert caught.value.hint == "Choose another name; this tool never replaces a file."
+    assert caught.value.hint == "Choose another name for the folder."

@@ -216,3 +216,64 @@ STORETEXT chatgpt_liest=nein beleg="src/ liest appinfo/info.xml nirgends (grep �
 ## Summe
 
 INVENTAR funde=73 umformulieren=28 lassen=44 allowed=0 laufzeittexte=54 owner_offen=1 (instruktion A/B; Werkzeugtexte 18 Funde: 16 umformulieren, 2 lassen; Laufzeittexte 54: 12 umformulieren, 42 lassen; ALLOWED-Rückfall nur für prepare_context vorbereitet)
+
+# ---------------------------------------------------------------------------------------------
+# Task 3 (nach FREIGABE tooltexte-53 antwort=freigabe instruktion=A context=umformulieren
+# laufzeit=ja datum=2026-11-20 und ZUSATZ searchhit=lassen dateien_plus=carddav.py,clients/mail.py)
+# ---------------------------------------------------------------------------------------------
+
+ENTSCHEID instruktion=A gate_nimmt_aus=ja (Kommentar im Modul-Docstring von tests/contract/test_tool_text_assurances.py mit Verweis auf die FREIGABE-Zeile)
+ENTSCHEID searchhit=lassen gate_nimmt_outputschema_aus=ja (src/mcp_connector/models.py unverändert)
+ENTSCHEID context=umformulieren allowed_eintraege=0
+DATEIEN_PLUS src/mcp_connector/nextcloud/clients/carddav.py src/mcp_connector/nextcloud/clients/mail.py (Owner-Zusatz 2026-11-20; nicht in files_modified des Plans, im Muster der fünften Stelle)
+
+RED commit=49b3ff10 "test(35-10): measure the description of the switched-on tools" gates=gruen (8312 passed, 35 skipped; Budget 23109/18770; ruff, format 417, pyright 0, vulture 0)
+RED commit=1b089604 "test(35-10): tool texts carry no assurances (issue 53)" rot=3 (test_the_standard_tool_texts_carry_no_assurance, test_the_switched_on_tool_texts_carry_no_assurance, test_the_runtime_texts_carry_no_assurance) gruen=23 (Gegenproben, Zähltests, Schreibverb)
+RED funde standard=12 switched=15 runtime=10 (files.py:893, files.py:918, caldav.py:376, caldav.py:56, carddav.py:59, dav.py:1251, dav.py:1307, mail.py:248, tasks.py:159, xml.py:60; Zeile = erstes Literal des Ausdrucks)
+
+GATE forbidden=never,no-verb,nothing-is,create-only,guarantee,without-risk,only-ever,reads-only planted_je_muster=1 clean_je_muster=1 (handgeschrieben, nicht aus den Regexen erzeugt)
+GATE optionale_beschreibungen=files_update,tasks_complete,tasks_update,tasks_move,profile_fields_browse gesehen=ja (test_the_switched_on_tool_texts_carry_no_assurance prüft set(OPTIONAL_TOOLS) <= gesehene Beschreibungen; Gegenprobe: gepflanzter Satz in files_update wird gemeldet)
+GATE schreibverb=create,add,send,upload,update,replace,complete,reopen,move,write,change (change ergänzt, weil tasks_update mit "Change fields" beginnt) gegenprobe=ja
+GATE runtime_texts sammler=message,hint,*_hint,Argumente_der_ToolError-Familie (aus ToolError.__subclasses__) name_aufloesung=lokal_dann_modul texte=594 bekannte_stellen_erreicht=ja
+GATE hint_hint files.py:975/978 erreicht=ja (Name-Auflösung in der umschließenden Funktion; Zähltest prüft "Call again with the same path; ")
+GATE uri_hint caldav.py/carddav.py erreicht=ja (Modulkonstante _URI_HINT)
+GATE positivkontrolle_runtime=ja (gepflanzter Quelltext: Literal, Modulkonstante und lokale Variable gemeldet, Docstrings nicht gesammelt)
+
+TESTAENDERUNG tests/contract/test_tool_surface.py:182 alt="assert \"never overwrites\" in (tool.description or \"\")" neu="assert \"Create a new file\" in (tool.description or \"\"); assert \"must not exist\" in tool.input_schema[\"properties\"][\"path\"][\"description\"]" grund="Issue #53: die Vorbedingung bleibt geprüft, jetzt im Parametertext path; der Anlegecharakter in der Beschreibung"
+TESTAENDERUNG tests/unit/test_files_create_folder.py:56 alt="CHAIN_RETRY_HINT ... that is safe: folders that exist are kept ..." neu="Call again with the same path and parents=true; folders that exist are kept and only the missing ones are created." grund="freigegebener Laufzeittext files.py:975; Aussage über das Behalten vorhandener Ordner bleibt"
+TESTAENDERUNG tests/unit/test_files_create_folder.py:60 alt="SINGLE_RETRY_HINT ... that is safe: a folder that exists is kept." neu="Call again with the same path; a folder that exists is kept." grund="freigegebener Laufzeittext files.py:978"
+TESTAENDERUNG tests/unit/test_files_create_folder.py:192 alt="hint == \"Choose another name; this tool never replaces a file.\"" neu="hint == \"Choose another name for the folder.\"" grund="freigegebener Laufzeittext files.py:893; die Meldung prüft weiter, dass eine Datei im Weg abgelehnt wird"
+TESTAENDERUNG tests/unit/test_files_create_folder.py:1110 alt="NO_FOLDER_HINT = \"... .part; this tool never replaces anything.\"" neu="NO_FOLDER_HINT = \"Choose another name, for example one that does not end in .part.\"" grund="freigegebener Laufzeittext files.py:919"
+TESTAENDERUNG tests/unit/test_files_create_folder.py:1244 alt="hint == \"Choose another name; this tool never replaces a file.\"" neu="hint == \"Choose another name for the folder.\"" grund="wie :192"
+TESTAENDERUNG tests/unit/test_files_upload.py:105 alt="assert \"Uploads never overwrite existing files.\" in text" neu="assert \"The upload path must not exist yet.\" in text" grund="freigegebener Laufzeittext dav.py:1307; :104 und :106 prüfen weiter A file already exists und Choose a different name"
+TESTAENDERUNG tests/integration/test_files_roundtrip.py:100 alt="assert \"Uploads never overwrite existing files.\" in text" neu="assert \"The upload path must not exist yet.\" in text" grund="wie test_files_upload.py:105; läuft in CI (35-06), hier ruff grün und 9 Tests gesammelt"
+TESTAENDERUNG tests/unit/test_caldav_writer.py:260 alt="\"This server never overwrites events. Create the event under a new name.\"" neu="\"Create the event again; it gets a new name.\"" grund="freigegebener Laufzeittext caldav.py:376; der Fall 412 bleibt ConflictError mit der Meldung An event object named ... already exists."
+
+AST src/mcp_connector/nextcloud/clients/caldav.py nur_strings=ja
+AST src/mcp_connector/nextcloud/clients/carddav.py nur_strings=ja
+AST src/mcp_connector/nextcloud/clients/dav.py nur_strings=ja
+AST src/mcp_connector/nextcloud/clients/mail.py nur_strings=ja
+AST src/mcp_connector/nextcloud/clients/tasks.py nur_strings=ja
+AST src/mcp_connector/nextcloud/clients/xml.py nur_strings=ja
+AST src/mcp_connector/server/reg_calendar.py nur_strings=ja
+AST src/mcp_connector/server/reg_context.py nur_strings=ja
+AST src/mcp_connector/server/reg_deck.py nur_strings=ja
+AST src/mcp_connector/server/reg_files.py nur_strings=ja
+AST src/mcp_connector/server/reg_mail.py nur_strings=ja
+AST src/mcp_connector/server/reg_notes.py nur_strings=ja
+AST src/mcp_connector/server/reg_tables.py nur_strings=ja
+AST src/mcp_connector/server/reg_talk.py nur_strings=ja
+AST src/mcp_connector/server/reg_tasks.py nur_strings=ja
+AST src/mcp_connector/tools/files.py nur_strings=ja
+AST positivkontrolle ungleich=ja (reg_tasks.py ge=0 -> ge=1 gepflanzt) kontrolle_nur_string_gleich=ja
+AST basis=1b089604 (Stand vor GREEN) verfahren="ast.parse, jede str-Konstante (Docstrings eingeschlossen) durch einen Platzhalter ersetzt, ast.dump verglichen"
+ANNOT vergleich gleich=ja (tools/list vorher und nachher, 32 und 27 Werkzeuge; Schemas ohne Texte gleich, Parametertexte unverändert, outputSchema und _meta gleich)
+PITFALL1 MOVE/DELETE/COPY/PROPPATCH in hinzugefügten src-Zeilen treffer=0
+DIFFBEWEIS vierte_und_fuenfte_stelle leer=ja
+
+BUDGET nachher standard=27 bytes_standard=18606 alle=32 bytes_alle=22933 groesstes=files_upload:1377
+BUDGET grenzen unveraendert=ja (git diff -U0 -- scripts/check_tool_budget.py | grep -E '^[+-][A-Z_]+ =' leer; nur Messkommentar 2026-11-20 ergänzt)
+BUDGET schaetzung_vs_messung gleich=ja (alle 12 Werkzeuge byte-genau wie geschätzt)
+GATES green pytest_unit_contract=8338_passed_35_skipped (vorher 8312 plus 26 neue) budget=exit0 ruff=exit0 format=exit0_417_dateien pyright=0_fehler vulture=0_funde
+INTEGRATION tests/integration/test_files_roundtrip.py ruff=gruen gesammelt=9 (Lauf selbst in CI, 35-06)
+LIVE_VORAB stdio tools=32 (Hilfsprogramm live_stdio.py, Platzhalter NC_MCP_URL=http://127.0.0.1:9, keine echten Werte); Zeilen in Task 4

@@ -57,7 +57,7 @@ GENERATED_PREFIXES = ("z-server-generated--", "z-app-generated--")
 
 _URI_HINT = (
     "Use an address book exactly as contacts_search reports it, for example 'contacts'. "
-    "An address book name is one path segment, never a path."
+    "An address book name is one path segment, not a path."
 )
 
 _NO_ADDRESSBOOK = (

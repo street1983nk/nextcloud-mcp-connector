@@ -191,6 +191,12 @@ print(json.dumps(asyncio.run(main())))
 #               reads 23109 + 15 percent = 26575.35, rounded up to the next 500 = 27000 on
 #               this number; that is arithmetic and not a decision, and a budget is lifted
 #               against a measurement that needs it.
+#
+#   Measurement 2026-11-20, issue 53 wording: 22933 bytes with every switch on, 32 tools;
+#               standard state 18606 bytes, 27 tools. Twelve descriptions state preconditions
+#               and errors instead of assurances (plan 35-10); the biggest tool is files_upload
+#               at 1377 bytes, below the per tool ceiling, which stays where it is.
+#   Budget      unchanged at 26000, because the measurement fits below it.
 BUDGET_BYTES = 26_000
 
 # The second claim, and the one that actually reports a regression. A total with headroom

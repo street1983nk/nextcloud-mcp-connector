@@ -890,7 +890,7 @@ async def _late_fileid(clients: NcClients, target: str) -> str:
 def _file_in_the_way(path: str) -> ConflictError:
     return ConflictError(
         message=f"A file, not a folder, already exists at {path}.",
-        hint="Choose another name; this tool never replaces a file.",
+        hint="Choose another name for the folder.",
     )
 
 
@@ -914,10 +914,7 @@ def _in_the_way(node: Mapping[str, Any]) -> ConflictError:
             f"{path} cannot be created as a folder: Nextcloud reports an entry there that "
             "is not a folder."
         ),
-        hint=(
-            "Choose another name, for example one that does not end in .part; this tool "
-            "never replaces anything."
-        ),
+        hint="Choose another name, for example one that does not end in .part.",
     )
 
 
@@ -972,10 +969,10 @@ def _cut_off(
         if not created:
             rest += " No other folder was created in this call."
     hint = (
-        "Call again with the same path and parents=true; that is safe: folders that exist "
-        "are kept and only the missing ones are created."
+        "Call again with the same path and parents=true; folders that exist are kept and "
+        "only the missing ones are created."
         if chain
-        else "Call again with the same path; that is safe: a folder that exists is kept."
+        else "Call again with the same path; a folder that exists is kept."
     )
     if isinstance(exc, httpx.TimeoutException):
         return ToolError(

@@ -247,7 +247,7 @@ def _check_mail_server(response: httpx.Response, what: str) -> None:
         hint=(
             "Open Mail in Nextcloud and check that account: the usual causes are a mail "
             "server that cannot be reached, a password the mail server rejects, or a mailbox "
-            "that has never been synchronised."
+            "that has not been synchronised yet."
         ),
     )
 

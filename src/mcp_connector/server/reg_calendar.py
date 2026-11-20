@@ -70,7 +70,7 @@ async def calendar_create_event(
     ] = None,
     ctx: Context | None = None,
 ) -> str:
-    """Create a calendar event; returns the times the server confirmed, never overwrites."""
+    """Create a new calendar event; returns the times the server confirmed."""
     clients = deps.resolve_clients(ctx)
     return compact(
         await calendar_tools.create_event(

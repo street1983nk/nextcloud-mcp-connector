@@ -59,7 +59,7 @@ async def deck_create_card(
     ] = "",
     ctx: Context | None = None,
 ) -> str:
-    """Create a card in an existing stack; never changes or deletes an existing card."""
+    """Create a new card in an existing stack."""
     clients = deps.resolve_clients(ctx)
     return compact(
         await deck_tools.create_card(

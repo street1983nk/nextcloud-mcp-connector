@@ -179,8 +179,10 @@ async def test_files_upload_is_annotated_as_create_only() -> None:
     assert annotations.idempotent_hint is False, "a second call on the same path fails"
     assert annotations.open_world_hint is False
     assert tool.output_schema is None, "structured_output=False (schema diet)"
-    assert "never overwrites" in (tool.description or ""), (
-        "the constraint belongs in the description the model reads"
+    # Issue #53: the constraint is a precondition the model reads, not an assurance.
+    assert "Create a new file" in (tool.description or "")
+    assert "must not exist" in tool.input_schema["properties"]["path"]["description"], (
+        "the constraint belongs in the text the model reads"
     )
 
     assert tool.meta is not None

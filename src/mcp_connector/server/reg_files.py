@@ -183,7 +183,7 @@ async def files_upload(
     file: OpenAIFile = None,
     ctx: Context | None = None,
 ) -> str:
-    """Create text/base64 or ChatGPT attachments; never overwrites."""
+    """Create a new file from text, base64 or a ChatGPT attachment."""
     clients = deps.resolve_clients(ctx)
     if file is not None:
         if content is not None or content_base64 is not None:
@@ -255,8 +255,8 @@ async def files_create_folder(
     ] = False,
     ctx: Context | None = None,
 ) -> str:
-    """Create a folder; an existing folder answers created false. Never overwrites, moves
-    or deletes."""
+    """Create a folder; an existing folder answers created false, an existing file at
+    the path returns an error."""
     clients = deps.resolve_clients(ctx)
     return compact(await files_tools.create_folder(clients, path=path, parents=parents))
 
@@ -274,10 +274,10 @@ if config.files_update_enabled():
         """Replace an existing UTF-8 text file only when its ETag still matches.
 
         This is a whole-file replacement: read the complete file first and send the
-        complete new content, never a partial read. It cannot create, delete, move or
-        rename files. If the file changed or was deleted, the update is rejected and
-        the client must read it again and decide what to do. Version history is not
-        guaranteed for every Nextcloud storage backend.
+        complete new content, not a partial read. The file must already exist and keeps
+        its path. If the file changed or was deleted, the update is rejected and
+        the client must read it again and decide what to do. Whether an older version is
+        kept depends on the Nextcloud storage backend.
         """
 
         clients = deps.resolve_clients(ctx)

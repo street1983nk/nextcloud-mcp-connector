@@ -257,7 +257,7 @@ async def test_put_event_returns_the_same_shape_as_before(
         (
             412,
             "An event object named ev.ics already exists.",
-            "This server never overwrites events. Create the event under a new name.",
+            "Create the event again; it gets a new name.",
             None,
         ),
         (

@@ -54,7 +54,7 @@ CALDAV_UTC_FORMAT = "%Y%m%dT%H%M%SZ"
 
 _URI_HINT = (
     "Use a calendar exactly as calendar_list_events reports it, for example 'personal'. "
-    "A calendar name is one path segment, never a path."
+    "A calendar name is one path segment, not a path."
 )
 
 _NO_CALENDAR = (
@@ -373,7 +373,7 @@ EVENT_WORDING = WriteWording(
         "this instance: it does not honour the precondition."
     ),
     exists="An event object named {name} already exists.",
-    exists_hint="This server never overwrites events. Create the event under a new name.",
+    exists_hint="Create the event again; it gets a new name.",
     forbidden="No permission to write to the calendar {label}.",
     forbidden_hint="Pick one of your own calendars, or ask its owner for write permission.",
     missing="The calendar {label} does not exist.",
