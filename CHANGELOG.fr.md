@@ -27,7 +27,7 @@ dans [CHANGELOG.md](CHANGELOG.md).
 - Niveaux : `me` pour les champs visibles du compte lui-même ; `definitions`, `values` et `search`
   utilisent des routes que l'application réserve aux administrateurs. Uniquement des
   requêtes OCS GET avec les permissions du compte connecté ; rien n'est créé, modifié ni
-  supprimé.
+  supprimé. L'UID `.` ou `..` est refusé avant l'envoi de toute requête.
 - Le commutateur ne pilote que cet outil. La recherche (`unified_search`, `search`,
   `prepare_context`) atteint le fournisseur de recherche de l'application avec ou sans lui
   et suit les permissions de l'application : un administrateur trouve les valeurs privées,

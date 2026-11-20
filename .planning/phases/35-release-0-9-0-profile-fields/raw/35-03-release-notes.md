@@ -11,6 +11,7 @@
 - Every account reads its own visible values with `me`.
 - The field catalogue, the values of other accounts and the exact search use routes the Profile Fields app reserves for administrators; the app checks that itself.
 - Only OCS GET requests with the permissions of the connected account; nothing is created, changed or deleted.
+- A UID of `.` or `..` is refused before any request is sent.
 - The audit log records `level`, `limit` and `offset` only.
 
 ### Admin note
@@ -41,6 +42,6 @@
 
 ### Credits
 
-- Profile Fields support by Vitor Mattos (@vitormattos) in #49.
+- Profile Fields support by Vitor Mattos (vitormattos) in #49.
 
 Full list: CHANGELOG.md

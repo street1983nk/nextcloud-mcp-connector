@@ -19,3 +19,5 @@ FREIGABE pf-gruppen-412 antwort="Ja, vor 0.9.0 (Empfohlen)" datum=2026-11-20
 FOLGEPUNKT ocs-data-message antwort="Nach 0.9.0 (Empfohlen)" datum=2026-11-20
 FREIGABE volltest antwort=abgenommen screenshot=entfaellt nachmessung=nc34-rechte datum=2026-11-20
 ANTWORT wortlaut="Abgenommen + NC34-Rechte nachmessen (Empf.)" datum=2026-11-20
+FREIGABE fix-T-35-PF-02 antwort="(a) Vor 0.9.0 schließen (Empfohlen)" datum=2026-11-20
+FREIGABE pr-text-mention antwort="Ohne @ (Empfohlen)" datum=2026-11-20

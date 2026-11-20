@@ -24,7 +24,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   you disable and enable this app again.
 - Levels: `me` for the account's own visible fields; `definitions`, `values` and `search` use routes
   the app reserves for administrators. Only OCS GET requests with the permissions of the
-  connected account; nothing is created, changed or deleted.
+  connected account; nothing is created, changed or deleted. A UID of `.` or `..` is
+  refused before any request is sent.
 - The switch steers this tool only. The search (`unified_search`, `search`,
   `prepare_context`) reaches the search provider of the app with or without it and follows
   the permissions of the app: an administrator finds private values, every other account

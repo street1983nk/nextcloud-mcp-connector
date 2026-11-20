@@ -26,6 +26,7 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
 - Ebenen: `me` für die eigenen sichtbaren Felder; `definitions`, `values` und `search`
   nutzen Routen, die die App Administratoren vorbehält. Nur OCS-GET-Anfragen mit den
   Berechtigungen des verbundenen Kontos; nichts wird angelegt, geändert oder gelöscht.
+  Die UID `.` oder `..` wird abgelehnt, bevor eine Anfrage gesendet wird.
 - Der Schalter steuert nur dieses Tool. Die Suche (`unified_search`, `search`,
   `prepare_context`) erreicht den Suchprovider der App mit und ohne Schalter und folgt den
   Berechtigungen der App: Ein Administrator findet private Werte, jedes andere Konto nur
