@@ -27,3 +27,5 @@ FREIGABE merge-main antwort=go datum=2026-11-20
 ANTWORT wortlaut="Darf ich main per Fast-Forward auf den Release-Stand bringen?: Go" | Kontext: zum CI-geprüften Stand kommen nur Planungsnotizen dazu, vor dem Push geprüft, danach CI auf main; Tag separat gefragt datum=2026-11-20
 FREIGABE tag-v0.9.0 antwort=tag datum=2026-11-20
 ANTWORT wortlaut="Tag v0.9.0 auf main b70a860f setzen und pushen? (startet release.yml: Image + Store-Archiv + GitHub-Release; unumkehrbar): Tag setzen" datum=2026-11-20
+FREIGABE signatur antwort=signieren datum=2026-11-21
+ANTWORT wortlaut="Darf ich das Archiv signieren?: Ja" | Umfang: Signatur und Prüfung über das heruntergeladene Asset; .sig-Upload und Submit nicht Teil dieser Antwort datum=2026-11-21

@@ -1,0 +1,13 @@
+# Plan 35-08, Task 2: Signatur über das heruntergeladene Asset v0.9.0 (Runbook Schritt 6)
+FREIGABE-BEZUG FREIGABE signatur antwort=signieren datum=2026-11-21
+DOWNLOAD weg="gh release download v0.9.0 -R street1983nk/nextcloud-mcp-connector" ziel=neues leeres Verzeichnis im Scratchpad p35
+DOWNLOAD groesse=64052 sha256=115b0e9fe877332e938b7ab1e605b0e73526b536d0efc64217724d68305c5f77
+  gleich der ASSET-Zeile aus raw/35-07-release.txt (groesse=64052, gleicher sha256)
+SIGNATUR befehl="openssl dgst -sha512 -sign ~/.nextcloud/certificates/mcp_connector.key -out <sig> <asset>" exit=0
+  Schlüssel nur als Pfad an openssl übergeben, nie gelesen, kopiert oder ausgegeben.
+SIGNATUR verify=Verified OK groesse=512 sha256_sig=24156401266faf7fed867b69e8572e05e538d3f6c8c87f1a6595f4e351c4fa59
+  Prüfung: Public Key aus ~/.nextcloud/certificates/mcp_connector.crt (subject=CN=mcp_connector, notAfter=2036-11-24) per "openssl x509 -pubkey -noout", danach "openssl dgst -sha512 -verify <pub.pem> -signature <sig> <asset>", Exit 0.
+NEGATIVKONTROLLE Kopie des Assets mit einem angehängten Byte gegen dieselbe Signatur: "Verification failure" (bad signature), Exit 1
+BASE64 laenge=684 ort=nur Scratchpad (Plan 35-08 Task 2: keine Base64-Signatur im Repo; die .sig wird erst mit dem Upload öffentlich)
+SIG-UPLOAD nein (nicht Teil dieser Freigabe; offen bis Owner-Antwort)
+SUBMIT offen (Checkpoint Task 3, FREIGABE submit fehlt)
