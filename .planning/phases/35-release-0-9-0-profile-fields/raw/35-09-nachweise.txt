@@ -76,3 +76,15 @@ PRUEFUNG zusatz head=0251e216 claude_ai_code=0 66ffa30d_im_bereich=0 nicht_planu
 HALT Task-2-Checkpoint: Owner-Frage push-runbook offen, nichts gepusht
 PRUEFUNG vor=push-runbook bereich=origin/main..HEAD commits=12 autor_committer_fremd=0 trailer=0 closes_woerter=0
 PRUEFUNG zusatz origin/main=b70a860f (git fetch unmittelbar davor) hinter=0 ff=ja claude_ai_code=0 66ffa30d_im_bereich=0; 11 Commits bis zur Freigabezeile geprüft, dieser Protokoll-Commit ist der 12. und wird nach dem Commit erneut geprüft
+PUSH main b70a860f..1679c2c5 ff=ja; plan/release-090 b70a860f..1679c2c5 ff=ja (kein force); danach origin/main..HEAD=0
+CI-MAIN unit conclusion=success run=44857695880
+CI-MAIN image conclusion=success run=44857695880
+CI-MAIN exapp conclusion=success run=44857695880
+CI-MAIN canary-nc35 conclusion=success run=44857695880
+CI-MAIN integration conclusion=success run=44857695880
+CI-MAIN CodeQL (python) conclusion=success run=44857695962
+CI-MAIN pip-audit over the locked set conclusion=success run=44857695962
+CI-MAIN REUSE licensing lint conclusion=success run=44857695962
+CI-MAIN Scorecard analysis conclusion=success run=44857696039
+MAIN sha=1679c2c5f600f08ffc51ffbe6f940f406f9b495f gepusht=main,plan/release-090
+SCRATCH p35 geloescht=ja
