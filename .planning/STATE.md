@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Tasks-Bundle und Ordner anlegen (Release 0.8.0)
 status: Awaiting next milestone
-stopped_at: "Milestone v1.8 complete und archiviert (Phasenordner 30-34 bleiben in .planning/phases/, weil docs/, tests/ und scripts/ darauf verweisen); Release 0.8.0 im Store"
-last_updated: "2026-11-14T10:45:00.000Z"
-last_activity: 2026-11-14, Milestone v1.8 abgeschlossen und archiviert; vorher Release 0.8.0 im Store (Tag v0.8.0 auf b4b6518, store-submit HTTP 201, Katalog 0.8.0), CI-Lauf 43580117707 auf main 00525cb grün, #32 und #44 beantwortet und geschlossen
+stopped_at: "Phase 35 (Einzelphase, Release 0.9.0 Profile Fields) complete; 0.9.0 im Store"
+last_updated: "2026-11-21T03:30:00.000Z"
+last_activity: 2026-11-21, Phase 35 abgeschlossen; Release 0.9.0 im Store (Tag v0.9.0 auf b70a860f, store-submit Lauf 44854983055 HTTP 201, Katalog 0.9.0), CI auf main 1679c2c5 grün, secure-phase 35 threats_open 0; Antworten auf #53, PR #54, PR #49 gepostet
 progress:
   total_phases: 5
   completed_phases: 5
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-14)
 
 **Core value:** Die zugänglichste und sauberste MCP-Anbindung für Nextcloud: per Klick installierbar, spec-konformes OAuth statt App-Passwort-Gebastel, und der Assistent sieht niemals mehr als der angemeldete Nutzer.
-**Current focus:** Kein aktiver Milestone. v1.8 ist archiviert, Release 0.8.0 steht seit 14.11.2026 im Store. Nächster Milestone nicht geplant; Start mit /gsd:new-milestone, sobald das Owner-Thema feststeht.
+**Current focus:** Kein aktiver Milestone. Release 0.9.0 (Phase 35, Einzelphase) steht seit 21.11.2026 im Store. Nächstes Connector-Thema 0.10.0 (PR #54 mit eigenem Schalter); vorher arbeitet der Owner an Findling.
 
 ## Current Position
 
-Phase: Milestone v1.8 complete (Phasen 30-34)
+Phase: 35 complete (Einzelphase, Release 0.9.0)
 Plan: keiner
 Status: Awaiting next milestone
-Last activity: 2026-11-14, Milestone v1.8 abgeschlossen und archiviert
+Last activity: 2026-11-21, Phase 35 abgeschlossen, 0.9.0 im Store
 
 ## Performance Metrics
 
