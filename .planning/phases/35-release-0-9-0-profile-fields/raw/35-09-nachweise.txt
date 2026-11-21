@@ -74,3 +74,5 @@ FETCH origin/main=b70a860f origin/plan/release-090=b70a860f HEAD..origin/main=0 
 PRUEFUNG vor=push-runbook-vorschau bereich=origin/main..HEAD commits=9 autor_committer_fremd=0 trailer=0 closes_woerter=0
 PRUEFUNG zusatz head=0251e216 claude_ai_code=0 66ffa30d_im_bereich=0 nicht_planung=docs/store-submission.md,tests/unit/test_tasks_create.py positivkontrolle "Fixes #12"/"Claude-Session" gemeldet=ja
 HALT Task-2-Checkpoint: Owner-Frage push-runbook offen, nichts gepusht
+PRUEFUNG vor=push-runbook bereich=origin/main..HEAD commits=12 autor_committer_fremd=0 trailer=0 closes_woerter=0
+PRUEFUNG zusatz origin/main=b70a860f (git fetch unmittelbar davor) hinter=0 ff=ja claude_ai_code=0 66ffa30d_im_bereich=0; 11 Commits bis zur Freigabezeile geprüft, dieser Protokoll-Commit ist der 12. und wird nach dem Commit erneut geprüft
