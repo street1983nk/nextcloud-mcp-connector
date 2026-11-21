@@ -35,3 +35,5 @@ FREIGABE submit antwort=workflow datum=2026-11-21
 ANTWORT wortlaut="workflow" | Kontext: store-submit.yml in street1983nk/nextcloud-search im direkten Modus datum=2026-11-21
 FREIGABE test-datumsfest antwort=b datum=2026-11-21
 ANTWORT wortlaut="Variante (b) Test datumsfest" | Umsetzung: in test_a_due_date_is_that_very_day "20261121" nur in den Datumszeilen der Aufgabe (DUE, DTSTART) prüfen, gleich streng; Positivkontrolle; gleiches Muster in anderen Tests suchen, nur ändern, wenn heute rot (Weitergabe durch die Hauptsitzung) datum=2026-11-21
+FREIGABE push-runbook antwort=push datum=2026-11-21
+ANTWORT wortlaut="Push" | Kontext: Fast-Forward von main und plan/release-090 auf den Nachtrag (Runbook-Zeilen 0.9.0, Sicherheitsvertrag, Testfix, Planungs-Commits 35-07 bis 35-09), ohne force; CI auf main danach (Weitergabe durch die Hauptsitzung, AskUserQuestion) datum=2026-11-21
