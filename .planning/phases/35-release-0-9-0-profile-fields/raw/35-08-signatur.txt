@@ -9,5 +9,7 @@ SIGNATUR verify=Verified OK groesse=512 sha256_sig=24156401266faf7fed867b69e8572
   Prüfung: Public Key aus ~/.nextcloud/certificates/mcp_connector.crt (subject=CN=mcp_connector, notAfter=2036-11-24) per "openssl x509 -pubkey -noout", danach "openssl dgst -sha512 -verify <pub.pem> -signature <sig> <asset>", Exit 0.
 NEGATIVKONTROLLE Kopie des Assets mit einem angehängten Byte gegen dieselbe Signatur: "Verification failure" (bad signature), Exit 1
 BASE64 laenge=684 ort=nur Scratchpad (Plan 35-08 Task 2: keine Base64-Signatur im Repo; die .sig wird erst mit dem Upload öffentlich)
-SIG-UPLOAD nein (nicht Teil dieser Freigabe; offen bis Owner-Antwort)
-SUBMIT offen (Checkpoint Task 3, FREIGABE submit fehlt)
+SIG-UPLOAD ja (FREIGABE sig-upload antwort=hochladen datum=2026-11-21)
+  gh release view v0.9.0: mcp_connector-0.9.0.tar.gz.sig 512 Bytes, digest sha256:24156401266faf7fed867b69e8572e05e538d3f6c8c87f1a6595f4e351c4fa59 (gleich der lokal geprüften Signatur); Download der Release-URL per cmp byte-gleich mit der geprüften .sig
+WORKFLOW-EINGABEN store-submit.yml (street1983nk/nextcloud-search) per "gh workflow view --yaml" gelesen: direct_download (nur https://github.com/street1983nk/*), direct_signature (base64), register=false, tag leer im direkten Modus
+SUBMIT offen: FREIGABE submit antwort=workflow liegt vor, der Start per "gh workflow run" wurde vom Berechtigungssystem der Sitzung abgelehnt; kein Lauf gestartet, nichts eingereicht
