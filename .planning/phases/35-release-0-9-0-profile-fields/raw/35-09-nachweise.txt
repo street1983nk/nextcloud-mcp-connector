@@ -1,0 +1,51 @@
+# 35-09 Nachweise Runbook Schritt 8 für 0.9.0
+# Datum: 2026-11-21, erster Durchlauf ab 02:19:37Z (Store-Annahme 02:16:40Z, Lauf 44854983055, HTTP 201)
+# Befehle: die fünf Befehle aus docs/store-submission.md Schritt 8 mit <version>=0.9.0, dazu curl auf die Detailseite
+# und deren Beschreibung (/apps/mcp_connector/description) sowie ein Headless-Chrome-Abzug der gerenderten Seite.
+# Reihenfolge: Asset, Image, Tags, Detailseite, Autor, Katalog zuletzt.
+# Ausgaben zuerst im Scratchpad p35/n09; Geheimnisprüfung (Skript im Scratchpad, gibt nur Namen und Zahlen aus) gegen alle
+# nicht leeren Werte von .env.exapp und .env.nc35 (voll und erste 12 Zeichen) sowie AUTHORIZATION-APP-API: Treffer nur
+# APP_ID (der App-Name mcp_connector), APP_VERSION (eine Versionsnummer) und die Namen der Testkonten (kurze Wörter im
+# öffentlichen HTML und JS des Stores), alles öffentlich; AUTHORIZATION-APP-API 0 Zeilen; kein Geheimnis.
+# Das ghcr-Pull-Token (anonym) lag nur in einer Shell-Variable, wurde nach den zwei Abrufen gelöscht und nie gespeichert.
+NACHWEIS asset status=302,200 groesse=64052
+  curl -sSIL auf releases/download/v0.9.0/mcp_connector-0.9.0.tar.gz: HTTP 302 (Location release-assets.githubusercontent.com), dann HTTP 200, Content-Length 64052 (gleich ASSET in raw/35-07-release.txt und DOWNLOAD in raw/35-08-signatur.txt).
+NACHWEIS image index=oci plattformen=linux/amd64,linux/arm64
+  mediaType application/vnd.oci.image.index.v1+json; manifests: linux/amd64 sha256:3409963811f9..., linux/arm64 sha256:6be6f67cc209... (beide gleich IMAGE in raw/35-07-release.txt) und zwei Attestierungseinträge unknown/unknown.
+NACHWEIS tags enthaelt=0.9.0
+  ghcr tags/list: 33 Tags, genau einmal 0.9.0 (grep -cx).
+NACHWEIS detailseite nennt=0.9.0
+  apps.nextcloud.com/apps/mcp_connector: 12 Treffer "0.9.0", 0 Treffer "0.8.0" (curl, 02:19Z).
+NACHWEIS detailseite links=gerendert en=2 de=2 fr=2
+  Die Beschreibung kommt als Markdown (text/plain) von /apps/mcp_connector/description und wird im Browser von detail.js
+  (markdown-it, danach rel="noopener noreferrer" an jedem <a>) gerendert; curl allein sieht nur den leeren Abschnitt
+  "app-description markdown loading". Beleg per Headless-Chrome (--dump-dom, je Sprache eigenes Profil, --lang):
+  en: <a href="https://apps.nextcloud.com/apps/findling" rel="noopener noreferrer">Findling</a>
+      <a href="https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/README.md" rel="noopener noreferrer">README on GitHub</a>
+  de: <a href="https://apps.nextcloud.com/apps/findling" rel="noopener noreferrer">Findling</a>
+      <a href="https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/README.de.md" rel="noopener noreferrer">README auf GitHub</a>
+  fr: <a href="https://apps.nextcloud.com/apps/findling" rel="noopener noreferrer">Findling</a>
+      <a href="https://github.com/street1983nk/nextcloud-mcp-connector/blob/main/README.fr.md" rel="noopener noreferrer">README sur GitHub</a>
+  Gegenprobe: roher Markdown-Text "[Findling](" im gerenderten DOM 0 Treffer je Sprache; der Abschnitt hat die Klasse "loading" nicht mehr.
+NACHWEIS autor katalog=admin@infranode.dev infoxml=admin@infranode.dev gleich=ja
+  Katalog authors[0].mail von mcp_connector gegen <author mail> in git show v0.9.0:appinfo/info.xml.
+NACHWEIS katalog top=0.8.0 spanne=>=32.0.0 <36.0.0 durchlauf=first-pass zeit=02:20:50Z last_modified=01:00:13Z
+  appapi_apps.json listet für mcp_connector als oberste Release 0.8.0 (Download v0.8.0), 0.9.0 noch nicht; bekannter Cache
+  (Last-Modified 01:00:13Z liegt vor der Store-Annahme 02:16:40Z). Keine Warteschleife in dieser Sitzung (Auftrag der
+  Hauptsitzung): Nachmessung nach der nächsten Regeneration OFFEN, holt die Hauptsitzung nach.
+PIN store-texte sha256=812b1b03d75311a949ee8a7e8461d343e5e26f45d3ac548e5b2bb9dc6a43b410 frozen_at="release 0.9.0"
+  Gelesen aus tests/unit/test_store_texts_frozen.py (EXPECTED_SHA256, FROZEN_AT); der Test läuft in den Gates grün.
+CODESTAND git diff --stat v0.9.0 HEAD außerhalb von .planning/ leer (Tag v0.9.0 = b70a860fbc05abc9661d82d8151743bd5b044ac9)
+ZAHLEN runbook-zeilen 0.9.0 je Zahl per grep gefunden: 8394, 18611, 22938 (raw/35-06-sicherheit.txt, letzter grüner Gate-Lauf am Code des Tags: git diff 3bee05c1 v0.9.0 außerhalb .planning/ leer); "10 von 10" und anzahl=27/28/32 (raw/35-04, raw/35-05); 812b1b03, 02:19:37Z, 02:20:50Z, 01:00:13Z (dieses Protokoll); 44815709326, b70a860f, nummer=55 (raw/35-07, raw/35-06); 64052, groesse=512, 44854983055, http=201, 02:16:40Z (raw/35-08); store-text datum=2026-11-20 (raw/35-freigaben.txt)
+GATE pytest-unit-contract exit=1 passed=8393 failed=1 skipped=35 datum=2026-11-21
+  ROT: tests/unit/test_tasks_create.py::test_a_due_date_is_that_very_day. Der Test legt eine Aufgabe mit due="2026-11-20" an und prüft
+  zusätzlich '"20261121" not in body'; der Körper trägt CREATED und DTSTAMP mit dem heutigen UTC-Datum (CREATED:20261121T022441Z).
+  Der Test ist damit genau am 2026-11-21 (UTC) rot und sonst grün; die DUE-Zeile selbst stimmt (DUE;VALUE=DATE:20261120).
+  Kein Produktbefund, Datei seit 5b949cb0 (2026-11-13) unverändert, Code gleich Tag v0.9.0. Nicht geändert: eine Korrektur
+  wäre ein Eingriff in eine Prüfung (35-RULES Abschnitt 11), Owner-Frage.
+GATE check_tool_budget exit=0 standard=18611/27 alle_schalter=22938/32 budget=26000
+GATE ruff-check exit=0
+GATE ruff-format exit=0 dateien=419
+GATE pyright exit=0 errors=0 warnings=0
+GATE vulture exit=0
+DASH docs/store-submission.md raw/35-09-nachweise.txt 35-SECURITY.md treffer=0 positivkontrolle=ok

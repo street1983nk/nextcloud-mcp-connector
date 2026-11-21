@@ -7,7 +7,7 @@ asvs_level: 1
 block_on: high
 register_authored_at_plan_time: true
 created: 2026-11-20
-audited_head: 3bee05c1
+audited_head: 7c62bf3e
 ---
 
 # Phase 35: Security
@@ -16,6 +16,7 @@ audited_head: 3bee05c1
 > Register aus den `<threat_model>`-Blöcken von 35-01 bis 35-06 und 35-10 (31 Einträge, zur Planzeit verfasst), dazu eigene Einträge für die Zusatzschritte 35-11 und 35-12 (ohne PLAN-Datei, Owner-Freigaben in raw/35-freigaben.txt) und für den mit 0.9.0 ausgelieferten Code aus PR #49 (T-35-PF-01 ff.).
 > Erstes Audit gegen HEAD 11ac2f80 (44 Commits über origin/main 66ffa30d), Nachprüfung nach der Korrektur von T-35-PF-02 gegen HEAD 3bee05c1 (48 Commits über origin/main). Der Code aus PR #49 liegt seit dem Squash-Commit 66ffa30d auf origin/main; in Phase 35 geändert sind davon nur `tools/profile_fields.py` (35-12 und 35-06) und der gemeinsame Fehlertext in `nextcloud/clients/ocs.py` (35-11).
 > **Ergebnis: 47 Einträge, 47 CLOSED, 0 OPEN. T-35-PF-02 (niedrig) war im ersten Audit offen und ist nach Owner-Entscheid vor 0.9.0 per Codekorrektur geschlossen; T-35-PF-10 (Umfeldprüfung) ohne Befund.**
+> **Nachtrag 35-09 (2026-11-21, nach dem Store-Release): Register von 35-07 bis 35-09 ergänzt (12 Einträge), zusammen 59 Einträge, 59 CLOSED, 0 OPEN. Der ausgelieferte Code ist der des Tags v0.9.0 (b70a860f); außerhalb von .planning/ hat sich seitdem nichts geändert.**
 
 ---
 
@@ -72,6 +73,23 @@ audited_head: 3bee05c1
 | T-35-06-03 | Elevation of Privilege | profile_fields_browse (Fremdcode) | mitigate | dieses Dokument, threats_open 0 als Push-Voraussetzung | CLOSED | Code-Prüfung unten (T-35-PF-01 ff.) liegt vor; das Gate hat gegriffen: der Push war wegen T-35-PF-02 gesperrt, bis die Korrektur bda22ac2 lag |
 | T-35-06-04 | Information Disclosure | CI-Logs im Protokoll | mitigate | nur Job, Ergebnis, Run-Id, zwei PROFILE-FIELDS-Zeilen | CLOSED | Regel im Plan Task 3; bis jetzt keine CI-Ausgabe im Protokoll; Durchführung wird in raw/35-06-push.txt sichtbar und in 35-09 nachgeprüft |
 
+### Register aus 35-07 bis 35-09 (Release, zur Planzeit verfasst, Nachtrag in 35-09)
+
+| Threat ID | Category | Component | Disposition | Mitigation | Status | Beleg |
+|-----------|----------|-----------|-------------|------------|--------|-------|
+| T-35-07-01 | Tampering (Tag auf ungeprüftem Stand) | git tag | mitigate | Tag nur auf main-SHA mit acht grünen CI-MAIN-Jobs, threats_open 0, nur nach Owner-Antwort | CLOSED | raw/35-07-release.txt `CI-MAIN-ERGEBNIS alle acht Jobs success auf sha=b70a860f`, `VORAUS-TAG threats_open=0`, `PRUEFUNG vor=tag ... commits=0 tag_auf_main=ja`; `FREIGABE tag-v0.9.0 antwort=tag` (raw/35-freigaben.txt) vor dem Tag; `TAG v0.9.0 sha=b70a860f` |
+| T-35-07-02 | Tampering (History umgeschrieben oder ungeprüfter Code nach der CI) | main | mitigate | nur Fast-Forward nach eigener Owner-Antwort, kein force; Diff zwischen CI-SHA und HEAD nur unter .planning/ | CLOSED | raw/35-07-release.txt `VORAUS-BELEG git diff --name-only 2307ede0 409e7d2d \| grep -v ^.planning/ leer`, `PUSH ... main 66ffa30d..b70a860f ff=ja (kein force)`, `PRUEFUNG vor=push-main ... autor_committer_fremd=0 trailer=0 closes_woerter=0`; `FREIGABE merge-main antwort=go` |
+| T-35-07-03 | Denial of Service (Installationen brechen) | Release-Asset, Image | mitigate | Asset nie löschen, Tag nie umschreiben; Fehler nach dem Tag nur mit Patch-Version | CLOSED | raw/35-09-nachweise.txt `NACHWEIS asset status=302,200 groesse=64052` (gleich 35-07), `NACHWEIS image index=oci plattformen=linux/amd64,linux/arm64` mit denselben Digests wie raw/35-07-release.txt `IMAGE`; `CODESTAND` Tag v0.9.0 = b70a860f unverändert |
+| T-35-07-04 | Repudiation (falsches Datum im signierten Archiv) | CHANGELOG*.md | mitigate | DATUM-Prüfung vor dem Fast-Forward und am Tag-Tag gegen den Stand auf main | CLOSED | raw/35-07-release.txt `DATUM changelog=2026-11-20 heute=2026-11-20 gleich=ja` und `DATUM tag=2026-11-20 changelog_main=2026-11-20 gleich=ja` |
+| T-35-08-01 | Information Disclosure | Signaturschlüssel | mitigate | Schlüssel nur als Pfad an openssl, Prüfung auf PRIVATE KEY im Phasenordner, Scratchpad gelöscht | CLOSED | raw/35-08-signatur.txt `SIGNATUR befehl=...` (nur Pfad), `SCRATCH geloescht=ja`; heute erneut: `grep -rl -- "-----BEGIN"` über den Phasenordner 0 Dateien (das Wort "PRIVATE KEY" steht nur in Plan-, SUMMARY- und Registertexten als Prüfbegriff) |
+| T-35-08-02 | Tampering (falsche Bytes signiert) | Asset | mitigate | Signatur über den Download, Größe gegen 35-07, Verify OK vor dem Submit | CLOSED | raw/35-08-signatur.txt `DOWNLOAD groesse=64052 sha256=115b0e9f...` gleich 35-07, `SIGNATUR verify=Verified OK`, `NEGATIVKONTROLLE ... Verification failure`; .sig-Digest am Release gleich der geprüften Signatur |
+| T-35-08-03 | Spoofing (Submit ohne Auftrag) | Store | mitigate | eigene Owner-Frage für Signatur und Submit, Freigabezeilen vor dem Schritt | CLOSED | raw/35-freigaben.txt `FREIGABE signatur`, `FREIGABE sig-upload`, `FREIGABE submit antwort=workflow` (2026-11-21), danach `SUBMIT weg=workflow run=44854983055 http=201` |
+| T-35-08-04 | Information Disclosure | Store-Token | mitigate | Token bleibt im Secret des Workflows bzw. beim Owner, nie in Datei oder Protokoll | CLOSED | raw/35-08-signatur.txt `WORKFLOW-EINGABEN` (Token nur als Secret APPSTORE_TOKEN von store-submit.yml); Ausführer 35-08 hat den Workflow-Start nur gegengelesen (35-08-SUMMARY, T-35-08-04) |
+| T-35-09-01 | Repudiation (unbelegte Zahl) | docs/store-submission.md | mitigate | jede Zahl der Zeile steht im Rohprotokoll; Katalog-Nachmessung in der Zeile selbst geschlossen oder ehrlich als first pass | CLOSED | Zeilen "Steps 1 to 7 are done for 0.9.0" und "Step 8 for 0.9.0": Zahlen aus raw/35-03 bis raw/35-09 (Abgleich in raw/35-09-nachweise.txt `ZAHLEN`); der Katalog stand beim ersten Durchlauf auf 0.8.0 und ist in der Zeile ehrlich als offen vermerkt (`NACHWEIS katalog ... durchlauf=first-pass`). Stand 2026-11-21: die zwei Zeilen stehen im Arbeitsbaum, ihr Commit wartet, weil der Gate-Lauf an diesem Tag einen datumsabhängigen Test rot zeigt (raw/35-09-nachweise.txt `GATE pytest-unit-contract exit=1`, kein Produktbefund, Owner-Frage) |
+| T-35-09-02 | Information Disclosure | Nachweisausgaben | mitigate | Ausgaben erst Scratchpad, Geheimnisprüfung; ghcr-Token nur im Scratchpad | CLOSED | raw/35-09-nachweise.txt Kopf: Geheimnisprüfung nur öffentliche Treffer (APP_ID, APP_VERSION, Testkontennamen), AUTHORIZATION-APP-API 0; ghcr-Token nur in einer Shell-Variable, nie gespeichert |
+| T-35-09-03 | Tampering (Kommentar ohne Auftrag) | GitHub PR #49 | mitigate | Claude postet nicht; Dankesentwurf geht an den Owner | CLOSED | die Protokolle raw/35-06 bis raw/35-09 und die SUMMARYs 35-06 bis 35-08 nennen keinen `gh pr comment` oder `gh issue comment` (grep 0 Treffer); der Ausführer 35-09 hat nichts gepostet; raw/35-03-dank-pr49.md bleibt Entwurf und geht in Task 2 an den Owner |
+| T-35-09-04 | Repudiation (Phase ohne Sicherheitsvertrag abgehakt) | 35-SECURITY.md | mitigate | Nachtrag mit threats_open 0, Übergabe von /gsd:secure-phase 35 an die Hauptsitzung vor dem Abhaken | CLOSED | dieser Nachtrag (59 Einträge, 0 OPEN); die Übergabe von `/gsd:secure-phase 35` (State A) steht in der Rückmeldung an die Hauptsitzung und in 35-09-SUMMARY |
+
 ### Zusatzschritt 35-11 (Wortlaut files_download und gemeinsamer OCS-Fehlertext)
 
 | Threat ID | Category | Component | Disposition | Mitigation | Status | Beleg |
@@ -122,6 +140,7 @@ Keine weiteren akzeptierten Risiken. T-35-PF-02 wurde nicht akzeptiert, sondern 
 |------------|---------------|--------|------|--------|
 | 2026-11-20 | 46 | 45 | 1 (T-35-PF-02, niedrig) | Ausführer 35-06, erstes Audit an 11ac2f80 |
 | 2026-11-20 | 47 | 47 | 0 (T-35-PF-02 geschlossen per 43454f05, bda22ac2, 3bee05c1; T-35-PF-10 neu, ohne Befund) | Ausführer 35-06, Nachprüfung an 3bee05c1 |
+| 2026-11-21 | 59 | 59 | 0 (Nachtrag T-35-07-01 bis T-35-09-04 aus den Release-Protokollen) | Ausführer 35-09, nach dem Store-Release |
 
 Lokal ausgeführt (kein Docker, kein Live-Lauf, nichts gepusht): pytest über test_tool_text_assurances, test_profile_fields_tools, test_profile_fields_app_missing, test_audit_surface, test_tool_surface, 190 passed; Schreibwerkzeug-Liste der 32er-Registry; Messung der httpx-URL für Punktsegmente; Vorschau-PRUEFUNG über origin/main..HEAD. `pip-audit` ist im Projekt kein lokales Werkzeug (`uv run --no-sync pip-audit` nicht gefunden); die Abhängigkeitsprüfung leistet der CI-Job `pip-audit` (security.yml:57-80) in Task 3. uv.lock ändert in Phase 35 nur die Projektversion.
 
@@ -135,5 +154,7 @@ Nachprüfung an 3bee05c1 (kein Docker, nichts gepusht): Gates nach 35-RULES Absc
 - [x] Accepted risks documented in Accepted Risks Log
 - [x] `threats_open: 0` confirmed
 - [x] `status: verified` set in frontmatter
+
+**Nachtrag 2026-11-21:** Register 35-07 bis 35-09 ergänzt, `threats_open: 0` bleibt. T-35-06-04 nachgeprüft: raw/35-06-push.txt trägt aus der CI nur Job, Ergebnis, Run-Id und die drei PROFILE-FIELDS-Zeilen (`CI-SCAN ... treffer=0`).
 
 **Approval:** verified 2026-11-20 (T-35-PF-02 nach Owner-Entscheid geschlossen, nicht akzeptiert). Push nur nach eigener Owner-Freigabe `FREIGABE push-branch`.
