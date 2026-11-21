@@ -12,4 +12,8 @@ BASE64 laenge=684 ort=nur Scratchpad (Plan 35-08 Task 2: keine Base64-Signatur i
 SIG-UPLOAD ja (FREIGABE sig-upload antwort=hochladen datum=2026-11-21)
   gh release view v0.9.0: mcp_connector-0.9.0.tar.gz.sig 512 Bytes, digest sha256:24156401266faf7fed867b69e8572e05e538d3f6c8c87f1a6595f4e351c4fa59 (gleich der lokal geprüften Signatur); Download der Release-URL per cmp byte-gleich mit der geprüften .sig
 WORKFLOW-EINGABEN store-submit.yml (street1983nk/nextcloud-search) per "gh workflow view --yaml" gelesen: direct_download (nur https://github.com/street1983nk/*), direct_signature (base64), register=false, tag leer im direkten Modus
-SUBMIT offen: FREIGABE submit antwort=workflow liegt vor, der Start per "gh workflow run" wurde vom Berechtigungssystem der Sitzung abgelehnt; kein Lauf gestartet, nichts eingereicht
+  Der erste Start per "gh workflow run" aus der Ausführer-Sitzung wurde vom Berechtigungssystem abgelehnt; der Owner hat das Kommando danach selbst als Eingabe geschickt, die Hauptsitzung hat es ausgeführt.
+SUBMIT weg=workflow run=44854983055 http=201 datum=2026-11-21
+  Lauf https://github.com/street1983nk/nextcloud-search/actions/runs/44854983055: conclusion=success, event=workflow_dispatch, 2026-11-21T02:16:40Z; Log "direct release: HTTP 201" und "the direct release is in the store" (vom Ausführer per gh run view gegengelesen).
+  Store-Seite https://apps.nextcloud.com/apps/mcp_connector nennt 0.9.0 (curl, 02:18Z). Der Katalog api/v1/appapi_apps.json führte um 02:18Z für mcp_connector noch 0.8.0 als neueste Version (Cache bis eine Stunde); /api/v1/platform/<v>/apps.json listet mcp_connector grundsätzlich nicht. Beleg ist die Store-Seite; der Katalog wird in 35-09 (Schritt 8) nachgeprüft.
+SCRATCH geloescht=ja (p35/sigwork mit .sig, pub.pem, sig.b64; p35/sig080dl mit dem Asset; Katalogabzug)
