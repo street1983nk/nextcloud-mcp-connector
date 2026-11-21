@@ -49,3 +49,24 @@ GATE ruff-format exit=0 dateien=419
 GATE pyright exit=0 errors=0 warnings=0
 GATE vulture exit=0
 DASH docs/store-submission.md raw/35-09-nachweise.txt 35-SECURITY.md treffer=0 positivkontrolle=ok
+FREIGABE-BEZUG FREIGABE test-datumsfest antwort=b datum=2026-11-21 (raw/35-freigaben.txt)
+TESTFIX test_a_due_date_is_that_very_day: '"20261121" not in body' ersetzt durch Prüfung nur der Datumszeilen der Aufgabe
+  (Hilfsfunktion task_date_lines: Zeilen, die mit DUE oder DTSTART beginnen), gleich streng; numstat 7/1, CRLF erhalten; Commit 89026ad3.
+POSITIVKONTROLLE dieselbe Hilfsfunktion (Skript im Scratchpad, lädt tests/unit/test_tasks_create.py): Körper mit CREATED/DTSTAMP/LAST-MODIFIED 20261121
+  und DUE 20261120 -> grün=True; DUE;VALUE=DATE:20261121 gepflanzt -> grün=False; DTSTART;VALUE=DATE:20261121 gepflanzt -> grün=False.
+  Dazu im echten Lauf: alte Prüfung heute rot (1 failed), neue Prüfung heute grün (test_tasks_create.py 70 passed).
+MUSTERSUCHE grep über tests/ nach Datumsliteral vor "not in": einziger Treffer dieses Musters war test_tasks_create.py:346.
+  Verwandt, nicht geändert, heute grün: tests/unit/test_connections_page.py:242 '"13 August 2026" not in text' (fester Zeitpunkt
+  der Testverbindung; könnte nur kollidieren, wenn die Seite das Tagesdatum rendert und der Lauf am 2026-08-13 wäre).
+GATE pytest-unit-contract exit=0 passed=8394 skipped=35 lauf=2 (nach dem Testfix, 2026-11-21)
+GATE check_tool_budget exit=0 standard=18611/27 alle_schalter=22938/32 budget=26000 lauf=2
+GATE ruff-check exit=0 lauf=2
+GATE ruff-format exit=0 dateien=419 lauf=2
+GATE pyright exit=0 errors=0 warnings=0 lauf=2
+GATE vulture exit=0 lauf=2
+GATE runbook pytest -q -p no:xdist exit=0 passed=8394 failed=0 (keine FAILED- oder ERROR-Zeile) lauf=2
+NACHWEIS katalog top=0.9.0 durchlauf=nach-regeneration zeit=02:39:30Z last_modified=02:30:15Z releases=0.9.0,0.8.0,0.7.3 spanne=>=32.0.0 <36.0.0
+  Download der obersten Release = releases/download/v0.9.0/mcp_connector-0.9.0.tar.gz, authors[0].mail admin@infranode.dev, 31 Releases, 0.9.0 genau einmal.
+  Die Regeneration lag etwa 14 Minuten nach der Store-Annahme (02:16:40Z).
+DASH lauf=2 docs/store-submission.md 35-SECURITY.md raw/35-09-nachweise.txt treffer=0 positivkontrolle=ok
+GATE pytest-unit-contract exit=0 passed=8394 skipped=35 lauf=3 (auf dem endgültigen Text der Runbook-Zeilen, vor dem Commit)
