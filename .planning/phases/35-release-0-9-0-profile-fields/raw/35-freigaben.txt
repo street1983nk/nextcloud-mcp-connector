@@ -33,3 +33,5 @@ FREIGABE sig-upload antwort=hochladen datum=2026-11-21
 ANTWORT wortlaut="Hochladen" | Kontext: .sig per gh release upload an v0.9.0 anhängen datum=2026-11-21
 FREIGABE submit antwort=workflow datum=2026-11-21
 ANTWORT wortlaut="workflow" | Kontext: store-submit.yml in street1983nk/nextcloud-search im direkten Modus datum=2026-11-21
+FREIGABE test-datumsfest antwort=b datum=2026-11-21
+ANTWORT wortlaut="Variante (b) Test datumsfest" | Umsetzung: in test_a_due_date_is_that_very_day "20261121" nur in den Datumszeilen der Aufgabe (DUE, DTSTART) prüfen, gleich streng; Positivkontrolle; gleiches Muster in anderen Tests suchen, nur ändern, wenn heute rot (Weitergabe durch die Hauptsitzung) datum=2026-11-21

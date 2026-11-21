@@ -240,6 +240,10 @@ def due_lines(body: str) -> list[str]:
     return [line for line in body.split("\r\n") if line.startswith("DUE")]
 
 
+def task_date_lines(body: str) -> list[str]:
+    return [line for line in body.split("\r\n") if line.startswith(("DUE", "DTSTART"))]
+
+
 # --- Refusals before any request ------------------------------------------------------------
 
 
@@ -343,7 +347,9 @@ async def test_a_due_date_is_that_very_day(clients: NcClients) -> None:
     result, stores = await create(clients, summary="t", due="2026-11-20")
     body = stores[OWN].body
     assert due_lines(body) == ["DUE;VALUE=DATE:20261120"]
-    assert "20261121" not in body
+    # Only the date lines of the task: CREATED, DTSTAMP and LAST-MODIFIED carry the moment of
+    # creation, which is the next day whenever this test runs on 2026-11-21.
+    assert not [line for line in task_date_lines(body) if "20261121" in line]
     assert result["due"] == "2026-11-20"
 
 
