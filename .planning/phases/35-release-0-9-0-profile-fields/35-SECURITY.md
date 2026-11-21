@@ -7,7 +7,7 @@ asvs_level: 1
 block_on: high
 register_authored_at_plan_time: true
 created: 2026-11-20
-audited_head: 7c62bf3e
+audited_head: 3572cfa0
 ---
 
 # Phase 35: Security
@@ -141,6 +141,9 @@ Keine weiteren akzeptierten Risiken. T-35-PF-02 wurde nicht akzeptiert, sondern 
 | 2026-11-20 | 46 | 45 | 1 (T-35-PF-02, niedrig) | Ausführer 35-06, erstes Audit an 11ac2f80 |
 | 2026-11-20 | 47 | 47 | 0 (T-35-PF-02 geschlossen per 43454f05, bda22ac2, 3bee05c1; T-35-PF-10 neu, ohne Befund) | Ausführer 35-06, Nachprüfung an 3bee05c1 |
 | 2026-11-21 | 59 | 59 | 0 (Nachtrag T-35-07-01 bis T-35-09-04 aus den Release-Protokollen) | Ausführer 35-09, nach dem Store-Release |
+| 2026-11-21 | 59 | 59 | 0 (secure-phase Zustand A, Kurzschluss: Register zur Planzeit verfasst, threats_open 0; Threat Flags aller SUMMARYs ohne neue Angriffsfläche) | Hauptsitzung /gsd:secure-phase 35 an 3572cfa0 |
+
+Prüfung der Hauptsitzung an 3572cfa0: 59 Registerzeilen, keine ohne CLOSED. Seit `audited_head` 7c62bf3e ändert sich außerhalb von .planning/ nur der Test `tests/unit/test_tasks_create.py` (89026ad3, datumsfest, Owner-Freigabe `test-datumsfest`) und die Runbook-Doku `docs/store-submission.md`; kein Produktcode, keine neue Angriffsfläche. CI auf main an 1679c2c5 grün (CI, Security scans, Scorecard).
 
 Lokal ausgeführt (kein Docker, kein Live-Lauf, nichts gepusht): pytest über test_tool_text_assurances, test_profile_fields_tools, test_profile_fields_app_missing, test_audit_surface, test_tool_surface, 190 passed; Schreibwerkzeug-Liste der 32er-Registry; Messung der httpx-URL für Punktsegmente; Vorschau-PRUEFUNG über origin/main..HEAD. `pip-audit` ist im Projekt kein lokales Werkzeug (`uv run --no-sync pip-audit` nicht gefunden); die Abhängigkeitsprüfung leistet der CI-Job `pip-audit` (security.yml:57-80) in Task 3. uv.lock ändert in Phase 35 nur die Projektversion.
 
