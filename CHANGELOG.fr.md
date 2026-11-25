@@ -13,6 +13,43 @@ dans [CHANGELOG.md](CHANGELOG.md).
 
 ## [Unreleased]
 
+### Ajouté
+
+- `files_update` peut remplacer un fichier existant d'un type connu (docx, xlsx, pptx,
+  OpenDocument, PDF, PNG, JPEG, GIF, WebP, texte UTF-8) par une pièce jointe ChatGPT (`file`),
+  avec la même condition d'ETag que pour le texte (`content`). L'ETag et l'étiquette
+  d'exclusion sont vérifiés avant le téléchargement de la pièce jointe, puis de nouveau juste
+  avant l'écriture.
+- Le commutateur « Allow replacing existing files with an attachment »
+  (`NC_MCP_FILES_UPDATE_ATTACHMENT`) est désactivé par défaut et n'agit qu'avec
+  `NC_MCP_FILES_UPDATE`, si bien qu'un administrateur peut autoriser les modifications de
+  texte sans autoriser les remplacements binaires. Il figure dans Paramètres d'administration,
+  Sécurité, MCP Connector et est déclaré comme variable d'environnement. Une modification
+  prend effet après avoir désactivé puis réactivé cette app. Désactivé, `files_update` dans la
+  liste des outils est celui de la 0.9.0.
+- La pièce jointe est vérifiée par rapport au type du fichier existant, et non au type qu'elle
+  déclare. Un fichier docx, xlsx, pptx ou OpenDocument est ouvert et sa structure vérifiée. Le
+  fichier ZIP ne doit pas avoir plus de 10 000 entrées ni un répertoire central de plus de 16
+  Mio, comptés sur le répertoire lui-même avant l'ouverture, et pas d'enregistrements ZIP64.
+  Un fichier Office doit avoir un `[Content_Types].xml` qui déclare sa partie principale
+  (`word/document.xml`, `xl/workbook.xml`, `ppt/presentation.xml`) comme document, classeur ou
+  présentation (un modèle ou un type avec macros est un autre type), et le premier élément de
+  cette partie principale, cherché dans ses 64 premiers Kio, doit être l'élément racine de ce
+  type ; la partie n'est pas analysée en entier. Un fichier OpenDocument doit avoir `mimetype`
+  physiquement en premier, stocké, sans champ extra et avec exactement ce type, un
+  `META-INF/manifest.xml` dont l'élément racine est `manifest` et dont l'entrée racine nomme
+  le même type, et un `content.xml` ou `styles.xml`. `[Content_Types].xml` et `manifest.xml`
+  sont lus jusqu'à 4 Mio. Le XML est lu avec un analyseur qui refuse toute DTD et toute
+  déclaration d'entité. Un PDF ou une image n'est comparé que sur ses premiers octets
+  (`%PDF-`, PNG, JPEG, GIF, WebP) et n'est pas analysé en entier : un fichier tronqué passe
+  donc. Un fichier texte doit être en UTF-8 sans octet NUL et ne pas commencer comme un format
+  binaire. Les anciens fichiers doc, xls et ppt partagent une signature et ne se distinguent
+  pas par leurs premiers octets : ils ne sont pas remplaçables. Un fichier existant d'un type
+  sans signature connue est refusé avant le téléchargement, avec la liste des types
+  remplaçables.
+- `files_download` renvoie l'ETag du fichier dans le premier tronçon, de sorte qu'un fichier
+  binaire dispose d'une référence pour `files_update`. Les tronçons suivants ne le portent pas.
+
 ## [0.9.0] - 2026-11-20
 
 ### Ajouté

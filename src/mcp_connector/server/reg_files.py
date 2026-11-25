@@ -261,7 +261,9 @@ async def files_create_folder(
     return compact(await files_tools.create_folder(clients, path=path, parents=parents))
 
 
-if config.files_update_enabled():
+if config.files_update_enabled() and not config.files_update_attachment_enabled():
+    # The attachment switch is off: files_update is the text-only tool of 0.9.0, unchanged,
+    # so the default surface does not change.
 
     @mcp.tool(annotations=UPDATE_EXISTING, structured_output=False)
     @graceful
@@ -287,5 +289,60 @@ if config.files_update_enabled():
                 path=path,
                 content=content,
                 etag=etag,
+            )
+        )
+
+elif config.files_update_enabled():
+
+    @mcp.tool(
+        annotations=UPDATE_EXISTING,
+        meta={"openai/fileParams": ["file"]},
+        structured_output=False,
+    )
+    @graceful
+    async def files_update(
+        path: Annotated[str, Field(description="Existing file path; must already exist")],
+        etag: Annotated[str, Field(description="ETag returned by files_read or files_download")],
+        content: Annotated[
+            str | None,
+            Field(description="Complete replacement as UTF-8 text; omit when sending file"),
+        ] = None,
+        file: OpenAIFile = None,
+        ctx: Context | None = None,
+    ) -> str:
+        """Replace an existing file only when its ETag still matches.
+
+        Send content (complete new UTF-8 text) or file (a ChatGPT attachment), with the ETag
+        from files_read or files_download. This replaces the whole file, which must already
+        exist and keeps its path. An attachment must be of the same known type as the
+        existing file (Office and OpenDocument by their type markers, PDF and images by
+        their first bytes only). If the file changed or was deleted, the update is rejected;
+        read it again and decide. Whether an older version is kept depends on the storage
+        backend.
+        """
+
+        if content is not None and file is not None:
+            raise ToolError(
+                message="Send content or file, not both.",
+                hint="Use content for a text file and file for a ChatGPT attachment.",
+            )
+        if content is None and file is None:
+            raise ToolError(
+                message="Send content for a text file or file for a ChatGPT attachment.",
+                hint="Read the file first with files_read or files_download to get its ETag.",
+            )
+        clients = deps.resolve_clients(ctx)
+        if file is None:
+            return compact(
+                await files_tools.update(clients, path=path, content=content or "", etag=etag)
+            )
+        return compact(
+            await files_tools.update_attachment(
+                clients,
+                path=path,
+                etag=etag,
+                download_url=file["download_url"],
+                file_id=file["file_id"],
+                mime_type=file.get("mime_type", ""),
             )
         )

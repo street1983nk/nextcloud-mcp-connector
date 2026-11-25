@@ -81,6 +81,17 @@ nicht bekannt. Dieser Server begrenzt stattdessen den Schaden:
   für `tasks_complete`, `tasks_update` und `tasks_move`. Beide ausgeschaltet lassen,
   solange der Assistent sie nicht braucht; ein Contract-Test schlägt bei
   jedem anderen destruktiven Aufruf fehl,
+- das Ersetzen einer Binärdatei hat einen eigenen Schalter:
+  `NC_MCP_FILES_UPDATE_ATTACHMENT` ist ab Werk aus und wirkt nur zusammen mit
+  `NC_MCP_FILES_UPDATE`, sodass ein Admin Textänderungen erlauben kann, ohne
+  das Ersetzen von Word-, Excel- oder PDF-Dateien zu erlauben. Ist er an,
+  muss der ChatGPT-Anhang vom selben Typ wie die bestehende Datei sein, bevor
+  etwas geschrieben wird, gleich welchen Typ er angibt: Eine Office- oder
+  OpenDocument-Datei wird geöffnet und ihre Struktur geprüft (Verzeichnis der
+  ZIP-Datei innerhalb von Grenzen, `[Content_Types].xml` oder `manifest.xml`,
+  erstes Element des Hauptteils), ein PDF oder Bild nur an den ersten Bytes
+  verglichen, und die älteren Dateien doc, xls und ppt lassen sich nicht
+  ersetzen,
 - Inhalte kommen mit ihrer Herkunft als Strukturfeldern zurück, der Client
   kann sehen, woher ein Text stammt,
 - der Ausgang lässt sich instanzweit schließen (Abschnitt 4).

@@ -11,6 +11,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `files_update` can replace an existing file of a known type (docx, xlsx, pptx, OpenDocument,
+  PDF, PNG, JPEG, GIF, WebP, UTF-8 text) with a ChatGPT attachment (`file`), under the same
+  ETag condition as for text (`content`). The ETag and the exclusion tag are checked before
+  the attachment is downloaded and again right before the write.
+- The switch "Allow replacing existing files with an attachment"
+  (`NC_MCP_FILES_UPDATE_ATTACHMENT`) is off by default and has an effect only together with
+  `NC_MCP_FILES_UPDATE`, so an administrator can allow text edits without allowing binary
+  replacements. It is in Administration settings, Security, MCP Connector and declared as an
+  environment variable. A change takes effect after you disable and enable this app again.
+  With it off, `files_update` in the tool list is the one of 0.9.0.
+- The attachment is checked against the type of the existing file, not against the type it
+  declares. A docx, xlsx, pptx or OpenDocument file is opened and its structure checked. The
+  ZIP file must have at most 10,000 entries and a central directory of at most 16 MiB, counted
+  from the directory itself before it is opened, and no ZIP64 records. An Office file must
+  have a `[Content_Types].xml` that declares its main part (`word/document.xml`,
+  `xl/workbook.xml`, `ppt/presentation.xml`) as a document, workbook or presentation (a
+  template or a macro type is another type), and the first element of that main part, looked
+  for in its first 64 KiB, must be the root element of that type; the part is not parsed
+  whole. An OpenDocument file must have `mimetype` physically first, stored, without extra
+  field and with exactly that type, a `META-INF/manifest.xml` whose root element is `manifest`
+  and whose root entry names the same type, and a `content.xml` or `styles.xml`.
+  `[Content_Types].xml` and `manifest.xml` are read up to 4 MiB. The XML is read with a parser
+  that refuses any DTD or entity declaration. A PDF or an image is compared on its first bytes
+  only (`%PDF-`, PNG, JPEG, GIF, WebP) and is not analysed whole, so a truncated one passes. A
+  text file must be UTF-8 without a NUL byte and must not start like a binary format. The
+  older doc, xls and ppt files share one signature and cannot be told apart by their first
+  bytes, so they cannot be replaced. An existing file of a type without a known signature is
+  refused before the download, with the list of types that can be replaced.
+- `files_download` returns the ETag of the file in the first chunk, so a binary file has a
+  handle for `files_update`. A later chunk does not carry it.
+
 ## [0.9.0] - 2026-11-20
 
 ### Added

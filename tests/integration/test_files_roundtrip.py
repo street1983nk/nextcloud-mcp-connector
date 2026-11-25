@@ -15,11 +15,15 @@ green on a machine without Docker.
 """
 
 import asyncio
+import base64
+import io
 import time
 import uuid
+import zipfile
 
 import httpx
 import pytest
+import respx
 
 from mcp_connector.config import normalize_base_url
 from mcp_connector.errors import ConflictError, ToolError
@@ -212,3 +216,136 @@ async def test_read_then_update_round_trip_uses_the_returned_etag(
     after = await files_tools.read(clients, path=path)
     assert after["content"] == "second\n"
     assert after["etag"] == result["etag"]
+
+
+class _OneShotStream(httpx.AsyncByteStream):
+    def __init__(self, data: bytes) -> None:
+        self.data = data
+
+    async def __aiter__(self):
+        yield self.data
+
+
+DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
+
+_PKG = "http://schemas.openxmlformats.org/package/2006"
+_ODOC = "http://schemas.openxmlformats.org/officeDocument/2006"
+_WORD = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+
+
+def _minimal_docx(text: str) -> bytes:
+    """A valid OOXML package with one paragraph, built in memory."""
+    head = '<?xml version="1.0" encoding="UTF-8"?>'
+    parts = {
+        "[Content_Types].xml": (
+            f'{head}<Types xmlns="{_PKG}/content-types">'
+            '<Default Extension="rels" '
+            'ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            f'<Override PartName="/word/document.xml" ContentType="{_WORD}"/></Types>'
+        ),
+        "_rels/.rels": (
+            f'{head}<Relationships xmlns="{_PKG}/relationships">'
+            f'<Relationship Id="rId1" Type="{_ODOC}/relationships/officeDocument" '
+            'Target="word/document.xml"/></Relationships>'
+        ),
+        "word/document.xml": (
+            f'{head}<w:document xmlns:w="http://schemas.openxmlformats.org/'
+            'wordprocessingml/2006/main"><w:body><w:p><w:r>'
+            f"<w:t>{text}</w:t></w:r></w:p></w:body></w:document>"
+        ),
+    }
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as package:
+        for name, xml in parts.items():
+            package.writestr(name, xml)
+    return buffer.getvalue()
+
+
+async def test_update_attachment_replaces_a_binary_and_guards_with_the_download_etag(
+    clients: NcClients, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only the ChatGPT file source is simulated; every Nextcloud request is real.
+
+    The replacement needs both admin switches, ``NC_MCP_FILES_UPDATE`` and
+    ``NC_MCP_FILES_UPDATE_ATTACHMENT``, and refuses bytes of another type than the file.
+    """
+    monkeypatch.setenv("NC_MCP_FILES_UPDATE", "on")
+    monkeypatch.setenv("NC_MCP_FILES_UPDATE_ATTACHMENT", "on")
+    path = _unique_path().replace(".md", ".docx")
+    source_url = "https://files.oaiusercontent.com/file-roundtrip?sig=test"
+    edited = _minimal_docx("edited")
+    original = _minimal_docx("original")
+    await files_tools.upload_binary(
+        clients,
+        path=path,
+        content_base64=base64.b64encode(original).decode("ascii"),
+        total_bytes=len(original),
+        final=True,
+        content_type=DOCX_TYPE,
+    )
+    downloaded = await files_tools.download(clients, path=path, max_bytes=len(original))
+    assert downloaded["etag"], "files_download must return the CAS handle"
+    assert downloaded["content_type"] == DOCX_TYPE
+    later_chunk = await files_tools.download(clients, path=path, offset=1, max_bytes=2)
+    assert "etag" not in later_chunk, "only the first chunk carries the ETag"
+    await asyncio.sleep(1.1)
+
+    with respx.mock(assert_all_called=False) as mock:
+        mock.route(host=httpx.URL(clients.creds.base_url).host).pass_through()
+        source_route = mock.get(source_url).mock(
+            return_value=httpx.Response(
+                200,
+                stream=_OneShotStream(edited),
+                headers={"Content-Length": str(len(edited))},
+            )
+        )
+        result = await files_tools.update_attachment(
+            clients,
+            path=path,
+            etag=downloaded["etag"],
+            download_url=source_url,
+            file_id="file_roundtrip",
+            mime_type=DOCX_TYPE,
+        )
+        assert result["size"] == len(edited)
+        assert result["versioned"] is not False
+
+        after = await files_tools.download(clients, path=path, max_bytes=len(edited))
+        assert after["content"] == edited
+        with zipfile.ZipFile(io.BytesIO(after["content"])) as package:
+            assert b"edited" in package.read("word/document.xml")
+        assert after["etag"] == result["etag"]
+        assert after["content_type"] == DOCX_TYPE
+
+        with pytest.raises(ConflictError):
+            await files_tools.update_attachment(
+                clients,
+                path=path,
+                etag=downloaded["etag"],
+                download_url=source_url,
+                file_id="file_roundtrip",
+            )
+
+        # Bytes of another type than the existing file are refused and nothing is written.
+        pdf = b"%PDF-1.7\nnot a word document\n"
+        source_route.mock(
+            return_value=httpx.Response(
+                200,
+                stream=_OneShotStream(pdf),
+                headers={"Content-Length": str(len(pdf))},
+            )
+        )
+        with pytest.raises(ToolError, match="not a Word"):
+            await files_tools.update_attachment(
+                clients,
+                path=path,
+                etag=result["etag"],
+                download_url=source_url,
+                file_id="file_roundtrip",
+                mime_type="application/pdf",
+            )
+        unchanged = await files_tools.download(clients, path=path, max_bytes=len(edited))
+        assert unchanged["content"] == edited
+        assert unchanged["etag"] == result["etag"]

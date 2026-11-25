@@ -65,10 +65,16 @@ mcp = MCPServer(
         "Files are never deleted, moved, renamed or unconditionally overwritten."
         " Tasks are never deleted."
         + (
-            " Existing UTF-8 text files can be replaced with files_update, "
-            "and only with a matching ETag."
-            if config.files_update_enabled()
-            else ""
+            " Existing files can be replaced with files_update (text as content, files of a "
+            "supported known type as a ChatGPT attachment, PDF and images checked by their first "
+            "bytes only), and only with a matching ETag."
+            if config.files_update_attachment_enabled()
+            else (
+                " Existing UTF-8 text files can be replaced with files_update, "
+                "and only with a matching ETag."
+                if config.files_update_enabled()
+                else ""
+            )
         )
         + (
             " Existing tasks can be completed, changed or moved with tasks_complete, "

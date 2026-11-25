@@ -561,6 +561,11 @@ Le journal d'audit est intégré et désactivé par défaut ; ensuite viendront 
 				<description>Off unless set to on. When enabled, the files_update tool can replace existing UTF-8 text files only when their current ETag matches the supplied ETag.</description>
 			</variable>
 			<variable>
+				<name>NC_MCP_FILES_UPDATE_ATTACHMENT</name>
+				<display-name>Allow replacing existing files with an attachment</display-name>
+				<description>Off unless set to on, and it has an effect only together with NC_MCP_FILES_UPDATE. When both are on, the files_update tool can replace an existing file of a known type (docx, xlsx, pptx, odt, ods, odp, odg, PDF, PNG, JPEG, GIF, WebP or UTF-8 text) with a ChatGPT attachment, only when the ETag matches and the attachment is of the same type as the existing file: an Office or OpenDocument file is opened and its type markers checked (not the whole document), a PDF or an image only by its first bytes. A change takes effect after you disable and enable this app again.</description>
+			</variable>
+			<variable>
 				<name>NC_MCP_TASKS_UPDATE</name>
 				<display-name>Allow changing existing tasks</display-name>
 				<description>Off unless set to on. When enabled, assistants can complete, reopen, edit and move existing tasks with tasks_complete, tasks_update and tasks_move, and only with the ETag returned by tasks_read. A change takes effect after you disable and enable this app again.</description>

@@ -227,9 +227,12 @@ protection incident.
   `tasks_move`, which relocates one task with its subtasks into another own or
   writable shared list when `NC_MCP_TASKS_UPDATE` is on. Uploads remain create-only.
   When `NC_MCP_FILES_UPDATE` is enabled, `files_update` can replace an
-  existing UTF-8 text file only with a matching ETag. Stale or deleted
-  targets are refused as conflicts, and the task tools refuse a stale ETag the
-  same way.
+  existing UTF-8 text file only with a matching ETag. With
+  `NC_MCP_FILES_UPDATE_ATTACHMENT` on as well, it can also replace a file such as a
+  Word, Excel or PDF file from a ChatGPT attachment, which the connector
+  downloads from the ChatGPT file host for that call and stages in a temporary
+  file until the write is done. Stale or deleted targets are refused as
+  conflicts, and the task tools refuse a stale ETag the same way.
 - The assistant never sees more than the signed in user. Every request runs under
   that identity, so Nextcloud's own permissions decide what an injection could
   reach at most.
@@ -247,7 +250,9 @@ modules on every run. An operator who wants the direct messaging channel closed 
 `NC_MCP_TALK_SEND` to off; one who needs every way out closed also reviews what the
 connected accounts share, because creating a file or conditionally replacing
 its content in a shared container remains a path outwards. Disabling
-`NC_MCP_FILES_UPDATE` closes the replacement path and disabling
+`NC_MCP_FILES_UPDATE` closes the replacement path (disabling only
+`NC_MCP_FILES_UPDATE_ATTACHMENT` closes the replacement of binary files and keeps
+the text edits) and disabling
 `NC_MCP_TASKS_UPDATE` closes every change to an existing task, but neither closes
 the create-only path.
 

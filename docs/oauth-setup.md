@@ -123,7 +123,7 @@ variable. A store installation needs this: with a single Docker daemon, Nextclou
 an ExApp without asking for deploy options, so `--env` never happens and every declared
 variable arrives empty.
 
-The form sits in **Administration settings, Security, MCP Connector** and carries ten
+The form sits in **Administration settings, Security, MCP Connector** and carries eleven
 fields:
 
 | Field | Config key | What it sets |
@@ -136,10 +136,11 @@ fields:
 | Let assistant apps send Talk messages | `talk_send` | `NC_MCP_TALK_SEND` |
 | Keep a record of tool calls | `audit_log` | `NC_MCP_AUDIT_LOG` |
 | Allow editing existing text files | `files_update` | `NC_MCP_FILES_UPDATE` |
+| Allow replacing existing files with an attachment | `files_update_attachment` | `NC_MCP_FILES_UPDATE_ATTACHMENT` |
 | Allow changing existing tasks | `tasks_update` | `NC_MCP_TASKS_UPDATE` |
 | Allow reading Profile Fields | `profile_fields_read` | `NC_MCP_PROFILE_FIELDS_READ` |
 
-**Not every field of this form is about OAuth.** The last five are not. The four after
+**Not every field of this form is about OAuth.** The last six are not. The five after
 `talk_send` ship off; the write switches and the Profile Fields switch are described in
 [exapp-install.md](./exapp-install.md). The Talk field decides whether
 `talk_send` may post a message into a Talk conversation at all, for every account of this

@@ -52,6 +52,7 @@ SWITCH_WORDING = {
     "talk_send": "Talk message",
     "audit_log": "record of tool calls",
     "files_update": "text files",
+    "files_update_attachment": "attachment",
     "tasks_update": "tasks",
     "profile_fields_read": "Profile Fields",
 }

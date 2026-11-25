@@ -412,3 +412,9 @@ background
 # --- Tool logic ahead of its registration, plan 33-08 --------------------------------------
 # Empty again: move_task sat here between task 1 and task 2 and left with tasks_move, which
 # calls it.
+
+# --- Handlers of the expat parser in tools/attachment_type.py -------------------------------
+# Assigned to the parser object and called by expat while it parses, never from our own code.
+StartDoctypeDeclHandler
+EntityDeclHandler
+StartElementHandler

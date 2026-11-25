@@ -1522,6 +1522,12 @@ BASE_INSTRUCTION = (
 FILES_UPDATE_SENTENCE = (
     " Existing UTF-8 text files can be replaced with files_update, and only with a matching ETag."
 )
+#: With the attachment switch on as well (0.10.0) the sentence names both ways.
+FILES_UPDATE_ATTACHMENT_SENTENCE = (
+    " Existing files can be replaced with files_update (text as content, files of a supported "
+    "known type as a ChatGPT attachment, PDF and images checked by their first bytes only), "
+    "and only with a matching ETag."
+)
 TASKS_UPDATE_SENTENCE = (
     " Existing tasks can be completed, changed or moved with tasks_complete, tasks_update "
     "and tasks_move, and only with the ETag from tasks_read."
@@ -1555,19 +1561,34 @@ def _instructions(switches: dict[str, str]) -> str:
 
 
 @pytest.mark.parametrize(
-    ("files", "tasks", "expected"),
+    ("files", "attachment", "tasks", "expected"),
     [
-        ("off", "off", BASE_INSTRUCTION),
-        ("on", "off", BASE_INSTRUCTION + FILES_UPDATE_SENTENCE),
-        ("off", "on", BASE_INSTRUCTION + TASKS_UPDATE_SENTENCE),
-        ("on", "on", BASE_INSTRUCTION + FILES_UPDATE_SENTENCE + TASKS_UPDATE_SENTENCE),
+        ("off", "off", "off", BASE_INSTRUCTION),
+        ("on", "off", "off", BASE_INSTRUCTION + FILES_UPDATE_SENTENCE),
+        # The attachment switch hangs on files_update: alone it changes nothing.
+        ("off", "on", "off", BASE_INSTRUCTION),
+        ("on", "on", "off", BASE_INSTRUCTION + FILES_UPDATE_ATTACHMENT_SENTENCE),
+        ("off", "off", "on", BASE_INSTRUCTION + TASKS_UPDATE_SENTENCE),
+        ("on", "off", "on", BASE_INSTRUCTION + FILES_UPDATE_SENTENCE + TASKS_UPDATE_SENTENCE),
+        (
+            "on",
+            "on",
+            "on",
+            BASE_INSTRUCTION + FILES_UPDATE_ATTACHMENT_SENTENCE + TASKS_UPDATE_SENTENCE,
+        ),
     ],
 )
 def test_the_instruction_names_the_modifying_task_tools_only_with_their_switch_on(
-    files: str, tasks: str, expected: str
+    files: str, attachment: str, tasks: str, expected: str
 ) -> None:
     """Plan 33-09: one sentence per switch, and the switch-off text stays byte for byte."""
-    instruction = _instructions({"NC_MCP_FILES_UPDATE": files, "NC_MCP_TASKS_UPDATE": tasks})
+    instruction = _instructions(
+        {
+            "NC_MCP_FILES_UPDATE": files,
+            "NC_MCP_FILES_UPDATE_ATTACHMENT": attachment,
+            "NC_MCP_TASKS_UPDATE": tasks,
+        }
+    )
 
     assert instruction == expected
     if tasks == "on":

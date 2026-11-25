@@ -81,6 +81,17 @@ complète n'est connue. Ce serveur limite plutôt les dégâts :
   pour `tasks_complete`, `tasks_update` et `tasks_move`. Les laisser
   désactivés tant que l'assistant n'en a pas besoin ; un test de contrat
   échoue à tout autre appel destructif,
+- remplacer un fichier binaire a son propre interrupteur :
+  `NC_MCP_FILES_UPDATE_ATTACHMENT` est désactivé par défaut et n'agit qu'avec
+  `NC_MCP_FILES_UPDATE`, si bien qu'un administrateur peut autoriser les
+  modifications de texte sans autoriser le remplacement de fichiers Word,
+  Excel ou PDF. Une fois activé, la pièce jointe ChatGPT doit être du
+  même type que le fichier existant avant toute écriture, quel que soit le
+  type qu'elle déclare : un fichier Office ou OpenDocument est ouvert et
+  sa structure vérifiée (répertoire du fichier ZIP dans des limites,
+  `[Content_Types].xml` ou `manifest.xml`, premier élément de la partie
+  principale), un PDF ou une image n'est comparé que sur ses premiers octets,
+  et les anciens fichiers doc, xls et ppt ne sont pas remplaçables,
 - les contenus reviennent avec leur origine en champs structurés, le client
   peut voir d'où vient un texte,
 - le canal sortant peut être fermé pour toute l'instance (section 4).

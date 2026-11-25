@@ -163,6 +163,7 @@ async def test_the_eight_fields_are_the_eight_config_keys_in_order() -> None:
         "talk_send",
         "audit_log",
         "files_update",
+        "files_update_attachment",
         "tasks_update",
         "profile_fields_read",
     ]
@@ -173,6 +174,7 @@ async def test_the_eight_fields_are_the_eight_config_keys_in_order() -> None:
         "checkbox",
         "checkbox",
         "text",
+        "checkbox",
         "checkbox",
         "checkbox",
         "checkbox",
@@ -360,6 +362,27 @@ async def test_the_files_update_field_is_a_checkbox_that_ships_off() -> None:
 
 @pytest.mark.anyio
 @respx.mock
+async def test_the_files_update_attachment_field_is_a_checkbox_that_ships_off() -> None:
+    """0.10.0: replacing a file with an attachment is its own opt-in, off by default, and the
+    form says that it has an effect only together with the files_update switch."""
+    route = respx.post(SETTINGS_URL).mock(return_value=httpx.Response(200, json={}))
+
+    await admin_settings.register_admin_form(env=ENV)
+
+    fields = json.loads(route.calls.last.request.content)["formScheme"]["fields"]
+    ids = [field["id"] for field in fields]
+    assert ids.index("files_update_attachment") == ids.index("files_update") + 1
+    switch = next(field for field in fields if field["id"] == "files_update_attachment")
+    assert switch["type"] == "checkbox"
+    assert switch["default"] is False
+    assert switch["title"] == strings.ADMIN_FIELD_FILES_UPDATE_ATTACHMENT_LABEL
+    assert switch["description"] == strings.ADMIN_FIELD_FILES_UPDATE_ATTACHMENT_DESCRIPTION
+    assert "together with" in switch["description"]
+    assert "sensitive" not in json.dumps(switch).lower()
+
+
+@pytest.mark.anyio
+@respx.mock
 async def test_the_tasks_update_field_is_a_checkbox_that_ships_off() -> None:
     """D-33-01: the switch of the modifying task tools is opt-in and ships disabled."""
     route = respx.post(SETTINGS_URL).mock(return_value=httpx.Response(200, json={}))
@@ -441,6 +464,7 @@ def _manifest_display_name(variable: str) -> str:
     ("variable", "label"),
     [
         ("NC_MCP_FILES_UPDATE", "ADMIN_FIELD_FILES_UPDATE_LABEL"),
+        ("NC_MCP_FILES_UPDATE_ATTACHMENT", "ADMIN_FIELD_FILES_UPDATE_ATTACHMENT_LABEL"),
         ("NC_MCP_TASKS_UPDATE", "ADMIN_FIELD_TASKS_UPDATE_LABEL"),
         ("NC_MCP_PROFILE_FIELDS_READ", "ADMIN_FIELD_PROFILE_FIELDS_READ_LABEL"),
     ],
@@ -557,7 +581,7 @@ async def test_no_field_of_the_form_offers_a_level_of_recording() -> None:
     await admin_settings.register_admin_form(env=ENV)
 
     fields = json.loads(route.calls.last.request.content)["formScheme"]["fields"]
-    assert len(fields) == 10, "every field of the form is walked, not a subset of it"
+    assert len(fields) == 11, "every field of the form is walked, not a subset of it"
     for field in fields:
         assert LEVEL_WORD.search(json.dumps(field).lower()) is None, (
             f"{field['id']} offers a level of recording this app cannot deliver"

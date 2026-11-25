@@ -2507,6 +2507,7 @@ def test_every_variable_the_code_reads_is_declared_in_the_manifest(
         config.ENV_TALK_SEND,
         config.ENV_FILES_ROOT,
         config.ENV_FILES_UPDATE,
+        config.ENV_FILES_UPDATE_ATTACHMENT,
         config.ENV_TASKS_UPDATE,
         config.ENV_PROFILE_FIELDS_READ,
         config.ENV_DISABLED_TOOLS,

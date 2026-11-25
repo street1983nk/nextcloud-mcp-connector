@@ -44,8 +44,16 @@ OPTIONAL_TOOLS: dict[str, str] = {
 #: still switch it on.
 TASKS_UPDATE_SWITCH = "NC_MCP_TASKS_UPDATE"
 
+#: The variable of the switch that changes the schema of ``files_update`` and registers no tool
+#: of its own (0.10.0). It is measured on, so the switched-on surface carries the ``file``
+#: parameter of ``files_update``.
+FILES_UPDATE_ATTACHMENT_SWITCH = "NC_MCP_FILES_UPDATE_ATTACHMENT"
+
 #: Every switch the measurement turns on.
-SWITCHES: frozenset[str] = frozenset(OPTIONAL_TOOLS.values()) | {TASKS_UPDATE_SWITCH}
+SWITCHES: frozenset[str] = frozenset(OPTIONAL_TOOLS.values()) | {
+    TASKS_UPDATE_SWITCH,
+    FILES_UPDATE_ATTACHMENT_SWITCH,
+}
 
 _MEASURE = """
 import asyncio, json

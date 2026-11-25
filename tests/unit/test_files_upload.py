@@ -11,14 +11,20 @@ encodable as UTF-8.
 
 import asyncio
 import base64
+import json
+import os
+import subprocess
+import sys
 
+import attachment_bytes as ab
 import guard_routes
 import httpx
 import pytest
 import respx
 
+from mcp_connector import config
 from mcp_connector.errors import ConflictError, ToolError
-from mcp_connector.nextcloud import NcClients
+from mcp_connector.nextcloud import NcClients, exclusion
 from mcp_connector.nextcloud.clients import dav
 from mcp_connector.nextcloud.credentials import Credentials
 from mcp_connector.tools import files as files_tools
@@ -399,8 +405,17 @@ async def test_chatgpt_attachment_streams_to_create_only_put(clients: NcClients)
     }
 
 
-def _update_stat_xml(etag: str, *, fileid: str = "") -> str:
+def _update_stat_xml(
+    etag: str,
+    *,
+    fileid: str = "",
+    content_type: str = "text/markdown",
+    folder: bool = False,
+) -> str:
     fileid_prop = f"<oc:fileid>{fileid}</oc:fileid>" if fileid else ""
+    resourcetype = (
+        "<d:resourcetype><d:collection/></d:resourcetype>" if folder else "<d:resourcetype/>"
+    )
     return f"""<?xml version="1.0" encoding="utf-8"?>
 <d:multistatus xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
   <d:response>
@@ -408,10 +423,10 @@ def _update_stat_xml(etag: str, *, fileid: str = "") -> str:
       <d:prop>
         {fileid_prop}
         <d:getcontentlength>13</d:getcontentlength>
-        <d:getcontenttype>text/markdown</d:getcontenttype>
+        <d:getcontenttype>{content_type}</d:getcontenttype>
         <d:getlastmodified>Thu, 08 Oct 2026 10:00:00 GMT</d:getlastmodified>
         <d:getetag>{etag}</d:getetag>
-        <d:resourcetype/>
+        {resourcetype}
       </d:prop>
       <d:status>HTTP/1.1 200 OK</d:status>
     </d:propstat>
@@ -761,3 +776,724 @@ async def test_update_quotes_a_bare_etag_token(clients: NcClients) -> None:
         await files_tools.update(clients, path=TARGET, content="x", etag="abc123")
 
     assert put.calls[0].request.headers["if-match"] == '"abc123"'
+
+
+DOCX = ab.DOCX
+DOCX_URL = f"{FILES_ROOT}/Docs/report.docx"
+DOCX_BYTES = ab.docx_bytes("edited docx " * 50)
+
+
+@pytest.fixture
+def attachment_switch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Both admin switches on: ``update_attachment`` refuses a call while the second is off."""
+    monkeypatch.setenv(config.ENV_FILES_UPDATE, "on")
+    monkeypatch.setenv(config.ENV_FILES_UPDATE_ATTACHMENT, "on")
+
+
+def _attachment_response(data: bytes = DOCX_BYTES, status: int = 200) -> httpx.Response:
+    return httpx.Response(
+        status,
+        stream=_OneShotStream(data),
+        headers={"Content-Length": str(len(data)), "Content-Type": DOCX},
+    )
+
+
+def _stat_route(
+    mock: respx.MockRouter, etag: str = '"caller-etag"', *, folder: bool = False
+) -> respx.Route:
+    return mock.route(method="PROPFIND", url=DOCX_URL).mock(
+        return_value=httpx.Response(
+            207, text=_update_stat_xml(etag, fileid="123", content_type=DOCX, folder=folder)
+        )
+    )
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_replaces_a_docx_with_the_existing_type(
+    clients: NcClients,
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        source = mock.get(OPENAI_FILE_URL).mock(return_value=_attachment_response())
+        _stat_route(mock)
+        put = mock.route(method="PUT", url=DOCX_URL).mock(
+            return_value=httpx.Response(204, headers={"OC-ETag": '"new-etag"'})
+        )
+        mock.route(
+            method="PROPFIND", url__regex=r".*/remote\.php/dav/versions/[^/]+/versions/123$"
+        ).mock(
+            side_effect=[
+                httpx.Response(207, text=_versions_xml(1)),
+                httpx.Response(207, text=_versions_xml(2)),
+            ]
+        )
+        result = await files_tools.update_attachment(
+            clients,
+            path="/Docs/report.docx",
+            etag='"caller-etag"',
+            download_url=OPENAI_FILE_URL,
+            file_id="file_test",
+            mime_type=DOCX,
+        )
+
+    assert source.call_count == 1
+    request = put.calls[0].request
+    assert request.headers["if-match"] == '"caller-etag"'
+    assert request.headers["content-type"] == DOCX
+    assert request.headers["content-length"] == str(len(DOCX_BYTES))
+    assert request.content == DOCX_BYTES
+    assert result == {
+        "path": "/Docs/report.docx",
+        "etag": '"new-etag"',
+        "size": len(DOCX_BYTES),
+        "versioned": True,
+    }
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_with_a_stale_etag_downloads_and_writes_nothing(
+    clients: NcClients,
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        _stat_route(mock, etag='"current-etag"')
+        with pytest.raises(ConflictError, match="changed or was deleted"):
+            await files_tools.update_attachment(
+                clients,
+                path="/Docs/report.docx",
+                etag='"old-etag"',
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+                mime_type=DOCX,
+            )
+
+        assert [call.request.method for call in mock.calls] == ["PROPFIND"]
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_rechecks_the_etag_after_the_download(
+    clients: NcClients,
+) -> None:
+    stat = httpx.Response(
+        207, text=_update_stat_xml('"caller-etag"', fileid="123", content_type=DOCX)
+    )
+    changed = httpx.Response(
+        207, text=_update_stat_xml('"changed-etag"', fileid="123", content_type=DOCX)
+    )
+    with respx.mock(assert_all_called=True) as mock:
+        source = mock.get(OPENAI_FILE_URL).mock(return_value=_attachment_response())
+        mock.route(method="PROPFIND", url=DOCX_URL).mock(side_effect=[stat, changed])
+        mock.route(method="PROPFIND", url__regex=r".*/dav/versions/.*").mock(
+            return_value=httpx.Response(404)
+        )
+        with pytest.raises(ConflictError, match="changed or was deleted"):
+            await files_tools.update_attachment(
+                clients,
+                path="/Docs/report.docx",
+                etag='"caller-etag"',
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+                mime_type=DOCX,
+            )
+
+        assert source.call_count == 1
+        assert all(call.request.method != "PUT" for call in mock.calls)
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_rechecks_the_tag_after_the_download(
+    clients: NcClients, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scopes = iter([exclusion.UNTAGGED, exclusion.TagScope("active", fileids=frozenset({"123"}))])
+
+    async def tagged_during_the_download(_clients: object) -> exclusion.TagScope:
+        return next(scopes)
+
+    monkeypatch.setattr(exclusion, "load_scope", tagged_during_the_download)
+    with respx.mock(assert_all_called=True) as mock:
+        source = mock.get(OPENAI_FILE_URL).mock(return_value=_attachment_response())
+        _stat_route(mock)
+        mock.route(method="PROPFIND", url__regex=r".*/dav/versions/.*").mock(
+            return_value=httpx.Response(404)
+        )
+        with pytest.raises(ConflictError, match="changed or was deleted"):
+            await files_tools.update_attachment(
+                clients,
+                path="/Docs/report.docx",
+                etag='"caller-etag"',
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+                mime_type=DOCX,
+            )
+
+        assert source.call_count == 1
+        assert all(call.request.method != "PUT" for call in mock.calls)
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_has_no_request_between_the_last_check_and_the_put(
+    clients: NcClients, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The version count is read before the last check, so a tag put on the file while it
+    is read is seen by that check; counted after the check, the tag would arrive too late."""
+    tagged = False
+
+    async def load_scope(_clients: object) -> exclusion.TagScope:
+        if tagged:
+            return exclusion.TagScope("active", fileids=frozenset({"123"}))
+        return exclusion.UNTAGGED
+
+    def versions_while_the_tag_is_put(_request: httpx.Request) -> httpx.Response:
+        nonlocal tagged
+        tagged = True
+        return httpx.Response(207, text=_versions_xml(1))
+
+    monkeypatch.setattr(exclusion, "load_scope", load_scope)
+    with respx.mock as mock:
+        mock.get(OPENAI_FILE_URL).mock(return_value=_attachment_response())
+        _stat_route(mock)
+        mock.route(method="PROPFIND", url__regex=r".*/dav/versions/.*").mock(
+            side_effect=versions_while_the_tag_is_put
+        )
+        put = mock.route(method="PUT", url=DOCX_URL).mock(return_value=httpx.Response(204))
+        with pytest.raises(ConflictError, match="changed or was deleted"):
+            await files_tools.update_attachment(
+                clients,
+                path="/Docs/report.docx",
+                etag='"caller-etag"',
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+                mime_type=DOCX,
+            )
+
+        assert put.call_count == 0
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_puts_right_after_its_last_check(clients: NcClients) -> None:
+    """In the order of the requests, the one before the PUT is the stat of the last check."""
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(OPENAI_FILE_URL).mock(return_value=_attachment_response())
+        _stat_route(mock)
+        mock.route(method="PROPFIND", url__regex=r".*/dav/versions/.*").mock(
+            return_value=httpx.Response(207, text=_versions_xml(1))
+        )
+        mock.route(method="PUT", url=DOCX_URL).mock(return_value=httpx.Response(204))
+        await files_tools.update_attachment(
+            clients,
+            path="/Docs/report.docx",
+            etag='"caller-etag"',
+            download_url=OPENAI_FILE_URL,
+            file_id="file_test",
+        )
+
+        before_the_put = next(
+            mock.calls[n - 1].request
+            for n, call in enumerate(mock.calls)
+            if call.request.method == "PUT"
+        )
+
+    assert (before_the_put.method, str(before_the_put.url)) == ("PROPFIND", DOCX_URL)
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_rejects_an_untrusted_url_before_any_request(
+    clients: NcClients,
+) -> None:
+    with respx.mock as mock:
+        with pytest.raises(ToolError, match="allowed ChatGPT file host"):
+            await files_tools.update_attachment(
+                clients,
+                path="/Docs/report.docx",
+                etag='"caller-etag"',
+                download_url="https://example.com/file-test",
+                file_id="file_test",
+                mime_type=DOCX,
+            )
+        assert not mock.calls
+
+
+def _typed_download(content_type: str | None, data: bytes = DOCX_BYTES) -> httpx.Response:
+    headers = {"Content-Length": str(len(data))}
+    if content_type is not None:
+        headers["Content-Type"] = content_type
+    return httpx.Response(200, stream=_OneShotStream(data), headers=headers)
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+@pytest.mark.parametrize(
+    ("declared", "data", "accepted"),
+    [
+        # Right bytes pass whatever the attachment says it is, parameters included.
+        ("application/octet-stream", ab.docx_bytes("one"), True),
+        ("application/pdf", ab.docx_bytes("a different text"), True),
+        (DOCX.upper(), ab.docx_bytes(), True),
+        ("", ab.docx_bytes("x" * 500), True),
+        ("image/png", ab.docx_bytes("png"), True),
+        ("text/plain; charset=utf-8", ab.docx_bytes("parameters"), True),
+        (DOCX + "; charset=binary", ab.docx_bytes("more parameters"), True),
+        # Wrong bytes are refused whatever the attachment says it is.
+        (DOCX, ab.PDF_BYTES, False),
+        (DOCX, ab.xlsx_bytes(), False),
+        (DOCX, ab.docm_bytes(), False),
+        ("application/pdf", ab.TEXT_BYTES, False),
+    ],
+)
+async def test_update_attachment_decides_by_the_bytes_and_not_by_the_declared_type(
+    clients: NcClients, declared: str, data: bytes, accepted: bool
+) -> None:
+    """The declared type is not an input: the bytes alone decide, and the type that is stored
+    stays the one of the existing file."""
+    with respx.mock as mock:
+        mock.get(OPENAI_FILE_URL).mock(return_value=_attachment_response(data))
+        _stat_route(mock)
+        mock.route(method="PROPFIND", url__regex=r".*/dav/versions/.*").mock(
+            return_value=httpx.Response(404)
+        )
+        put = mock.route(method="PUT", url=DOCX_URL).mock(
+            return_value=httpx.Response(204, headers={"OC-ETag": '"new-etag"'})
+        )
+        call = files_tools.update_attachment(
+            clients,
+            path="/Docs/report.docx",
+            etag='"caller-etag"',
+            download_url=OPENAI_FILE_URL,
+            file_id="file_test",
+            mime_type=declared,
+        )
+        if not accepted:
+            with pytest.raises(ToolError, match="The attachment is not a Word"):
+                await call
+            assert put.call_count == 0
+            return
+        result = await call
+
+    assert put.calls[0].request.headers["content-type"] == DOCX
+    assert put.calls[0].request.content == data
+    assert result["etag"] == '"new-etag"'
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+@pytest.mark.parametrize("served", ["application/octet-stream", "application/pdf", None])
+async def test_update_attachment_does_not_read_the_type_the_download_is_served_with(
+    clients: NcClients, served: str | None
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(OPENAI_FILE_URL).mock(return_value=_typed_download(served))
+        _stat_route(mock)
+        mock.route(method="PROPFIND", url__regex=r".*/dav/versions/.*").mock(
+            return_value=httpx.Response(404)
+        )
+        put = mock.route(method="PUT", url=DOCX_URL).mock(
+            return_value=httpx.Response(204, headers={"OC-ETag": '"new-etag"'})
+        )
+        await files_tools.update_attachment(
+            clients,
+            path="/Docs/report.docx",
+            etag='"caller-etag"',
+            download_url=OPENAI_FILE_URL,
+            file_id="file_test",
+        )
+
+    assert put.calls[0].request.headers["content-type"] == DOCX
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_replaces_a_generic_existing_type_by_its_extension(
+    clients: NcClients,
+) -> None:
+    """The server reports ``application/octet-stream`` for the .docx: the extension tells what
+    to expect, and the stored type stays the generic one of the existing file."""
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(OPENAI_FILE_URL).mock(return_value=_attachment_response())
+        mock.route(method="PROPFIND", url=DOCX_URL).mock(
+            return_value=httpx.Response(
+                207,
+                text=_update_stat_xml(
+                    '"caller-etag"', fileid="123", content_type="application/octet-stream"
+                ),
+            )
+        )
+        mock.route(method="PROPFIND", url__regex=r".*/dav/versions/.*").mock(
+            return_value=httpx.Response(404)
+        )
+        put = mock.route(method="PUT", url=DOCX_URL).mock(
+            return_value=httpx.Response(204, headers={"OC-ETag": '"new-etag"'})
+        )
+        await files_tools.update_attachment(
+            clients,
+            path="/Docs/report.docx",
+            etag='"caller-etag"',
+            download_url=OPENAI_FILE_URL,
+            file_id="file_test",
+            mime_type="application/octet-stream",
+        )
+
+    assert put.calls[0].request.headers["content-type"] == "application/octet-stream"
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_replaces_a_text_file_and_keeps_its_parameters(
+    clients: NcClients,
+) -> None:
+    text = b"a,b\n1,2\n"
+    csv_url = f"{FILES_ROOT}/Docs/table.csv"
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(OPENAI_FILE_URL).mock(return_value=_typed_download(None, text))
+        mock.route(method="PROPFIND", url=csv_url).mock(
+            return_value=httpx.Response(
+                207,
+                text=_update_stat_xml(
+                    '"caller-etag"', fileid="123", content_type="text/csv; charset=utf-8"
+                ),
+            )
+        )
+        mock.route(method="PROPFIND", url__regex=r".*/dav/versions/.*").mock(
+            return_value=httpx.Response(404)
+        )
+        put = mock.route(method="PUT", url=csv_url).mock(
+            return_value=httpx.Response(204, headers={"OC-ETag": '"new-etag"'})
+        )
+        await files_tools.update_attachment(
+            clients,
+            path="/Docs/table.csv",
+            etag='"caller-etag"',
+            download_url=OPENAI_FILE_URL,
+            file_id="file_test",
+            mime_type="TEXT/CSV",
+        )
+
+    assert put.calls[0].request.headers["content-type"] == "text/csv; charset=utf-8"
+    assert put.calls[0].request.content == text
+
+
+#: What the existing file is (type reported by WebDAV, path) and what is attached; every row
+#: has to end in a refusal that names the type and writes nothing.
+_REFUSED = [
+    pytest.param(DOCX, "report.docx", ab.xlsx_bytes(), "Word (docx)", id="xlsx-over-docx"),
+    pytest.param(DOCX, "report.docx", ab.plain_zip_bytes(), "Word (docx)", id="any-zip-over-docx"),
+    pytest.param(DOCX, "report.docx", ab.PDF_BYTES, "Word (docx)", id="pdf-over-docx"),
+    pytest.param(DOCX, "report.docx", ab.TEXT_BYTES, "Word (docx)", id="text-over-docx"),
+    pytest.param(
+        "application/octet-stream", "report.docx", ab.PDF_BYTES, "Word (docx)", id="generic-docx"
+    ),
+    pytest.param(
+        ab.ODT, "letter.odt", ab.odf_bytes(ab.ODS), "OpenDocument text (odt)", id="ods-over-odt"
+    ),
+    pytest.param(ab.PPTX, "deck.pptx", ab.docx_bytes(), "PowerPoint (pptx)", id="docx-over-pptx"),
+    pytest.param("application/pdf", "scan.pdf", ab.docx_bytes(), "PDF", id="docx-over-pdf"),
+    pytest.param("image/png", "logo.png", ab.JPEG_BYTES, "PNG", id="jpeg-over-png"),
+    pytest.param(
+        "text/markdown", "notes.md", "Grüße".encode("latin-1"), "UTF-8 text", id="latin-1-over-md"
+    ),
+    pytest.param("text/markdown", "notes.md", b"a\x00b", "UTF-8 text", id="nul-over-md"),
+    pytest.param("text/markdown", "notes.md", ab.docx_bytes(), "UTF-8 text", id="docx-over-md"),
+    pytest.param("text/markdown", "notes.md", ab.PDF_BYTES, "UTF-8 text", id="ascii-pdf-over-md"),
+    pytest.param(DOCX, "report.docx", ab.docm_bytes(), "Word (docx)", id="docm-over-docx"),
+    pytest.param(
+        DOCX, "report.docx", ab.docx_marker_only_bytes(), "Word (docx)", id="marker-only-over-docx"
+    ),
+    pytest.param(
+        ab.ODT,
+        "letter.odt",
+        ab.odf_bytes(ab.ODT + "-template"),
+        "OpenDocument text (odt)",
+        id="ott-over-odt",
+    ),
+    pytest.param(
+        ab.ODT,
+        "letter.odt",
+        ab.odf_bytes(ab.ODT, deflated=True),
+        "OpenDocument text (odt)",
+        id="compressed-mimetype-over-odt",
+    ),
+    pytest.param(
+        DOCX,
+        "report.docx",
+        ab.many_entries_zip_bytes(10_001),
+        "Word (docx)",
+        id="too-many-entries-over-docx",
+    ),
+]
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+@pytest.mark.parametrize(("existing", "name", "data", "label"), _REFUSED)
+async def test_update_attachment_refuses_bytes_of_another_type_and_writes_nothing(
+    clients: NcClients, existing: str, name: str, data: bytes, label: str
+) -> None:
+    url = f"{FILES_ROOT}/Docs/{name}"
+    with respx.mock(assert_all_called=True) as mock:
+        source = mock.get(OPENAI_FILE_URL).mock(return_value=_typed_download(existing, data))
+        mock.route(method="PROPFIND", url=url).mock(
+            return_value=httpx.Response(
+                207, text=_update_stat_xml('"caller-etag"', fileid="123", content_type=existing)
+            )
+        )
+        with pytest.raises(ToolError) as excinfo:
+            await files_tools.update_attachment(
+                clients,
+                path=f"/Docs/{name}",
+                etag='"caller-etag"',
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+                mime_type=existing,
+            )
+
+        assert source.call_count == 1
+        assert [
+            call.request.method for call in mock.calls if call.request.url != OPENAI_FILE_URL
+        ] == ["PROPFIND"]
+    assert f"The attachment is not a {label} file" in excinfo.value.message
+    assert f"/Docs/{name}" in excinfo.value.hint
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+@pytest.mark.parametrize(
+    ("existing", "name"),
+    [
+        ("application/zip", "archive.zip"),
+        ("application/octet-stream", "blob.bin"),
+        ("application/vnd.ms-outlook", "mail.msg"),
+        ("application/msword", "old.doc"),
+        ("application/vnd.ms-excel", "old.xls"),
+        ("application/vnd.ms-powerpoint", "old.ppt"),
+        ("application/octet-stream", "old.doc"),
+    ],
+)
+async def test_update_attachment_refuses_an_existing_type_without_a_signature_before_any_download(
+    clients: NcClients, existing: str, name: str
+) -> None:
+    url = f"{FILES_ROOT}/Docs/{name}"
+    with respx.mock(assert_all_called=True) as mock:
+        mock.route(method="PROPFIND", url=url).mock(
+            return_value=httpx.Response(
+                207, text=_update_stat_xml('"caller-etag"', fileid="123", content_type=existing)
+            )
+        )
+        with pytest.raises(ToolError, match="cannot replace it with an attachment") as excinfo:
+            await files_tools.update_attachment(
+                clients,
+                path=f"/Docs/{name}",
+                etag='"caller-etag"',
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+                mime_type=existing,
+            )
+
+        assert [call.request.method for call in mock.calls] == ["PROPFIND"]
+    assert "docx" in excinfo.value.hint
+    assert "PDF" in excinfo.value.hint
+
+
+@pytest.mark.anyio
+async def test_update_attachment_with_the_switch_off_names_the_switch_and_makes_no_request(
+    clients: NcClients, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(config.ENV_FILES_UPDATE, "on")
+    monkeypatch.delenv(config.ENV_FILES_UPDATE_ATTACHMENT, raising=False)
+    with respx.mock as mock:
+        with pytest.raises(ToolError, match="switched off") as excinfo:
+            await files_tools.update_attachment(
+                clients,
+                path="/Docs/report.docx",
+                etag='"caller-etag"',
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+                mime_type=DOCX,
+            )
+        assert not mock.calls
+    assert config.ENV_FILES_UPDATE_ATTACHMENT in excinfo.value.hint
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_conflicts_when_the_type_of_the_file_changes_during_the_download(
+    clients: NcClients,
+) -> None:
+    """The existing file became another type while the attachment was coming down: the bytes
+    were checked against the old one, so the replacement is the conflict sentence."""
+    first = httpx.Response(
+        207, text=_update_stat_xml('"caller-etag"', fileid="123", content_type=DOCX)
+    )
+    second = httpx.Response(
+        207, text=_update_stat_xml('"caller-etag"', fileid="123", content_type="application/pdf")
+    )
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(OPENAI_FILE_URL).mock(return_value=_attachment_response())
+        mock.route(method="PROPFIND", url=DOCX_URL).mock(side_effect=[first, second])
+        mock.route(method="PROPFIND", url__regex=r".*/dav/versions/.*").mock(
+            return_value=httpx.Response(404)
+        )
+        with pytest.raises(ConflictError, match="changed or was deleted"):
+            await files_tools.update_attachment(
+                clients,
+                path="/Docs/report.docx",
+                etag='"caller-etag"',
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+                mime_type=DOCX,
+            )
+
+        assert all(call.request.method != "PUT" for call in mock.calls)
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_refuses_a_folder_without_a_put(clients: NcClients) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        _stat_route(mock, folder=True)
+        with pytest.raises(ToolError, match="is a folder"):
+            await files_tools.update_attachment(
+                clients,
+                path="/Docs/report.docx",
+                etag='"caller-etag"',
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+                mime_type=DOCX,
+            )
+
+        assert [call.request.method for call in mock.calls] == ["PROPFIND"]
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_lost_race_gives_the_conflict_sentence(
+    clients: NcClients,
+) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(OPENAI_FILE_URL).mock(return_value=_attachment_response())
+        _stat_route(mock)
+        mock.route(method="PROPFIND", url__regex=r".*/dav/versions/.*").mock(
+            return_value=httpx.Response(404)
+        )
+        mock.route(method="PUT", url=DOCX_URL).mock(return_value=httpx.Response(412))
+        with pytest.raises(ConflictError, match="changed or was deleted"):
+            await files_tools.update_attachment(
+                clients,
+                path="/Docs/report.docx",
+                etag='"caller-etag"',
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+                mime_type=DOCX,
+            )
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_without_a_file_id_makes_no_request(clients: NcClients) -> None:
+    with respx.mock as mock:
+        with pytest.raises(ToolError, match="no file id"):
+            await files_tools.update_attachment(
+                clients,
+                path="/Docs/report.docx",
+                etag='"caller-etag"',
+                download_url=OPENAI_FILE_URL,
+                file_id="  ",
+                mime_type=DOCX,
+            )
+        assert not mock.calls
+
+
+@pytest.mark.anyio
+@pytest.mark.usefixtures("attachment_switch")
+async def test_update_attachment_with_an_expired_link_never_writes(clients: NcClients) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        mock.get(OPENAI_FILE_URL).mock(return_value=httpx.Response(403))
+        _stat_route(mock)
+        with pytest.raises(ToolError, match="unavailable or expired"):
+            await files_tools.update_attachment(
+                clients,
+                path="/Docs/report.docx",
+                etag='"caller-etag"',
+                download_url=OPENAI_FILE_URL,
+                file_id="file_test",
+                mime_type=DOCX,
+            )
+
+        assert all(call.request.method != "PUT" for call in mock.calls)
+
+
+@pytest.mark.anyio
+async def test_download_returns_the_etag(clients: NcClients) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        _stat_route(mock, etag='"dl-etag"')
+        mock.route(method="GET", url=DOCX_URL).mock(
+            return_value=httpx.Response(206, content=b"PK\x03\x04")
+        )
+        result = await files_tools.download(clients, path="/Docs/report.docx", max_bytes=4)
+
+    assert result["etag"] == '"dl-etag"'
+
+
+@pytest.mark.anyio
+async def test_download_returns_the_etag_only_in_the_first_chunk(clients: NcClients) -> None:
+    with respx.mock(assert_all_called=True) as mock:
+        _stat_route(mock, etag='"dl-etag"')
+        mock.route(method="GET", url=DOCX_URL).mock(
+            return_value=httpx.Response(206, content=b"\x03\x04")
+        )
+        result = await files_tools.download(
+            clients, path="/Docs/report.docx", offset=2, max_bytes=2
+        )
+
+    assert "etag" not in result
+
+
+_TOOL_CALL = """
+import asyncio, json
+from mcp import Client
+from mcp_connector.server import mcp
+
+async def main():
+    async with Client(mcp) as client:
+        out = []
+        for args in ({args}):
+            result = await client.call_tool("files_update", args)
+            out.append([result.is_error, result.content[0].text])
+        return out
+
+print(json.dumps(asyncio.run(main())))
+"""
+
+
+def test_the_registered_tool_wants_exactly_one_of_content_and_file() -> None:
+    both = (
+        '{"path": "/a.docx", "etag": "x", "content": "t", '
+        '"file": {"download_url": "u", "file_id": "f"}}'
+    )
+    neither = '{"path": "/a.docx", "etag": "x"}'
+    env = {
+        **os.environ,
+        "NC_MCP_FILES_UPDATE": "1",
+        "NC_MCP_FILES_UPDATE_ATTACHMENT": "1",
+        "PYTHONUTF8": "1",
+    }
+    done = subprocess.run(  # noqa: S603 - this interpreter, a fixed snippet
+        [sys.executable, "-c", _TOOL_CALL.replace("{args}", f"{both}, {neither}")],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+        check=False,
+    )
+    assert done.returncode == 0, done.stderr
+    (both_error, both_text), (neither_error, neither_text) = json.loads(
+        done.stdout.strip().splitlines()[-1]
+    )
+
+    assert both_error
+    assert "Send content or file, not both." in both_text
+    assert neither_error
+    assert "Send content for a text file or file for a ChatGPT" in neither_text

@@ -18,7 +18,7 @@ import hashlib
 import re
 from collections.abc import AsyncIterable, Sequence
 from posixpath import dirname
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import quote, unquote, urlsplit
 
 import httpx
@@ -1005,7 +1005,7 @@ def versions_url(creds: Credentials, fileid: int | str) -> str:
     return f"{creds.base_url}/remote.php/dav/versions/{user}/versions/{fileid}"
 
 
-async def _count_versions(
+async def count_versions(
     client: httpx.AsyncClient,
     creds: Credentials,
     fileid: int | str,
@@ -1039,36 +1039,50 @@ async def update_file(
     client: httpx.AsyncClient,
     creds: Credentials,
     path: str,
-    data: bytes,
+    data: bytes | AsyncIterable[bytes],
     content_type: str,
     etag: str,
     fileid: int | str = "",
+    content_length: int | None = None,
+    versions_before: Literal["count"] | int | None = "count",
 ) -> dict:
     """Replace an existing file only when its ETag still matches ``etag``.
 
-    ``etag`` arrives already normalized (:func:`normalize_etag`). Everything after the
-    PUT is best-effort reporting: once Nextcloud accepted the write, no follow-up read
-    may turn the answer into an error, or the caller would retry a write that happened.
+    ``etag`` arrives already normalized (:func:`normalize_etag`). A streamed ``data``
+    needs ``content_length``. ``versions_before`` is the count :func:`count_versions` gave
+    before the caller's last check; the default reads it here, right before the PUT.
+    Everything after the PUT is best-effort reporting: once
+    Nextcloud accepted the write, no follow-up read may turn the answer into an error,
+    or the caller would retry a write that happened.
     """
     target = safe_path(path)
-    before = await _count_versions(client, creds, fileid)
+    if isinstance(data, bytes):
+        size = len(data)
+    elif content_length is None:
+        raise ValueError("content_length is required when data is a stream")
+    else:
+        size = content_length
+    before = (
+        await count_versions(client, creds, fileid)
+        if versions_before == "count"
+        else versions_before
+    )
+    # One literal dict, so the no-destructive-calls gate reads If-Match off this call.
+    length = {} if isinstance(data, bytes) else {"Content-Length": str(size)}
     response = await client.put(
         files_url(creds, target),
         content=data,
-        headers={
-            "If-Match": etag,
-            "Content-Type": content_type,
-        },
+        headers={"If-Match": etag, "Content-Type": content_type, **length},
         auth=creds.auth(),
     )
     _check_update(response, target)
-    after = await _count_versions(client, creds, fileid)
+    after = await count_versions(client, creds, fileid)
     versioned = after > before if before is not None and after is not None else None
     new_etag = response.headers.get("oc-etag", "") or response.headers.get("etag", "")
     return {
         "path": target,
         "etag": new_etag,
-        "size": len(data),
+        "size": size,
         "versioned": versioned,
     }
 
