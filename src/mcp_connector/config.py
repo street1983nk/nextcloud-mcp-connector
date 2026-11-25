@@ -49,6 +49,7 @@ ENV_PUBLIC_URL = "NC_MCP_PUBLIC_URL"
 ENV_TALK_SEND = "NC_MCP_TALK_SEND"
 ENV_FILES_ROOT = "NC_MCP_FILES_ROOT"
 ENV_FILES_UPDATE = "NC_MCP_FILES_UPDATE"
+ENV_FILES_UPDATE_ATTACHMENT = "NC_MCP_FILES_UPDATE_ATTACHMENT"
 ENV_TASKS_UPDATE = "NC_MCP_TASKS_UPDATE"
 ENV_PROFILE_FIELDS_READ = "NC_MCP_PROFILE_FIELDS_READ"
 # Comma separated tool bundle names whose tools are not registered (issue #15).
@@ -732,6 +733,37 @@ def files_update_enabled(env: Mapping[str, str] | None = None) -> bool:
     logger.warning(
         "%s is neither on nor off, so files_update stays disabled (understood are %s and %s).",
         ENV_FILES_UPDATE,
+        ", ".join(sorted(_TRUE_VALUES)),
+        ", ".join(sorted(_FALSE_VALUES)),
+    )
+    return False
+
+
+def files_update_attachment_enabled(env: Mapping[str, str] | None = None) -> bool:
+    """Whether files_update may replace a file with a ChatGPT attachment (0.10.0).
+
+    The direction of :func:`files_update_enabled`. It is read when the tool registers, which
+    picks the form of the tool, and again on every call, which keeps the attachment path
+    closed if the answer changes. The shipped state is off, so an unset, blank or
+    unrecognised value keeps the attachment path closed. It has an effect only together with
+    ``files_update``: with that switch off the answer is False whatever this variable says,
+    because the tool itself is not registered. An administrator can so allow text edits
+    without allowing binary replacements.
+    """
+    source = os.environ if env is None else env
+    if not files_update_enabled(source):
+        return False
+    value = (source.get(ENV_FILES_UPDATE_ATTACHMENT) or "").strip().lower()
+    if not value:
+        return False
+    if value in _TRUE_VALUES:
+        return True
+    if value in _FALSE_VALUES:
+        return False
+    logger.warning(
+        "%s is neither on nor off, so files_update does not accept attachments "
+        "(understood are %s and %s).",
+        ENV_FILES_UPDATE_ATTACHMENT,
         ", ".join(sorted(_TRUE_VALUES)),
         ", ".join(sorted(_FALSE_VALUES)),
     )

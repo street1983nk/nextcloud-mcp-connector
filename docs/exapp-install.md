@@ -45,12 +45,13 @@ The other switches, all optional, are in [oauth-setup.md](./oauth-setup.md).
 ### Write switches
 
 Two switches decide whether an assistant may change something that already exists. Both ship
-off. Nothing deletes, with or without them, and `tasks_move` is the only tool that moves
-anything.
+off. A third, for attachments, hangs on `NC_MCP_FILES_UPDATE` and ships off as well. Nothing
+deletes, with or without them, and `tasks_move` is the only tool that moves anything.
 
 | Variable | Config key | Label in the admin settings | Tools it adds |
 |---|---|---|---|
 | `NC_MCP_FILES_UPDATE` | `files_update` | Allow editing existing text files | `files_update`: replaces an existing UTF-8 text file, only with the ETag read before |
+| `NC_MCP_FILES_UPDATE_ATTACHMENT` | `files_update_attachment` | Allow replacing existing files with an attachment | Only together with `NC_MCP_FILES_UPDATE`: `files_update` also takes a ChatGPT attachment (`file`) and replaces a file of a known type (docx, xlsx, pptx, OpenDocument, PDF, PNG, JPEG, GIF, WebP, UTF-8 text; not doc, xls or ppt), only with the ETag read before and when the attachment matches the type of the existing file: an Office or OpenDocument file is opened and its structure checked (directory of the ZIP file, `[Content_Types].xml` or `manifest.xml`, main part), a PDF or an image is compared on its first bytes only, and none of them is analysed whole. It adds no tool; the tool list shows the `file` parameter only with both on |
 | `NC_MCP_TASKS_UPDATE` | `tasks_update` | Allow changing existing tasks | `tasks_complete`, `tasks_update`, `tasks_move`: complete or reopen, edit and move one existing task, only with the ETag from `tasks_read` |
 
 - **Installed from the app store:** tick the box in Nextcloud, under Administration settings,
@@ -74,11 +75,13 @@ and is not. A key that was never set is created by the same command without
 `--update-only`. Every change takes effect only after the app was disabled and enabled
 again.
 
-Check the result in the tool list of a connected client, not in the form. With both switches
-off it holds no `tasks_complete`, `tasks_update`, `tasks_move` or `files_update`; with
+Check the result in the tool list of a connected client, not in the form. With the two tool
+switches off it holds no `tasks_complete`, `tasks_update`, `tasks_move` or `files_update`; with
 `tasks_update` on the three task tools appear, with `files_update` on `files_update`
-appears. With the other switches at their defaults that is 27 tools with both off and 31
-with both on; the counts are held by `tests/contract/test_tool_surface.py` and
+appears. `files_update_attachment` adds no tool: it only adds the `file` parameter to
+`files_update`, and only while `files_update` is on as well; with it off, the tool list shows
+`files_update` exactly as without that switch. With the other switches at their defaults that
+is 27 tools with the two tool switches off and 31 with both on; the counts are held by `tests/contract/test_tool_surface.py` and
 `scripts/check_tool_budget.py`. A value set in the form or with occ wins over the
 registration variable. Measured on Nextcloud 35 on 2026-11-14, both the attempt
 without `--update-only` that left the switch on and the one with it

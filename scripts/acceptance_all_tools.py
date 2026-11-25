@@ -110,6 +110,7 @@ REQUIRED_ENV = ("NC_MCP_URL", "NC_MCP_USER", "NC_MCP_APP_PASSWORD")
 #: Switches handed on to the server when they are set here; nothing else of this environment is.
 FORWARDED_SWITCHES = (
     "NC_MCP_FILES_UPDATE",
+    "NC_MCP_FILES_UPDATE_ATTACHMENT",
     "NC_MCP_TASKS_UPDATE",
     "NC_MCP_PROFILE_FIELDS_READ",
 )

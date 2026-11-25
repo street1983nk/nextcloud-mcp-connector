@@ -1,4 +1,4 @@
-"""The ten admin values (BL-06, TALK-04, D-14, opt-in switches), read from the ExApp configuration.
+"""The eleven admin values (BL-06, TALK-04, D-14, opt-in switches), read from the ExApp config.
 
 The fifth one joined in phase 6 with ``NC_MCP_OAUTH_CIMD``: a switch that exists as a deploy
 variable and as a documented sentence, but not in this chain, is a switch an installation
@@ -10,8 +10,9 @@ The seventh joined in phase 18 with ``NC_MCP_AUDIT_LOG``, the switch that decide
 tool calls are recorded at all (D-14), and it was the first of them that ships off: a
 record about named people that an administrator never asked for is the failure that switch
 exists to prevent, so the end of this chain, the default in code, says no. The eighth to the
-tenth followed as opt-in switches that ship off as well: ``NC_MCP_FILES_UPDATE`` and
-``NC_MCP_TASKS_UPDATE`` in phase 33, ``NC_MCP_PROFILE_FIELDS_READ`` in 0.9.0.
+eleventh followed as opt-in switches that ship off as well: ``NC_MCP_FILES_UPDATE`` and
+``NC_MCP_TASKS_UPDATE`` in phase 33, ``NC_MCP_PROFILE_FIELDS_READ`` in 0.9.0 and
+``NC_MCP_FILES_UPDATE_ATTACHMENT`` in 0.10.0.
 
 Three facts carry this module, and each of them is measured rather than assumed:
 
@@ -24,7 +25,7 @@ Three facts carry this module, and each of them is measured rather than assumed:
 * **The config key IS the field id of the Declarative Settings form.** AppAPI's
   ``SetValueListener`` stores an admin value with
   ``ExAppConfigService::setAppConfigValue($app, $fieldId, $value)``, without a prefix, so
-  the ten ids of ``exapp/admin_settings.py`` are exactly :data:`CONFIG_KEYS`
+  the eleven ids of ``exapp/admin_settings.py`` are exactly :data:`CONFIG_KEYS`
   (nextcloud/app_api v34.0.3, ``lib/Listener/DeclarativeSettings/SetValueListener.php``).
 * **AppAPI 34 answers in lower case.** The entries carry ``configkey`` and ``configvalue``,
   the column names of ``ex_apps_config`` serialised straight out of the entity. The camel
@@ -108,7 +109,7 @@ LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "::1", "localhost"})
 #: is looking at, and a second spelling there would be a string that drifts silently.
 PUBLIC_URL_KEY = "public_url"
 
-#: The ten keys, in the order the form declares its fields. They are the field ids of the
+#: The eleven keys, in the order the form declares its fields. They are the field ids of the
 #: admin form and the configuration keys at the same time (see the module docstring).
 #: ``oauth_cimd`` stands next to ``oauth_dcr`` because the code reads the two as one answer
 #: (``registry.client_policy``: this switch AND the DCR switch), and two coupled switches
@@ -116,8 +117,9 @@ PUBLIC_URL_KEY = "public_url"
 #: ``talk_send`` comes after them for the same reason read the other way round: it is
 #: independent of all four OAuth values, and putting it between them would tear that grouping
 #: apart. ``audit_log`` joined in phase 18; it is about none of the six above, because it is
-#: about this app watching itself rather than about who may reach it. The three opt-in
-#: switches ``files_update``, ``tasks_update`` and ``profile_fields_read`` follow it.
+#: about this app watching itself rather than about who may reach it. The four opt-in
+#: switches ``files_update``, ``files_update_attachment`` (which hangs on the first),
+#: ``tasks_update`` and ``profile_fields_read`` follow it.
 CONFIG_KEYS: tuple[str, ...] = (
     PUBLIC_URL_KEY,
     "oauth_dcr",
@@ -127,6 +129,7 @@ CONFIG_KEYS: tuple[str, ...] = (
     "talk_send",
     "audit_log",
     "files_update",
+    "files_update_attachment",
     "tasks_update",
     "profile_fields_read",
 )
@@ -142,6 +145,7 @@ KEY_TO_ENV: Mapping[str, str] = {
     "talk_send": config.ENV_TALK_SEND,
     "audit_log": config.ENV_AUDIT_LOG,
     "files_update": config.ENV_FILES_UPDATE,
+    "files_update_attachment": config.ENV_FILES_UPDATE_ATTACHMENT,
     "tasks_update": config.ENV_TASKS_UPDATE,
     "profile_fields_read": config.ENV_PROFILE_FIELDS_READ,
 }
@@ -162,6 +166,7 @@ SWITCH_KEYS: frozenset[str] = frozenset(
         "talk_send",
         "audit_log",
         "files_update",
+        "files_update_attachment",
         "tasks_update",
         "profile_fields_read",
     }
@@ -545,7 +550,7 @@ def _headers(settings: config.ExAppSettings) -> dict[str, str]:
 
 
 def _config_values(payload: Any) -> dict[str, str] | None:
-    """Pull our ten values out of the OCS envelope, or refuse to guess.
+    """Pull our eleven values out of the OCS envelope, or refuse to guess.
 
     ``None`` means the answer could not be read and is therefore not an empty one. The three
     accepted shapes are the ones ``crypto._config_value`` accepts: a list of entries with

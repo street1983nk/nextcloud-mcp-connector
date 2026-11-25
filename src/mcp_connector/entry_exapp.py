@@ -670,6 +670,16 @@ def main() -> None:
     if config.ENV_FILES_UPDATE in resolved:
         os.environ[config.ENV_FILES_UPDATE] = resolved[config.ENV_FILES_UPDATE]
 
+    # The same reader and the same reason for the switch that lets files_update take a
+    # ChatGPT attachment (0.10.0): ``.server`` registers one or the other form of the tool
+    # when it is first imported, and that registration reads the process environment. Without
+    # this line a box unticked in Nextcloud would leave the binary replacement armed. The
+    # write comes before :func:`build_exapp_app`, and the price is the same activation cycle.
+    if config.ENV_FILES_UPDATE_ATTACHMENT in resolved:
+        os.environ[config.ENV_FILES_UPDATE_ATTACHMENT] = resolved[
+            config.ENV_FILES_UPDATE_ATTACHMENT
+        ]
+
     # The third key that travels, for the same reader and for the same reason (D-33-00d).
     # The switch of the tools that change existing tasks is read once, when ``.server``
     # registers the task tools, and that registration reads the process environment. Without

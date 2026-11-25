@@ -44,6 +44,8 @@ __all__ = [
     "ADMIN_FIELD_CIMD_LABEL",
     "ADMIN_FIELD_DCR_DESCRIPTION",
     "ADMIN_FIELD_DCR_LABEL",
+    "ADMIN_FIELD_FILES_UPDATE_ATTACHMENT_DESCRIPTION",
+    "ADMIN_FIELD_FILES_UPDATE_ATTACHMENT_LABEL",
     "ADMIN_FIELD_FILES_UPDATE_DESCRIPTION",
     "ADMIN_FIELD_FILES_UPDATE_LABEL",
     "ADMIN_FIELD_PROFILE_FIELDS_READ_DESCRIPTION",
@@ -678,11 +680,12 @@ ADMIN_SETTINGS_TITLE = "MCP Connector"
 
 ADMIN_SETTINGS_DESCRIPTION = (
     "Settings an installation from the app store needs. A field left empty keeps whatever the "
-    "deploy environment of the container sets, and a value set here wins over it. Of the ten "
-    "fields, the first five are about connecting an assistant app. The five switches after "
-    "them decide whether an assistant may send a Talk message through this app, whether this "
-    "app keeps a record of tool calls, and whether assistants may edit existing text files, "
-    "change existing tasks and read Profile Fields. Changes take effect after you disable and "
+    "deploy environment of the container sets, and a value set here wins over it. Of the "
+    "eleven fields, the first five are about connecting an assistant app. The six switches "
+    "after them decide whether an assistant may send a Talk message through this app, whether "
+    "this app keeps a record of tool calls, whether assistants may edit existing text files, "
+    "whether they may replace an existing file with an attachment, change existing tasks and "
+    "read Profile Fields. Changes take effect after you disable and "
     "enable this app again."
 )
 
@@ -815,6 +818,25 @@ ADMIN_FIELD_FILES_UPDATE_DESCRIPTION = (
     "file changed or was deleted in the meantime, the update is rejected and the client must "
     "read it again and decide what to do. Updates replace the whole file; they cannot create, "
     "delete, move or rename files. Creating files remains available through the upload tool. "
+    "A change takes effect after you disable and enable this app again."
+)
+
+ADMIN_FIELD_FILES_UPDATE_ATTACHMENT_LABEL = "Allow replacing existing files with an attachment"
+
+#: The form half of ``NC_MCP_FILES_UPDATE_ATTACHMENT``. It hangs on the switch above and does
+#: nothing without it: with both on, ``files_update`` also takes a ChatGPT attachment and
+#: replaces an existing file of a known type, such as DOCX, XLSX or PDF, under the same ETag
+#: condition. With only the switch above on, the tool edits UTF-8 text and nothing else. The
+#: text states what the switch does and what it needs, and promises nothing beyond that.
+ADMIN_FIELD_FILES_UPDATE_ATTACHMENT_DESCRIPTION = (
+    'Off by default, and it has an effect only together with "Allow editing existing text '
+    'files". When both are on, assistants can replace an existing file of a known type (docx, '
+    "xlsx, pptx, odt, ods, odp, odg, PDF, PNG, JPEG, GIF, WebP or UTF-8 text) with a ChatGPT "
+    "attachment through files_update, when they present the ETag they read before the edit. "
+    "The attachment must be of the same type as the existing file: an Office or OpenDocument "
+    "file is opened and its type markers checked (not the whole document), a PDF or an image "
+    "only by its first bytes, "
+    "before anything is written. "
     "A change takes effect after you disable and enable this app again."
 )
 

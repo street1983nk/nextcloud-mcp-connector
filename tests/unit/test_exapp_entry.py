@@ -1893,6 +1893,45 @@ def test_a_start_without_a_stored_files_update_switch_leaves_the_variable_alone(
     assert config.files_update_enabled() is False
 
 
+def test_a_stored_attachment_switch_wins_over_the_deploy_variable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, admin_config: AdminConfig
+) -> None:
+    """The direction that matters for safety: an unticked box disarms the binary replacement
+    even when the deploy environment armed it. Whether the tool then has the ``file`` parameter
+    is proven in a fresh interpreter by tests/unit/test_exapp_files_update_attachment_switch.py."""
+    admin_config.values["files_update_attachment"] = "0"
+
+    start(
+        monkeypatch,
+        tmp_path,
+        env={config.ENV_FILES_UPDATE: "on", config.ENV_FILES_UPDATE_ATTACHMENT: "on"},
+    )
+
+    assert os.environ[config.ENV_FILES_UPDATE_ATTACHMENT] == config_values.SWITCH_OFF
+    assert config.files_update_attachment_enabled() is False
+
+
+def test_a_stored_attachment_switch_of_on_reaches_the_process_environment(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, admin_config: AdminConfig
+) -> None:
+    admin_config.values["files_update"] = "1"
+    admin_config.values["files_update_attachment"] = "1"
+
+    start(monkeypatch, tmp_path, env={config.ENV_FILES_UPDATE_ATTACHMENT: "off"})
+
+    assert os.environ[config.ENV_FILES_UPDATE_ATTACHMENT] == config_values.SWITCH_ON
+    assert config.files_update_attachment_enabled() is True
+
+
+def test_a_start_without_a_stored_attachment_switch_leaves_the_variable_alone(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    start(monkeypatch, tmp_path)
+
+    assert config.ENV_FILES_UPDATE_ATTACHMENT not in os.environ
+    assert config.files_update_attachment_enabled() is False
+
+
 def test_a_stored_tasks_update_switch_wins_over_the_deploy_variable(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, admin_config: AdminConfig
 ) -> None:
@@ -1983,6 +2022,7 @@ def test_the_entry_point_writes_exactly_the_named_keys_into_the_process_environm
     assert writes == [
         "os.environ[config.ENV_TALK_SEND] =",
         "os.environ[config.ENV_FILES_UPDATE] =",
+        "os.environ[config.ENV_FILES_UPDATE_ATTACHMENT] =",
         "os.environ[config.ENV_TASKS_UPDATE] =",
         "os.environ[config.ENV_PROFILE_FIELDS_READ] =",
     ]
@@ -2001,6 +2041,7 @@ def test_the_write_happens_before_the_application_is_built() -> None:
 
     export = source.index("os.environ[config.ENV_TALK_SEND]")
     files_update = source.index("os.environ[config.ENV_FILES_UPDATE]")
+    attachment = source.index("os.environ[config.ENV_FILES_UPDATE_ATTACHMENT]")
     tasks_update = source.index("os.environ[config.ENV_TASKS_UPDATE]")
     profile_fields = source.index("os.environ[config.ENV_PROFILE_FIELDS_READ]")
     resolved = source.index("resolved, refused = _resolved_env()")
@@ -2013,7 +2054,7 @@ def test_the_write_happens_before_the_application_is_built() -> None:
     assert resolved < files_update < built
     # The same moment for the modifying task tools (D-33-00d): ``reg_tasks`` reads the
     # switch when ``.server`` is imported by that first build.
-    assert resolved < files_update < tasks_update < built
+    assert resolved < files_update < attachment < tasks_update < built
     # And for the opt-in reader: ``.server`` decides at that first import whether it loads
     # ``opt_profile_fields`` at all.
     assert resolved < profile_fields < built

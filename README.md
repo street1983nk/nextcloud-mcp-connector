@@ -43,9 +43,17 @@ You bring the model, and no content leaves your server.
 - No deleting: no tool deletes files, events, tasks, notes, cards or contacts; deleting a task
   is deliberately not offered
 - No unconditional overwriting: `files_upload` refuses existing paths. If the admin enables
-  `NC_MCP_FILES_UPDATE`, `files_update` can replace an existing UTF-8 text file only when its
-  ETag matches the value read earlier; stale or deleted files are rejected. Version history
-  depends on the Nextcloud storage backend.
+  `NC_MCP_FILES_UPDATE`, `files_update` can replace an existing UTF-8 text file (as `content`)
+  only when its ETag matches the value read earlier; stale or deleted files are rejected.
+  Version history depends on the Nextcloud storage backend. A second switch,
+  `NC_MCP_FILES_UPDATE_ATTACHMENT` (off by default, and effective only together with
+  `NC_MCP_FILES_UPDATE`), lets `files_update` also replace a file such as a Word, Excel or PDF
+  file with a ChatGPT attachment. The attachment must be of the same type as the existing
+  file, whatever type it declares. An Office or OpenDocument file is opened and its structure
+  is checked (the directory of the ZIP file within limits, `[Content_Types].xml` or
+  `manifest.xml`, the first element of the main part); a PDF or an image is compared on its
+  first bytes only, and the older doc, xls and ppt files cannot be replaced. The ETag is
+  checked again right before the write.
 - Existing tasks stay unchanged unless the admin turns on the switch
   "Allow changing existing tasks" (`NC_MCP_TASKS_UPDATE`): Off by default. When on, assistants
   can change one task at a time, and only with the ETag returned by `tasks_read`:
@@ -87,7 +95,7 @@ hand: a contract test reads the live registry and fails if a name or a level dis
 | `files_read_as_markdown` | read | A DOCX, XLSX, PPTX or PDF file converted to Markdown, in slices |
 | `files_upload` | create-only | A new text file or any-size binary upload in base64 chunks; an existing path is refused, never overwritten |
 | `files_create_folder` | create-only | A new folder, optionally with its missing parents (at most 10 per call); an existing folder answers created false, nothing is overwritten |
-| `files_update` | conditional-update | Replaces an existing UTF-8 text file only with its previously read ETag; available only when the admin enables `NC_MCP_FILES_UPDATE` |
+| `files_update` | conditional-update | Replaces an existing UTF-8 text file only with its previously read ETag, and with `NC_MCP_FILES_UPDATE_ATTACHMENT` also a file of a known type from a ChatGPT attachment; available only when the admin enables `NC_MCP_FILES_UPDATE` |
 | `calendar_list_events` | read | Events in an explicit time range, with an explicit time zone |
 | `calendar_create_event` | create-only | A new event; existing events are never changed |
 | `tasks_search` | read | Open tasks by default, from own and shared task lists; 25 per page |

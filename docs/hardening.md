@@ -75,6 +75,15 @@ instead is bound the damage:
   (existing UTF-8 text files), `NC_MCP_TASKS_UPDATE` for `tasks_complete`,
   `tasks_update` and `tasks_move`. Leave both off unless the assistant needs
   them; a contract test fails on any other destructive call,
+- replacing a binary file is a switch of its own: `NC_MCP_FILES_UPDATE_ATTACHMENT`
+  ships off and has an effect only together with `NC_MCP_FILES_UPDATE`, so an
+  administrator can allow text edits without allowing Word, Excel or PDF files to be
+  replaced. With it on, the ChatGPT attachment must be of the same type as the
+  existing file before anything is written, whatever type it declares: an Office
+  or OpenDocument file is opened and its structure is checked (the directory of
+  the ZIP file within limits, `[Content_Types].xml` or `manifest.xml`, the first
+  element of the main part), a PDF or an image is compared on its first bytes only, and the older
+  doc, xls and ppt files cannot be replaced,
 - content is returned with its origin as structured fields, so the client can
   tell where text came from,
 - the outgoing channel can be closed instance-wide (section 4).

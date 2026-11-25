@@ -50,9 +50,18 @@ Das Modell bringen Sie mit, und kein Inhalt verlässt Ihren Server.
 - Kein Löschen: kein Tool löscht Dateien, Termine, Aufgaben, Notizen, Karten oder Kontakte;
   das Löschen einer Aufgabe wird bewusst nicht angeboten
 - Kein bedingungsloses Überschreiben: `files_upload` lehnt einen vorhandenen Pfad ab. Aktiviert
-  der Admin `NC_MCP_FILES_UPDATE`, ersetzt `files_update` eine bestehende UTF-8-Textdatei nur
-  dann, wenn ihr ETag dem zuvor gelesenen Wert entspricht; geänderte oder gelöschte Dateien
-  werden abgelehnt. Der Versionsverlauf hängt vom Speicher-Backend von Nextcloud ab.
+  der Admin `NC_MCP_FILES_UPDATE`, ersetzt `files_update` eine bestehende UTF-8-Textdatei (als
+  `content`) nur dann, wenn ihr ETag dem zuvor gelesenen Wert entspricht; geänderte oder
+  gelöschte Dateien werden abgelehnt. Der Versionsverlauf hängt vom Speicher-Backend von
+  Nextcloud ab. Ein zweiter Schalter, `NC_MCP_FILES_UPDATE_ATTACHMENT` (ab Werk aus und nur
+  zusammen mit `NC_MCP_FILES_UPDATE` wirksam), erlaubt `files_update` zusätzlich, eine Datei
+  wie Word, Excel oder PDF durch einen ChatGPT-Anhang zu ersetzen. Der Anhang muss vom
+  selben Typ wie die bestehende Datei sein, gleich welchen Typ er angibt: Eine Office- oder
+  OpenDocument-Datei wird geöffnet und ihre Struktur geprüft (Verzeichnis der ZIP-Datei
+  innerhalb von Grenzen, `[Content_Types].xml` oder `manifest.xml`, erstes Element des
+  Hauptteils), ein PDF oder Bild nur an den ersten Bytes verglichen, und die älteren Dateien
+  doc, xls und ppt lassen sich nicht ersetzen. Das ETag wird unmittelbar vor dem Schreiben
+  erneut geprüft.
 - Bestehende Aufgaben bleiben unverändert, solange der Admin den Schalter
   "Bestehende Aufgaben ändern erlauben" (in der Oberfläche englisch "Allow changing existing
   tasks", `NC_MCP_TASKS_UPDATE`) nicht einschaltet; ab Werk ist er aus.
@@ -101,7 +110,7 @@ abweicht.
 | `files_read_as_markdown` | read | Eine DOCX-, XLSX-, PPTX- oder PDF-Datei, in Markdown umgewandelt, in Abschnitten |
 | `files_upload` | create-only | Eine neue Textdatei oder ein Binär-Upload beliebiger Größe in Base64-Blöcken; ein vorhandener Pfad wird abgelehnt, nie überschrieben |
 | `files_create_folder` | create-only | Ein neuer Ordner, auf Wunsch samt fehlender Elternordner (höchstens 10 je Aufruf); ein vorhandener Ordner antwortet mit created false, nichts wird überschrieben |
-| `files_update` | conditional-update | Ersetzt eine bestehende UTF-8-Textdatei nur mit ihrem zuvor gelesenen ETag; nur verfügbar, wenn der Admin `NC_MCP_FILES_UPDATE` aktiviert |
+| `files_update` | conditional-update | Ersetzt eine bestehende UTF-8-Textdatei nur mit ihrem zuvor gelesenen ETag, mit `NC_MCP_FILES_UPDATE_ATTACHMENT` auch eine Datei bekannten Typs durch einen ChatGPT-Anhang; nur verfügbar, wenn der Admin `NC_MCP_FILES_UPDATE` aktiviert |
 | `calendar_list_events` | read | Termine in einem expliziten Zeitraum, mit expliziter Zeitzone |
 | `calendar_create_event` | create-only | Ein neuer Termin; bestehende Termine werden nie geändert |
 | `tasks_search` | read | Standardmäßig offene Aufgaben, aus eigenen und geteilten Aufgabenlisten; 25 je Seite |

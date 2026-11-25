@@ -12,6 +12,41 @@ Deutsche Fassung ab 0.7.2; ältere Einträge stehen in [CHANGELOG.md](CHANGELOG.
 
 ## [Unreleased]
 
+### Hinzugefügt
+
+- `files_update` kann eine bestehende Datei bekannten Typs (docx, xlsx, pptx, OpenDocument,
+  PDF, PNG, JPEG, GIF, WebP, UTF-8-Text) durch einen ChatGPT-Anhang (`file`) ersetzen, unter
+  derselben ETag-Bedingung wie bei Text (`content`). ETag und Ausschluss-Tag werden vor dem
+  Herunterladen des Anhangs und noch einmal unmittelbar vor dem Schreiben geprüft.
+- Der Schalter "Allow replacing existing files with an attachment"
+  (`NC_MCP_FILES_UPDATE_ATTACHMENT`) ist ab Werk aus und wirkt nur zusammen mit
+  `NC_MCP_FILES_UPDATE`, sodass ein Admin Textänderungen erlauben kann, ohne binäres Ersetzen
+  zu erlauben. Er steht unter Administrationseinstellungen, Sicherheit, MCP Connector und ist
+  als Umgebungsvariable deklariert. Eine Änderung wirkt, nachdem Sie diese App einmal aus- und
+  wieder eingeschaltet haben. Ist er aus, ist `files_update` in der Tool-Liste das aus 0.9.0.
+- Der Anhang wird gegen den Typ der bestehenden Datei geprüft, nicht gegen den Typ, den er
+  angibt. Eine docx-, xlsx-, pptx- oder OpenDocument-Datei wird geöffnet und ihre Struktur
+  geprüft. Die ZIP-Datei darf höchstens 10.000 Einträge und ein zentrales Verzeichnis von
+  höchstens 16 MiB haben, gezählt am Verzeichnis selbst, bevor sie geöffnet wird, und keine
+  ZIP64-Einträge. Eine Office-Datei braucht eine `[Content_Types].xml`, die ihren Hauptteil
+  (`word/document.xml`, `xl/workbook.xml`, `ppt/presentation.xml`) als Dokument, Arbeitsmappe
+  oder Präsentation ausweist (eine Vorlage oder ein Makro-Typ ist ein anderer Typ), und das
+  erste Element dieses Hauptteils, gesucht in seinen ersten 64 KiB, muss das Wurzelelement
+  dieses Typs sein; der Teil wird nicht ganz geparst. Eine OpenDocument-Datei braucht
+  `mimetype` physisch als erstes Element, unkomprimiert, ohne Extra-Feld und mit genau diesem
+  Typ, eine `META-INF/manifest.xml`, deren Wurzelelement `manifest` ist und deren
+  Wurzeleintrag denselben Typ nennt, und eine `content.xml` oder `styles.xml`.
+  `[Content_Types].xml` und `manifest.xml` werden bis 4 MiB gelesen. Das XML wird mit einem
+  Parser gelesen, der jede DTD und jede Entitätsdeklaration ablehnt. Ein PDF oder ein Bild
+  wird nur an den ersten Bytes verglichen (`%PDF-`, PNG, JPEG, GIF, WebP) und nicht als Ganzes
+  analysiert; ein abgeschnittenes passiert also. Eine Textdatei muss UTF-8 ohne NUL-Byte sein
+  und darf nicht wie ein Binärformat beginnen. Die älteren Dateien doc, xls und ppt teilen
+  eine Signatur und lassen sich an den ersten Bytes nicht unterscheiden; sie lassen sich daher
+  nicht ersetzen. Eine bestehende Datei eines Typs ohne bekannte Signatur wird vor dem
+  Herunterladen mit der Liste der ersetzbaren Typen abgelehnt.
+- `files_download` liefert das ETag der Datei im ersten Abschnitt, damit eine Binärdatei einen
+  Anhaltspunkt für `files_update` hat. Spätere Abschnitte tragen es nicht.
+
 ## [0.9.0] - 2026-11-20
 
 ### Hinzugefügt

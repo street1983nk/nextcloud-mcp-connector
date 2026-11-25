@@ -93,6 +93,7 @@ def test_the_seven_keys_are_the_field_ids_of_the_admin_form() -> None:
         "talk_send",
         "audit_log",
         "files_update",
+        "files_update_attachment",
         "tasks_update",
         "profile_fields_read",
     )
@@ -109,6 +110,7 @@ def test_every_key_maps_to_the_variable_the_existing_code_already_reads() -> Non
         "talk_send": config.ENV_TALK_SEND,
         "audit_log": config.ENV_AUDIT_LOG,
         "files_update": config.ENV_FILES_UPDATE,
+        "files_update_attachment": config.ENV_FILES_UPDATE_ATTACHMENT,
         "tasks_update": config.ENV_TASKS_UPDATE,
         "profile_fields_read": config.ENV_PROFILE_FIELDS_READ,
     }
@@ -177,6 +179,7 @@ async def test_one_request_asks_for_all_seven_keys() -> None:
             "talk_send",
             "audit_log",
             "files_update",
+            "files_update_attachment",
             "tasks_update",
             "profile_fields_read",
         ]

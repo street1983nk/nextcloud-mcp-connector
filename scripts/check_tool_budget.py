@@ -6,9 +6,10 @@ immediately attributable.
 
 Measured with every switch on since phase 33 (TMOD-05, pitfall 6 of 33-RESEARCH.md): the
 optional tools register only behind ``NC_MCP_FILES_UPDATE``, ``NC_MCP_TASKS_UPDATE`` and
-``NC_MCP_PROFILE_FIELDS_READ`` (the last one since 0.9.0), and a
-gate that weighs the default registry never sees them, neither in the total nor under the per
-tool ceiling. The switches are read when ``mcp_connector.server`` is imported, so each state
+``NC_MCP_PROFILE_FIELDS_READ`` (the last one since 0.9.0), and ``NC_MCP_FILES_UPDATE_ATTACHMENT``
+adds the ``file`` parameter to ``files_update`` (since 0.10.0). A gate that weighs the default
+registry never sees them, neither in the total nor under the per tool ceiling. The switches are
+read when ``mcp_connector.server`` is imported, so each state
 is measured in a fresh interpreter, and the script sets them itself: the CI call stays as it
 is. The default state is printed as a control line and is not what the limits hold.
 """
@@ -21,7 +22,12 @@ from typing import Any
 
 #: The switches the authoritative measurement turns on; held equal to the ones of the
 #: contract gates by ``tests/contract/test_tool_surface.py``.
-SWITCHES = ("NC_MCP_FILES_UPDATE", "NC_MCP_TASKS_UPDATE", "NC_MCP_PROFILE_FIELDS_READ")
+SWITCHES = (
+    "NC_MCP_FILES_UPDATE",
+    "NC_MCP_FILES_UPDATE_ATTACHMENT",
+    "NC_MCP_TASKS_UPDATE",
+    "NC_MCP_PROFILE_FIELDS_READ",
+)
 
 _MEASURE = """
 import asyncio, json

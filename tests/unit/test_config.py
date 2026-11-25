@@ -419,6 +419,74 @@ def test_files_update_switch_reads_the_process_environment_when_no_mapping_is_gi
     assert config.files_update_enabled() is False
 
 
+# --- the switch that lets files_update take a ChatGPT attachment (0.10.0) -------------
+
+BOTH_ON = {config.ENV_FILES_UPDATE: "on"}
+
+
+def test_the_files_update_attachment_switch_carries_the_expected_name() -> None:
+    assert config.ENV_FILES_UPDATE_ATTACHMENT == "NC_MCP_FILES_UPDATE_ATTACHMENT"
+
+
+@pytest.mark.parametrize("raw", sorted(config._TRUE_VALUES))
+def test_every_understood_on_spelling_enables_the_attachment_path(raw: str) -> None:
+    env = {**BOTH_ON, config.ENV_FILES_UPDATE_ATTACHMENT: raw}
+    assert config.files_update_attachment_enabled(env) is True
+
+
+@pytest.mark.parametrize("raw", sorted(config._FALSE_VALUES))
+def test_every_understood_off_spelling_disables_the_attachment_path(raw: str) -> None:
+    env = {**BOTH_ON, config.ENV_FILES_UPDATE_ATTACHMENT: raw}
+    assert config.files_update_attachment_enabled(env) is False
+
+
+def test_without_the_attachment_variable_the_attachment_path_is_disabled() -> None:
+    assert config.files_update_attachment_enabled(BOTH_ON) is False
+    assert config.files_update_attachment_enabled({}) is False
+
+
+@pytest.mark.parametrize("raw", ["", "   ", "\t\n", "vielleicht", "maybe", "enabled", "2", "onoff"])
+def test_a_blank_or_unrecognised_attachment_value_keeps_the_path_disabled(raw: str) -> None:
+    env = {**BOTH_ON, config.ENV_FILES_UPDATE_ATTACHMENT: raw}
+    assert config.files_update_attachment_enabled(env) is False
+
+
+@pytest.mark.parametrize("files", [None, "", "off", "maybe"])
+def test_the_attachment_switch_has_no_effect_without_files_update(files: str | None) -> None:
+    env = {config.ENV_FILES_UPDATE_ATTACHMENT: "on"}
+    if files is not None:
+        env[config.ENV_FILES_UPDATE] = files
+
+    assert config.files_update_attachment_enabled(env) is False
+
+
+def test_the_attachment_switch_reads_the_process_environment_when_no_mapping_is_given(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(config.ENV_FILES_UPDATE, config_values.SWITCH_ON)
+    monkeypatch.setenv(config.ENV_FILES_UPDATE_ATTACHMENT, config_values.SWITCH_ON)
+    assert config.files_update_attachment_enabled() is True
+
+    monkeypatch.setenv(config.ENV_FILES_UPDATE_ATTACHMENT, config_values.SWITCH_OFF)
+    assert config.files_update_attachment_enabled() is False
+
+    monkeypatch.delenv(config.ENV_FILES_UPDATE_ATTACHMENT)
+    assert config.files_update_attachment_enabled() is False
+
+
+def test_an_unrecognised_attachment_value_is_named_by_its_variable_and_never_quoted(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    secret = "s3cret-looking-value"
+    env = {**BOTH_ON, config.ENV_FILES_UPDATE_ATTACHMENT: secret}
+
+    with caplog.at_level("WARNING", logger="mcp_connector.config"):
+        assert config.files_update_attachment_enabled(env) is False
+
+    assert config.ENV_FILES_UPDATE_ATTACHMENT in caplog.text
+    assert secret not in caplog.text
+
+
 # --- the switch that enables changing existing tasks (D-33-00d, D-33-01) ---------
 
 
