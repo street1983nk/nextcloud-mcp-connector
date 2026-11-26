@@ -289,6 +289,7 @@ class _Context:
             }
         )
         setattr(request.state, OAUTH_STATE_ATTR, identity)
+        self.headers = headers
         self.request_context = _RequestContext(request)
 
 
