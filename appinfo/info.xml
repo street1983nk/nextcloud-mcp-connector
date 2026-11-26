@@ -110,7 +110,7 @@ Documentation : [README sur GitHub](https://github.com/street1983nk/nextcloud-mc
 ### Enterprise
 
 Le journal d'audit est intégré et désactivé par défaut ; ensuite viendront les politiques de groupe.]]></description>
-	<version>0.9.0</version>
+	<version>0.9.1</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author mail="admin@infranode.dev">street1983nk</author>
 	<namespace>McpConnector</namespace>
@@ -190,7 +190,7 @@ Le journal d'audit est intégré et désactivé par défaut ; ensuite viendront 
 			-->
 			<registry>ghcr.io</registry>
 			<image>street1983nk/mcp_connector</image>
-			<image-tag>0.9.0</image-tag>
+			<image-tag>0.9.1</image-tag>
 		</docker-install>
 		<!--
 		  - Exactly thirteen routes, and they are the whole external attack surface of this app.

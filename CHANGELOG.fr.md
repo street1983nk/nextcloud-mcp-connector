@@ -13,6 +13,17 @@ dans [CHANGELOG.md](CHANGELOG.md).
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-26
+
+### Corrigé
+
+- Avec un compte LDAP/AD dont le nom de connexion diffère de son identifiant utilisateur
+  Nextcloud, les fichiers, la recherche, les versions, les téléversements, les agendas, les
+  tâches, les contacts et l'exclusion kein-ki fonctionnent de nouveau via OAuth ; auparavant,
+  chaque requête répondait 404. Le connecteur se connecte avec le nom de connexion et désigne
+  le compte par son identifiant utilisateur. Avec une connexion par adresse e-mail, la
+  recherche de fichiers trouve de nouveau des fichiers (#60).
+
 ## [0.9.0] - 2026-11-20
 
 ### Ajouté
@@ -140,6 +151,7 @@ dans [CHANGELOG.md](CHANGELOG.md).
   voyait jamais (#42). Un test maintient désormais les déclarations identiques à
   la liste dans laquelle le code les lit.
 
-[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.3...v0.8.0

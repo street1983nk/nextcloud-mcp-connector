@@ -11,6 +11,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-26
+
+### Fixed
+
+- With an LDAP/AD account whose login name differs from its Nextcloud user ID, files,
+  search, versions, uploads, calendars, tasks, contacts and the kein-ki exclusion work
+  again over OAuth; before, every request answered 404. The connector signs in with the
+  login name and addresses the account by its user ID. With a login by email address, the
+  file search finds files again (#60).
+
 ## [0.9.0] - 2026-11-20
 
 ### Added
@@ -1175,7 +1185,8 @@ First release, submitted to the Nextcloud App Store.
   never sees more than that user sees in the web interface.
 - A privacy and data flow description, see [docs/privacy.md](docs/privacy.md).
 
-[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.3...v0.8.0
 [0.7.3]: https://github.com/street1983nk/nextcloud-mcp-connector/compare/v0.7.2...v0.7.3
