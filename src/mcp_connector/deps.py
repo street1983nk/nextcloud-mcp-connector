@@ -327,11 +327,14 @@ def _credentials_from_oauth(
         # in user could reach, so an impersonation identity without a user is a refusal and
         # never an outgoing call (T-02-12). The refusal is word for word the one a missing
         # identity gets, so the outside cannot tell the two apart (T-23-12, T-23-13).
-        if exapp is None or not identity.nc_user:
+        if exapp is None or not identity.principal or not identity.nc_user:
             raise _no_user_context()
         return Credentials(
             base_url=exapp.base_url,
-            user=identity.nc_user,
+            # The principal and not the login name: the AppAPI header names a user id, and
+            # where the two differ (LDAP, login by email) the login name is another account
+            # or none at all (issue 60). Today's only source of this way sets both alike.
+            user=identity.principal,
             secret=exapp.app_secret,
             mode=MODE_APPAPI,
             app_id=exapp.app_id,
@@ -345,6 +348,11 @@ def _credentials_from_oauth(
         user=identity.nc_user,
         secret=identity.app_password,
         mode=MODE_BASIC,
+        # Basic signs in with the login name, every DAV home is named by the user id (issue
+        # 60). The principal comes out of the stored connection row (``principal_of``) and
+        # never out of the request; a legacy row without an id yields the login name here,
+        # which keeps its behaviour unchanged.
+        account_id=identity.principal,
     )
 
 
@@ -431,4 +439,7 @@ def _credentials_from_basic(headers: Mapping[str, str]) -> Credentials:
 
     # The base URL stays a deployment decision. A client that could pick the target
     # instance could aim this server, and the credentials, at a host of its choosing.
+    # No ``account_id`` (issue 60): this mode stores nothing, and the only source of an id
+    # would be a network call per request. The typed name keeps naming the DAV home, so a
+    # login name that differs from the user id needs the user id typed here instead.
     return Credentials(base_url=config.load_base_url(), user=user, secret=secret)

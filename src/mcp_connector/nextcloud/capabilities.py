@@ -147,13 +147,13 @@ class Capabilities:
             raise ValueError(f"{app!r} is not an optional app this server checks") from None
 
 
-#: (base_url, user) -> (stored_at, capabilities). No secrets, no session state.
-_cache: dict[tuple[str, str], tuple[float, Capabilities]] = {}
+#: (base_url, user, account) -> (stored_at, capabilities). No secrets, no session state.
+_cache: dict[tuple[str, str, str], tuple[float, Capabilities]] = {}
 
 
 async def load(clients: NcClients) -> Capabilities:
     """Return the capabilities of this credential context, cached for ``TTL_SECONDS``."""
-    key = (clients.creds.base_url, clients.creds.user)
+    key = clients.creds.identity_key
     now = time.monotonic()
     cached = _cache.get(key)
     if cached is not None and now - cached[0] < TTL_SECONDS:
@@ -188,7 +188,7 @@ async def load_mail(clients: NcClients) -> Capabilities:
         mail_available=_navigation_lists_mail(ocs.parse_ocs(response, what=_NAVIGATION_WHAT)),
     )
 
-    key = (clients.creds.base_url, clients.creds.user)
+    key = clients.creds.identity_key
     cached = _cache.get(key)
     if cached is not None:
         _cache[key] = (cached[0], filled)

@@ -30,7 +30,7 @@ TAGS = f"{BASE}/remote.php/dav/systemtags/"
 HOME = f"{BASE}/remote.php/dav/files/alice/"
 ADMIN_HOME = f"{BASE}/remote.php/dav/files/admin/"
 CAPABILITIES = f"{BASE}/ocs/v2.php/cloud/capabilities"
-ALICE_KEY = (BASE, "alice")
+ALICE_KEY = (BASE, "alice", "alice")
 
 XML_HEADERS = {"Content-Type": "application/xml; charset=utf-8"}
 
@@ -180,7 +180,7 @@ def test_exclude_tag_ids_sorts_numerically_and_is_empty_without_a_match() -> Non
 
 
 def test_the_cache_stores_positive_results_only() -> None:
-    key = ("http://nc.test", "alice")
+    key = ("http://nc.test", "alice", "alice")
 
     exclusion._store_ids(key, ())
     assert exclusion._tag_ids == {}
@@ -195,7 +195,7 @@ def test_the_cache_stores_positive_results_only() -> None:
 
 
 def test_a_cache_entry_expires_after_the_ttl(monkeypatch: pytest.MonkeyPatch) -> None:
-    key = ("http://nc.test", "alice")
+    key = ("http://nc.test", "alice", "alice")
     exclusion._tag_ids[key] = (100.0, ("64",))
 
     monkeypatch.setattr(exclusion.time, "monotonic", lambda: 100.0 + exclusion.TTL_SECONDS - 1)
@@ -206,8 +206,8 @@ def test_a_cache_entry_expires_after_the_ttl(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_clear_cache_drops_every_entry() -> None:
-    exclusion._tag_ids[("http://nc.test", "alice")] = (0.0, ("64",))
-    exclusion._tag_ids[("http://nc.test", "admin")] = (0.0, ("63",))
+    exclusion._tag_ids[("http://nc.test", "alice", "alice")] = (0.0, ("64",))
+    exclusion._tag_ids[("http://nc.test", "admin", "admin")] = (0.0, ("63",))
 
     exclusion.clear_cache()
 
@@ -913,7 +913,7 @@ async def test_the_name_cache_is_keyed_per_user(clients: NcClients, admin: NcCli
     assert [asked_user(call.request) for call in listing.calls] == ["admin", "alice"]
     assert asked_ids(admin_report.calls[0].request) == ["63"]
     assert asked_ids(alice_report.calls[0].request) == ["64"]
-    assert exclusion._tag_ids[(BASE, "admin")][1] == ("63",)
+    assert exclusion._tag_ids[(BASE, "admin", "admin")][1] == ("63",)
     assert exclusion._tag_ids[ALICE_KEY][1] == ("64",)
     assert admin_scope.fileids == frozenset({"990"})
     assert alice_scope.fileids == frozenset({"957"})

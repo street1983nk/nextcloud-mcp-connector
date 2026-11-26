@@ -81,7 +81,7 @@ class AddressBookRef:
 
 def addressbooks_home_url(creds: Credentials) -> str:
     """The CardDAV home collection of the authenticated user."""
-    return f"{creds.base_url}{DAV_ADDRESSBOOKS_PREFIX}{quote(creds.user, safe='')}/"
+    return f"{creds.base_url}{DAV_ADDRESSBOOKS_PREFIX}{quote(creds.account, safe='')}/"
 
 
 def addressbook_url(creds: Credentials, addressbook_uri: str) -> str:

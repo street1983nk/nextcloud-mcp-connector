@@ -191,7 +191,7 @@ def safe_path(path: str) -> str:
 
 def files_url(creds: Credentials, path: str) -> str:
     """Build the WebDAV URL of a file in the user's own home."""
-    user = quote(creds.user, safe="")
+    user = quote(creds.account, safe="")
     return f"{creds.base_url}{DAV_FILES_PREFIX}{user}{quote(safe_path(path), safe='/')}"
 
 
@@ -381,7 +381,8 @@ def search_scope(creds: Credentials, folder: str = "/") -> str:
     channel and the folder part runs through :func:`safe_path` first, so a search cannot
     reach into another account or outside ``NC_MCP_FILES_ROOT`` (threat T-01-32).
 
-    ``creds.user`` is quoted like everywhere else in this package (WR-10). This was the
+    The user segment is ``creds.account``, the Nextcloud user id and not the login name
+    (issue 60), and it is quoted like everywhere else in this package (WR-10). This was the
     single place that wrote it into a path unquoted, which was harmless while the value
     came from the environment and stopped being harmless in the ExApp mode, where it comes
     out of ``AUTHORIZATION-APP-API``: a slash or a dot segment in the user id would have
@@ -394,7 +395,7 @@ def search_scope(creds: Credentials, folder: str = "/") -> str:
     """
     target = safe_path(folder)
     suffix = "" if target == "/" else target
-    return f"/files/{quote(creds.user, safe='')}{suffix}"
+    return f"/files/{quote(creds.account, safe='')}{suffix}"
 
 
 def build_search_body(
@@ -836,8 +837,13 @@ def _plain_path(path: str) -> bool:
 
 
 def _home_prefix(creds: Credentials) -> str:
-    """The decoded path of this user's files directory, the prefix every href must carry."""
-    return f"{urlsplit(creds.base_url).path.rstrip('/')}{DAV_FILES_PREFIX}{creds.user}"
+    """The decoded path of this user's files directory, the prefix every href must carry.
+
+    Nextcloud writes the user id into every href, so this is ``creds.account`` and not the
+    login name (issue 60). Unquoted on purpose: :func:`_home_path_of` compares against the
+    href decoded segment by segment, and a quoted id would miss every id with a space.
+    """
+    return f"{urlsplit(creds.base_url).path.rstrip('/')}{DAV_FILES_PREFIX}{creds.account}"
 
 
 def _home_path_of(href: str, home: str) -> str | None:
@@ -1001,7 +1007,7 @@ def _check_update(response: httpx.Response, path: str) -> None:
 
 def versions_url(creds: Credentials, fileid: int | str) -> str:
     """Build the DAV URL of the version listing of one file."""
-    user = quote(creds.user, safe="")
+    user = quote(creds.account, safe="")
     return f"{creds.base_url}/remote.php/dav/versions/{user}/versions/{fileid}"
 
 
@@ -1079,7 +1085,7 @@ def uploads_url(creds: Credentials, upload_id: str, part: str | None = None, *, 
     Caller-controlled ids never name a browser's existing temporary upload directory.
     Changing the destination or configured root selects a different staging directory.
     """
-    user = quote(creds.user, safe="")
+    user = quote(creds.account, safe="")
     identity = "\x00".join((config.files_root(), safe_path(path), upload_id))
     folder = "nc-mcp-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()
     suffix = "" if part is None else f"/{quote(part, safe='')}"

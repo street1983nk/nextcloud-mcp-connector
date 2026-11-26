@@ -19,7 +19,7 @@ app is switched. The answer to the question itself is the only one that counts: 
 Why the tagged set is never cached beyond one call and only name to id is (E3, EXCL-02): a
 tag added a second ago has to take effect on the next call, so the set is asked for anew by
 every guard instance, and a guard lives exactly as long as one tool call. What survives is the
-mapping from the tag name to its ids, per ``(base_url, user)``, positive results only: an
+mapping from the tag name to its ids, per ``(base_url, user, account)``, positive results only: an
 account without the tag lists again on every call, so a freshly created tag is never hidden
 behind a cached "nothing". The key carries the user because visibility differs: an admin sees
 restricted and invisible tags that alice does not, and an admin id handed to alice would only
@@ -94,8 +94,8 @@ type State = Literal["untagged", "active", "unverifiable"]
 #: tool contract (``errors.REASONS`` stays frozen); phase 27 decides what the model reads.
 type Why = Literal["timeout", "unreachable", "status", "stale_twice", "unparsable", "foreign_href"]
 
-#: (base_url, user) -> (stored_at, one id per distinct spelling). Positive only.
-_tag_ids: dict[tuple[str, str], tuple[float, tuple[str, ...]]] = {}
+#: (base_url, user, account) -> (stored_at, one id per distinct spelling). Positive only.
+_tag_ids: dict[tuple[str, str, str], tuple[float, tuple[str, ...]]] = {}
 
 
 def clear_cache() -> None:
@@ -103,7 +103,7 @@ def clear_cache() -> None:
     _tag_ids.clear()
 
 
-def _cached_ids(key: tuple[str, str]) -> tuple[str, ...] | None:
+def _cached_ids(key: tuple[str, str, str]) -> tuple[str, ...] | None:
     """The ids stored for ``key`` if the entry is younger than ``TTL_SECONDS``."""
     cached = _tag_ids.get(key)
     if cached is not None and time.monotonic() - cached[0] < TTL_SECONDS:
@@ -111,13 +111,13 @@ def _cached_ids(key: tuple[str, str]) -> tuple[str, ...] | None:
     return None
 
 
-def _store_ids(key: tuple[str, str], ids: tuple[str, ...]) -> None:
+def _store_ids(key: tuple[str, str, str], ids: tuple[str, ...]) -> None:
     """Remember ``ids`` for ``key``, but never an empty result (a new tag must show at once)."""
     if ids:
         _tag_ids[key] = (time.monotonic(), ids)
 
 
-def _drop_ids(key: tuple[str, str]) -> None:
+def _drop_ids(key: tuple[str, str, str]) -> None:
     """Forget the ids of ``key``; a 412 has just shown them stale."""
     _tag_ids.pop(key, None)
 
@@ -232,7 +232,7 @@ async def load_scope(clients: "NcClients") -> TagScope:
         return _unverifiable("unparsable")
 
 
-async def _fresh_ids(clients: "NcClients", key: tuple[str, str]) -> tuple[str, ...] | TagScope:
+async def _fresh_ids(clients: "NcClients", key: tuple[str, str, str]) -> tuple[str, ...] | TagScope:
     """List the tags and return one id per spelling, or the state the listing already decides."""
     listing = await systemtags.list_tags(clients.client, clients.creds)
     if listing.status != 207:
@@ -246,7 +246,7 @@ async def _fresh_ids(clients: "NcClients", key: tuple[str, str]) -> tuple[str, .
 
 async def _flight(clients: "NcClients") -> TagScope:
     """The D-25-05 automaton: 207 is a set, one 412 re-lists once, anything else is a refusal."""
-    key = (clients.creds.base_url, clients.creds.user)
+    key = clients.creds.identity_key
     ids = _cached_ids(key)
     if ids is None:
         fresh = await _fresh_ids(clients, key)
@@ -330,7 +330,7 @@ class ExclusionGuard:
     not the cost. A cancelled flight stores nothing, so the next caller starts a new one;
     that only doubles the cost and stays fail-closed.
 
-    One instance serves exactly one ``(base_url, user)``: the first call binds the guard to
+    One instance serves exactly one ``(base_url, user, account)``: the first call binds the guard to
     that identity, and a later call with a different one raises instead of handing out the
     scope of a foreign account. The docstring contract alone would rely on the discipline of
     phase 27, and the guard core protects itself against exactly that everywhere else.
@@ -342,18 +342,18 @@ class ExclusionGuard:
         # Created here, not on first use, like the lock of ``oauth.jwks.KeySet``.
         self._lock = asyncio.Lock()
         self._scope: TagScope | None = None
-        self._key: tuple[str, str] | None = None
+        self._key: tuple[str, str, str] | None = None
 
     async def scope(self, clients: "NcClients") -> TagScope:
         """The scope of this tool call, asked for at most once however many parts need it."""
         # The identity check runs before the fast path on purpose: a cached scope must never
         # be handed to a caller with different credentials. No await sits between check and
         # bind, so two concurrent first calls cannot interleave here.
-        key = (clients.creds.base_url, clients.creds.user)
+        key = clients.creds.identity_key
         if self._key is None:
             self._key = key
         elif self._key != key:
-            raise ValueError("one ExclusionGuard serves exactly one (base_url, user)")
+            raise ValueError("one ExclusionGuard serves exactly one (base_url, user, account)")
         known = self._scope
         if known is not None:
             # The fast path takes no lock; nothing is awaited between check and return.

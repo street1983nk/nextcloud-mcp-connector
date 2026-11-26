@@ -145,7 +145,7 @@ class ObjectCount:
 
 def home_url(creds: Credentials) -> str:
     """The WebDAV root of the user's whole home, deliberately outside the sandbox."""
-    return f"{creds.base_url}{dav.DAV_FILES_PREFIX}{quote(creds.user, safe='')}/"
+    return f"{creds.base_url}{dav.DAV_FILES_PREFIX}{quote(creds.account, safe='')}/"
 
 
 def filter_files_body(tag_id: str) -> bytes:
@@ -475,7 +475,7 @@ async def confirm_admin(client: httpx.AsyncClient, creds: Credentials) -> bool |
         members = _admin_members(response)
         if members is None:
             return None
-        return creds.user.casefold() in {uid.casefold() for uid in members}
+        return creds.account.casefold() in {uid.casefold() for uid in members}
     if response.status_code == 403 and code == 403:
         return False
     return None

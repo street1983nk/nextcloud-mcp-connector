@@ -90,7 +90,7 @@ def to_caldav_utc(value: datetime) -> str:
 
 def calendars_home_url(creds: Credentials) -> str:
     """The CalDAV home collection of the authenticated user."""
-    return f"{creds.base_url}{DAV_CALENDARS_PREFIX}{quote(creds.user, safe='')}/"
+    return f"{creds.base_url}{DAV_CALENDARS_PREFIX}{quote(creds.account, safe='')}/"
 
 
 def calendar_url(creds: Credentials, calendar_uri: str) -> str:

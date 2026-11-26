@@ -30,6 +30,17 @@ class Credentials:
 
     In the ``appapi`` mode ``secret`` is ``APP_SECRET``, not a user password: the user id
     travels in the same base64 token, and Nextcloud picks the account from it (AUTH-05).
+
+    Two names, one account (issue 60). ``user`` is what authenticates: the login name in
+    the Basic modes, the user id in the ``appapi`` mode. ``account_id`` is the canonical
+    Nextcloud user id, and :attr:`account` is what every DAV path and every comparison with
+    a user id reads. On LDAP/AD and with a login by email address the two differ, and a DAV
+    home below the login name answers 404. ``account_id`` is filled only from the value this
+    server stored for the connection (``nc_account_id``, ``oauth/principal.py``), never from
+    a request. Empty means "no stored id", and :attr:`account` then falls back to ``user``,
+    which is every legacy row, the passthrough mode and stdio, exactly as before. A wrong
+    value could never widen access: Nextcloud refuses a DAV home that is not the one of the
+    authenticated account.
     """
 
     base_url: str
@@ -39,6 +50,22 @@ class Credentials:
     app_id: str = ""
     app_version: str = ""
     aa_version: str = ""
+    account_id: str = ""
+
+    @property
+    def account(self) -> str:
+        """The Nextcloud user id of this account: the stored id, else ``user``."""
+        return self.account_id or self.user
+
+    @property
+    def identity_key(self) -> tuple[str, str, str]:
+        """The key of every per account cache: never coarser than ``(base_url, user)``.
+
+        The account id is added to the old key and does not replace it, so an entry can only
+        be split further than before and never shared between two accounts that one of the
+        two values alone would have kept apart.
+        """
+        return (self.base_url, self.user, self.account)
 
     def auth(self) -> httpx.Auth:
         """Return the ``httpx.Auth`` of this mode, one fresh object per call.
@@ -57,7 +84,7 @@ class Credentials:
     def __repr__(self) -> str:
         return (
             f"Credentials(base_url={self.base_url!r}, user={self.user!r}, "
-            f"mode={self.mode!r}, secret='***')"
+            f"account={self.account!r}, mode={self.mode!r}, secret='***')"
         )
 
 

@@ -697,7 +697,7 @@ async def test_the_second_question_does_not_extend_the_life_of_the_snapshot(
     as long as they keep asking, which is exactly the kind of quiet lifetime extension the TTL
     exists to prevent.
     """
-    key = (BASE, USER)
+    key = (BASE, USER, USER)
     with respx.mock(assert_all_called=True) as mock:
         mock.get(CAPABILITIES_URL).mock(
             return_value=httpx.Response(200, json=capabilities_fixture())
